@@ -2,18 +2,78 @@
   "note": "Kenney asset packs (CC0, https://kenney.nl). Fetched by tools/fetch-assets.mjs into www/assets/kenney/.",
   "maxTotalMB": 9,
   "packs": [
-    { "slug": "platformer-pack-redux", "max": 160 },
-    { "slug": "physics-assets", "max": 120 },
-    { "slug": "puzzle-pack", "max": 80 },
-    { "slug": "animal-pack-redux", "max": 60 },
-    { "slug": "racing-pack", "max": 90 },
-    { "slug": "space-shooter-redux", "max": 90 },
-    { "slug": "background-elements-redux", "max": 60 },
-    { "slug": "pixel-platformer", "max": 60 },
-    { "slug": "tiny-dungeon", "max": 60 },
-    { "slug": "rolling-ball-assets", "max": 40 },
-    { "slug": "monster-builder-pack", "max": 60 },
-    { "slug": "food-kit", "max": 0 },
-    { "slug": "particle-pack", "max": 40 }
+    {
+      "slug": "platformer-pack-redux",
+      "search": "platformer",
+      "max": 160
+    },
+    {
+      "slug": "physics-assets",
+      "max": 120
+    },
+    {
+      "slug": "puzzle-pack",
+      "search": "puzzle",
+      "max": 80
+    },
+    {
+      "slug": "animal-pack-redux",
+      "search": "animal",
+      "max": 60
+    },
+    {
+      "slug": "racing-pack",
+      "max": 90
+    },
+    {
+      "slug": "space-shooter-redux",
+      "search": "space shooter",
+      "max": 90
+    },
+    {
+      "slug": "background-elements-redux",
+      "search": "background elements",
+      "max": 60
+    },
+    {
+      "slug": "pixel-platformer",
+      "max": 60
+    },
+    {
+      "slug": "tiny-dungeon",
+      "max": 60
+    },
+    {
+      "slug": "rolling-ball-assets",
+      "max": 40
+    },
+    {
+      "slug": "monster-builder-pack",
+      "max": 60
+    },
+    {
+      "slug": "toon-characters-1",
+      "search": "toon characters",
+      "max": 60
+    },
+    {
+      "slug": "shape-characters",
+      "search": "shape characters",
+      "max": 40
+    },
+    {
+      "slug": "alien-ufo-pack",
+      "search": "ufo",
+      "max": 40
+    },
+    {
+      "slug": "emotes-pack",
+      "search": "emotes",
+      "max": 30
+    },
+    {
+      "slug": "particle-pack",
+      "max": 40
+    }
   ]
 }

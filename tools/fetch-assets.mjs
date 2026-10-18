@@ -62,7 +62,19 @@ fs.mkdirSync(OUT, { recursive: true });
 for (const pack of cfg.packs) {
   if (!pack.max) continue;
   try {
-    const html = await get(`https://kenney.nl/assets/${pack.slug}`);
+    let html;
+    try { html = await get(`https://kenney.nl/assets/${pack.slug}`); }
+    catch (e) {
+      // pack renamed? search the catalog and take the first matching asset page
+      const q = pack.search || pack.slug.replace(/-/g, ' ');
+      const list = await get(`https://kenney.nl/assets?search=${encodeURIComponent(q)}`);
+      const slugs = [...list.matchAll(/href="(?:https:\/\/kenney\.nl)?\/assets\/([a-z0-9-]+)"/g)].map((m) => m[1]).filter((x) => !['tag', 'category', 'series'].some((b) => x.startsWith(b)));
+      const words = q.toLowerCase().split(' ');
+      const hit = slugs.find((x) => words.every((w) => x.includes(w))) || slugs.find((x) => x.includes(words[0]));
+      if (!hit) throw new Error(`${e.message}; search "${q}" found nothing`);
+      say(`${pack.slug}: using ${hit}`);
+      html = await get(`https://kenney.nl/assets/${hit}`);
+    }
     const m = html.match(/href="([^"]+\.zip[^"]*)"/i) || html.match(/(https?:\/\/[^"'\s]+\.zip)/i);
     if (!m) throw new Error('no zip link on page');
     const zipUrl = new URL(m[1].replace(/&amp;/g, '&'), 'https://kenney.nl').href;
