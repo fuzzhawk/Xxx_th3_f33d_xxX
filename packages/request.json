@@ -1,4 +1,5 @@
 {
   "id": "2026-W43",
-  "note": "First package: the week of Oct 19, 2026. Edit this file to request a new package."
+  "rev": 2,
+  "note": "Rebuild of the first package with cleaner hooks, topic relevance filter and gentler rate limits. Edit this file to request a new package."
 }

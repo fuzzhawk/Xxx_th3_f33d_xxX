@@ -68,18 +68,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function log(...m) { console.log(`[${new Date().toISOString().slice(11, 19)}]`, ...m); }
 function warn(m) { report.warnings.push(m); console.warn('WARN', m); }
 
-async function fetchText(url, { headers = {}, timeout = 20000, retries = 2, ua = UA } = {}) {
+async function fetchText(url, { headers = {}, timeout = 20000, retries = 4, ua = UA } = {}) {
   for (let attempt = 0; ; attempt++) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), timeout);
     try {
       const res = await fetch(url, { headers: { 'User-Agent': ua, 'Accept-Language': 'en-US,en;q=0.8', ...headers }, signal: ctl.signal, redirect: 'follow' });
-      if (res.status === 429 || res.status >= 500) throw Object.assign(new Error(`HTTP ${res.status}`), { retry: true });
+      if (res.status === 429 || res.status >= 500) throw Object.assign(new Error(`HTTP ${res.status}`), { retry: true, wait: (+res.headers.get('retry-after') || 0) * 1000 });
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
       return await res.text();
     } catch (e) {
       if (attempt >= retries || (e.status && !e.retry)) throw e;
-      await sleep(800 * 2 ** attempt);
+      await sleep(Math.max(e.wait || 0, (e.retry ? 4000 : 800) * 2 ** attempt));
     } finally { clearTimeout(timer); }
   }
 }
@@ -124,14 +124,25 @@ function sentences(text) {
   if (rest) out.push(rest);
   return out;
 }
+const stripParens = (s) => { let prev; do { prev = s; s = s.replace(/\s*\([^()]*\)/g, ''); } while (s !== prev); return s.replace(/\s+([,.;])/g, '$1'); };
 function cleanExtract(s) {
-  return s.replace(/\s*\([^()]*(?:listen|pronounced|IPA|;\s*$)[^()]*\)/gi, '')
+  return s.replace(/\s*\([^()]*(?:listen|pronounced|IPA|\[|;|[A-Z][a-z]+:)[^()]*\)/g, '')
     .replace(/\(\s*[;,]\s*/g, '(').replace(/\(\s*\)/g, '').replace(/\s+([,.;])/g, '$1').replace(/\s+/g, ' ').trim();
 }
 
 // ------------------------------------------------------------------ history (no repeats across packages)
 const historyPath = path.join(OUT, 'history.json');
 const history = readJSON(historyPath, { wiki: [], video: [], web: [], memeImg: [], kym: [], product: [] });
+if (args.id && !OFFLINE) {
+  const old = path.join(OUT, args.id);
+  const rd = (f) => readJSON(path.join(old, f), []);
+  if (fs.existsSync(old)) {
+    const drop = { wiki: rd('wiki.json').map((p) => p.id.slice(1)), video: rd('video.json').map((p) => p.vid), web: rd('web.json').map((p) => p.url),
+      memeImg: rd('meme.json').map((p) => p.img), kym: rd('meme.json').map((p) => p.link), product: rd('product.json').map((p) => p.name) };
+    for (const [k, v] of Object.entries(drop)) { const d = new Set(v); history[k] = (history[k] || []).filter((x) => !d.has(x)); }
+    console.log(`Rebuilding ${args.id}: its previous posts are allowed again`);
+  }
+}
 const seen = Object.fromEntries(Object.entries(history).map(([k, v]) => [k, new Set(v)]));
 
 // ------------------------------------------------------------------ counts
@@ -154,6 +165,7 @@ async function categoryMembers(cat, depth = 1) {
       if (m.ns === 0) titles.push(m.title);
       else if (m.ns === 14) subs.push(m.title.replace(/^Category:/, ''));
     }
+    await sleep(150);
     if (depth > 0) for (const s of shuffle(subs).slice(0, 5)) titles.push(...await categoryMembers(s, depth - 1));
   } catch (e) { warn(`wiki category ${cat}: ${e.message}`); }
   return titles;
@@ -187,11 +199,12 @@ async function buildWiki() {
     const t = topics.wiki[key];
     log(`wiki: ${key}`);
     const cand = new Set(t.seeds);
-    const catLists = await pool(t.categories, 4, (c) => categoryMembers(c));
+    const catLists = await pool(t.categories, 2, (c) => categoryMembers(c));
     catLists.forEach((l) => (l || []).forEach((x) => cand.add(x)));
-    const likeLists = await pool(shuffle([...t.seeds]).slice(0, 30), 4, moreLike);
+    const likeLists = await pool(shuffle([...t.seeds]).slice(0, 30), 2, moreLike);
     likeLists.forEach((l) => (l || []).forEach((x) => cand.add(x)));
     const seeds = new Set(t.seeds);
+    const relevant = t.keywords ? new RegExp(t.keywords, 'i') : null;
     const order = [...cand].filter((x) => !/^(List|Lists|Outline|Index|Timeline|Glossary) of /.test(x) && !/^\d{3,4}s?( in .*)?$/.test(x));
     // seeds first (shuffled), then the rest (shuffled), capped to keep request count sane
     const ordered = [...shuffle(order.filter((x) => seeds.has(x))), ...shuffle(order.filter((x) => !seeds.has(x)))].slice(0, perTopic * 2.2);
@@ -206,10 +219,11 @@ async function buildWiki() {
       if (ex.length < 160) continue;
       const ss = sentences(ex).slice(0, 5);
       if (ss.length < 2) continue;
+      if (relevant && !seeds.has(p.title) && !relevant.test(ss.join(' '))) continue;
       claimed.add(pid);
       posts.push({
         id: `w${pid}`, cat: 'wiki', sub: key, title: p.title,
-        hook: clip(ss[0], 190), summary: ss.join(' '),
+        hook: clip(stripParens(ss[0]), 190), summary: ss.join(' '),
         url: p.fullurl || `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
         thumb: p.thumbnail?.source || undefined
       });
@@ -311,7 +325,7 @@ async function buildVideos() {
   const taken = new Set();
   for (const [key, g] of Object.entries(groups)) {
     const quota = Math.round(want.video * g.weight / totalW);
-    const lists = await pool(g.queries, 3, async (q) => { const r = await ytSearch(q); await sleep(300); return r; });
+    const lists = await pool(g.queries, 2, async (q) => { await sleep(700); return ytSearch(q); });
     const failures = lists.filter((l) => !l).length;
     if (failures) warn(`youtube ${key}: ${failures}/${g.queries.length} searches failed`);
     // interleave query results so one query cannot dominate
@@ -319,7 +333,10 @@ async function buildVideos() {
     const maxLen = Math.max(0, ...lists.map((l) => (l || []).length));
     for (let i = 0; i < maxLen; i++) for (const l of lists) if (l && l[i]) cand.push(l[i]);
     const fresh = cand.filter((v) => !taken.has(v.vid) && !seen.video.has(v.vid) && (!v.dur || durSec(v.dur) <= 600));
-    const uniq = [...new Map(fresh.map((v) => [v.vid, v])).values()].slice(0, Math.ceil(quota * 1.4));
+    const kw = g.keywords ? new RegExp(g.keywords, 'i') : null;
+    const dedup = [...new Map(fresh.map((v) => [v.vid, v])).values()];
+    const ranked = kw ? [...dedup.filter((v) => kw.test(v.title)), ...dedup.filter((v) => !kw.test(v.title))] : dedup;
+    const uniq = ranked.slice(0, Math.ceil(quota * 1.4));
     const checks = await pool(uniq, 8, (v) => embeddable(v.vid));
     let n = 0;
     uniq.forEach((v, i) => {
@@ -468,7 +485,7 @@ function buildGames() {
 
 const PSYCH_ALGOS = ['julia', 'mandel', 'tunnel', 'plasma', 'moire', 'kaleido', 'flow', 'spiro', 'rings', 'warp'];
 function buildPsych(quotes, wiki) {
-  const lines = [...quotes.map((q) => ({ text: q.text, author: q.author })), ...wiki.filter((w) => w.hook.length < 150).map((w) => ({ text: w.hook, author: w.title, url: w.url }))];
+  const lines = quotes.filter((q) => q.text.length <= 180).map((q) => ({ text: q.text, author: q.author }));
   shuffle(lines);
   return Array.from({ length: want.psych }, (_, i) => {
     const seed = Math.floor(rand() * 2 ** 31);
