@@ -1,0 +1,202 @@
+{
+  "id": "2026-W43",
+  "title": "The Feed · 2026-W43",
+  "created": "2026-10-18T19:23:23.557Z",
+  "total": 5704,
+  "counts": {
+    "game": 1140,
+    "wiki": 1715,
+    "video": 1139,
+    "meme": 570,
+    "product": 285,
+    "psych": 285,
+    "selfcare": 285,
+    "web": 285
+  },
+  "estHours": 39.2,
+  "categories": {
+    "game": {
+      "label": "Physics games",
+      "pct": 20
+    },
+    "wiki": {
+      "label": "Condensed Wikipedia",
+      "pct": 30
+    },
+    "video": {
+      "label": "Videos",
+      "pct": 20
+    },
+    "meme": {
+      "label": "Memes",
+      "pct": 10
+    },
+    "product": {
+      "label": "Made-up products",
+      "pct": 5
+    },
+    "psych": {
+      "label": "Psychedelic",
+      "pct": 5
+    },
+    "selfcare": {
+      "label": "Self-care",
+      "pct": 5
+    },
+    "web": {
+      "label": "From the web",
+      "pct": 5
+    }
+  },
+  "topics": {
+    "wiki": {
+      "music": "Music history",
+      "literature": "Literature",
+      "science": "Science",
+      "history": "History",
+      "transgressive": "Transgressive art",
+      "mysteries": "Unsolved mysteries",
+      "occult": "Occult & religious customs"
+    },
+    "video": {
+      "animals": "Cute animals",
+      "retrogaming": "Retro gaming",
+      "vintagescifi": "Vintage sci-fi & fantasy",
+      "music": "Music history",
+      "literature": "Literature",
+      "science": "Science",
+      "history": "History",
+      "transgressive": "Transgressive art",
+      "mysteries": "Unsolved mysteries",
+      "occult": "Occult & religious customs"
+    },
+    "game": {
+      "plinko": "Plinko",
+      "breakout": "Breakout",
+      "merge": "Merge",
+      "dash": "Dash",
+      "flappy": "Flap",
+      "stacker": "Stacker",
+      "pong": "Pong",
+      "peggle": "Peg Shot",
+      "golf": "Bounce Golf",
+      "juggle": "Juggle"
+    }
+  },
+  "files": {
+    "game": "game.json",
+    "wiki": "wiki.json",
+    "video": "video.json",
+    "meme": "meme.json",
+    "product": "product.json",
+    "psych": "psych.json",
+    "selfcare": "selfcare.json",
+    "web": "web.json"
+  },
+  "prompt": "# The Feed — package prompt\n\nThis is the living spec for each weekly package. It is editable from the app\n(Settings → Package prompt) and synced back here. Each new package is\ngenerated from this file, `tools/data/config.json`, and the newest file in\n`feedback/`.\n\n## Goals\n- Replace 3–5 hours/day of doomscrolling with a feed that is curious, weird and kind.\n- One package lasts a full week (target: 5 h/day × 7 days) with **no repeated posts**,\n  and nothing repeated from earlier packages.\n- Mostly offline. Only videos (and, optionally, images) need the network.\n- Keep AI-generated images and text to a minimum unless a category asks for it.\n- Use favorites, saves and more/less marks from `feedback/` to steer the next package.\n\n## Categories and share of the feed\n\n### Physics games — 20%\nSimple 2D physics games: bouncing objects, merging items, breaking blocks,\nside-scrolling dash mechanics and other classic casual styles. Each card runs on\nauto-pilot when it appears and becomes playable when tapped.\n\n### Condensed Wikipedia — 30%\nArticles condensed to 5 sentences or fewer. Each card shows a one-sentence hook;\ntapping it expands the summary and links to the full article. Topics:\n- **Music history**: all genres, especially underground trip-hop, punk, avant-garde,\n  electronic, hip-hop, heavy metal and transgressive experimental.\n- **Literature**: all genres, especially sci-fi, sex and erotica, Beat Generation authors,\n  esoteric and occult, experimental, offbeat non-fiction, poetry and alternative science.\n- **Science**: especially biology, sociology, psychology, technology and mathematics.\n- **History**: especially revolutionary periods, indigenous history and art history.\n- **Transgressive art**: especially queer artists and artists imprisoned or persecuted for their work.\n- **Unsolved mysteries**: especially esoteric and supernatural mysteries.\n- **Occult and religious customs**: indigenous spirituality, Gnosticism and cult activities.\n\n### YouTube videos — 20%\nMostly short videos and reels. They autoplay muted and have an unmute button. Topics:\ncute animals, retro gaming, vintage sci-fi and fantasy films and shows, plus every\nWikipedia topic above.\n\n### Memes — 10%\nHumorous images juxtaposed with snippets from the Wikipedia section, plus quotes\nfrom Robert Anton Wilson, William S. Burroughs, Tom Robbins and other offbeat authors.\nAlso memes collected from knowyourmeme.com.\n\n### Made-up products — 5%\nWeird, absurd products that don't exist and serve surreal purposes, with 80s/90s-style\npromo graphics and absurdist product descriptions.\n\n### Psychedelic visuals — 5%\nFractals, tunnels, fading colors and other generative, math-based imagery, each with a\nshort quote from the sections above.\n\n### Self-care reminders — 5%\nPrompts to make art and music, go for walks, work out, breathe, meditate and so on.\n\n### From around the web — 5%\nCarefully picked posts and articles from Substack, Hacker News and occasionally Reddit,\nchosen to match the topics above.\n",
+  "report": {
+    "sources": {
+      "wikiquote": 2052,
+      "wikipedia": 1715,
+      "youtube": 1139,
+      "hackernews": 513,
+      "substack": 15,
+      "reddit": 0,
+      "commons": 852,
+      "knowyourmeme": 0,
+      "memesBuilt": 570
+    },
+    "warnings": [
+      "wiki category Jamaican dub musicians: HTTP 429",
+      "wiki category Black metal genres: HTTP 429",
+      "wiki category Theremin: HTTP 429",
+      "wiki category Dub musical groups: HTTP 429",
+      "wiki category Experimental string instruments: HTTP 429",
+      "wiki category Inventors of musical instruments: HTTP 429",
+      "wiki category Iterated function systems: HTTP 429",
+      "wiki category Emulation software: HTTP 429",
+      "wiki category Animal cognition: HTTP 429",
+      "wiki category Fungal morphology and anatomy: HTTP 429",
+      "wiki category Optical illusions: HTTP 429",
+      "wiki category History of computer companies: HTTP 429",
+      "wiki category Sleep disorders: HTTP 429",
+      "wiki category Poisonous fungi: HTTP 429",
+      "wiki category Neurological disorders: HTTP 429",
+      "wiki category Computer introductions: HTTP 429",
+      "wiki category Recreational mathematics: HTTP 429",
+      "wiki category Mycology organizations: HTTP 429",
+      "wiki category History of computing in France: HTTP 429",
+      "wiki category Mycoviruses: HTTP 429",
+      "wiki category Mycological literature: HTTP 429",
+      "wiki category Obscenity controversies in television: HTTP 429",
+      "wiki category Body art: HTTP 429",
+      "wiki category Viennese Actionism: HTTP 429",
+      "wiki category Cinema of Transgression: HTTP 429",
+      "wiki category Obscenity controversies in art: HTTP 429",
+      "wiki category Mail art: HTTP 429",
+      "wiki category Outsider art: HTTP 429",
+      "wiki category Banned books: HTTP 429",
+      "wiki category Jyllands-Posten Muhammad cartoons controversy: HTTP 429",
+      "wiki category Art controversies: HTTP 429",
+      "wiki category Underground comix: HTTP 429",
+      "wiki category Obscenity controversies in literature: HTTP 429",
+      "wiki extracts batch 0: HTTP 429",
+      "wiki extracts batch 20: HTTP 429",
+      "wiki extracts batch 40: HTTP 429",
+      "wiki extracts batch 60: HTTP 429",
+      "wiki extracts batch 80: HTTP 429",
+      "wiki extracts batch 100: HTTP 429",
+      "wiki extracts batch 120: HTTP 429",
+      "wiki extracts batch 140: HTTP 429",
+      "wiki extracts batch 160: HTTP 429",
+      "youtube animals: 2/16 searches failed",
+      "youtube retrogaming: 2/12 searches failed",
+      "youtube vintagescifi: 9/14 searches failed",
+      "youtube music: 8/10 searches failed",
+      "youtube literature: 1/9 searches failed",
+      "youtube science: 2/10 searches failed",
+      "youtube history: 2/8 searches failed",
+      "youtube transgressive: 3/8 searches failed",
+      "youtube mysteries: 3/8 searches failed",
+      "youtube occult: 2/8 searches failed",
+      "substack https://astralcodexten.substack.com/feed: HTTP 403",
+      "substack https://tedgioia.substack.com/feed: HTTP 403",
+      "substack https://erikhoel.substack.com/feed: HTTP 403",
+      "substack https://garymarcus.substack.com/feed: HTTP 403",
+      "substack https://freddiedeboer.substack.com/feed: HTTP 403",
+      "substack https://thehonestbroker.substack.com/feed: HTTP 403",
+      "substack https://www.thepsychedelicpress.co.uk/feed: fetch failed",
+      "substack search occult: HTTP 403",
+      "substack search punk: HTTP 403",
+      "substack search beat generation: HTTP 403",
+      "substack search trip hop: HTTP 403",
+      "substack search psychedelic: HTTP 403",
+      "substack search science fiction: HTTP 403",
+      "substack search weird history: HTTP 403",
+      "substack search esoteric: HTTP 403",
+      "reddit HighStrangeness: HTTP 403",
+      "reddit occult: HTTP 403",
+      "reddit UnresolvedMysteries: HTTP 403",
+      "reddit AskHistorians: HTTP 403",
+      "reddit printSF: HTTP 403",
+      "reddit triphop: HTTP 403",
+      "reddit experimentalmusic: HTTP 403",
+      "reddit Gnosticism: HTTP 403",
+      "reddit Psychonaut: HTTP 403",
+      "reddit retrogaming: HTTP 403",
+      "reddit WeirdWheels: HTTP 403",
+      "reddit AlternativeHistory: HTTP 403",
+      "knowyourmeme https://knowyourmeme.com/memes/trending: HTTP 404"
+    ],
+    "wanted": {
+      "game": 1140,
+      "wiki": 1711,
+      "video": 1140,
+      "meme": 570,
+      "product": 285,
+      "psych": 285,
+      "selfcare": 285,
+      "web": 285
+    }
+  }
+}

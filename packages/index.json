@@ -1,0 +1,22 @@
+{
+  "packages": [
+    {
+      "id": "2026-W43",
+      "title": "The Feed · 2026-W43",
+      "created": "2026-10-18T19:23:23.557Z",
+      "total": 5704,
+      "counts": {
+        "game": 1140,
+        "wiki": 1715,
+        "video": 1139,
+        "meme": 570,
+        "product": 285,
+        "psych": 285,
+        "selfcare": 285,
+        "web": 285
+      },
+      "estHours": 39.2
+    }
+  ],
+  "latest": "2026-W43"
+}
