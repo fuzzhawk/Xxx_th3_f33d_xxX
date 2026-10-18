@@ -55,6 +55,7 @@ async function get(url, binary) {
 
 const index = { license: 'CC0 1.0, Kenney (www.kenney.nl)', packs: {}, roles: {} };
 let total = 0;
+let sitemap = null;
 const cap = cfg.maxTotalMB * 1024 * 1024;
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
@@ -65,13 +66,13 @@ for (const pack of cfg.packs) {
     let html;
     try { html = await get(`https://kenney.nl/assets/${pack.slug}`); }
     catch (e) {
-      // pack renamed? search the catalog and take the first matching asset page
+      // pack renamed? look it up in the sitemap (falls back to the catalog search page)
       const q = pack.search || pack.slug.replace(/-/g, ' ');
-      const list = await get(`https://kenney.nl/assets?search=${encodeURIComponent(q)}`);
-      const slugs = [...list.matchAll(/href="(?:https:\/\/kenney\.nl)?\/assets\/([a-z0-9-]+)"/g)].map((m) => m[1]).filter((x) => !['tag', 'category', 'series'].some((b) => x.startsWith(b)));
+      sitemap ??= await get('https://kenney.nl/sitemap.xml').catch(() => '') + await get(`https://kenney.nl/assets?search=${encodeURIComponent(q)}`).catch(() => '');
+      const slugs = [...new Set([...sitemap.matchAll(/kenney\.nl\/assets\/([a-z0-9-]+)/g)].map((m) => m[1]))].filter((x) => !['tag', 'category', 'series', 'page'].some((b) => x.startsWith(b)));
       const words = q.toLowerCase().split(' ');
       const hit = slugs.find((x) => words.every((w) => x.includes(w))) || slugs.find((x) => x.includes(words[0]));
-      if (!hit) throw new Error(`${e.message}; search "${q}" found nothing`);
+      if (!hit) throw new Error(`${e.message}; no match for "${q}" among ${slugs.length} sitemap assets`);
       say(`${pack.slug}: using ${hit}`);
       html = await get(`https://kenney.nl/assets/${hit}`);
     }
