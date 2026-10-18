@@ -33,12 +33,12 @@ export const DEFAULTS = {
   pkg: null                // current package id
 };
 
-export const settings = Object.assign({}, DEFAULTS, lsGet('settings', {}));
+export const settings = Object.assign(structuredClone(DEFAULTS), lsGet('settings', {}));
 export function saveSettings() { lsSet('settings', settings); }
 export function resetSettings(keep = ['token', 'repo', 'branch', 'pkg']) {
   const kept = Object.fromEntries(keep.map((k) => [k, settings[k]]));
   for (const k of Object.keys(settings)) delete settings[k];
-  Object.assign(settings, DEFAULTS, kept);
+  Object.assign(settings, structuredClone(DEFAULTS), kept);
   saveSettings();
 }
 
