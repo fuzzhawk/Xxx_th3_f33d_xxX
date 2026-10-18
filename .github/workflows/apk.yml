@@ -58,6 +58,12 @@ jobs:
           npx --yes @capacitor/assets@3.0.5 generate --android --iconBackgroundColor '#14110f' --iconBackgroundColorDark '#14110f' --splashBackgroundColor '#14110f' --splashBackgroundColorDark '#14110f' || echo "icon generation failed; using default icons"
           npx cap sync android
 
+      - name: Add native code (immersive mode, save to gallery)
+        run: |
+          dest=android/app/src/main/java/com/fuzzhawk/thefeed
+          mkdir -p "$dest"
+          cp android-overrides/java/*.java "$dest/"
+
       - name: Use the shared signing key and a rising version code
         run: |
           mkdir -p ~/.android
