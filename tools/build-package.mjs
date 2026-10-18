@@ -461,7 +461,7 @@ async function buildWeb() {
     for (const it of feed.items.slice(0, f.max)) {
       if (!it.title || !it.link) continue;
       const thumb = firstImg(it.html, it.link);
-      sites.push({ source: f.name, sub: 'site', title: it.title, url: it.link, excerpt: clip(stripTags(it.html), 320), date: isoDate(it.date), thumb: thumb && !/feedburner|gravatar|pixel|emoji|share/i.test(thumb) ? thumb : undefined });
+      sites.push({ source: f.name, sub: 'site', title: it.title, url: it.link, excerpt: clip(stripTags(it.html).replace(/^Link URL:\s*\S+\s*/i, '').replace(/\s*(Comments URL|Votes|Comments):.*$/i, ''), 320), date: isoDate(it.date), thumb: thumb && !/feedburner|gravatar|pixel|emoji|share/i.test(thumb) ? thumb : undefined });
       perSite[f.name] = (perSite[f.name] || 0) + 1;
     }
   });
