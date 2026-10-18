@@ -1,0 +1,12 @@
+{
+  "appId": "com.fuzzhawk.thefeed",
+  "appName": "The Feed",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "thefeed.localhost"
+  },
+  "android": {
+    "backgroundColor": "#14110f"
+  }
+}

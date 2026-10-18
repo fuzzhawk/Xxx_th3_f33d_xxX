@@ -1,0 +1,90 @@
+name: Build APK
+
+on:
+  push:
+    paths:
+      - 'www/**'
+      - 'assets/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'android-overrides/**'
+      - 'tools/bundle-package.mjs'
+      - '.github/workflows/apk.yml'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ inputs.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bundle the newest package into the app
+        env:
+          BUILD_BRANCH: ${{ inputs.ref || github.ref_name }}
+        run: node tools/bundle-package.mjs
+
+      - name: Create the Android project
+        run: |
+          npx cap add android
+          npx --yes @capacitor/assets@3.0.5 generate --android --iconBackgroundColor '#14110f' --iconBackgroundColorDark '#14110f' --splashBackgroundColor '#14110f' --splashBackgroundColorDark '#14110f' || echo "icon generation failed; using default icons"
+          npx cap sync android
+
+      - name: Use the shared signing key and a rising version code
+        run: |
+          mkdir -p ~/.android
+          cp android-overrides/debug.keystore ~/.android/debug.keystore
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"0.1.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
+
+      - name: Build
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Collect APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk the-feed.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: the-feed-apk
+          path: the-feed.apk
+
+      - name: Publish to the "apk-latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: The Feed (latest APK)
+          body: |
+            Built from `${{ inputs.ref || github.ref_name }}` at ${{ github.sha }} (run ${{ github.run_number }}).
+            On your phone: download **the-feed.apk** below, open it, and allow installs from your browser if asked.
+            New builds install over the old one and keep your favorites and stats.
+          files: the-feed.apk
+          make_latest: true

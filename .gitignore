@@ -1,0 +1,6 @@
+node_modules/
+android/
+www/bundled/
+www/build-info.js
+*.apk
+.DS_Store

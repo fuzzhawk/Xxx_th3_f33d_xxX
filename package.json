@@ -1,0 +1,19 @@
+{
+  "name": "the-feed",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Feed: a weekly, offline-first replacement for doomscrolling.",
+  "type": "module",
+  "scripts": {
+    "bundle": "node tools/bundle-package.mjs",
+    "build:package": "node tools/build-package.mjs",
+    "serve": "node tools/serve.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3"
+  }
+}
