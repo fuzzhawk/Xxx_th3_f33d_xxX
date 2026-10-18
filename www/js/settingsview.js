@@ -10,7 +10,7 @@ import { lsGet, lsSet } from './store.js';
 let root, app;
 export function initSettings(view, appApi) { root = view; app = appApi; }
 
-const group = (title, sub, ...kids) => el('div.group', el('h3', title), sub ? el('p.sub', sub) : null, ...kids);
+const group = (title, sub, ...kids) => el('div.group', el('h3', title), sub ? el('p.sub', sub) : null, el('div.box', ...kids));
 function toggle(key, label, hint, after) {
   const input = el('input', { type: 'checkbox', checked: !!settings[key], onchange: () => { settings[key] = input.checked; saveSettings(); after?.(); } });
   return el('div.field', el('label', label, hint ? el('small', hint) : null), el('label.toggle', input, el('span')));
@@ -30,6 +30,10 @@ export async function render() {
   root.replaceChildren(el('div.settings', el('h2', 'Settings'),
     await packageGroup(man),
     balanceGroup(man),
+    group('Display', null,
+      toggle('immersive', 'Full screen', 'Hide the Android navigation buttons. Swipe up from the bottom edge to show them.', () => app.applyImmersive()),
+      toggle('showNsfw', 'Adult comics', 'Include NSFW webcomics such as Oglaf', () => app.softReload()),
+      toggle('blurNsfw', 'Blur adult comics until tapped')),
     group('Playback', null,
       toggle('autoplay', 'Autoplay videos', 'Videos start when they scroll into view'),
       toggle('startMuted', 'Start videos muted'),
@@ -147,6 +151,7 @@ function balanceGroup(man) {
     subGroup('wiki', 'Wikipedia topics', man?.topics?.wiki),
     subGroup('video', 'Video topics', man?.topics?.video),
     subGroup('game', 'Game types', man?.topics?.game),
+    subGroup('web', 'Web sources', man?.topics?.web),
     toggle('avoidRepeat', 'Avoid the same kind twice in a row'),
     toggle('adaptive', 'Learn from ▲ / ▼ marks', 'Marks nudge topic weights up or down', () => app.softReload()),
     el('div.btnrow', el('button.btn.small', { onclick: () => { settings.learned = {}; saveSettings(); app.softReload(); toast('Learned weights cleared'); render(); } }, 'Forget learned weights'),

@@ -1,5 +1,5 @@
 import { el, weightedPick, fmtDur } from './util.js';
-import { settings, saveSettings, pctFor, subWeight, seenSet, markSeen, resetSeen, CATS } from './state.js';
+import { settings, saveSettings, pctFor, subWeight, seenSet, markSeen, resetSeen, CATS, CAT_LABEL } from './state.js';
 import { renderCard, notice } from './cards.js';
 import * as stats from './stats.js';
 
@@ -51,8 +51,9 @@ export class CardObserver {
 }
 
 export class Feed {
-  constructor(view, list, spacer, sentinel) {
-    this.view = view; this.list = list; this.spacer = spacer; this.sentinel = sentinel;
+  constructor(view, list, spacer, sentinel, stories) {
+    this.view = view; this.list = list; this.spacer = spacer; this.sentinel = sentinel; this.storiesEl = stories;
+    this.focus = null;
     this.obs = new CardObserver(view, { onDwell: (card, ms) => this.dwelled(card, ms) });
     this.more = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) this.append(8); }, { root: view, rootMargin: '1400px 0px' });
     this.more.observe(sentinel);
@@ -74,7 +75,31 @@ export class Feed {
     this.list.replaceChildren();
     this.spacer.style.height = '0px';
     this.view.scrollTop = 0;
+    this.renderStories();
     this.append(10);
+  }
+
+  // Instagram-style "stories": one bubble per kind of post; tapping one focuses the feed on it.
+  renderStories() {
+    if (!this.storiesEl) return;
+    const FACE = { all: ['✦', '#2a2420'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✧', '#a07a22'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'] };
+    const NAME = { all: 'For you', game: 'Games', wiki: 'Wiki', video: 'Videos', meme: 'Memes', product: 'Shop', psych: 'Trip', selfcare: 'Breathe', web: 'Web' };
+    const items = ['all', ...CATS.filter((c) => this.remaining(c) > 0)];
+    const bubble = (c) => el(`button.story${(this.focus || 'all') === c ? '.on' : ''}`, { onclick: () => this.setFocus(c === 'all' ? null : c) },
+      el('div.ring', el('div.face', { style: { background: FACE[c][1] } }, FACE[c][0])), el('span', NAME[c] || CAT_LABEL[c]));
+    this.storiesEl.replaceChildren(el('div.stories', items.map(bubble)),
+      this.focus ? el('div.focusbar', el('span', 'Showing only ', el('b', CAT_LABEL[this.focus])), el('button.btn.small', { onclick: () => this.setFocus(null) }, 'Show everything')) : '');
+  }
+  setFocus(cat) {
+    this.focus = cat;
+    [...this.list.children].forEach((c) => this.obs.remove(c));
+    this.list.replaceChildren();
+    this.spacer.style.height = '0px';
+    this.rebuildPools();
+    this.ended = false;
+    this.renderStories();
+    this.view.scrollTop = 0;
+    this.append(8);
   }
 
   rebuildPools() {
@@ -84,6 +109,7 @@ export class Feed {
       const bySub = new Map();
       for (const p of posts) {
         if (seen.has(p.id)) continue;
+        if (p.nsfw && !settings.showNsfw) continue;
         const k = p.sub || '_';
         if (!bySub.has(k)) bySub.set(k, []);
         bySub.get(k).push(p);
@@ -96,6 +122,10 @@ export class Feed {
   // Weighted round-robin: the category furthest behind its target share goes next.
   nextPost() {
     const now = Date.now();
+    if (this.focus) {
+      if (this.remaining(this.focus)) return this.take(this.focus);
+      this.focus = null; this.renderStories();
+    }
     if (settings.selfcareEveryMin > 0 && now - this.lastSelfcare > settings.selfcareEveryMin * 60000 && this.remaining('selfcare')) return this.take('selfcare');
     const pct = pctFor(this.pkg.manifest);
     const avail = CATS.filter((c) => pct[c] > 0 && this.remaining(c) > 0 && !(c === 'video' && settings.skipVideosOffline && !navigator.onLine));
@@ -161,7 +191,7 @@ export class Feed {
     const cards = this.list.children;
     if (cards.length <= 90) return;
     let h = 0;
-    const gap = 14;
+    const gap = 0;
     const drop = [...cards].slice(0, 30);
     for (const c of drop) { h += c.offsetHeight + gap; this.obs.remove(c); c.remove(); }
     this.spacer.style.height = `${(parseFloat(this.spacer.style.height) || 0) + h}px`;

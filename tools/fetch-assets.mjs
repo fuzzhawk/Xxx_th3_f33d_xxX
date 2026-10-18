@@ -14,6 +14,8 @@ const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/data/assets.json')
 const OUT = path.join(ROOT, 'www/assets/kenney');
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kenney-'));
+const logLines = [];
+const say = (...m) => { const l = m.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' '); logLines.push(l); console.log(l); };
 
 const ROLES = [
   ['bg', /background|backdrop|(^|[_/-])bg[_-]|sky|clouds?\d|hills?\d|mountain/i],
@@ -97,12 +99,13 @@ for (const pack of cfg.packs) {
       }
     }
     index.packs[pack.slug] = kept.length;
-    console.log(`${pack.slug}: kept ${kept.length} of ${files.length} (${roles.join(', ')})`);
+    say(`${pack.slug}: kept ${kept.length} of ${files.length} (${roles.join(', ')})`);
   } catch (e) {
-    console.warn(`WARN ${pack.slug}: ${e.message}`);
+    say(`WARN ${pack.slug}: ${e.message}`);
   }
 }
 index.dims = {};
 for (const r of Object.values(index.roles)) for (const f of r) { const s = pngSize(path.join(OUT, f)); index.dims[f] = [s.w, s.h]; }
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index));
-console.log(`total ${(total / 1048576).toFixed(1)} MB`, Object.fromEntries(Object.entries(index.roles).map(([k, v]) => [k, v.length])));
+say(`total ${(total / 1048576).toFixed(1)} MB`, Object.fromEntries(Object.entries(index.roles).map(([k, v]) => [k, v.length])));
+fs.writeFileSync(path.join(OUT, 'fetch-log.txt'), logLines.join('\n') + '\n');

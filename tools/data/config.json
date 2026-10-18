@@ -3,34 +3,136 @@
   "days": 7,
   "buffer": 1.12,
   "categories": {
-    "game":     { "label": "Physics games",       "pct": 20, "dwellSec": 45 },
-    "wiki":     { "label": "Condensed Wikipedia", "pct": 30, "dwellSec": 16 },
-    "video":    { "label": "Videos",              "pct": 20, "dwellSec": 40 },
-    "meme":     { "label": "Memes",               "pct": 10, "dwellSec": 6 },
-    "product":  { "label": "Made-up products",    "pct": 5,  "dwellSec": 12 },
-    "psych":    { "label": "Psychedelic",         "pct": 5,  "dwellSec": 12 },
-    "selfcare": { "label": "Self-care",           "pct": 5,  "dwellSec": 5 },
-    "web":      { "label": "From the web",        "pct": 5,  "dwellSec": 18 }
+    "game": {
+      "label": "Physics games",
+      "pct": 20,
+      "dwellSec": 45
+    },
+    "wiki": {
+      "label": "Condensed Wikipedia",
+      "pct": 30,
+      "dwellSec": 16
+    },
+    "video": {
+      "label": "Videos",
+      "pct": 20,
+      "dwellSec": 40
+    },
+    "meme": {
+      "label": "Memes",
+      "pct": 10,
+      "dwellSec": 6
+    },
+    "product": {
+      "label": "Made-up products",
+      "pct": 5,
+      "dwellSec": 12
+    },
+    "psych": {
+      "label": "Psychedelic",
+      "pct": 5,
+      "dwellSec": 12
+    },
+    "selfcare": {
+      "label": "Self-care",
+      "pct": 5,
+      "dwellSec": 5
+    },
+    "web": {
+      "label": "From the web",
+      "pct": 5,
+      "dwellSec": 18
+    }
   },
-  "gameTypes": ["plinko", "breakout", "merge", "dash", "flappy", "stacker", "pong", "peggle", "golf", "juggle"],
+  "gameTypes": [
+    "plinko",
+    "breakout",
+    "merge",
+    "dash",
+    "flappy",
+    "stacker",
+    "pong",
+    "peggle",
+    "golf",
+    "juggle",
+    "platformer",
+    "racer",
+    "raycast",
+    "rocks",
+    "sling"
+  ],
   "quoteAuthors": [
-    "Robert Anton Wilson", "William S. Burroughs", "Tom Robbins", "Principia Discordia",
-    "Philip K. Dick", "Terence McKenna", "Alan Watts", "Timothy Leary", "Hunter S. Thompson",
-    "Kurt Vonnegut", "Ursula K. Le Guin", "Aleister Crowley", "Allen Ginsberg", "Jack Kerouac",
-    "J. G. Ballard", "Douglas Adams", "Kathy Acker", "Charles Fort", "Marshall McLuhan",
-    "Frank Zappa", "Sun Ra", "David Lynch", "Octavia E. Butler", "Carl Jung", "Anaïs Nin",
-    "Jorge Luis Borges", "Antonin Artaud", "Brian Eno", "John Cage", "Diane di Prima",
-    "Kenneth Patchen", "Gregory Corso", "Lawrence Ferlinghetti", "Brion Gysin", "Oscar Wilde"
+    "Robert Anton Wilson",
+    "William S. Burroughs",
+    "Tom Robbins",
+    "Principia Discordia",
+    "Philip K. Dick",
+    "Terence McKenna",
+    "Alan Watts",
+    "Timothy Leary",
+    "Hunter S. Thompson",
+    "Kurt Vonnegut",
+    "Ursula K. Le Guin",
+    "Aleister Crowley",
+    "Allen Ginsberg",
+    "Jack Kerouac",
+    "J. G. Ballard",
+    "Douglas Adams",
+    "Kathy Acker",
+    "Charles Fort",
+    "Marshall McLuhan",
+    "Frank Zappa",
+    "Sun Ra",
+    "David Lynch",
+    "Octavia E. Butler",
+    "Carl Jung",
+    "Anaïs Nin",
+    "Jorge Luis Borges",
+    "Antonin Artaud",
+    "Brian Eno",
+    "John Cage",
+    "Diane di Prima",
+    "Kenneth Patchen",
+    "Gregory Corso",
+    "Lawrence Ferlinghetti",
+    "Brion Gysin",
+    "Oscar Wilde"
   ],
   "memeImageQueries": [
-    "Victorian engraving animal", "medieval manuscript marginalia", "Ernst Haeckel Kunstformen",
-    "Grandville illustration", "Gustave Doré engraving", "alchemical engraving", "vintage photograph cat",
-    "vintage photograph dog costume", "taxidermy", "Hieronymus Bosch detail", "NASA space colony art",
-    "1950s advertisement illustration", "old anatomical illustration", "Codex Gigas", "Hortus Deliciarum",
-    "victorian portrait photograph serious", "owl photograph", "goat photograph", "capybara", "frog photograph",
-    "raccoon photograph", "opossum", "crow photograph", "Nuremberg Chronicle woodcut", "Flammarion engraving",
-    "Aberdeen Bestiary", "Robert Fludd", "seance photograph", "spirit photography", "vintage robot",
-    "old computer 1970s photograph", "Soviet space poster", "early aviation crash photograph", "circus photograph vintage"
+    "Victorian engraving animal",
+    "medieval manuscript marginalia",
+    "Ernst Haeckel Kunstformen",
+    "Grandville illustration",
+    "Gustave Doré engraving",
+    "alchemical engraving",
+    "vintage photograph cat",
+    "vintage photograph dog costume",
+    "taxidermy",
+    "Hieronymus Bosch detail",
+    "NASA space colony art",
+    "1950s advertisement illustration",
+    "old anatomical illustration",
+    "Codex Gigas",
+    "Hortus Deliciarum",
+    "victorian portrait photograph serious",
+    "owl photograph",
+    "goat photograph",
+    "capybara",
+    "frog photograph",
+    "raccoon photograph",
+    "opossum",
+    "crow photograph",
+    "Nuremberg Chronicle woodcut",
+    "Flammarion engraving",
+    "Aberdeen Bestiary",
+    "Robert Fludd",
+    "seance photograph",
+    "spirit photography",
+    "vintage robot",
+    "old computer 1970s photograph",
+    "Soviet space poster",
+    "early aviation crash photograph",
+    "circus photograph vintage"
   ],
   "knowYourMemeUrls": [
     "https://knowyourmeme.com/memes/popular",
@@ -41,25 +143,349 @@
     "https://knowyourmeme.com/photos/trending"
   ],
   "web": {
-    "hnQueries": ["synthesizer", "trip hop", "punk history", "avant-garde", "occult", "gnostic", "mycology",
-      "octopus", "evolution biology", "psychology study", "mathematics proof", "cellular automata", "fractal",
-      "retro computing", "demoscene", "emulator", "science fiction", "William Burroughs", "Philip K. Dick",
-      "unsolved mystery", "Voynich", "archaeology", "indigenous", "revolution history", "art forgery",
-      "brutalism", "zine", "analog photography", "sound design", "generative art", "consciousness", "dreams"],
-    "hnMinPoints": 60,
-    "substackFeeds": [
-      "https://astralcodexten.substack.com/feed",
-      "https://tedgioia.substack.com/feed",
-      "https://erikhoel.substack.com/feed",
-      "https://www.experimental-history.com/feed",
-      "https://garymarcus.substack.com/feed",
-      "https://freddiedeboer.substack.com/feed",
-      "https://www.thepsychedelicpress.co.uk/feed",
-      "https://thehonestbroker.substack.com/feed"
+    "hnQueries": [
+      "synthesizer",
+      "trip hop",
+      "punk history",
+      "avant-garde",
+      "occult",
+      "gnostic",
+      "mycology",
+      "octopus",
+      "evolution biology",
+      "psychology study",
+      "mathematics proof",
+      "cellular automata",
+      "fractal",
+      "retro computing",
+      "demoscene",
+      "emulator",
+      "science fiction",
+      "William Burroughs",
+      "Philip K. Dick",
+      "unsolved mystery",
+      "Voynich",
+      "archaeology",
+      "indigenous",
+      "revolution history",
+      "art forgery",
+      "brutalism",
+      "zine",
+      "analog photography",
+      "sound design",
+      "generative art",
+      "consciousness",
+      "dreams"
     ],
-    "substackSearch": ["occult", "punk", "trip hop", "beat generation", "psychedelic", "science fiction", "weird history", "esoteric"],
-    "subreddits": ["HighStrangeness", "occult", "UnresolvedMysteries", "AskHistorians", "printSF", "triphop",
-      "experimentalmusic", "Gnosticism", "retrogaming", "Psychonaut", "AlternativeHistory", "WeirdWheels"],
-    "redditShare": 0.2
-  }
+    "hnMinPoints": 60,
+    "subreddits": [
+      "HighStrangeness",
+      "occult",
+      "UnresolvedMysteries",
+      "AskHistorians",
+      "printSF",
+      "triphop",
+      "experimentalmusic",
+      "Gnosticism",
+      "retrogaming",
+      "Psychonaut",
+      "AlternativeHistory",
+      "WeirdWheels"
+    ],
+    "redditShare": 0.1,
+    "feeds": [
+      {
+        "name": "Lobsters",
+        "urls": [
+          "https://lobste.rs/rss"
+        ],
+        "max": 25
+      },
+      {
+        "name": "Tildes ~music",
+        "urls": [
+          "https://tildes.net/~music/topics.rss"
+        ],
+        "max": 8
+      },
+      {
+        "name": "Tildes ~books",
+        "urls": [
+          "https://tildes.net/~books/topics.rss"
+        ],
+        "max": 8
+      },
+      {
+        "name": "Tildes ~science",
+        "urls": [
+          "https://tildes.net/~science/topics.rss"
+        ],
+        "max": 8
+      },
+      {
+        "name": "Tildes ~arts",
+        "urls": [
+          "https://tildes.net/~arts/topics.rss"
+        ],
+        "max": 6
+      },
+      {
+        "name": "Tildes ~humanities",
+        "urls": [
+          "https://tildes.net/~humanities/topics.rss"
+        ],
+        "max": 6
+      },
+      {
+        "name": "MetaFilter",
+        "urls": [
+          "https://rss.metafilter.com/metafilter.rss"
+        ],
+        "max": 20
+      },
+      {
+        "name": "Slashdot",
+        "urls": [
+          "https://rss.slashdot.org/Slashdot/slashdotMain"
+        ],
+        "max": 12
+      },
+      {
+        "name": "Kottke",
+        "urls": [
+          "https://feeds.kottke.org/main"
+        ],
+        "max": 15
+      },
+      {
+        "name": "Atlas Obscura",
+        "urls": [
+          "https://www.atlasobscura.com/feeds/latest"
+        ],
+        "max": 20
+      },
+      {
+        "name": "The Public Domain Review",
+        "urls": [
+          "https://publicdomainreview.org/rss.xml"
+        ],
+        "max": 15
+      },
+      {
+        "name": "The Daily Grail",
+        "urls": [
+          "https://www.dailygrail.com/feed/"
+        ],
+        "max": 15
+      },
+      {
+        "name": "JSTOR Daily",
+        "urls": [
+          "https://daily.jstor.org/feed/"
+        ],
+        "max": 15
+      },
+      {
+        "name": "Quanta Magazine",
+        "urls": [
+          "https://api.quantamagazine.org/feed/",
+          "https://www.quantamagazine.org/feed/"
+        ],
+        "max": 15
+      },
+      {
+        "name": "Nautilus",
+        "urls": [
+          "https://nautil.us/feed/"
+        ],
+        "max": 12
+      },
+      {
+        "name": "Aeon",
+        "urls": [
+          "https://aeon.co/feed.rss"
+        ],
+        "max": 15
+      },
+      {
+        "name": "The Marginalian",
+        "urls": [
+          "https://www.themarginalian.org/feed/"
+        ],
+        "max": 12
+      },
+      {
+        "name": "Hackaday",
+        "urls": [
+          "https://hackaday.com/blog/feed/"
+        ],
+        "max": 15
+      },
+      {
+        "name": "Hyperallergic",
+        "urls": [
+          "https://hyperallergic.com/feed/"
+        ],
+        "max": 15
+      },
+      {
+        "name": "Colossal",
+        "urls": [
+          "https://www.thisiscolossal.com/feed/"
+        ],
+        "max": 15
+      },
+      {
+        "name": "Open Culture",
+        "urls": [
+          "https://www.openculture.com/feed"
+        ],
+        "max": 15
+      },
+      {
+        "name": "The Quietus",
+        "urls": [
+          "https://thequietus.com/feed/",
+          "https://thequietus.com/feed"
+        ],
+        "max": 15
+      },
+      {
+        "name": "Bandcamp Daily",
+        "urls": [
+          "https://daily.bandcamp.com/feed"
+        ],
+        "max": 15
+      },
+      {
+        "name": "Experimental History",
+        "urls": [
+          "https://www.experimental-history.com/feed"
+        ],
+        "max": 6
+      }
+    ],
+    "comics": [
+      {
+        "name": "Everlasting Blort",
+        "urls": [
+          "https://everlastingblort.com/feed",
+          "https://www.everlastingblort.com/feed",
+          "https://everlastingblort.com/rss",
+          "https://everlastingblort.tumblr.com/rss"
+        ],
+        "max": 15
+      },
+      {
+        "name": "SMBC",
+        "urls": [
+          "https://www.smbc-comics.com/comic/rss"
+        ],
+        "max": 15
+      },
+      {
+        "name": "Existential Comics",
+        "urls": [
+          "https://existentialcomics.com/rss.xml"
+        ],
+        "max": 12
+      },
+      {
+        "name": "Wondermark",
+        "urls": [
+          "https://wondermark.com/feed/"
+        ],
+        "max": 10
+      },
+      {
+        "name": "The Perry Bible Fellowship",
+        "urls": [
+          "https://pbfcomics.com/feed/"
+        ],
+        "max": 12
+      },
+      {
+        "name": "Dinosaur Comics",
+        "urls": [
+          "https://www.qwantz.com/rssfeed.php"
+        ],
+        "max": 10
+      },
+      {
+        "name": "Cat and Girl",
+        "urls": [
+          "https://catandgirl.com/feed/"
+        ],
+        "max": 10
+      },
+      {
+        "name": "Poorly Drawn Lines",
+        "urls": [
+          "https://poorlydrawnlines.com/feed/"
+        ],
+        "max": 12
+      },
+      {
+        "name": "Buttersafe",
+        "urls": [
+          "https://www.buttersafe.com/feed/"
+        ],
+        "max": 8
+      },
+      {
+        "name": "Oglaf",
+        "urls": [
+          "https://www.oglaf.com/feeds/rss/"
+        ],
+        "max": 12,
+        "nsfw": true
+      }
+    ],
+    "xkcdRandom": 40,
+    "comicShare": 0.4
+  },
+  "videoRegion": "CA",
+  "spriteQueries": [
+    "teapot",
+    "skull",
+    "rubber duck",
+    "banana",
+    "cat",
+    "owl",
+    "octopus",
+    "mushroom",
+    "crystal",
+    "cactus",
+    "eye",
+    "hand",
+    "toaster",
+    "cassette tape",
+    "bust sculpture",
+    "trilobite",
+    "beetle",
+    "flower",
+    "pizza",
+    "donut",
+    "flying saucer",
+    "robot",
+    "gramophone",
+    "brain",
+    "jellyfish",
+    "shoe",
+    "hat",
+    "chair",
+    "snail",
+    "frog",
+    "bone",
+    "crown",
+    "guitar",
+    "synthesizer",
+    "goat",
+    "moai",
+    "dice",
+    "pineapple",
+    "alien",
+    "rocket"
+  ],
+  "spriteCount": 160
 }

@@ -312,7 +312,23 @@ async function ytSearch(query) {
   return found;
 }
 function durSec(d) { if (!d) return 0; return d.split(':').reduce((s, x) => s * 60 + (+x || 0), 0); }
-async function embeddable(vid) {
+// Checks that a video plays embedded and is not blocked in config.videoRegion
+// (YouTube's own watch-page data); falls back to oEmbed when the page can't be read.
+async function playable(vid) {
+  const region = config.videoRegion;
+  try {
+    const html = await fetchText(`https://www.youtube.com/watch?v=${vid}&hl=en`, { ua: BROWSER_UA, headers: { Cookie: 'CONSENT=YES+cb; SOCS=CAI' }, retries: 1, timeout: 15000 });
+    const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]+?\})\s*;\s*(?:var\s|<\/script>)/);
+    if (m) {
+      const pr = JSON.parse(m[1]);
+      const ps = pr.playabilityStatus || {};
+      if (ps.status && ps.status !== 'OK') return null;
+      if (ps.playableInEmbed === false) return null;
+      const countries = pr.microformat?.playerMicroformatRenderer?.availableCountries;
+      if (region && Array.isArray(countries) && countries.length && !countries.includes(region)) { report.regionBlocked = (report.regionBlocked || 0) + 1; return null; }
+      return { title: pr.videoDetails?.title, author_name: pr.videoDetails?.author };
+    }
+  } catch { /* fall through */ }
   try {
     const j = await fetchJSON(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${vid}`)}&format=json`, { retries: 1, timeout: 10000 });
     return j && j.title ? j : null;
@@ -337,7 +353,7 @@ async function buildVideos() {
     const dedup = [...new Map(fresh.map((v) => [v.vid, v])).values()];
     const ranked = kw ? [...dedup.filter((v) => kw.test(v.title)), ...dedup.filter((v) => !kw.test(v.title))] : dedup;
     const uniq = ranked.slice(0, Math.ceil(quota * 1.4));
-    const checks = await pool(uniq, 8, (v) => embeddable(v.vid));
+    const checks = await pool(uniq, 5, (v) => playable(v.vid));
     let n = 0;
     uniq.forEach((v, i) => {
       if (n >= quota || !checks[i]) return;
@@ -351,18 +367,82 @@ async function buildVideos() {
   return posts;
 }
 
-// ------------------------------------------------------------------ web (HN, Substack, Reddit)
-async function ogDescription(url) {
+// ------------------------------------------------------------------ web (HN, sites, comics, Reddit)
+async function ogMeta(url) {
   try {
-    const html = await fetchText(url, { ua: BROWSER_UA, timeout: 9000, retries: 0 });
-    const m = html.match(/<meta[^>]+(?:property|name)=["'](?:og:description|description|twitter:description)["'][^>]+content=["']([^"']{30,})["']/i)
-      || html.match(/<meta[^>]+content=["']([^"']{30,})["'][^>]+(?:property|name)=["'](?:og:description|description)["']/i);
-    return m ? clip(decodeEntities(m[1]).trim(), 320) : '';
-  } catch { return ''; }
+    const html = await fetchText(url, { ua: BROWSER_UA, timeout: 10000, retries: 0 });
+    const meta = (k) => (html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${k}["'][^>]+content=["']([^"']+)["']`, 'i')) || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${k}["']`, 'i')) || [])[1];
+    return { desc: meta('og:description') || meta('description') || meta('twitter:description'), image: meta('og:image') || meta('twitter:image'), html };
+  } catch { return {}; }
+}
+// Parses RSS 2.0 and Atom into { title, link, html, date }.
+function parseFeed(xml) {
+  const unc = (s) => (s || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+  const pick = (blk, t) => unc((blk.match(new RegExp(`<${t}(?:\\s[^>]*)?>([\\s\\S]*?)</${t}>`)) || [])[1]);
+  const title = stripTags(unc((xml.match(/<title[^>]*>([\s\S]*?)<\/title>/) || [])[1] || ''));
+  const items = [];
+  const blocks = xml.includes('<entry') ? xml.split(/<entry[\s>]/).slice(1) : xml.split(/<item[\s>]/).slice(1);
+  for (const b of blocks) {
+    const link = stripTags(pick(b, 'link')) || (b.match(/<link[^>]+href=["']([^"']+)["']/) || [])[1] || stripTags(pick(b, 'guid'));
+    items.push({
+      title: stripTags(decodeEntities(pick(b, 'title'))),
+      link: decodeEntities(link || ''),
+      html: decodeEntities(pick(b, 'content:encoded') || pick(b, 'content') || pick(b, 'description') || pick(b, 'summary')),
+      date: pick(b, 'pubDate') || pick(b, 'published') || pick(b, 'updated') || pick(b, 'dc:date')
+    });
+  }
+  return { title, items };
+}
+const isoDate = (d) => { const t = new Date(d || ''); return isNaN(t) ? '' : t.toISOString().slice(0, 10); };
+async function readFeed(f) {
+  for (const url of f.urls) {
+    try { const xml = await fetchText(url, { ua: BROWSER_UA, retries: 1 }); const parsed = parseFeed(xml); if (parsed.items.length) return parsed; }
+    catch (e) { warn(`feed ${f.name} ${url}: ${e.message}`); }
+  }
+  return null;
+}
+function firstImg(html, base) {
+  const m = (html || '').match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (!m) return null;
+  try { return new URL(decodeEntities(m[1]), base).href; } catch { return null; }
+}
+async function buildComics(w) {
+  const out = [];
+  await pool(w.comics, 3, async (f) => {
+    const feed = await readFeed(f);
+    if (!feed) return;
+    let n = 0;
+    for (const it of feed.items) {
+      if (n >= f.max || !it.link) continue;
+      let img = firstImg(it.html, it.link);
+      if (!img || /feeds\.feedburner|gravatar|pixel|emoji|share|button/i.test(img)) {
+        const page = await ogMeta(it.link);
+        img = page.html ? (page.html.match(/<img[^>]+(?:id|class)=["'][^"']*(?:comic|strip|cc-comic)[^"']*["'][^>]*src=["']([^"']+)["']/i) || page.html.match(/<div[^>]+id=["'](?:comic|strip)[^"']*["'][\s\S]{0,400}?<img[^>]+src=["']([^"']+)["']/i) || [])[1] || page.image : null;
+        if (img) try { img = new URL(decodeEntities(img), it.link).href; } catch { img = null; }
+      }
+      if (!img) continue;
+      const alt = stripTags(it.html).slice(0, 220);
+      out.push({ source: f.name, sub: 'comic', title: it.title || f.name, url: it.link, img, excerpt: alt && alt !== it.title ? clip(alt, 200) : '', date: isoDate(it.date), nsfw: f.nsfw || undefined });
+      n++;
+    }
+    log(`comics: ${f.name} -> ${n}`);
+  });
+  // xkcd: random picks from the whole archive
+  if (w.xkcdRandom) {
+    try {
+      const latest = (await fetchJSON('https://xkcd.com/info.0.json')).num;
+      const nums = new Set();
+      while (nums.size < w.xkcdRandom) nums.add(1 + Math.floor(rand() * latest));
+      const got = await pool([...nums].filter((n) => n !== 404), 4, (n) => fetchJSON(`https://xkcd.com/${n}/info.0.json`));
+      for (const x of got) if (x?.img) out.push({ source: 'xkcd', sub: 'comic', title: `${x.safe_title} (#${x.num})`, url: `https://xkcd.com/${x.num}/`, img: x.img, excerpt: x.alt, date: `${x.year}-${String(x.month).padStart(2, '0')}-${String(x.day).padStart(2, '0')}` });
+      log(`comics: xkcd -> ${got.filter(Boolean).length}`);
+    } catch (e) { warn(`xkcd: ${e.message}`); }
+  }
+  report.sources.comics = out.length;
+  return out;
 }
 async function buildWeb() {
   const w = config.web;
-  const items = [];
   // Hacker News via Algolia
   const hnLists = await pool(w.hnQueries, 4, (q) => fetchJSON(`https://hn.algolia.com/api/v1/search?${new URLSearchParams({ query: q, tags: 'story', numericFilters: `points>${w.hnMinPoints}`, hitsPerPage: '20' })}`).then((j) => j.hits.map((h) => ({ q, h }))));
   const hn = [];
@@ -372,58 +452,74 @@ async function buildWeb() {
     hn.push({ source: 'Hacker News', sub: 'hn', title: h.title, url, discuss: `https://news.ycombinator.com/item?id=${h.objectID}`, meta: `${h.points} points · ${h.num_comments || 0} comments`, date: h.created_at?.slice(0, 10), excerpt: h.story_text ? clip(stripTags(h.story_text), 320) : '', topic: q });
   }));
   report.sources.hackernews = hn.length;
-  // Substack RSS + search
-  const ss = [];
-  await pool(w.substackFeeds, 4, async (feed) => {
-    try {
-      const xml = await fetchText(feed, { ua: BROWSER_UA });
-      const pub = stripTags((xml.match(/<channel>[\s\S]*?<title>([\s\S]*?)<\/title>/) || [])[1] || '').replace(/^<!\[CDATA\[|\]\]>$/g, '');
-      for (const it of xml.split(/<item>/).slice(1, 16)) {
-        const g = (t) => ((it.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`)) || [])[1] || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
-        const title = stripTags(g('title'));
-        const link = stripTags(g('link'));
-        if (!title || !link) continue;
-        ss.push({ source: pub || new URL(feed).hostname, sub: 'substack', title, url: link, excerpt: clip(stripTags(g('description')), 320), date: new Date(g('pubDate') || Date.now()).toISOString().slice(0, 10) });
-      }
-    } catch (e) { warn(`substack ${feed}: ${e.message}`); }
+  // Sites (RSS/Atom)
+  const sites = [];
+  const perSite = {};
+  await pool(w.feeds, 4, async (f) => {
+    const feed = await readFeed(f);
+    if (!feed) return;
+    for (const it of feed.items.slice(0, f.max)) {
+      if (!it.title || !it.link) continue;
+      const thumb = firstImg(it.html, it.link);
+      sites.push({ source: f.name, sub: 'site', title: it.title, url: it.link, excerpt: clip(stripTags(it.html), 320), date: isoDate(it.date), thumb: thumb && !/feedburner|gravatar|pixel|emoji|share/i.test(thumb) ? thumb : undefined });
+      perSite[f.name] = (perSite[f.name] || 0) + 1;
+    }
   });
-  await pool(w.substackSearch, 2, async (q) => {
-    try {
-      const j = await fetchJSON(`https://substack.com/api/v1/post/search?${new URLSearchParams({ query: q, page: '0' })}`, { ua: BROWSER_UA, retries: 0 });
-      for (const r of (j.results || j.posts || []).slice(0, 12)) {
-        if (!r.title || !r.canonical_url) continue;
-        ss.push({ source: r.publication?.name || 'Substack', sub: 'substack', title: r.title, url: r.canonical_url, excerpt: clip(r.subtitle || r.description || '', 320), date: (r.post_date || '').slice(0, 10) });
-      }
-    } catch (e) { warn(`substack search ${q}: ${e.message}`); }
-  });
-  report.sources.substack = ss.length;
-  // Reddit (occasional)
+  report.sources.sites = perSite;
+  const comics = await buildComics(w);
+  // Reddit (occasional; usually blocked from CI)
   const rd = [];
   await pool(w.subreddits, 2, async (s) => {
     try {
-      const j = await fetchJSON(`https://www.reddit.com/r/${s}/top.json?t=month&limit=25&raw_json=1`, { retries: 1 });
+      const j = await fetchJSON(`https://www.reddit.com/r/${s}/top.json?t=month&limit=25&raw_json=1`, { retries: 0 });
       for (const c of j.data?.children || []) {
         const d = c.data;
         if (!d || d.over_18 || d.stickied || d.score < 100) continue;
         rd.push({ source: `r/${s}`, sub: 'reddit', title: d.title, url: `https://www.reddit.com${d.permalink}`, excerpt: clip((d.selftext || '').replace(/\s+/g, ' '), 320), meta: `${d.score} upvotes · ${d.num_comments} comments`, date: new Date(d.created_utc * 1000).toISOString().slice(0, 10) });
       }
-      await sleep(1200);
     } catch (e) { warn(`reddit ${s}: ${e.message}`); }
   });
   report.sources.reddit = rd.length;
 
   const fresh = (l) => shuffle(l.filter((x) => !seen.web.has(x.url)));
+  const comicN = Math.min(comics.length, Math.round(want.web * w.comicShare));
   const redditN = Math.min(rd.length, Math.round(want.web * w.redditShare));
-  const ssN = Math.min(ss.length, Math.round((want.web - redditN) * 0.45));
-  const chosen = [...fresh(rd).slice(0, redditN), ...fresh(ss).slice(0, ssN)];
+  const siteN = Math.min(sites.length, Math.round((want.web - comicN - redditN) * 0.65));
+  const chosen = [...fresh(comics).slice(0, comicN), ...fresh(rd).slice(0, redditN), ...fresh(sites).slice(0, siteN)];
   const urls = new Set(chosen.map((x) => x.url));
-  for (const x of fresh(hn)) { if (chosen.length >= want.web) break; if (!urls.has(x.url)) { urls.add(x.url); chosen.push(x); } }
-  for (const x of fresh([...ss, ...rd])) { if (chosen.length >= want.web) break; if (!urls.has(x.url)) { urls.add(x.url); chosen.push(x); } }
-  // fill in excerpts for links that have none
-  const missing = chosen.filter((x) => !x.excerpt && !x.url.includes('news.ycombinator.com'));
-  const descs = await pool(missing, 6, (x) => ogDescription(x.url));
-  missing.forEach((x, i) => { if (descs[i]) x.excerpt = descs[i]; });
+  for (const x of [...fresh(hn), ...fresh(sites), ...fresh(comics), ...fresh(rd)]) { if (chosen.length >= want.web) break; if (!urls.has(x.url)) { urls.add(x.url); chosen.push(x); } }
+  const missing = chosen.filter((x) => !x.excerpt && x.sub !== 'comic' && !x.url.includes('news.ycombinator.com'));
+  const metas = await pool(missing, 6, (x) => ogMeta(x.url));
+  missing.forEach((x, i) => { if (metas[i]?.desc) x.excerpt = clip(decodeEntities(metas[i].desc), 320); });
   return chosen.map((x) => ({ id: `web${hashStr(x.url).toString(36)}`, cat: 'web', ...x }));
+}
+
+// ------------------------------------------------------------------ game sprites (transparent PNGs from Commons)
+async function buildSprites() {
+  const out = [];
+  const lists = await pool(config.spriteQueries, 3, async (q) => {
+    try {
+      const j = await fetchJSON(`https://commons.wikimedia.org/w/api.php?${new URLSearchParams({ action: 'query', generator: 'search', gsrsearch: `${q} filemime:image/png`, gsrnamespace: '6', gsrlimit: '12', prop: 'imageinfo', iiprop: 'url|extmetadata|size', iiurlwidth: '160', format: 'json', formatversion: '2' })}`);
+      return (j.query?.pages || []).map((p) => ({ q, ii: p.imageinfo?.[0], title: p.title })).filter((x) => x.ii?.thumburl);
+    } catch (e) { warn(`sprites ${q}: ${e.message}`); return []; }
+  });
+  const cand = shuffle(lists.flat().filter((x) => /public domain|cc0|cc[- ]by|pd/i.test(x.ii.extmetadata?.LicenseShortName?.value || '')));
+  const perQuery = {};
+  await pool(cand, 4, async (x) => {
+    if (out.length >= config.spriteCount || (perQuery[x.q] || 0) >= 6) return;
+    try {
+      const r = await fetch(x.ii.thumburl, { headers: { 'User-Agent': UA } });
+      if (!r.ok) return;
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > 60000 || buf.readUInt32BE(0) !== 0x89504e47) return;
+      const colorType = buf[25];
+      if (!(colorType === 6 || colorType === 4 || (colorType === 3 && buf.includes(Buffer.from('tRNS'))))) return;
+      perQuery[x.q] = (perQuery[x.q] || 0) + 1;
+      out.push({ src: `data:image/png;base64,${buf.toString('base64')}`, name: x.title.replace(/^File:/, ''), credit: `${clip(stripTags(x.ii.extmetadata?.Artist?.value || 'Unknown'), 40)} · ${x.ii.extmetadata?.LicenseShortName?.value} · Wikimedia Commons` });
+    } catch { /* skip */ }
+  });
+  report.sources.sprites = out.length;
+  return out;
 }
 
 // ------------------------------------------------------------------ meme images
@@ -467,7 +563,8 @@ async function kymMemes() {
 
 // ------------------------------------------------------------------ procedural categories
 const GAME_NAMES = {
-  plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', stacker: 'Stacker', pong: 'Pong', peggle: 'Peg Shot', golf: 'Bounce Golf', juggle: 'Juggle'
+  plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', stacker: 'Stacker', pong: 'Pong', peggle: 'Peg Shot', golf: 'Bounce Golf', juggle: 'Juggle',
+  platformer: 'Platformer', racer: 'Road Racer', raycast: 'Maze Shooter', rocks: 'Rocks', sling: 'Slingshot'
 };
 const ADJ = ['Ember', 'Moss', 'Rust', 'Ochre', 'Clay', 'Amber', 'Dusk', 'Ash', 'Copper', 'Sage', 'Umber', 'Saffron', 'Cedar', 'Flint', 'Honey', 'Basalt', 'Juniper', 'Tangerine', 'Cinder', 'Sienna', 'Lichen', 'Marigold', 'Obsidian', 'Fern', 'Paprika', 'Driftwood', 'Terracotta', 'Pumpkin', 'Gravel', 'Sunset'];
 function buildGames() {
@@ -577,7 +674,7 @@ function offlineFixtures() {
 
 // ------------------------------------------------------------------ main
 async function main() {
-  let wiki, video, web, quotes, commons, kym;
+  let wiki, video, web, quotes, commons, kym, sprites = [];
   if (OFFLINE) ({ wiki, video, web, quotes, commons, kym } = offlineFixtures());
   else {
     quotes = await buildQuotes();
@@ -586,6 +683,7 @@ async function main() {
     web = await buildWeb();
     commons = await commonsImages();
     kym = await kymMemes();
+    sprites = await buildSprites();
   }
   const posts = {
     game: buildGames(),
@@ -611,6 +709,7 @@ async function main() {
   const files = {};
   for (const [k, v] of Object.entries(posts)) { files[k] = `${k}.json`; writeJSON(path.join(dir, files[k]), v); }
 
+  if (sprites.length) writeJSON(path.join(dir, 'sprites.json'), sprites);
   const prompt = fs.readFileSync(path.join(ROOT, 'packages/prompt.md'), 'utf8');
   const manifest = {
     id: pkgId, title: `The Feed · ${pkgId}`, created: new Date().toISOString(), offline: OFFLINE || undefined,
@@ -619,9 +718,10 @@ async function main() {
     topics: {
       wiki: Object.fromEntries(Object.entries(topics.wiki).map(([k, t]) => [k, t.label])),
       video: Object.fromEntries(Object.entries(topics.video).map(([k, t]) => [k, t.label])),
-      game: Object.fromEntries(config.gameTypes.map((t) => [t, GAME_NAMES[t] || t]))
+      game: Object.fromEntries(config.gameTypes.map((t) => [t, GAME_NAMES[t] || t])),
+      web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' }
     },
-    files, prompt, report
+    files, sprites: sprites.length ? 'sprites.json' : undefined, prompt, report
   };
   writeJSON(path.join(dir, 'manifest.json'), manifest, true);
 

@@ -4,3 +4,4 @@ www/bundled/
 www/build-info.js
 *.apk
 .DS_Store
+www/_test.html

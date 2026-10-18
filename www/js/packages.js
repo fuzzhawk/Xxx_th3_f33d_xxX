@@ -34,7 +34,9 @@ async function fetchPackage(base, id, onProgress) {
     posts[cat] = await getJSON(`${base}${id}/${file}`, 60000);
     onProgress?.(++i / entries.length);
   }
-  return { manifest, posts };
+  let sprites = [];
+  if (manifest.sprites) { try { sprites = await getJSON(`${base}${id}/${manifest.sprites}`, 60000); } catch { /* optional */ } }
+  return { manifest, posts, sprites };
 }
 
 export async function downloadPackage(id, onProgress) {

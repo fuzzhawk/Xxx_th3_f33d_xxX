@@ -1,4 +1,5 @@
-import { Game, W, H, circleRect, reflect, circlePeg, walls, roundRect } from './engine.js';
+import { Platformer, Racer, Raycast, Rocks, Sling } from './more.js';
+import { Game, W, H, circleRect, reflect, circlePeg, walls, roundRect, drawFit, drawRectImg } from './engine.js';
 
 // ================================================================ Plinko
 class Plinko extends Game {
@@ -17,7 +18,7 @@ class Plinko extends Game {
   }
   drop(x) {
     if (this.balls.length > 30) return;
-    this.balls.push({ x: Math.max(12, Math.min(W - 12, x)), y: 22, vx: this.r(-20, 20), vy: 0, r: 6, c: this.col(this.ri(0, 5)) });
+    this.balls.push({ x: Math.max(12, Math.min(W - 12, x)), y: 22, vx: this.r(-20, 20), vy: 0, r: 6 * this.S, c: this.col(this.ri(0, 5)), i: this.skin.any('ball', 'item', 'animal', 'enemy'), rot: 0 });
   }
   autopilot(dt) {
     this.next -= dt;
@@ -27,7 +28,7 @@ class Plinko extends Game {
   step(dt) {
     const floor = H - 44;
     for (const b of this.balls) {
-      b.vy += this.gravity * dt; b.x += b.vx * dt; b.y += b.vy * dt;
+      b.vy += this.gravity * this.G * dt; b.x += b.vx * dt; b.y += b.vy * dt;
       for (const p of this.pegs) if (circlePeg(b, p, 0.5)) { p.hit = 0.25; b.vx += this.r(-12, 12); }
       walls(b, 0, W, null, null, 0.5);
       if (b.y > floor) {
@@ -58,7 +59,7 @@ class Plinko extends Game {
       c.globalAlpha = 1;
       this.text(c, String(s.v), s.x + s.w / 2, H - 20, 11);
     });
-    for (const b of this.balls) { c.fillStyle = b.c; c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.fill(); }
+    for (const b of this.balls) { b.rot += b.vx * 0.002; this.orb(c, b.i, b.x, b.y, b.r, b.c, b.rot); }
   }
 }
 
@@ -76,12 +77,12 @@ class Breakout extends Game {
     this.bricks = [];
     for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
       const keep = [true, (r + k) % 2 === 0, Math.abs(k - 3.5) <= r / 1.4, Math.abs(k - 3.5) + Math.abs(r - rows / 2) <= rows / 1.6, this.rng() > 0.25, Math.sin(k * 0.9 + r) > -0.4][pattern];
-      if (keep) this.bricks.push({ x: 10 + k * bw + 1.5, y: 54 + r * (bh + 4), w: bw - 3, h: bh, hp: this.rng() < 0.12 ? 2 : 1, c: this.col(r) });
+      if (keep) this.bricks.push({ x: 10 + k * bw + 1.5, y: 54 + r * (bh + 4), w: bw - 3, h: bh, hp: this.rng() < 0.12 ? 2 : 1, c: this.col(r), i: this.skin.pick(`row${r % 3}`, 'tile', 'block') });
     }
     this.serve();
   }
   serve() {
-    this.ball = { x: this.paddle.x, y: this.paddle.y - 12, vx: 0, vy: 0, r: 6, stuck: 0.6 };
+    this.ball = { x: this.paddle.x, y: this.paddle.y - 12, vx: 0, vy: 0, r: 6 * this.S, stuck: 0.6, i: this.skin.pick('bb', 'ball', 'item') };
     this.speed = 300 + this.level * 15;
   }
   autopilot(dt) {
@@ -135,11 +136,11 @@ class Breakout extends Game {
   hud() { return `${this.score} · ♥${Math.max(0, this.lives)}`; }
   draw(c) {
     this.clear(c);
-    for (const k of this.bricks) { c.fillStyle = k.c; c.globalAlpha = k.hp > 1 ? 1 : 0.85; roundRect(c, k.x, k.y, k.w, k.h, 4); c.fill(); if (k.hp > 1) { c.strokeStyle = this.pal.ink; c.lineWidth = 1.5; c.stroke(); } }
+    for (const k of this.bricks) { c.fillStyle = k.c; c.globalAlpha = k.hp > 1 ? 1 : 0.85; roundRect(c, k.x, k.y, k.w, k.h, 4); c.fill(); if (k.i) { c.globalAlpha = 0.75; c.save(); roundRect(c, k.x, k.y, k.w, k.h, 4); c.clip(); drawRectImg(c, k.i, k.x, k.y, k.w, k.h, true); c.restore(); } c.globalAlpha = 1; if (k.hp > 1) { c.strokeStyle = this.pal.ink; c.lineWidth = 1.5; roundRect(c, k.x, k.y, k.w, k.h, 4); c.stroke(); } }
     c.globalAlpha = 1;
     const p = this.paddle;
     c.fillStyle = this.pal.ink; roundRect(c, p.x - p.w / 2, p.y, p.w, p.h, 5); c.fill();
-    c.fillStyle = this.col(0); c.beginPath(); c.arc(this.ball.x, this.ball.y, this.ball.r, 0, 7); c.fill();
+    this.orb(c, this.ball.i, this.ball.x, this.ball.y, this.ball.r, this.col(0), this.t * 4);
   }
 }
 
@@ -151,7 +152,8 @@ class Merge extends Game {
     this.balls = [];
     this.L = 22; this.R = W - 22; this.F = H - 18; this.line = 74;
     this.cur = this.ri(0, 3); this.nxt = this.ri(0, 3);
-    this.aimX = W / 2; this.cool = 0; this.over = 0; this.useEmoji = this.rng() < 0.5;
+    this.aimX = W / 2; this.cool = 0; this.over = 0; this.useEmoji = this.rng() < 0.35;
+    this.lvImg = this.rng() < 0.75 ? this.skin.list('levels', RADII.length, 'animal', 'ball', 'item', 'enemy') : null;
   }
   dropAt(x) {
     if (this.cool > 0) return;
@@ -173,7 +175,7 @@ class Merge extends Game {
   step(dt) {
     this.cool -= dt;
     const bs = this.balls;
-    for (const b of bs) { b.vy += 900 * dt; b.vx *= 0.996; b.vy *= 0.999; b.x += b.vx * dt; b.y += b.vy * dt; b.age += dt; }
+    for (const b of bs) { b.vy += 900 * this.G * dt; b.vx *= 0.996; b.vy *= 0.999; b.x += b.vx * dt; b.y += b.vy * dt; b.age += dt; }
     for (let it = 0; it < 3; it++) {
       for (let i = 0; i < bs.length; i++) {
         const a = bs[i]; if (a.dead) continue;
@@ -208,6 +210,8 @@ class Merge extends Game {
     if (this.over > 1.6) { this.balls.forEach((b) => this.burst(b.x, b.y, this.col(b.lv), 4)); this.balls = []; this.score = 0; this.over = 0; }
   }
   drawBall(c, x, y, r, lv) {
+    const li = this.lvImg?.[lv];
+    if (li && drawFit(c, li, x, y, r * 2.15, r * 2.15)) return;
     c.fillStyle = this.col(lv);
     c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
     c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.arc(x - r * 0.35, y - r * 0.35, r * 0.35, 0, 7); c.fill();
@@ -278,7 +282,7 @@ class Dash extends Game {
     this.gaps = this.gaps.filter((g) => g.x + g.w > -40);
     this.hills.forEach((h) => { h.x -= dx * 0.25; if (h.x < -80) { h.x += 8 * 70; h.h = this.r(30, 90); } });
     const prevBottom = p.y + p.s;
-    p.vy += 1900 * dt; p.y += p.vy * dt;
+    p.vy += 1900 * this.G * dt; p.y += p.vy * dt;
     let floor = this.overGap(p.x, p.x + p.s) ? Infinity : this.ground;
     for (const o of this.obs) {
       if (p.x + p.s <= o.x + 2 || p.x >= o.x + o.w - 2) continue;
@@ -308,14 +312,15 @@ class Dash extends Game {
     c.fillStyle = 'rgba(0,0,0,.2)'; c.fillRect(0, this.ground + 6, W, 3);
     for (const o of this.obs) {
       c.fillStyle = o.type === 'spike' ? this.col(3) : this.col(1);
-      if (o.type === 'spike') { c.beginPath(); c.moveTo(o.x, this.ground); c.lineTo(o.x + o.w / 2, this.ground - o.h); c.lineTo(o.x + o.w, this.ground); c.fill(); }
-      else { roundRect(c, o.x, this.ground - o.h, o.w, o.h, 3); c.fill(); }
+      if (o.type === 'spike') { const e = this.skin.pick('spike', 'enemy', 'meteor'); if (!drawFit(c, e, o.x + o.w / 2, this.ground - o.h / 2, o.w * 1.2, o.h * 1.2)) { c.beginPath(); c.moveTo(o.x, this.ground); c.lineTo(o.x + o.w / 2, this.ground - o.h); c.lineTo(o.x + o.w, this.ground); c.fill(); } }
+      else { roundRect(c, o.x, this.ground - o.h, o.w, o.h, 3); c.fill(); const t = this.skin.pick('blk', 'block', 'tile'); if (t) { c.save(); c.clip(); drawRectImg(c, t, o.x, this.ground - o.h, o.w, o.h, true); c.restore(); } }
     }
     if (!this.dead) {
       const p = this.p;
       c.save(); c.translate(p.x + p.s / 2, p.y + p.s / 2); c.rotate(p.rot);
-      c.fillStyle = this.col(0); roundRect(c, -p.s / 2, -p.s / 2, p.s, p.s, 4); c.fill();
-      c.fillStyle = this.pal.bg; c.fillRect(2, -5, 4, 4); c.restore();
+      const hero = this.skin.pick('hero', 'char', 'animal');
+      if (!drawFit(c, hero, 0, 0, p.s * 1.5, p.s * 1.5)) { c.fillStyle = this.col(0); roundRect(c, -p.s / 2, -p.s / 2, p.s, p.s, 4); c.fill(); c.fillStyle = this.pal.bg; c.fillRect(2, -5, 4, 4); }
+      c.restore();
     }
   }
 }
@@ -335,7 +340,7 @@ class Flap extends Game {
   step(dt) {
     if (this.dead) { this.dead -= dt; if (this.dead <= 0) this.reset(); return; }
     const b = this.b;
-    b.vy += 1250 * dt; b.y += b.vy * dt;
+    b.vy += 1250 * this.G * dt; b.y += b.vy * dt;
     for (const p of this.pipes) { p.x -= this.speed * dt; if (!p.passed && p.x + 54 < b.x) { p.passed = true; this.score++; } }
     this.nextX -= this.speed * dt;
     if (this.nextX < W) { this.pipes.push({ x: this.nextX + 60, gap: this.r(60, H - 80 - this.gapH) }); this.nextX += this.r(180, 220); }
@@ -352,16 +357,20 @@ class Flap extends Game {
     this.clear(c);
     for (const p of this.pipes) {
       c.fillStyle = this.col(2); roundRect(c, p.x, -10, 54, p.gap + 10, 6); c.fill(); roundRect(c, p.x, p.gap + this.gapH, 54, H, 6); c.fill();
+      const pt = this.skin.pick('pipe', 'tile', 'block');
+      if (pt) { c.globalAlpha = 0.6; drawRectImg(c, pt, p.x, -10, 54, p.gap + 10, true); drawRectImg(c, pt, p.x, p.gap + this.gapH, 54, H, true); c.globalAlpha = 1; }
       c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(p.x + 8, -10, 6, p.gap + 10); c.fillRect(p.x + 8, p.gap + this.gapH, 6, H);
     }
     c.fillStyle = this.col(1); c.fillRect(0, H - 20, W, 20);
     if (!this.dead) {
       const b = this.b;
       c.save(); c.translate(b.x, b.y); c.rotate(Math.max(-0.5, Math.min(1.2, b.vy / 500)));
-      c.fillStyle = this.col(0); c.beginPath(); c.arc(0, 0, b.r, 0, 7); c.fill();
-      c.fillStyle = this.pal.ink; c.beginPath(); c.arc(4, -3, 3.5, 0, 7); c.fill();
-      c.fillStyle = this.pal.bg; c.beginPath(); c.arc(5, -3, 1.6, 0, 7); c.fill();
-      c.fillStyle = this.col(1); c.beginPath(); c.moveTo(9, 0); c.lineTo(16, 2); c.lineTo(9, 4); c.fill();
+      if (!drawFit(c, this.skin.pick('bird', 'animal', 'enemy', 'ship'), 0, 0, b.r * 3 * this.S, b.r * 3 * this.S)) {
+        c.fillStyle = this.col(0); c.beginPath(); c.arc(0, 0, b.r, 0, 7); c.fill();
+        c.fillStyle = this.pal.ink; c.beginPath(); c.arc(4, -3, 3.5, 0, 7); c.fill();
+        c.fillStyle = this.pal.bg; c.beginPath(); c.arc(5, -3, 1.6, 0, 7); c.fill();
+        c.fillStyle = this.col(1); c.beginPath(); c.moveTo(9, 0); c.lineTo(16, 2); c.lineTo(9, 4); c.fill();
+      }
       c.restore();
     }
   }
@@ -403,7 +412,7 @@ class Stacker extends Game {
     if (this.over) { this.over -= dt; if (this.over <= 0) this.reset(); }
     const m = this.mov;
     if (!this.over) { m.x += this.dir * this.mspeed * dt; if (m.x > W) this.dir = -1; if (m.x + m.w < 0) this.dir = 1; }
-    for (const d of this.debris) { d.vy += 900 * dt; d.y += d.vy * dt; d.x += d.vx * dt; d.rot += d.vr * dt; }
+    for (const d of this.debris) { d.vy += 900 * this.G * dt; d.y += d.vy * dt; d.x += d.vx * dt; d.rot += d.vr * dt; }
     this.debris = this.debris.filter((d) => d.y - this.cam < H + 100);
     const targetCam = Math.min(0, this.stack[this.stack.length - 1].y - H * 0.55);
     this.cam += (targetCam - this.cam) * Math.min(1, dt * 4);
@@ -411,7 +420,8 @@ class Stacker extends Game {
   draw(c) {
     this.clear(c);
     c.save(); c.translate(0, -this.cam);
-    this.stack.forEach((s, i) => { c.fillStyle = this.colFor(i); c.fillRect(s.x, s.y, s.w, 22); c.fillStyle = 'rgba(0,0,0,.15)'; c.fillRect(s.x, s.y + 18, s.w, 4); });
+    const tex = this.skin.pick('stk', 'tile', 'block');
+    this.stack.forEach((s, i) => { c.fillStyle = this.colFor(i); c.fillRect(s.x, s.y, s.w, 22); if (tex) { c.globalAlpha = 0.45; drawRectImg(c, tex, s.x, s.y, s.w, 22, true); c.globalAlpha = 1; } c.fillStyle = 'rgba(0,0,0,.15)'; c.fillRect(s.x, s.y + 18, s.w, 4); });
     if (!this.over) { c.fillStyle = this.colFor(this.stack.length); c.fillRect(this.mov.x, this.mov.y, this.mov.w, 22); }
     for (const d of this.debris) { c.save(); c.translate(d.x + d.w / 2, d.y + 11); c.rotate(d.rot); c.fillStyle = d.c; c.fillRect(-d.w / 2, -11, d.w, 22); c.restore(); }
     c.restore();
@@ -468,7 +478,7 @@ class Pong extends Game {
     this.text(c, String(this.pts[1]), W - 24, H / 2 + 24, 22, 'rgba(255,255,255,.2)');
     c.fillStyle = this.col(3); roundRect(c, this.top.x - this.top.w / 2, 20, this.top.w, 10, 5); c.fill();
     c.fillStyle = this.col(0); roundRect(c, this.bot.x - this.bot.w / 2, H - 30, this.bot.w, 10, 5); c.fill();
-    c.fillStyle = this.pal.ink; c.beginPath(); c.arc(this.b.x, this.b.y, this.b.r, 0, 7); c.fill();
+    this.orb(c, this.skin.pick('pb', 'ball', 'animal', 'item'), this.b.x, this.b.y, this.b.r * this.S, this.pal.ink, this.t * 3);
   }
 }
 
@@ -516,7 +526,7 @@ class PegShot extends Game {
     this.pegs = this.pegs.filter((p) => p.gone === 0 || p.gone > 0);
     const b = this.ball;
     if (!b) { if (this.shots <= 0 || !this.pegs.some((p) => p.target)) { this.score += this.shots * 50; this.level(); } return; }
-    b.vy += 480 * dt; b.x += b.vx * dt; b.y += b.vy * dt;
+    b.vy += 480 * this.G * dt; b.x += b.vx * dt; b.y += b.vy * dt;
     walls(b, 0, W, 0, null, 0.9);
     for (const p of this.pegs) if (!p.gone && circlePeg(b, p, 0.78)) { if (!p.lit) { p.lit = true; b.hits++; this.score += p.target ? 100 : 10; } }
     if (b.y > H - 18 && Math.abs(b.x - bk.x) < 34) { this.shots++; this.burst(b.x, b.y, this.col(1), 16); this.ball = null; this.clearLit(); return; }
@@ -529,7 +539,8 @@ class PegShot extends Game {
     for (const p of this.pegs) {
       c.fillStyle = p.target ? this.col(0) : this.col(5);
       c.globalAlpha = p.gone ? Math.max(0, p.gone * 4) : 1;
-      c.beginPath(); c.arc(p.x, p.y, p.r + (p.lit ? 1.5 : 0), 0, 7); c.fill();
+      const pi = p.target ? this.skin.pick('tgt', 'item', 'enemy') : null;
+      if (!pi || !drawFit(c, pi, p.x, p.y, 17, 17)) { c.beginPath(); c.arc(p.x, p.y, p.r + (p.lit ? 1.5 : 0), 0, 7); c.fill(); }
       if (p.lit) { c.strokeStyle = this.pal.ink; c.lineWidth = 2; c.stroke(); }
     }
     c.globalAlpha = 1;
@@ -542,7 +553,7 @@ class PegShot extends Game {
     c.fillStyle = this.col(1); roundRect(c, 0, -7, 30, 14, 5); c.fill(); c.restore();
     c.fillStyle = this.col(2); c.beginPath(); c.arc(W / 2, 34, 14, 0, 7); c.fill();
     c.fillStyle = this.col(1); c.globalAlpha = 0.8; roundRect(c, this.bucket.x - 34, H - 16, 68, 14, 6); c.fill(); c.globalAlpha = 1;
-    if (this.ball) { c.fillStyle = this.pal.ink; c.beginPath(); c.arc(this.ball.x, this.ball.y, this.ball.r, 0, 7); c.fill(); }
+    if (this.ball) this.orb(c, this.skin.pick('shot', 'ball', 'item', 'animal'), this.ball.x, this.ball.y, this.ball.r * this.S, this.pal.ink, this.t * 5);
   }
 }
 function shuffleWith(a, rng) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -628,8 +639,8 @@ class Golf extends Game {
     c.fillStyle = '#35432a'; for (let y = 0; y < H; y += 28) c.fillRect(0, y, W, 14);
     if (this.sand) { c.fillStyle = '#b89a62'; roundRect(c, this.sand.x, this.sand.y, this.sand.w, this.sand.h, 20); c.fill(); }
     c.strokeStyle = this.col(1); c.lineWidth = 6; c.strokeRect(7, 7, W - 14, H - 14);
-    c.fillStyle = this.col(3); for (const r of this.rects) { roundRect(c, r.x, r.y, r.w, r.h, 4); c.fill(); }
-    for (const b of this.bumpers) { c.fillStyle = this.col(0); c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.fill(); c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.arc(b.x, b.y, b.r * 0.5, 0, 7); c.fill(); }
+    c.fillStyle = this.col(3); const gw = this.skin.pick('gwall', 'tile', 'block'); for (const r of this.rects) { roundRect(c, r.x, r.y, r.w, r.h, 4); c.fill(); if (gw) { c.save(); c.clip(); drawRectImg(c, gw, r.x, r.y, r.w, r.h, true); c.restore(); } }
+    for (const b of this.bumpers) { if (!drawFit(c, this.skin.pick(`bump${b.r | 0}`, 'item', 'enemy', 'animal'), b.x, b.y, b.r * 2.2, b.r * 2.2)) { c.fillStyle = this.col(0); c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.fill(); c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.arc(b.x, b.y, b.r * 0.5, 0, 7); c.fill(); } }
     c.fillStyle = '#0b0a08'; c.beginPath(); c.arc(this.cup.x, this.cup.y, this.cup.r, 0, 7); c.fill();
     c.strokeStyle = this.pal.ink; c.lineWidth = 2; c.beginPath(); c.moveTo(this.cup.x, this.cup.y); c.lineTo(this.cup.x, this.cup.y - 34); c.stroke();
     c.fillStyle = this.col(0); c.beginPath(); c.moveTo(this.cup.x, this.cup.y - 34); c.lineTo(this.cup.x + 18, this.cup.y - 28); c.lineTo(this.cup.x, this.cup.y - 22); c.fill();
@@ -645,7 +656,7 @@ class Golf extends Game {
 class Juggle extends Game {
   setup() { this.reset(); }
   reset() { this.balls = [this.mk()]; this.score = 0; this.drops = 0; }
-  mk() { return { x: this.r(80, W - 80), y: this.r(60, 140), vx: this.r(-60, 60), vy: 0, r: 22, spin: 0, c1: this.col(this.ri(0, 5)), c2: this.col(this.ri(0, 5)), cd: 0 }; }
+  mk() { return { i: this.skin.any('ball', 'animal', 'item', 'enemy'), x: this.r(80, W - 80), y: this.r(60, 140), vx: this.r(-60, 60), vy: 0, r: 22 * this.S, spin: 0, c1: this.col(this.ri(0, 5)), c2: this.col(this.ri(0, 5)), cd: 0 }; }
   kick(b, x) { b.vy = -560 - this.r(0, 60); b.vx += (b.x - x) * 7; b.spin += (b.x - x) * 0.2; b.cd = 0.15; this.score++; this.burst(b.x, b.y + b.r, b.c1, 6, 100); if (this.score % 15 === 0 && this.balls.length < 4) this.balls.push(this.mk()); }
   autopilot() {
     for (const b of this.balls) if (b.vy > 0 && b.y > H * 0.66 && b.cd <= 0) this.kick(b, b.x + this.r(-9, 9));
@@ -656,7 +667,7 @@ class Juggle extends Game {
   }
   step(dt) {
     for (const b of this.balls) {
-      b.cd -= dt; b.vy += 720 * dt; b.vx *= 0.999; b.x += b.vx * dt; b.y += b.vy * dt; b.spin *= 0.99;
+      b.cd -= dt; b.vy += 720 * this.G * dt; b.vx *= 0.999; b.x += b.vx * dt; b.y += b.vy * dt; b.spin *= 0.99;
       walls(b, 0, W, 0, null, 0.8);
       if (b.y - b.r > H) { b.dead = true; this.drops++; }
     }
@@ -668,6 +679,7 @@ class Juggle extends Game {
     this.clear(c);
     c.fillStyle = 'rgba(255,255,255,.05)'; c.fillRect(0, H * 0.66, W, 2);
     for (const b of this.balls) {
+      if (drawFit(c, b.i, b.x, b.y, b.r * 2.2, b.r * 2.2, (this.ang || 0) * b.spin * 0.1 + b.x * 0.02)) continue;
       c.save(); c.translate(b.x, b.y); c.rotate((this.ang || 0) * b.spin * 0.1 + b.x * 0.02);
       for (let i = 0; i < 6; i++) { c.fillStyle = i % 2 ? b.c1 : b.c2; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, b.r, (i * Math.PI) / 3, ((i + 1) * Math.PI) / 3); c.fill(); }
       c.fillStyle = this.pal.ink; c.beginPath(); c.arc(0, 0, 4, 0, 7); c.fill();
@@ -676,8 +688,10 @@ class Juggle extends Game {
   }
 }
 
-export const GAMES = { plinko: Plinko, breakout: Breakout, merge: Merge, dash: Dash, flappy: Flap, stacker: Stacker, pong: Pong, peggle: PegShot, golf: Golf, juggle: Juggle };
+export const GAMES = { plinko: Plinko, breakout: Breakout, merge: Merge, dash: Dash, flappy: Flap, stacker: Stacker, pong: Pong, peggle: PegShot, golf: Golf, juggle: Juggle, platformer: Platformer, racer: Racer, raycast: Raycast, rocks: Rocks, sling: Sling };
 export const GAME_HINT = {
   plinko: 'tap to drop a ball', breakout: 'drag to move the paddle', merge: 'drag to aim, release to drop', dash: 'tap to jump (twice to double-jump)',
-  flappy: 'tap to flap', stacker: 'tap to drop the block', pong: 'drag to move your paddle', peggle: 'aim, release to shoot', golf: 'drag back from anywhere, release to putt', juggle: 'tap the balls to keep them up'
+  flappy: 'tap to flap', stacker: 'tap to drop the block', pong: 'drag to move your paddle', peggle: 'aim, release to shoot', golf: 'drag back from anywhere, release to putt', juggle: 'tap the balls to keep them up',
+  platformer: 'tap to jump, twice to double-jump, stomp enemies', racer: 'hold left or right to steer', raycast: 'drag to turn, hold to walk, tap to shoot',
+  rocks: 'tap to shoot, hold to thrust toward your finger', sling: 'drag back and release to launch'
 };

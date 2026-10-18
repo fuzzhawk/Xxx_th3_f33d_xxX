@@ -1,156 +1,231 @@
-// Card renderers. Each card is a plain element; heavy content (iframes, canvases)
-// is created in card._activate() and torn down in card._deactivate(), which the
-// feed calls as cards scroll in and out of view.
-import { el, toast, fmtDur } from './util.js';
+// Post renderers, laid out like a social feed: header (avatar, handle, context),
+// full-width media, an action row, then the caption. Heavy content (iframes,
+// canvases) is created in card._activate() and torn down in card._deactivate().
+import { el, toast, fmtDur, copyText } from './util.js';
 import { settings, setMark, marks, CAT_LABEL } from './state.js';
 import * as favs from './favs.js';
 import { setImg } from './images.js';
 import { productSVG } from './productart.js';
 import { GAMES, GAME_HINT } from './games/all.js';
+import { MUTATORS } from './games/engine.js';
 import { Psych } from './psych.js';
+import { icon } from './icons.js';
+import { actionSheet } from './sheet.js';
+import { saveFromPost } from './save.js';
 import * as stats from './stats.js';
 
 const TOPIC_COLOR = {
-  music: '#e8742a', literature: '#c9952b', science: '#7d8a4a', history: '#b5532f', transgressive: '#d06a8c', mysteries: '#6d8fa0', occult: '#9a7bb0',
+  music: '#e8742a', literature: '#c9952b', science: '#8a9a52', history: '#c4623a', transgressive: '#d06a8c', mysteries: '#6d9bb0', occult: '#a283c4',
   animals: '#d8a25a', retrogaming: '#5b9aa9', vintagescifi: '#a77bd0'
 };
 const TOPIC_GLYPH = { music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉' };
+const CAT_FACE = { game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'] };
 let soundOn = false;
-const ICON_HEART = '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.2-8.6C1.3 8.4 3 5 6.4 5c2.1 0 3.6 1.2 4.6 2.7C12 6.2 13.5 5 15.6 5 19 5 20.7 8.4 19.2 11.4 17 15.6 12 20 12 20z"/></svg>';
-const ICON_SAVE = '<svg viewBox="0 0 24 24"><path d="M6 3.5h12v17l-6-4.2-6 4.2z"/></svg>';
 
 export function labelOf(post) {
   return post.title || post.name || post.text || post.quote || post.top || post.vid || post.id;
 }
+const handleFor = (post, ctx) => {
+  switch (post.cat) {
+    case 'wiki': return [`wiki.${post.sub}`, `${ctx.topics?.wiki?.[post.sub] || post.sub} · Wikipedia`];
+    case 'video': return [post.channel ? post.channel.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'tube' : `tube.${post.sub}`, `${ctx.topics?.video?.[post.sub] || 'Video'}${post.dur ? ` · ${post.dur}` : ''}`];
+    case 'game': return ['arcade', `${ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
+    case 'meme': return [post.sub === 'kym' ? 'knowyourmeme' : 'meme.lord', post.sub === 'kym' ? 'Know Your Meme' : 'remix'];
+    case 'product': return ['infomercial.tv', 'Sponsored · not available in stores'];
+    case 'psych': return ['the.trip', `${post.sub} · generative`];
+    case 'selfcare': return ['self.care', post.title];
+    case 'web': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'web', `${post.sub === 'comic' ? 'Comic' : post.sub === 'hn' ? 'Hacker News' : post.source || 'Web'}${post.date ? ` · ${post.date}` : ''}`];
+    default: return [post.cat, ''];
+  }
+};
 
+// ------------------------------------------------ shared chrome
+function header(post, ctx) {
+  const [handle, sub] = handleFor(post, ctx);
+  const [g, bg] = post.cat === 'wiki' ? [TOPIC_GLYPH[post.sub] || 'W', TOPIC_COLOR[post.sub] || '#3a3530'] : CAT_FACE[post.cat] || ['•', '#333'];
+  const more = el('button.more-btn', { 'aria-label': 'More', html: icon('more') });
+  more.onclick = (e) => { e.stopPropagation(); postMenu(post, ctx, more.closest('.post')); };
+  return el('div.post-head',
+    el('div.avatar', el('span', { style: { background: bg } }, g)),
+    el('div.who', el('b', handle, post.cat === 'wiki' || post.cat === 'product' ? el('span.tick', '✓') : null), el('small', sub)),
+    more);
+}
+export function postMenu(post, ctx, card) {
+  const link = post.url || post.link || (post.vid ? `https://www.youtube.com/watch?v=${post.vid}` : null);
+  const hasMedia = card?.querySelector('.media img, .media canvas, .media svg.art');
+  actionSheet(labelOf(post).toString().slice(0, 70), [
+    hasMedia && { icon: 'download', label: 'Save image to gallery', run: () => saveFromPost(card) },
+    link && { icon: 'send', label: 'Open original', run: () => window.open(link, '_blank') },
+    link && { icon: 'link', label: 'Copy link', run: async () => toast((await copyText(link)) ? 'Link copied' : 'Copy failed') },
+    { icon: 'up', label: marks[post.id]?.v === 1 ? 'Clear "more like this"' : 'More like this', run: () => { toast(setMark(post, 1, labelOf(post)) ? 'You will see more like this' : 'Mark cleared'); card?._sync?.(); } },
+    { icon: 'down', label: marks[post.id]?.v === -1 ? 'Clear "less like this"' : 'Less like this', run: () => { toast(setMark(post, -1, labelOf(post)) ? 'You will see less like this' : 'Mark cleared'); card?._sync?.(); } }
+  ]);
+}
 function actions(post, ctx, ext) {
-  const fav = el('button.fav', { 'aria-label': 'Favorite', title: 'Favorite', html: ICON_HEART });
-  const save = el('button.save', { 'aria-label': 'Save', title: 'Save for later', html: ICON_SAVE });
-  const up = el('button.up', { 'aria-label': 'More like this', title: 'More like this' }, '▲');
-  const down = el('button.down', { 'aria-label': 'Less like this', title: 'Less like this' }, '▼');
+  const btn = (cls, ic, label) => el(`button.${cls}`, { 'aria-label': label, html: icon(ic) });
+  const fav = btn('fav', 'heart', 'Favorite'), up = btn('up', 'up', 'More like this'), down = btn('down', 'down', 'Less like this'), save = btn('save', 'bookmark', 'Save');
+  const share = ext ? btn('share', 'send', 'Open') : null;
   const sync = () => {
     fav.classList.toggle('on', favs.has('fav', post.id));
     save.classList.toggle('on', favs.has('save', post.id));
     up.classList.toggle('on', marks[post.id]?.v === 1);
     down.classList.toggle('on', marks[post.id]?.v === -1);
   };
-  fav.onclick = (e) => { e.stopPropagation(); const on = favs.toggle('fav', post, ctx.pkgId); toast(on ? 'Added to favorites' : 'Removed from favorites'); sync(); };
-  save.onclick = (e) => { e.stopPropagation(); const on = favs.toggle('save', post, ctx.pkgId); toast(on ? 'Saved' : 'Unsaved'); sync(); };
-  up.onclick = (e) => { e.stopPropagation(); const v = setMark(post, 1, labelOf(post)); toast(v ? 'More like this' : 'Mark cleared'); sync(); };
-  down.onclick = (e) => { e.stopPropagation(); const v = setMark(post, -1, labelOf(post)); toast(v ? 'Less like this' : 'Mark cleared'); sync(); };
+  fav.onclick = (e) => { e.stopPropagation(); favs.toggle('fav', post, ctx.pkgId); sync(); };
+  save.onclick = (e) => { e.stopPropagation(); toast(favs.toggle('save', post, ctx.pkgId) ? 'Saved' : 'Removed from saved'); sync(); };
+  up.onclick = (e) => { e.stopPropagation(); toast(setMark(post, 1, labelOf(post)) ? 'More like this' : 'Mark cleared'); sync(); };
+  down.onclick = (e) => { e.stopPropagation(); toast(setMark(post, -1, labelOf(post)) ? 'Less like this' : 'Mark cleared'); sync(); };
+  if (share) share.onclick = (e) => { e.stopPropagation(); window.open(ext, '_blank'); };
   sync();
-  const bar = el('div.actions', fav, save, up, down, el('span.spacer'), ext || null);
+  const bar = el('div.actions', fav, up, down, share, el('span.spacer'), save);
   bar._sync = sync;
   return bar;
 }
-const extLink = (url, label = 'Open ↗') => (url ? el('a.ext', { href: url, target: '_blank', rel: 'noopener', onclick: (e) => e.stopPropagation() }, label) : null);
-function head(post, label, color, extra) {
-  return el('div.card-head', el('span.badge', { style: color ? { background: color } : null }, label), extra ? el('span', extra) : null);
+function post(cls, p, ctx, { media, body, ext, caption, metaLine, mediaInteractive = false } = {}) {
+  const bar = actions(p, ctx, ext);
+  const card = el(`article.post.${cls}`, header(p, ctx), media || null, body || null, bar, caption || null, metaLine ? el('div.meta-line', metaLine) : null);
+  card._sync = bar._sync;
+  if (media) wireMedia(card, media, p, ctx, mediaInteractive);
+  return card;
 }
+// double-tap to like, long-press for the save menu
+function wireMedia(card, media, p, ctx, interactive) {
+  const heart = el('div.bigheart', { html: icon('heart', 'fill') });
+  media.append(heart);
+  let lastTap = 0, timer = null, sx = 0, sy = 0, longFired = false;
+  media.addEventListener('contextmenu', (e) => e.preventDefault());
+  media.addEventListener('pointerdown', (e) => {
+    sx = e.clientX; sy = e.clientY; longFired = false;
+    clearTimeout(timer);
+    if (interactive && card.querySelector('.stage.playing')) return;
+    timer = setTimeout(() => { longFired = true; navigator.vibrate?.(12); postMenu(p, ctx, card); }, 520);
+  });
+  media.addEventListener('pointermove', (e) => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 10) clearTimeout(timer); });
+  media.addEventListener('pointerup', () => clearTimeout(timer));
+  media.addEventListener('pointercancel', () => clearTimeout(timer));
+  media.addEventListener('click', (e) => {
+    if (longFired) { e.stopPropagation(); e.preventDefault(); return; }
+    if (interactive) return;
+    const now = Date.now();
+    if (now - lastTap < 300) {
+      if (!favs.has('fav', p.id)) favs.toggle('fav', p, ctx.pkgId);
+      card._sync?.();
+      heart.classList.remove('pop'); void heart.offsetWidth; heart.classList.add('pop');
+    }
+    lastTap = now;
+  }, true);
+}
+const capt = (handle, text, extra) => el('div.caption', el('b', handle), text, extra || null);
 
-// ------------------------------------------------ wiki
-function wiki(post, ctx) {
-  const topic = ctx.topics?.wiki?.[post.sub] || post.sub;
-  const rest = post.summary.startsWith(post.hook.replace(/…$/, '')) ? post.summary.slice(post.hook.replace(/…$/, '').length).trim() : post.summary;
-  const card = el('article.card.wiki',
-    el('span.glyph', TOPIC_GLYPH[post.sub] || '❦'),
-    head(post, topic, TOPIC_COLOR[post.sub], 'Wikipedia'),
-    el('div.card-body',
-      el('h3', post.title),
-      el('div.hook', post.hook.endsWith('…') ? post.hook : post.hook),
-      el('div.more', rest ? el('p', rest) : null),
-      el('span.tapmore', 'tap to read more')),
-    actions(post, ctx, extLink(post.url, 'Full article ↗')));
-  if (post.thumb && settings.showWikiImages) {
+// ------------------------------------------------ wiki (text post)
+function wiki(p, ctx) {
+  const topic = ctx.topics?.wiki?.[p.sub] || p.sub;
+  const hookBase = p.hook.replace(/…$/, '');
+  const rest = p.summary.startsWith(hookBase) ? p.summary.slice(hookBase.length).trim() : p.summary;
+  const tp = el('div.textpost', { style: { '--tc': TOPIC_COLOR[p.sub] || '#c9952b' } },
+    el('div.kicker', topic), el('h3', p.title), el('div.hook', p.hook),
+    rest ? el('div.rest', el('p', rest)) : null,
+    rest ? el('span.tapmore', 'Tap to read more') : null);
+  tp.style.setProperty('--tc', TOPIC_COLOR[p.sub] || '#c9952b');
+  const body = el('div', tp);
+  if (p.thumb && settings.showWikiImages) {
     const img = el('img.thumb', { alt: '', loading: 'lazy' });
-    setImg(img, post.thumb, () => img.remove());
-    card.insertBefore(img, card.children[1]);
+    setImg(img, p.thumb, () => img.remove());
+    body.prepend(img);
   }
-  card.onclick = () => card.classList.toggle('open');
+  const card = post('wiki', p, ctx, { body, ext: p.url, metaLine: 'From Wikipedia, the free encyclopedia' });
+  tp.onclick = () => card.classList.toggle('open');
   return card;
 }
 
 // ------------------------------------------------ video
-function video(post, ctx) {
+function video(p, ctx) {
   const frame = el('div.frame');
   const poster = el('img', { alt: '', loading: 'lazy' });
-  poster.src = `https://i.ytimg.com/vi/${post.vid}/${post.short ? 'oar2' : 'hqdefault'}.jpg`;
-  poster.onerror = () => { if (!poster.dataset.f) { poster.dataset.f = 1; poster.src = `https://i.ytimg.com/vi/${post.vid}/hqdefault.jpg`; } else poster.remove(); };
-  const unmute = el('button.unmute', soundOn ? '🔇 Mute' : '🔊 Unmute');
+  poster.src = `https://i.ytimg.com/vi/${p.vid}/${p.short ? 'oar2' : 'hqdefault'}.jpg`;
+  poster.onerror = () => { if (!poster.dataset.f) { poster.dataset.f = 1; poster.src = `https://i.ytimg.com/vi/${p.vid}/hqdefault.jpg`; } else poster.remove(); };
+  const unmute = el('button.pillbtn.unmute', { html: icon('mute') });
   let iframe = null;
   const send = (func, args = []) => iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+  const setLabel = () => { unmute.innerHTML = icon(card._muted ? 'mute' : 'sound'); };
+  const onMsg = (e) => {
+    if (!iframe || e.source !== iframe.contentWindow) return;
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    if (d.event === 'onError' || (d.event === 'infoDelivery' && d.info?.playerState === undefined && d.info?.errorCode)) unavailable(d.info);
+  };
+  const unavailable = (code) => {
+    removeEventListener('message', onMsg);
+    frame.replaceChildren(el('div.offline', `This video can't play here (YouTube error ${code ?? ''}). Skipping it.`));
+    card._skip = true;
+    setTimeout(() => { card.style.transition = 'opacity .4s'; card.style.opacity = '0'; setTimeout(() => card.remove(), 420); }, 1400);
+  };
   const mount = () => {
     if (iframe) return;
     if (!navigator.onLine) { frame.replaceChildren(el('div.offline', 'You are offline. This video will play when you are back online.')); return; }
     const muted = settings.startMuted && !(settings.rememberSound && soundOn);
-    const q = new URLSearchParams({ autoplay: 1, mute: muted ? 1 : 0, playsinline: 1, loop: 1, playlist: post.vid, controls: 1, rel: 0, modestbranding: 1, enablejsapi: 1, origin: location.origin });
-    iframe = el('iframe', { src: `https://www.youtube.com/embed/${post.vid}?${q}`, allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', allowfullscreen: true, referrerpolicy: 'strict-origin-when-cross-origin', title: post.title });
+    const q = new URLSearchParams({ autoplay: 1, mute: muted ? 1 : 0, playsinline: 1, loop: 1, playlist: p.vid, controls: 1, rel: 0, modestbranding: 1, enablejsapi: 1, origin: location.origin });
+    iframe = el('iframe', { src: `https://www.youtube.com/embed/${p.vid}?${q}`, allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', allowfullscreen: true, referrerpolicy: 'strict-origin-when-cross-origin', title: p.title });
+    iframe.addEventListener('load', () => iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: p.vid, channel: 'widget' }), '*'));
+    addEventListener('message', onMsg);
     frame.append(iframe);
-    unmute.textContent = muted ? '🔊 Unmute' : '🔇 Mute';
-    card._muted = muted;
+    card._muted = muted; setLabel();
   };
   unmute.onclick = (e) => {
     e.stopPropagation();
-    if (!iframe) { mount(); }
+    if (!iframe) mount();
     card._muted = !card._muted;
     send(card._muted ? 'mute' : 'unMute'); if (!card._muted) send('setVolume', [100]);
-    soundOn = !card._muted;
-    unmute.textContent = card._muted ? '🔊 Unmute' : '🔇 Mute';
+    soundOn = !card._muted; setLabel();
   };
   frame.append(poster, unmute);
-  const card = el(`article.card.video${post.short ? '.short' : ''}`,
-    head(post, ctx.topics?.video?.[post.sub] || 'Video', TOPIC_COLOR[post.sub], post.dur || ''),
-    el('div', { style: { height: '10px' } }),
-    frame,
-    el('div.title', post.title),
-    post.channel ? el('div.channel', post.channel) : null,
-    actions(post, ctx, extLink(`https://www.youtube.com/watch?v=${post.vid}`, 'YouTube ↗')));
+  const media = el('div.media', frame);
+  const card = post(`video${p.short ? '.short' : ''}`, p, ctx, { media, ext: `https://www.youtube.com/watch?v=${p.vid}`, caption: capt(handleFor(p, ctx)[0], p.title), mediaInteractive: true });
   if (!settings.autoplay) {
-    const play = el('button.unmute', { style: { left: '50%', right: 'auto', bottom: '50%', transform: 'translate(-50%,50%)', fontSize: '18px' } }, '▶ Play');
+    const play = el('button.pillbtn.play', { html: `${icon('play', 'fill')}<span>Play</span>` });
     play.onclick = (e) => { e.stopPropagation(); play.remove(); mount(); };
     frame.append(play);
   }
   card._activate = () => { if (settings.autoplay) mount(); };
-  card._deactivate = () => { if (iframe) { iframe.remove(); iframe = null; } };
+  card._deactivate = () => { if (iframe) { removeEventListener('message', onMsg); iframe.remove(); iframe = null; } };
   card._heavy = true;
   return card;
 }
 
 // ------------------------------------------------ games
-function game(post, ctx) {
+function game(p, ctx) {
   const canvas = el('canvas');
   const mode = el('span.pill.auto', 'AUTO');
   const score = el('span.pill', '0');
-  const hint = el('div.hint', `tap the game to play · ${GAME_HINT[post.sub] || ''}`);
-  const autobtn = el('button.autobtn', '⟲ autopilot');
-  const stage = el('div.stage', canvas, el('div.hud', mode, score), autobtn);
-  const name = ctx.topics?.game?.[post.sub] || post.sub;
-  const card = el('article.card.game', head(post, 'Game', '#7d8a4a', name), el('div.gtitle', post.title), hint, el('div', { style: { height: '8px' } }), stage, actions(post, ctx));
+  const hud = el('div.hud', mode, score);
+  const autobtn = el('button.pillbtn.autobtn', { html: `${icon('replay')}<span>Autopilot</span>` });
+  const tapplay = el('div.pillbtn.tapplay', { html: `${icon('play', 'fill')}<span>Tap to play</span>` });
+  const stage = el('div.stage', canvas, hud, autobtn, tapplay);
+  const media = el('div.media', stage);
+  const hint = el('span.muted', GAME_HINT[p.sub] || '');
+  const card = post('game', p, ctx, { media, caption: capt('arcade', `${p.title} · `, hint), mediaInteractive: true });
   let g = null, idle;
-  const Cls = GAMES[post.sub] || GAMES.plinko;
+  const Cls = GAMES[p.sub] || GAMES.plinko;
   const ensure = () => {
     if (g) return g;
-    g = new Cls(canvas, post);
+    g = new Cls(canvas, p);
     g.onHud = (s) => { if (score.textContent !== s) score.textContent = s; };
+    for (const m of g.modLabels()) hud.append(el('span.pill.mod', m));
     return g;
   };
-  const setPlaying = (p) => {
-    ensure().setAuto(!p);
-    stage.classList.toggle('playing', p);
-    mode.textContent = p ? 'YOU' : 'AUTO';
-    mode.className = `pill ${p ? 'live' : 'auto'}`;
-    card.classList.toggle('playing', p);
-    hint.textContent = p ? `playing · ${GAME_HINT[post.sub] || ''} · drag outside the game to scroll` : `tap the game to play · ${GAME_HINT[post.sub] || ''}`;
-    if (p && !g.running) g.start();
+  const setPlaying = (on) => {
+    ensure().setAuto(!on);
+    stage.classList.toggle('playing', on);
+    mode.textContent = on ? 'YOU' : 'AUTO';
+    mode.className = `pill ${on ? 'live' : 'auto'}`;
+    hint.textContent = on ? `${GAME_HINT[p.sub] || ''} · scroll from outside the game` : GAME_HINT[p.sub] || '';
+    if (on && !g.running) g.start();
     bump();
   };
   const bump = () => { clearTimeout(idle); idle = setTimeout(() => { if (!g?.auto) setPlaying(false); }, 25000); };
-  stage.addEventListener('click', (e) => {
-    if (!g || g.auto) { setPlaying(true); const p = g.local(e); g.tap(p.x, p.y); }
-  });
-  canvas.addEventListener('pointerdown', (e) => { if (!g || g.auto) return; canvas.setPointerCapture(e.pointerId); const p = g.local(e); g.pointer.down = true; g.down(p.x, p.y); bump(); });
-  canvas.addEventListener('pointermove', (e) => { if (!g || g.auto) return; const p = g.local(e); g.move(p.x, p.y); });
-  canvas.addEventListener('pointerup', (e) => { if (!g || g.auto) return; const p = g.local(e); g.pointer.down = false; g.up(p.x, p.y); });
+  stage.addEventListener('click', (e) => { if (!g || g.auto) { setPlaying(true); const q = g.local(e); g.tap(q.x, q.y); } });
+  canvas.addEventListener('pointerdown', (e) => { if (!g || g.auto) return; canvas.setPointerCapture(e.pointerId); const q = g.local(e); g.pointer.down = true; g.down(q.x, q.y); bump(); });
+  canvas.addEventListener('pointermove', (e) => { if (!g || g.auto) return; const q = g.local(e); g.move(q.x, q.y); });
+  canvas.addEventListener('pointerup', (e) => { if (!g || g.auto) return; const q = g.local(e); g.pointer.down = false; g.up(q.x, q.y); });
   autobtn.onclick = (e) => { e.stopPropagation(); setPlaying(false); };
   card._activate = () => { ensure(); if (settings.autopilot || !g.auto) g.start(); else { g.resize(); g.frame(performance.now()); } };
   card._deactivate = () => { g?.stop(); };
@@ -159,70 +234,43 @@ function game(post, ctx) {
 }
 
 // ------------------------------------------------ psychedelic
-function psych(post, ctx) {
+function psych(p, ctx) {
   const canvas = el('canvas');
-  const stage = el('div.stage', canvas, el('div.quote', `“${post.quote.replace(/^["“]|["”]$/g, '')}”`, post.author ? el('small', `— ${post.author}`) : null));
-  const card = el('article.card.psych', stage, actions(post, ctx));
-  let p = null;
-  stage.onclick = () => { if (p) { p.stop(); p = new Psych(canvas, { ...post, seed: (Math.random() * 2 ** 31) | 0 }, settings); p.start(); } };
-  card._activate = () => { p ||= new Psych(canvas, post, settings); p.start(); };
-  card._deactivate = () => p?.stop();
+  const stage = el('div.stage', canvas, el('div.quote', `“${p.quote.replace(/^["“]|["”]$/g, '')}”`, p.author ? el('small', `— ${p.author}`) : null));
+  const media = el('div.media', stage);
+  const card = post('psych', p, ctx, { media, caption: capt('the.trip', el('span.muted', 'tap twice to keep it · tap and hold to save')) });
+  let fx = null;
+  card._activate = () => { fx ||= new Psych(canvas, p, settings); fx.start(); };
+  card._deactivate = () => fx?.stop();
   card._heavy = true;
   return card;
 }
 
 // ------------------------------------------------ memes
-function meme(post, ctx) {
+function meme(p, ctx) {
   const box = el('div.img');
-  const img = el('img', { alt: post.text || post.title || 'meme', loading: 'lazy' });
-  const fallback = () => {
-    img.remove();
-    box.prepend(el('div.noimg', ['🦉', '🐐', '🐸', '🦝', '🐈', '🦆', '🛸', '🗿'][post.id.length % 8]));
-  };
-  setImg(img, post.img, fallback);
-  if (post.ratio) img.style.aspectRatio = `${1 / post.ratio}`;
+  const img = el('img', { alt: p.text || p.title || 'meme', loading: 'lazy' });
+  setImg(img, p.img, () => { img.remove(); box.prepend(el('div.noimg', ['🦉', '🐐', '🐸', '🦝', '🐈', '🦆', '🛸', '🗿'][p.id.length % 8])); });
+  if (p.ratio) img.style.aspectRatio = `${1 / p.ratio}`;
   box.append(img);
-  if (post.style === 'impact') {
-    if (post.top) box.append(el('div.impact.top', post.top));
-    if (post.bottom) box.append(el('div.impact.bottom', post.bottom));
-  }
-  const card = el('article.card.meme',
-    head(post, 'Meme', '#d8c3a5', post.sub === 'kym' ? 'Know Your Meme' : ''),
-    el('div', { style: { height: '10px' } }),
-    post.style === 'caption' ? el('div.caption', post.text) : null,
-    post.style === 'kym' ? el('div.kymtitle', post.title) : null,
-    box,
-    post.credit ? el('div.credit', post.credit) : null,
-    actions(post, ctx, extLink(post.link, post.sub === 'kym' ? 'KYM ↗' : 'Source ↗')));
-  return card;
+  if (p.style === 'impact') { if (p.top) box.append(el('div.impact.top', p.top)); if (p.bottom) box.append(el('div.impact.bottom', p.bottom)); }
+  const media = el('div.media', p.style === 'caption' ? el('div.mcap', p.text) : null, box);
+  return post('meme', p, ctx, { media, ext: p.link, caption: p.style === 'kym' ? capt('knowyourmeme', p.title) : null, metaLine: p.credit });
 }
 
 // ------------------------------------------------ products
 const CART = ['Your cart is now in a superposition.', 'Added to a cart that does not exist.', 'Order received. It will arrive yesterday.', 'Thank you. Your call is important to the void.', 'Out of stock in this timeline.', 'Shipping to your astral address.', 'Payment accepted: one (1) daydream.'];
-function product(post, ctx) {
-  const art = el('div', { html: productSVG(post) });
-  const card = el('article.card.product',
-    head(post, 'Product', '#ff7a1a', 'not available in stores'),
-    el('div', { style: { height: '10px' } }),
-    art.firstElementChild,
-    el('div.card-body',
-      el('h3', post.name),
-      el('div.tag', post.tagline),
-      el('p', post.desc),
-      el('ul', post.features.map((f) => el('li', f))),
-      el('div.price', el('b', post.price), el('button.buy', { onclick: (e) => { e.stopPropagation(); toast(CART[Math.floor(Math.random() * CART.length)]); } }, 'Add to cart')),
-      el('div.fine', post.disclaimer)),
-    actions(post, ctx));
-  return card;
+function product(p, ctx) {
+  const art = el('div', { html: productSVG(p) }).firstElementChild;
+  const media = el('div.media', art);
+  const body = el('div.pbody',
+    el('div.shop', el('div', el('b', p.name), el('small', p.price)), el('button.buy', { onclick: (e) => { e.stopPropagation(); toast(CART[Math.floor(Math.random() * CART.length)]); } }, 'Shop now')));
+  const caption = el('div.pbody', el('div.tag', p.tagline), el('p', p.desc), el('ul', p.features.map((f) => el('li', f))), el('div', { style: { fontSize: '11px', color: 'var(--faint)' } }, p.disclaimer));
+  return post('product', p, ctx, { media, body, caption });
 }
 
 // ------------------------------------------------ self care
-const BREATH = {
-  box: [['in', 4], ['hold', 4], ['out', 4], ['hold', 4]],
-  478: [['in', 4], ['hold', 7], ['out', 8]],
-  coherent: [['in', 5], ['out', 5]],
-  sigh: [['in', 2], ['in more', 1], ['out', 6]]
-};
+const BREATH = { box: [['in', 4], ['hold', 4], ['out', 4], ['hold', 4]], 478: [['in', 4], ['hold', 7], ['out', 8]], coherent: [['in', 5], ['out', 5]], sigh: [['in', 2], ['in more', 1], ['out', 6]] };
 let audioCtx;
 function chime() {
   try {
@@ -230,25 +278,26 @@ function chime() {
     [523.25, 783.99, 1046.5].forEach((f, i) => {
       const o = audioCtx.createOscillator(), g = audioCtx.createGain();
       o.frequency.value = f; o.type = 'sine';
-      g.gain.setValueAtTime(0.0001, audioCtx.currentTime + i * 0.18);
-      g.gain.exponentialRampToValueAtTime(0.2, audioCtx.currentTime + i * 0.18 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + i * 0.18 + 1.2);
-      o.connect(g).connect(audioCtx.destination); o.start(audioCtx.currentTime + i * 0.18); o.stop(audioCtx.currentTime + i * 0.18 + 1.3);
+      const t = audioCtx.currentTime + i * 0.18;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.2, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+      o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + 1.3);
     });
   } catch { /* no audio */ }
 }
-function selfcare(post, ctx) {
+function selfcare(p, ctx) {
   const row = el('div.row');
-  const body = el('div.sc-body', el('div.sc-title', post.title), el('div.sc-text', post.text), row);
+  const sc = el('div.sc', el('div.sc-title', p.title), el('div.sc-text', p.text), row);
+  sc.style.setProperty('--h', p.hue ?? 30);
   const done = el('button.btn', { onclick: (e) => { e.stopPropagation(); stats.selfcareDone(); done.textContent = 'Nice ✓'; done.disabled = true; toast('Logged. Proud of you.'); } }, 'Did it ✓');
-  if (post.kind === 'timer') {
-    const cd = el('span.countdown', fmtDur(post.dur));
+  const card = post('selfcare', p, ctx, { body: sc });
+  if (p.kind === 'timer') {
+    const cd = el('span.countdown', fmtDur(p.dur));
     let iv;
     const start = el('button.btn.primary', {
       onclick: (e) => {
         e.stopPropagation();
         if (iv) { clearInterval(iv); iv = null; start.textContent = 'Resume'; return; }
-        const end = Date.now() + (cd._left ?? post.dur) * 1000;
+        const end = Date.now() + (cd._left ?? p.dur) * 1000;
         start.textContent = 'Pause';
         iv = setInterval(() => {
           const left = Math.max(0, Math.round((end - Date.now()) / 1000));
@@ -256,18 +305,18 @@ function selfcare(post, ctx) {
           if (!left) { clearInterval(iv); iv = null; chime(); stats.selfcareDone(); start.textContent = 'Done ✓'; start.disabled = true; toast('Time! Welcome back.'); }
         }, 250);
       }
-    }, `Start ${fmtDur(post.dur, true)}`);
+    }, `Start ${fmtDur(p.dur, true)}`);
     row.append(cd, start);
-  } else if (post.kind === 'breathe') {
+  } else if (p.kind === 'breathe') {
     const ball = el('div.ball'), lbl = el('div.lbl', 'tap start');
-    body.insertBefore(el('div.breath', ball, lbl), row);
+    sc.insertBefore(el('div.breath', ball, lbl), row);
     let running = false;
     const startB = el('button.btn.primary', {
       onclick: async (e) => {
         e.stopPropagation();
         if (running) return;
         running = true; startB.disabled = true;
-        const seq = BREATH[post.pattern] || BREATH.box;
+        const seq = BREATH[p.pattern] || BREATH.box;
         for (let cycle = 0; cycle < 4 && card.isConnected; cycle++) {
           for (const [ph, s] of seq) {
             lbl.textContent = `${ph} · ${s}`;
@@ -282,37 +331,45 @@ function selfcare(post, ctx) {
     }, 'Start');
     row.append(startB);
   } else row.append(done);
-  const card = el('article.card.selfcare', { style: { '--h': post.hue ?? 30 } }, body, actions(post, ctx));
-  card.style.setProperty('--h', post.hue ?? 30);
   return card;
 }
 
-// ------------------------------------------------ web
-function web(post, ctx) {
-  const badge = { hn: 'hn', substack: 'substack', reddit: 'reddit' }[post.sub] || '';
-  const card = el('article.card.web',
-    el('div.card-head', el(`span.badge.${badge}`, post.source || post.sub), post.date ? el('span', post.date) : null),
-    el('div.card-body',
-      el('h3', post.title),
-      post.excerpt ? el('div.ex', post.excerpt) : null,
-      post.meta ? el('div.meta', post.meta) : null),
-    actions(post, ctx, el('span', { style: { display: 'flex', gap: '6px' } }, post.discuss && post.discuss !== post.url ? extLink(post.discuss, 'Comments') : null, extLink(post.url))));
+// ------------------------------------------------ web: link previews and comics
+function web(p, ctx) {
+  if (p.sub === 'comic') return comic(p, ctx);
+  const lc = el('a.linkcard', { href: p.url, target: '_blank', rel: 'noopener', onclick: (e) => e.stopPropagation() });
+  if (p.thumb) { const img = el('img', { alt: '', loading: 'lazy' }); setImg(img, p.thumb, () => img.remove()); lc.append(img); }
+  lc.append(el('div.lc-body', el('div.lc-src', p.source || p.sub), el('h3', p.title), p.excerpt ? el('div.ex', p.excerpt) : null));
+  const metaBits = [p.meta, p.discuss && p.discuss !== p.url ? 'tap ⋯ for comments' : null].filter(Boolean).join(' · ');
+  const card = post('web', p, ctx, { body: lc, ext: p.url, metaLine: metaBits || null });
+  if (p.discuss && p.discuss !== p.url) card.querySelector('.meta-line')?.addEventListener('click', () => window.open(p.discuss, '_blank'));
   return card;
+}
+function comic(p, ctx) {
+  const img = el('img', { alt: p.title, loading: 'lazy' });
+  const media = el('div.media', img);
+  setImg(img, p.img, () => { img.remove(); media.prepend(el('div.noimg', '✎')); });
+  if (p.nsfw && settings.blurNsfw) {
+    const veil = el('div.nsfw-veil', 'Adult comic · tap to show');
+    veil.onclick = (e) => { e.stopPropagation(); veil.remove(); };
+    media.append(veil);
+  }
+  return post('comic', p, ctx, { media, ext: p.url, caption: capt(handleFor(p, ctx)[0], p.title, p.excerpt ? el('div.muted', { style: { marginTop: '4px' } }, p.excerpt) : null), metaLine: p.date || null });
 }
 
 // ------------------------------------------------ special
 export function notice(title, text, buttons = []) {
-  return el('article.card.notice', el('h3', title), el('p', text), el('div.btnrow', { style: { justifyContent: 'center' } }, buttons));
+  return el('article.notice', el('h3', title), el('p', text), el('div.btnrow', { style: { justifyContent: 'center' } }, buttons));
 }
 
 const RENDER = { wiki, video, game, psych, meme, product, selfcare, web };
-export function renderCard(post, ctx) {
-  const fn = RENDER[post.cat];
+export function renderCard(p, ctx) {
+  const fn = RENDER[p.cat];
   if (!fn) return null;
-  const card = fn(post, ctx);
-  card.dataset.id = post.id;
-  card.dataset.cat = post.cat;
-  card._post = post;
+  const card = fn(p, ctx);
+  card.dataset.id = p.id;
+  card.dataset.cat = p.cat;
+  card._post = p;
   return card;
 }
-export { CAT_LABEL };
+export { CAT_LABEL, MUTATORS };

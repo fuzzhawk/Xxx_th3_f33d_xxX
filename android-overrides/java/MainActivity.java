@@ -25,7 +25,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     // Hides the navigation buttons; a swipe up from the bottom edge shows them briefly.
-    void setImmersive(boolean on) {
+    void setFeedImmersive(boolean on) {
         immersive = on;
         prefs().edit().putBoolean("immersive", on).apply();
         applyImmersive();
