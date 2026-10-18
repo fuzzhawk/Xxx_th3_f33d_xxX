@@ -1,17 +1,18 @@
-WARN platformer-pack-redux: HTTP 404 https://kenney.nl/assets/platformer-pack-redux; search "platformer" found nothing
+platformer-pack-redux: using platformer-art-buildings
+platformer-pack-redux: kept 61 of 98 (tile, item, road)
 physics-assets: kept 69 of 334 (char, bg, deco, tile, block, road, item)
-WARN puzzle-pack: HTTP 404 https://kenney.nl/assets/puzzle-pack; search "puzzle" found nothing
-WARN animal-pack-redux: HTTP 404 https://kenney.nl/assets/animal-pack-redux; search "animal" found nothing
+WARN puzzle-pack: HTTP 404 https://kenney.nl/assets/puzzle-pack; no match for "puzzle" among 16 sitemap assets
+WARN animal-pack-redux: HTTP 404 https://kenney.nl/assets/animal-pack-redux; no match for "animal" among 16 sitemap assets
 racing-pack: kept 78 of 423 (car, char, road, deco, fx, tile)
-WARN space-shooter-redux: HTTP 404 https://kenney.nl/assets/space-shooter-redux; search "space shooter" found nothing
-WARN background-elements-redux: HTTP 404 https://kenney.nl/assets/background-elements-redux; search "background elements" found nothing
+WARN space-shooter-redux: HTTP 404 https://kenney.nl/assets/space-shooter-redux; no match for "space shooter" among 16 sitemap assets
+WARN background-elements-redux: HTTP 404 https://kenney.nl/assets/background-elements-redux; no match for "background elements" among 16 sitemap assets
 pixel-platformer: kept 48 of 231 (bg, char, tile)
 tiny-dungeon: kept 60 of 132 (tile)
 rolling-ball-assets: kept 29 of 59 (bg, ball, tile, road, deco, item, fx)
 monster-builder-pack: kept 32 of 178 (deco, fx)
-WARN toon-characters-1: HTTP 404 https://kenney.nl/assets/toon-characters-1; search "toon characters" found nothing
+WARN toon-characters-1: HTTP 404 https://kenney.nl/assets/toon-characters-1; no match for "toon characters" among 16 sitemap assets
 shape-characters: kept 26 of 104 (fx, deco, tile, bg, item)
 alien-ufo-pack: kept 31 of 46 (deco, tile, ship)
 emotes-pack: kept 28 of 240 (deco, fx, item)
 particle-pack: kept 8 of 192 (bg)
-total 0.8 MB {"char":50,"bg":30,"deco":86,"tile":123,"block":17,"road":20,"item":28,"car":15,"fx":22,"ball":5,"ship":13}
+total 0.9 MB {"tile":176,"item":32,"road":24,"char":50,"bg":30,"deco":86,"block":17,"car":15,"fx":22,"ball":5,"ship":13}
