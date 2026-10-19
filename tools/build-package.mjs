@@ -674,7 +674,8 @@ function assignThemes(games, kits) {
 const GAME_NAMES = {
   plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', stacker: 'Stacker', pong: 'Pong', peggle: 'Peg Shot', golf: 'Bounce Golf', juggle: 'Juggle',
   platformer: 'Platformer', racer: 'Road Racer', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot',
-  necro: 'Necromancer', chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl'
+  necro: 'Necromancer', chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl',
+  starfox: 'Sky Fox', mystery: 'Manor Mystery', ski: 'Downhill', graves: 'Grave Merge', survivors: 'Cave Horde', robotron: 'Robo Arena', crokinole: 'Crokinole'
 };
 const ADJ = ['Ember', 'Moss', 'Rust', 'Ochre', 'Clay', 'Amber', 'Dusk', 'Ash', 'Copper', 'Sage', 'Umber', 'Saffron', 'Cedar', 'Flint', 'Honey', 'Basalt', 'Juniper', 'Tangerine', 'Cinder', 'Sienna', 'Lichen', 'Marigold', 'Obsidian', 'Fern', 'Paprika', 'Driftwood', 'Terracotta', 'Pumpkin', 'Gravel', 'Sunset'];
 function buildGames() {

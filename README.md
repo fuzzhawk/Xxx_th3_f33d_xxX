@@ -50,7 +50,7 @@ kept for archiving and to avoid repeats. Each one is sized for 5 hours a day for
 
 | Category | Share | Source |
 |---|---|---|
-| Games | 20% | 21 game types with autopilot, themed sprite kits and random modifiers |
+| Games | 20% | 28 game types with autopilot, themed sprite kits and random modifiers |
 | Condensed Wikipedia | 30% | Wikipedia API: seed articles, categories, "more like" search |
 | Videos | 20% | YouTube search (short videos), checked for embedding |
 | Memes | 10% | Wikimedia Commons images + Wikiquote/Wikipedia captions, Know Your Meme |
