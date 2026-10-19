@@ -423,7 +423,10 @@ async function readFeed(f) {
   for (let k = 0; k < (f.max || 10) && page; k++) {
     const title = (page.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) || page.match(/<title>([^<]+)<\/title>/i) || [])[1];
     const img = (page.match(/<img[^>]+(?:id|class)=["'][^"']*(?:comic|strip|blort|cc-comic|main)[^"']*["'][^>]*>/i) || page.match(/<(?:main|article)[\s\S]*?(<img[^>]+>)/i) || [])[0];
-    const src = img && (img.match(/src=["']([^"']+)["']/i) || [])[1];
+    let src = img && (img.match(/src=["']([^"']+)["']/i) || [])[1];
+    // fall back to the first image that isn't site chrome, then og:image
+    if (!src) src = [...page.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map((m) => m[1]).find((u) => !/logo|icon|avatar|banner|button|badge|sprite|spacer|pixel/i.test(u));
+    if (!src) src = (page.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) || [])[1];
     if (src) items.push({ title: decodeEntities(title || f.name).trim(), link: url, html: `<img src="${src}">`, date: null });
     const prev = (page.match(/<a[^>]+rel=["']prev["'][^>]*href=["']([^"']+)["']/i) || page.match(/<a[^>]+href=["']([^"']+)["'][^>]*rel=["']prev["']/i) || page.match(/<a[^>]+(?:class|id)=["'][^"']*prev[^"']*["'][^>]*href=["']([^"']+)["']/i) || [])[1];
     if (!prev) break;
@@ -431,6 +434,7 @@ async function readFeed(f) {
     try { page = await fetchText(url, { ua: BROWSER_UA, retries: 0 }); } catch { page = null; }
   }
   if (items.length) log(`feed ${f.name}: scraped ${items.length} pages`);
+  else report.sources[`${f.name} home`] = { bytes: html.length, links: [...html.matchAll(/<(?:link|a)[^>]+href=["']([^"']+)["']/gi)].map((m) => m[1]).slice(0, 30), imgs: [...html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map((m) => m[1]).slice(0, 15) };
   return items.length ? { title: f.name, items } : null;
 }
 function firstImg(html, base) {
