@@ -1,9 +1,9 @@
 platformer-pack-redux: using platformer-art-buildings
-platformer-pack-redux: kept 61 of 98 (tile, item, road)
-physics-assets: kept 69 of 334 (char, bg, deco, tile, block, road, item)
+platformer-pack-redux: kept 59 of 98 (tile, road, item)
+physics-assets: kept 59 of 334 (char, bg, deco, tile, block, road, item)
 WARN puzzle-pack: HTTP 404 https://kenney.nl/assets/puzzle-pack; no match for "puzzle" among 16 sitemap assets
 WARN animal-pack-redux: HTTP 404 https://kenney.nl/assets/animal-pack-redux; no match for "animal" among 16 sitemap assets
-racing-pack: kept 78 of 423 (car, char, road, deco, fx, tile)
+racing-pack: kept 77 of 423 (car, char, road, deco, fx, tile)
 WARN space-shooter-redux: HTTP 404 https://kenney.nl/assets/space-shooter-redux; no match for "space shooter" among 16 sitemap assets
 WARN background-elements-redux: HTTP 404 https://kenney.nl/assets/background-elements-redux; no match for "background elements" among 16 sitemap assets
 pixel-platformer: kept 48 of 231 (bg, char, tile)
@@ -15,4 +15,4 @@ shape-characters: kept 26 of 104 (fx, deco, tile, bg, item)
 alien-ufo-pack: kept 31 of 46 (deco, tile, ship)
 emotes-pack: kept 28 of 240 (deco, fx, item)
 particle-pack: kept 8 of 192 (bg)
-total 0.9 MB {"tile":176,"item":32,"road":24,"char":50,"bg":30,"deco":86,"block":17,"car":15,"fx":22,"ball":5,"ship":13}
+total 0.9 MB {"tile":176,"road":24,"item":30,"char":40,"bg":30,"deco":85,"block":17,"car":15,"fx":22,"ball":5,"ship":13}
