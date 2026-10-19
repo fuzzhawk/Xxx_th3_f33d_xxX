@@ -1,8 +1,8 @@
 {
   "id": "2026-W43",
   "title": "The Feed · 2026-W43",
-  "created": "2026-10-18T23:17:51.274Z",
-  "total": 5477,
+  "created": "2026-10-19T19:56:24.681Z",
+  "total": 5669,
   "counts": {
     "game": 1140,
     "wiki": 1715,
@@ -11,7 +11,8 @@
     "product": 285,
     "psych": 285,
     "selfcare": 285,
-    "web": 285
+    "web": 285,
+    "news": 192
   },
   "estHours": 36.7,
   "categories": {
@@ -46,6 +47,10 @@
     "web": {
       "label": "From the web",
       "pct": 5
+    },
+    "news": {
+      "label": "News",
+      "pct": 0
     }
   },
   "topics": {
@@ -83,15 +88,27 @@
       "juggle": "Juggle",
       "platformer": "Platformer",
       "racer": "Road Racer",
-      "raycast": "Maze Shooter",
+      "raycast": "Hell Maze",
       "rocks": "Rocks",
-      "sling": "Slingshot"
+      "sling": "Slingshot",
+      "necro": "Necromancer",
+      "chess": "Chess",
+      "dice": "Yacht Dice",
+      "cards": "Joker Hands",
+      "monsters": "Monster Battle",
+      "fighter": "Street Brawl"
     },
     "web": {
       "hn": "Hacker News",
       "site": "Sites",
       "comic": "Comics",
       "reddit": "Reddit"
+    },
+    "news": {
+      "mideast": "Middle East / Palestine",
+      "globalsouth": "Anti-imperialist / Global South",
+      "usleft": "US left",
+      "wire": "Wire services"
     }
   },
   "files": {
@@ -102,69 +119,104 @@
     "product": "product.json",
     "psych": "psych.json",
     "selfcare": "selfcare.json",
-    "web": "web.json"
+    "web": "web.json",
+    "news": "news.json"
   },
   "sprites": "sprites.json",
+  "themes": "themes.json",
   "prompt": "# The Feed — package prompt\n\nThis is the living spec for each weekly package. It is editable from the app\n(Settings → Package prompt) and synced back here. Each new package is\ngenerated from this file, `tools/data/config.json`, and the newest file in\n`feedback/`.\n\n## Goals\n- Replace 3–5 hours/day of doomscrolling with a feed that is curious, weird and kind.\n- One package lasts a full week (target: 5 h/day × 7 days) with **no repeated posts**,\n  and nothing repeated from earlier packages.\n- Mostly offline. Only videos (and, optionally, images) need the network.\n- Keep AI-generated images and text to a minimum unless a category asks for it.\n- Use favorites, saves and more/less marks from `feedback/` to steer the next package.\n\n## Categories and share of the feed\n\n### Physics games — 20%\nSimple 2D physics games: bouncing objects, merging items, breaking blocks,\nside-scrolling dash mechanics and other classic casual styles. Each card runs on\nauto-pilot when it appears and becomes playable when tapped.\n\n### Condensed Wikipedia — 30%\nArticles condensed to 5 sentences or fewer. Each card shows a one-sentence hook;\ntapping it expands the summary and links to the full article. Topics:\n- **Music history**: all genres, especially underground trip-hop, punk, avant-garde,\n  electronic, hip-hop, heavy metal and transgressive experimental.\n- **Literature**: all genres, especially sci-fi, sex and erotica, Beat Generation authors,\n  esoteric and occult, experimental, offbeat non-fiction, poetry and alternative science.\n- **Science**: especially biology, sociology, psychology, technology and mathematics.\n- **History**: especially revolutionary periods, indigenous history and art history.\n- **Transgressive art**: especially queer artists and artists imprisoned or persecuted for their work.\n- **Unsolved mysteries**: especially esoteric and supernatural mysteries.\n- **Occult and religious customs**: indigenous spirituality, Gnosticism and cult activities.\n\n### YouTube videos — 20%\nMostly short videos and reels. They autoplay muted and have an unmute button. Topics:\ncute animals, retro gaming, vintage sci-fi and fantasy films and shows, plus every\nWikipedia topic above.\n\n### Memes — 10%\nHumorous images juxtaposed with snippets from the Wikipedia section, plus quotes\nfrom Robert Anton Wilson, William S. Burroughs, Tom Robbins and other offbeat authors.\nAlso memes collected from knowyourmeme.com.\n\n### Made-up products — 5%\nWeird, absurd products that don't exist and serve surreal purposes, with 80s/90s-style\npromo graphics and absurdist product descriptions.\n\n### Psychedelic visuals — 5%\nFractals, tunnels, fading colors and other generative, math-based imagery, each with a\nshort quote from the sections above.\n\n### Self-care reminders — 5%\nPrompts to make art and music, go for walks, work out, breathe, meditate and so on.\n\n### From around the web — 5%\nCarefully picked posts and articles from Substack, Hacker News and occasionally Reddit,\nchosen to match the topics above.\n",
   "report": {
     "sources": {
       "wikiquote": 2052,
       "wikipedia": 1715,
       "youtube": 912,
-      "hackernews": 516,
+      "hackernews": 499,
       "sites": {
         "Lobsters": 25,
-        "Tildes ~books": 8,
         "Tildes ~science": 8,
         "Tildes ~music": 8,
+        "Tildes ~books": 8,
         "Tildes ~humanities": 6,
-        "MetaFilter": 12,
         "Tildes ~arts": 6,
         "Slashdot": 12,
         "Kottke": 15,
-        "Atlas Obscura": 20,
-        "The Public Domain Review": 15,
+        "MetaFilter": 17,
         "JSTOR Daily": 10,
-        "Nautilus": 10,
-        "Aeon": 15,
-        "Hackaday": 7,
         "Quanta Magazine": 5,
-        "The Marginalian": 12,
+        "The Public Domain Review": 15,
+        "Atlas Obscura": 20,
+        "Aeon": 15,
+        "Nautilus": 10,
+        "Hackaday": 7,
         "Hyperallergic": 15,
-        "The Daily Grail": 10,
+        "Open Culture": 15,
+        "The Marginalian": 12,
         "Colossal": 10,
+        "The Daily Grail": 10,
         "Bandcamp Daily": 15,
         "Experimental History": 6,
-        "Open Culture": 15,
         "The Quietus": 15
       },
       "comics": 137,
       "reddit": 0,
       "commons": 851,
       "knowyourmeme": 0,
-      "sprites": 48,
+      "sprites": 26,
+      "themes": 64,
+      "news": {
+        "Mondoweiss": 10,
+        "Al Jazeera English": 20,
+        "Middle East Eye": 20,
+        "Drop Site News": 20,
+        "Tricontinental": 10,
+        "Peoples Dispatch": 12,
+        "Democracy Now!": 20,
+        "Common Dreams": 20,
+        "Reuters": 20,
+        "AP": 20,
+        "Geopolitical Economy Report": 10,
+        "Declassified UK": 10
+      },
       "memesBuilt": 570
     },
     "warnings": [
-      "youtube music: 1/10 searches failed",
+      "youtube mysteries: 1/8 searches failed",
       "feed Everlasting Blort https://everlastingblort.com/feed: fetch failed",
       "feed Everlasting Blort https://www.everlastingblort.com/feed: fetch failed",
       "feed Everlasting Blort https://everlastingblort.com/rss: fetch failed",
-      "feed Everlasting Blort https://everlastingblort.tumblr.com/rss: HTTP 403",
+      "feed Everlasting Blort https://everlastingblort.tumblr.com/rss: HTTP 404",
       "reddit occult: HTTP 403",
       "reddit HighStrangeness: HTTP 403",
-      "reddit UnresolvedMysteries: HTTP 403",
       "reddit AskHistorians: HTTP 403",
-      "reddit printSF: HTTP 403",
+      "reddit UnresolvedMysteries: HTTP 403",
       "reddit triphop: HTTP 403",
+      "reddit printSF: HTTP 403",
       "reddit Gnosticism: HTTP 403",
       "reddit experimentalmusic: HTTP 403",
-      "reddit Psychonaut: HTTP 403",
       "reddit retrogaming: HTTP 403",
-      "reddit AlternativeHistory: HTTP 403",
+      "reddit Psychonaut: HTTP 403",
       "reddit WeirdWheels: HTTP 403",
-      "knowyourmeme https://knowyourmeme.com/memes/trending: HTTP 404"
+      "reddit AlternativeHistory: HTTP 403",
+      "knowyourmeme https://knowyourmeme.com/memes/trending: HTTP 404",
+      "feed The Cradle https://thecradlemedia.substack.com/feed: HTTP 403",
+      "feed The Electronic Intifada https://electronicintifada.net/rss.xml: HTTP 403",
+      "feed +972 Magazine https://972mag.com/feed: HTTP 403"
     ],
+    "memeStyles": {
+      "isthis": 37,
+      "chyron": 30,
+      "labels": 44,
+      "pov": 28,
+      "caption": 107,
+      "post": 31,
+      "quotecard": 25,
+      "demotivator": 46,
+      "brain": 24,
+      "starter": 34,
+      "impact": 74,
+      "twopanel": 51,
+      "versus": 39
+    },
     "wanted": {
       "game": 1140,
       "wiki": 1711,
@@ -173,7 +225,8 @@
       "product": 285,
       "psych": 285,
       "selfcare": 285,
-      "web": 285
+      "web": 285,
+      "news": 0
     }
   }
 }

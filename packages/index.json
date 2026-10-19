@@ -3,8 +3,8 @@
     {
       "id": "2026-W43",
       "title": "The Feed · 2026-W43",
-      "created": "2026-10-18T23:17:51.274Z",
-      "total": 5477,
+      "created": "2026-10-19T19:56:24.681Z",
+      "total": 5669,
       "counts": {
         "game": 1140,
         "wiki": 1715,
@@ -13,7 +13,8 @@
         "product": 285,
         "psych": 285,
         "selfcare": 285,
-        "web": 285
+        "web": 285,
+        "news": 192
       },
       "estHours": 36.7
     }
