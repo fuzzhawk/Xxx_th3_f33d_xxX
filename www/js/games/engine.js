@@ -11,15 +11,17 @@ export const MUTATORS = {
   slow: { label: 'SLOW-MO', time: 0.6 },
   giant: { label: 'GIANT', size: 1.45 },
   tiny: { label: 'TINY', size: 0.7 },
-  trails: { label: 'TRAILS' },
-  mirror: { label: 'MIRROR' },
-  wobble: { label: 'WOBBLE' },
-  hue: { label: 'ACID' },
-  invert: { label: 'NEGATIVE' },
-  junk: { label: 'JUNK RAIN' },
-  pixel: { label: '8-BIT' },
-  party: { label: 'PARTY' },
-  chaos: { label: 'CHAOS' }
+  trails: { label: 'TRAILS', w: 0.7 },
+  mirror: { label: 'MIRROR', w: 0.5 },
+  wobble: { label: 'WOBBLE', w: 0.12 },
+  hue: { label: 'ACID', w: 0.6 },
+  invert: { label: 'NEGATIVE', w: 0.35 },
+  junk: { label: 'JUNK RAIN', w: 0.5 },
+  pixel: { label: '8-BIT', w: 0.8 },
+  party: { label: 'PARTY', w: 0.8 },
+  chaos: { label: 'CHAOS', w: 0.4 },
+  swarm: { label: 'SWARM', w: 1.2 },
+  glass: { label: 'GLASS CANNON', w: 0.8 }
 };
 const EXCLUSIVE = [['lowg', 'heavy'], ['fast', 'slow'], ['giant', 'tiny'], ['hue', 'invert']];
 
@@ -41,7 +43,7 @@ export class Game {
     this.ctx = canvas.getContext('2d');
     this.post = post;
     this.rng = mulberry32(post.seed || 1);
-    this.pal = PALETTES[(post.seed >>> 3) % PALETTES.length];
+    this.pal = PALETTES[(post.seed >>> 3) % PALETTES.length]; // replaced by the theme palette below
     this.W = W; this.H = H;
     this.auto = true;
     this.score = 0;
@@ -53,20 +55,26 @@ export class Game {
     this.pointer = { x: W / 2, y: H / 2, down: false };
     this.onHud = null;
     this.rollMutators(post);
-    this.skin = new Skin(mulberry32((post.seed || 1) ^ 0x5bd1e995), this.mods.chaos ? 0.75 : 0.28);
-    this.bgStyle = ['grad', 'image', 'pattern', 'props', 'image', 'grad'][(post.seed >>> 5) % 6];
-    this.bgImg = this.bgStyle === 'image' ? this.skin.pick('bg', 'bg') : this.bgStyle === 'pattern' ? this.skin.pick('bgtile', 'tile', 'block') : null;
-    this.wall = this.bgStyle === 'props' ? Array.from({ length: 9 }, () => ({ i: this.skin.prop(), x: this.r(0, W), y: this.r(0, H), s: this.r(40, 110), r: this.r(-0.6, 0.6) })) : null;
+    this.skin = new Skin(post, !!this.mods.chaos);
+    this.pal = this.skin.pal;
+    this.theme = this.skin.name;
+    this.bgImg = this.skin.bg || this.skin.slots.tile[0];
+    this.bgStyle = this.skin.bg ? 'image' : 'pattern';
+    this.wall = this.mods.chaos ? Array.from({ length: 9 }, () => ({ i: this.skin.prop(), x: this.r(0, W), y: this.r(0, H), s: this.r(40, 110), r: this.r(-0.6, 0.6) })) : null;
     this.junk = [];
     this.setup();
   }
   rollMutators(post) {
     const R = mulberry32((post.seed || 1) * 2654435761);
-    const keys = Object.keys(MUTATORS);
+    const banned = this.constructor.noMods || [];
+    const keys = Object.keys(MUTATORS).filter((k) => !banned.includes(k));
+    const total = keys.reduce((s, k) => s + (MUTATORS[k].w ?? 1), 0);
     const n = post.mods ? 0 : [0, 1, 1, 2, 2, 3][Math.floor(R() * 6)];
     const picked = new Set(post.mods || []);
-    while (picked.size < n) {
-      const k = keys[Math.floor(R() * keys.length)];
+    let guard = 0;
+    while (picked.size < n && guard++ < 50) {
+      let x = R() * total, k = keys[0];
+      for (const kk of keys) { x -= MUTATORS[kk].w ?? 1; if (x <= 0) { k = kk; break; } }
       if (EXCLUSIVE.some((g) => g.includes(k) && g.some((o) => o !== k && picked.has(o)))) continue;
       picked.add(k);
     }
@@ -178,11 +186,12 @@ export class Game {
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     if (this.bgStyle === 'image' && ready(this.bgImg)) {
       const i = this.bgImg, s = Math.max(W / i.naturalWidth, H / i.naturalHeight);
-      c.globalAlpha = 0.55; c.drawImage(i, (W - i.naturalWidth * s) / 2, (H - i.naturalHeight * s) / 2, i.naturalWidth * s, i.naturalHeight * s);
+      c.globalAlpha = 0.6; c.drawImage(i, (W - i.naturalWidth * s) / 2, (H - i.naturalHeight * s) / 2, i.naturalWidth * s, i.naturalHeight * s);
       c.globalAlpha = 0.35; c.fillStyle = this.pal.bg; c.fillRect(0, 0, W, H); c.globalAlpha = 1;
     } else if (this.bgStyle === 'pattern' && ready(this.bgImg)) {
       c.globalAlpha = 0.16; drawRectImg(c, this.bgImg, 0, 0, W, H, true); c.globalAlpha = 1;
-    } else if (this.wall) {
+    }
+    if (this.wall) {
       c.globalAlpha = 0.18; for (const w of this.wall) drawFit(c, w.i, w.x, w.y, w.s, w.s, w.r); c.globalAlpha = 1;
     }
   }

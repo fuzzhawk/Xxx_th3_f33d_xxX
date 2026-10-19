@@ -19,7 +19,7 @@ export class Platformer extends Game {
     this.plat(x, y, w);
     if (this.rng() < 0.45) { const fx = x + this.r(30, w - 30), fy = y - this.r(70, 110); this.plats.push({ x: fx - 40, y: fy, w: 80, h: 14, float: true }); for (let i = 0; i < 3; i++) this.coins.push({ x: fx - 25 + i * 25, y: fy - 24 }); }
     else for (let i = 0; i < this.ri(0, 4); i++) this.coins.push({ x: x + 20 + i * 24, y: y - 30 });
-    if (w > 140 && this.rng() < 0.55) this.foes.push({ x: x + w * 0.6, y: y - 22, w: 22, h: 22, min: x + 4, max: x + w - 26, dir: -1, i: this.skin.any('enemy', 'animal', 'prop') });
+    if (w > 140 && this.rng() < (this.mods.swarm ? 0.85 : 0.55)) this.foes.push({ x: x + w * 0.6, y: y - 22, w: 22, h: 22, min: x + 4, max: x + w - 26, dir: -1, m: this.skin.creatures[1 + this.ri(0, 3)] });
   }
   ground(x0, x1, yb, prevYb) {
     let best = null;
@@ -77,10 +77,11 @@ export class Platformer extends Game {
     }
     const coin = this.skin.pick('coin', 'item');
     for (const k of this.coins) if (!drawFit(c, coin, k.x, k.y + Math.sin(this.t * 4 + k.x) * 3, 18, 18)) { c.fillStyle = this.col(1); c.beginPath(); c.arc(k.x, k.y, 6, 0, 7); c.fill(); }
-    for (const f of this.foes) if (!f.dead && !drawFit(c, f.i, f.x + 11, f.y + 11, 28 * this.S, 28 * this.S, 0, f.dir > 0)) { c.fillStyle = this.col(3); c.fillRect(f.x, f.y, f.w, f.h); }
+    for (const f of this.foes) if (!f.dead && !drawFit(c, f.m.frames[Math.floor(this.t * 5 + f.x) % 2], f.x + 11, f.y + 11, 30 * this.S, 30 * this.S, 0, f.dir > 0)) { c.fillStyle = this.col(3); c.fillRect(f.x, f.y, f.w, f.h); }
     if (!this.dead) {
       const p = this.p;
-      if (!drawFit(c, this.skin.pick('hero', 'char', 'animal'), p.x + p.w / 2, p.y + p.h / 2, 34 * this.S, 34 * this.S, p.on ? 0 : Math.sin(this.t * 10) * 0.15)) { c.fillStyle = this.col(0); roundRect(c, p.x, p.y, p.w, p.h, 5); c.fill(); }
+      const hero = this.skin.people[0], frame = !p.on ? hero.jump : hero.walk[Math.floor(this.t * 10) % 2];
+      if (!drawFit(c, frame, p.x + p.w / 2, p.y + p.h / 2 - 3, 36 * this.S, 40 * this.S)) { c.fillStyle = this.col(0); roundRect(c, p.x, p.y, p.w, p.h, 5); c.fill(); }
     }
     c.restore();
   }

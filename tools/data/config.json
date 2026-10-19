@@ -42,6 +42,11 @@
       "label": "From the web",
       "pct": 5,
       "dwellSec": 18
+    },
+    "news": {
+      "label": "News",
+      "pct": 0,
+      "dwellSec": 20
     }
   },
   "gameTypes": [
@@ -59,7 +64,13 @@
     "racer",
     "raycast",
     "rocks",
-    "sling"
+    "sling",
+    "necro",
+    "chess",
+    "dice",
+    "cards",
+    "monsters",
+    "fighter"
   ],
   "quoteAuthors": [
     "Robert Anton Wilson",
@@ -487,5 +498,94 @@
     "alien",
     "rocket"
   ],
-  "spriteCount": 160
+  "spriteCount": 160,
+  "news": {
+    "maxPerFeed": 20,
+    "groups": {
+      "mideast": {
+        "label": "Middle East / Palestine",
+        "feeds": [
+          [
+            "Mondoweiss",
+            "https://mondoweiss.net/feed"
+          ],
+          [
+            "The Electronic Intifada",
+            "https://electronicintifada.net/rss.xml"
+          ],
+          [
+            "Drop Site News",
+            "https://dropsitenews.com/feed"
+          ],
+          [
+            "The Cradle",
+            "https://thecradlemedia.substack.com/feed"
+          ],
+          [
+            "+972 Magazine",
+            "https://972mag.com/feed"
+          ],
+          [
+            "Middle East Eye",
+            "https://middleeasteye.net/rss"
+          ],
+          [
+            "Al Jazeera English",
+            "https://www.aljazeera.com/xml/rss/all.xml"
+          ]
+        ]
+      },
+      "globalsouth": {
+        "label": "Anti-imperialist / Global South",
+        "feeds": [
+          [
+            "Peoples Dispatch",
+            "https://peoplesdispatch.org/feed"
+          ],
+          [
+            "Geopolitical Economy Report",
+            "https://geopoliticaleconomy.com/feed"
+          ],
+          [
+            "Tricontinental",
+            "https://thetricontinental.org/feed"
+          ],
+          [
+            "Declassified UK",
+            "https://declassifieduk.org/feed"
+          ]
+        ]
+      },
+      "usleft": {
+        "label": "US left",
+        "feeds": [
+          [
+            "Democracy Now!",
+            "https://www.democracynow.org/democracynow.rss"
+          ],
+          [
+            "Common Dreams",
+            "https://www.commondreams.org/feeds/feed.rss"
+          ],
+          [
+            "MR Online",
+            "https://mronline.org/feed"
+          ]
+        ]
+      },
+      "wire": {
+        "label": "Wire services",
+        "feeds": [
+          [
+            "Reuters",
+            "https://news.google.com/rss/search?q=site:reuters.com+world"
+          ],
+          [
+            "AP",
+            "https://news.google.com/rss/search?q=site:apnews.com+world"
+          ]
+        ]
+      }
+    }
+  }
 }

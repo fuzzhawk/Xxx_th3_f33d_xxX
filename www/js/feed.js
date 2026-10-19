@@ -82,8 +82,8 @@ export class Feed {
   // Instagram-style "stories": one bubble per kind of post; tapping one focuses the feed on it.
   renderStories() {
     if (!this.storiesEl) return;
-    const FACE = { all: ['✦', '#2a2420'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✧', '#a07a22'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'] };
-    const NAME = { all: 'For you', game: 'Games', wiki: 'Wiki', video: 'Videos', meme: 'Memes', product: 'Shop', psych: 'Trip', selfcare: 'Breathe', web: 'Web' };
+    const FACE = { all: ['✦', '#2a2420'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✧', '#a07a22'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], news: ['◉', '#8a2b2b'] };
+    const NAME = { all: 'For you', game: 'Games', wiki: 'Wiki', video: 'Videos', meme: 'Memes', product: 'Shop', psych: 'Trip', selfcare: 'Breathe', web: 'Web', news: 'News' };
     const items = ['all', ...CATS.filter((c) => this.remaining(c) > 0)];
     const bubble = (c) => el(`button.story${(this.focus || 'all') === c ? '.on' : ''}`, { onclick: () => this.setFocus(c === 'all' ? null : c) },
       el('div.ring', el('div.face', { style: { background: FACE[c][1] } }, FACE[c][0])), el('span', NAME[c] || CAT_LABEL[c]));

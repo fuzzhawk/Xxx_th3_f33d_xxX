@@ -15,8 +15,8 @@ const src = path.resolve(ROOT, opt('src') || 'packages');
 const out = path.join(ROOT, 'www/bundled');
 
 const sh = (c) => { try { return execSync(c, { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return ''; } };
-const branch = process.env.BUILD_BRANCH || process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || sh('git rev-parse --abbrev-ref HEAD') || 'main';
-const sha = (process.env.GITHUB_SHA || sh('git rev-parse HEAD') || 'dev').slice(0, 7);
+const branch = process.env.BUILD_BRANCH || process.env.BRANCH || process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || sh('git rev-parse --abbrev-ref HEAD') || 'main';
+const sha = (process.env.GITHUB_SHA || process.env.COMMIT_REF || sh('git rev-parse HEAD') || 'dev').slice(0, 7);
 fs.writeFileSync(path.join(ROOT, 'www/build-info.js'), `window.BUILD = ${JSON.stringify({ branch, sha, date: new Date().toISOString().slice(0, 10) })};\n`);
 
 fs.rmSync(out, { recursive: true, force: true });

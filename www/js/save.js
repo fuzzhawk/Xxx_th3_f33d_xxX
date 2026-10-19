@@ -105,7 +105,7 @@ export async function saveFromPost(card) {
     }
   } catch (e) {
     console.warn('save failed', e);
-    const url = post?.img || post?.thumb;
+    const url = post?.img || post?.imgs?.[0] || post?.thumb;
     if (native() && url && /^https?:/.test(url)) {
       try { await window.Capacitor.nativePromise('FeedNative', 'saveUrl', { url, name: `thefeed-${Date.now() % 1000000}` }); toast('Saved to Pictures/The Feed'); return; }
       catch (e2) { toast(`Could not save: ${e2.message || e2}`); return; }

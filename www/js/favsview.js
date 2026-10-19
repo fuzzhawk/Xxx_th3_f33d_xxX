@@ -20,7 +20,7 @@ export function initFavs(view, ctxFn) {
 function tile(entry, i) {
   const p = entry.post;
   const t = el('button.tile', { onclick: () => { mode = 'list'; shown = Math.max(30, i + 10); jumpTo = p.id; render(); } });
-  const src = p.img || p.thumb || (p.vid ? `https://i.ytimg.com/vi/${p.vid}/hqdefault.jpg` : null);
+  const src = p.img || p.imgs?.[0] || p.thumb || (p.vid ? `https://i.ytimg.com/vi/${p.vid}/hqdefault.jpg` : null);
   if (src) { const img = el('img', { alt: '', loading: 'lazy' }); setImg(img, src, () => img.remove()); t.append(img); }
   else if (p.cat === 'product') t.append(el('div', { style: { position: 'absolute', inset: 0 }, html: productSVG(p) }));
   else t.append(el('span', (p.title || p.name || p.quote || p.text || '').toString().slice(0, 70)));

@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { hasTransparentEdges } from './png.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/data/assets.json'), 'utf8'));
@@ -53,7 +54,7 @@ async function get(url, binary) {
   return binary ? Buffer.from(await r.arrayBuffer()) : r.text();
 }
 
-const index = { license: 'CC0 1.0, Kenney (www.kenney.nl)', packs: {}, roles: {} };
+const index = { license: 'CC0 1.0, Kenney (www.kenney.nl)', packs: {}, roles: {}, files: {} };
 let total = 0;
 let sitemap = null;
 const cap = cfg.maxTotalMB * 1024 * 1024;
@@ -93,7 +94,11 @@ for (const pack of cfg.packs) {
       let role = pack.slug === 'animal-pack-redux' ? 'animal' : (ROLES.find(([, re]) => re.test(rel)) || ['deco'])[0];
       const isBg = role === 'bg';
       if (sz.w < 12 || sz.h < 12 || sz.w > (isBg ? 1400 : 300) || sz.h > (isBg ? 1400 : 300) || bytes > (isBg ? 450000 : 90000)) continue;
-      (byRole[role] ||= []).push({ f, rel, ...sz, bytes });
+      // sprites must be real cut-outs; fills (tiles, blocks, backgrounds) may be opaque
+      const fill = ['tile', 'block', 'bg', 'road'].includes(role);
+      const cut = hasTransparentEdges(fs.readFileSync(f));
+      if (!fill && !cut) continue;
+      (byRole[role] ||= []).push({ f, rel, ...sz, bytes, cut });
     }
     // spread the per-pack budget across roles
     const roles = Object.keys(byRole);
@@ -107,8 +112,10 @@ for (const pack of cfg.packs) {
         fs.mkdirSync(path.join(OUT, pack.slug), { recursive: true });
         fs.copyFileSync(x.f, path.join(OUT, name));
         total += x.bytes;
-        kept.push({ f: name, w: x.w, h: x.h, role: r });
+        kept.push({ f: name, w: x.w, h: x.h, role: r, cut: x.cut });
+        if (x.cut) (index.cut ||= []).push(name);
         (index.roles[r] ||= []).push(name);
+        index.files[name] = { pack: pack.slug, role: r, cut: x.cut };
       }
     }
     index.packs[pack.slug] = kept.length;

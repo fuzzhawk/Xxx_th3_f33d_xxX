@@ -12,6 +12,7 @@ import { Psych } from './psych.js';
 import { icon } from './icons.js';
 import { actionSheet } from './sheet.js';
 import { saveFromPost } from './save.js';
+import { renderMeme } from './memes.js';
 import * as stats from './stats.js';
 
 const TOPIC_COLOR = {
@@ -19,7 +20,7 @@ const TOPIC_COLOR = {
   animals: '#d8a25a', retrogaming: '#5b9aa9', vintagescifi: '#a77bd0'
 };
 const TOPIC_GLYPH = { music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉' };
-const CAT_FACE = { game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'] };
+const CAT_FACE = { news: ['◉', '#8a2b2b'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'] };
 let soundOn = false;
 
 export function labelOf(post) {
@@ -35,6 +36,7 @@ const handleFor = (post, ctx) => {
     case 'psych': return ['the.trip', `${post.sub} · generative`];
     case 'selfcare': return ['self.care', post.title];
     case 'web': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'web', `${post.sub === 'comic' ? 'Comic' : post.sub === 'hn' ? 'Hacker News' : post.source || 'Web'}${post.date ? ` · ${post.date}` : ''}`];
+    case 'news': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'news', `${ctx.topics?.news?.[post.sub] || 'News'}${post.date ? ` · ${post.date}` : ''}`];
     default: return [post.cat, ''];
   }
 };
@@ -51,11 +53,12 @@ function header(post, ctx) {
     more);
 }
 export function postMenu(post, ctx, card) {
-  const link = post.url || post.link || (post.vid ? `https://www.youtube.com/watch?v=${post.vid}` : null);
+  const link = post.wiki || post.url || post.link || (post.vid ? `https://www.youtube.com/watch?v=${post.vid}` : null);
   const hasMedia = card?.querySelector('.media img, .media canvas, .media svg.art');
   actionSheet(labelOf(post).toString().slice(0, 70), [
     hasMedia && { icon: 'download', label: 'Save image to gallery', run: () => saveFromPost(card) },
-    link && { icon: 'send', label: 'Open original', run: () => window.open(link, '_blank') },
+    link && { icon: 'send', label: post.wiki ? 'Open the Wikipedia article' : 'Open original', run: () => window.open(link, '_blank') },
+    post.cat === 'meme' && post.link && post.link !== link && { icon: 'link', label: 'Image source', run: () => window.open(post.link, '_blank') },
     link && { icon: 'link', label: 'Copy link', run: async () => toast((await copyText(link)) ? 'Link copied' : 'Copy failed') },
     { icon: 'up', label: marks[post.id]?.v === 1 ? 'Clear "more like this"' : 'More like this', run: () => { toast(setMark(post, 1, labelOf(post)) ? 'You will see more like this' : 'Mark cleared'); card?._sync?.(); } },
     { icon: 'down', label: marks[post.id]?.v === -1 ? 'Clear "less like this"' : 'Less like this', run: () => { toast(setMark(post, -1, labelOf(post)) ? 'You will see less like this' : 'Mark cleared'); card?._sync?.(); } }
@@ -208,6 +211,7 @@ function game(p, ctx) {
   const ensure = () => {
     if (g) return g;
     g = new Cls(canvas, p);
+    card._game = g;
     g.onHud = (s) => { if (score.textContent !== s) score.textContent = s; };
     for (const m of g.modLabels()) hud.append(el('span.pill.mod', m));
     return g;
@@ -246,16 +250,17 @@ function psych(p, ctx) {
   return card;
 }
 
-// ------------------------------------------------ memes
+// ------------------------------------------------ memes (drawn on a canvas, so saving gets exactly this)
 function meme(p, ctx) {
-  const box = el('div.img');
-  const img = el('img', { alt: p.text || p.title || 'meme', loading: 'lazy' });
-  setImg(img, p.img, () => { img.remove(); box.prepend(el('div.noimg', ['🦉', '🐐', '🐸', '🦝', '🐈', '🦆', '🛸', '🗿'][p.id.length % 8])); });
-  if (p.ratio) img.style.aspectRatio = `${1 / p.ratio}`;
-  box.append(img);
-  if (p.style === 'impact') { if (p.top) box.append(el('div.impact.top', p.top)); if (p.bottom) box.append(el('div.impact.bottom', p.bottom)); }
-  const media = el('div.media', p.style === 'caption' ? el('div.mcap', p.text) : null, box);
-  return post('meme', p, ctx, { media, ext: p.link, caption: p.style === 'kym' ? capt('knowyourmeme', p.title) : null, metaLine: p.credit });
+  const cv = el('canvas', { style: { width: '100%', display: 'block', background: '#0b0908' } });
+  cv.width = 720; cv.height = 560;
+  const media = el('div.media', cv);
+  let drawn = false;
+  const card = post('meme', p, ctx, { media, ext: p.wiki || p.link, caption: p.style === 'kym' ? capt('knowyourmeme', p.title) : p.ref ? capt(handleFor(p, ctx)[0], el('span.muted', `re: ${p.ref}`)) : null, metaLine: p.credit });
+  // render when the post comes into view
+  card._activate = () => { if (drawn) return; drawn = true; renderMeme(p, cv).catch(() => {}); };
+  card._heavy = true;
+  return card;
 }
 
 // ------------------------------------------------ products
@@ -362,7 +367,7 @@ export function notice(title, text, buttons = []) {
   return el('article.notice', el('h3', title), el('p', text), el('div.btnrow', { style: { justifyContent: 'center' } }, buttons));
 }
 
-const RENDER = { wiki, video, game, psych, meme, product, selfcare, web };
+const RENDER = { wiki, video, game, psych, meme, product, selfcare, web, news: web };
 export function renderCard(p, ctx) {
   const fn = RENDER[p.cat];
   if (!fn) return null;

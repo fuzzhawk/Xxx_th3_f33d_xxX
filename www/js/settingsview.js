@@ -31,7 +31,7 @@ export async function render() {
     await packageGroup(man),
     balanceGroup(man),
     group('Display', null,
-      toggle('immersive', 'Full screen', 'Hide the Android navigation buttons. Swipe up from the bottom edge to show them.', () => app.applyImmersive()),
+      window.Capacitor?.isNativePlatform?.() ? toggle('immersive', 'Full screen', 'Hide the Android navigation buttons. Swipe up from the bottom edge to show them.', () => app.applyImmersive()) : null,
       toggle('showNsfw', 'Adult comics', 'Include NSFW webcomics such as Oglaf', () => app.softReload()),
       toggle('blurNsfw', 'Blur adult comics until tapped')),
     group('Playback', null,
@@ -144,7 +144,7 @@ function balanceGroup(man) {
       return el('div.field', el('label', label, learned && Math.abs(learned - 1) > 0.01 ? el('small', `learned from marks: ${learned.toFixed(2)}×`) : null), input, val);
     }));
   };
-  return group('Feed balance', 'How much of each kind of post you get. Changes apply to new posts as you scroll.',
+  return group('Feed balance', 'How much of each kind of post you get. Changes apply to new posts as you scroll. News starts at 0% (hidden); tap News in the stories row to read it, or raise it here.',
     ...rows, total,
     el('div.btnrow', el('button.btn.small', { onclick: () => { settings.pct = null; saveSettings(); app.softReload(); render(); } }, 'Use package mix'),
       el('button.btn.small', { onclick: () => { settings.pct = { ...DEFAULT_PCT }; saveSettings(); app.softReload(); render(); } }, 'Original 20/30/20/10/5/5/5/5')),
@@ -152,6 +152,7 @@ function balanceGroup(man) {
     subGroup('video', 'Video topics', man?.topics?.video),
     subGroup('game', 'Game types', man?.topics?.game),
     subGroup('web', 'Web sources', man?.topics?.web),
+    subGroup('news', 'News sources', man?.topics?.news),
     toggle('avoidRepeat', 'Avoid the same kind twice in a row'),
     toggle('adaptive', 'Learn from ▲ / ▼ marks', 'Marks nudge topic weights up or down', () => app.softReload()),
     el('div.btnrow', el('button.btn.small', { onclick: () => { settings.learned = {}; saveSettings(); app.softReload(); toast('Learned weights cleared'); render(); } }, 'Forget learned weights'),

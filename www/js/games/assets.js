@@ -1,86 +1,141 @@
-// Sprites for the games: Kenney packs bundled with the app (www/assets/kenney)
-// plus a weekly batch of random transparent PNGs from Wikimedia Commons that
-// ships inside each package (sprites.json). Everything loads lazily; games
-// fall back to drawn shapes until an image is ready.
+// Game graphics. Each game has a theme (from the package's themes.json):
+//   commons – a kit of transparent PNGs + a background photo from Wikimedia Commons
+//   kenney  – one of the Kenney packs bundled in www/assets/kenney
+//   proc    – generated pixel creatures, items and textures
+// A Skin turns the theme into slots (hero, enemy, item, tile, bg) that the games
+// ask for by role. Online images are cached so they keep working offline.
+import { mulberry32 } from '../util.js';
+import { monster, humanoid, item as procItem, texture, themePalette } from './creature.js';
 
 const cache = new Map();
 let kenney = null;
 let props = [];
+const themes = new Map();
+const CACHE = 'feed-img-v1';
 
 export async function loadKenney() {
-  try {
-    const r = await fetch('assets/kenney/index.json');
-    if (r.ok) kenney = await r.json();
-  } catch { kenney = null; }
+  try { const r = await fetch('assets/kenney/index.json'); if (r.ok) kenney = await r.json(); } catch { kenney = null; }
 }
-export function setProps(list) {
-  props = (list || []).map((p) => p.src).filter(Boolean);
-}
+export function setProps(list) { props = (list || []).map((p) => p.src).filter(Boolean); }
+export function setThemes(list) { themes.clear(); for (const t of list || []) themes.set(t.id, t); }
 export const hasAssets = () => !!kenney || props.length > 0;
 
 export function img(src) {
   if (!src) return null;
+  if (typeof src !== 'string') return src; // already a canvas
   let i = cache.get(src);
-  if (!i) {
-    i = new Image();
-    i.decoding = 'async';
-    i.src = src.startsWith('data:') ? src : `assets/kenney/${src}`;
-    cache.set(src, i);
-  }
+  if (i) return i;
+  i = new Image();
+  i.decoding = 'async';
+  cache.set(src, i);
+  if (/^https?:/.test(src) && 'caches' in window) {
+    caches.open(CACHE).then((c) => c.match(src)).then(async (hit) => {
+      if (hit) { i.src = URL.createObjectURL(await hit.blob()); return; }
+      i.src = src;
+      fetch(src, { mode: 'cors' }).then((r) => r.ok && caches.open(CACHE).then((c) => c.put(src, r))).catch(() => {});
+    }).catch(() => { i.src = src; });
+  } else i.src = src.startsWith('data:') || /^https?:/.test(src) ? src : `assets/kenney/${src}`;
   return i;
 }
-export const ready = (i) => !!(i && i.complete && i.naturalWidth);
+export const ready = (i) => !!i && (i instanceof HTMLCanvasElement || (i.complete && i.naturalWidth > 0));
+const dims = (i) => [i.naturalWidth || i.width, i.naturalHeight || i.height];
 
-const pool = (role) => {
-  if (role === 'prop') return props;
-  return kenney?.roles?.[role] || [];
+const SLOT = {
+  hero: 'hero', char: 'hero', player: 'hero', ship: 'hero', car: 'hero',
+  enemy: 'enemy', animal: 'enemy', meteor: 'enemy', monster: 'enemy',
+  item: 'item', ball: 'item', prop: 'item', deco: 'item', fx: 'item', road: 'item', coin: 'item',
+  tile: 'tile', block: 'tile', bg: 'tile'
 };
+function shuffled(list, R) { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
-// A per-game selection of sprites, stable for a given seed.
 export class Skin {
-  constructor(rng, chaos = 0.3) {
-    this.rng = rng;
-    this.chaos = chaos;
+  constructor(post, chaos = false) {
+    const seed = post.seed || 1;
+    this.rng = mulberry32(seed ^ 0x5bd1e995);
+    this.chaos = chaos ? 0.6 : 0;
     this.memo = {};
+    const t = post.theme || { proc: true, hue: (seed >>> 3) % 360, seed, name: 'Wildcard' };
+    const base = t.id ? themes.get(t.id) : null;
+    const v = t.v || 0;
+    this.name = t.name || base?.name || 'Wildcard';
+    this.hue = ((base?.hue ?? t.hue ?? 0) + v * 37) % 360;
+    this.pal = themePalette(this.hue);
+    const R = mulberry32((seed ^ (v * 7919)) >>> 0);
+    this.slots = { hero: [], enemy: [], item: [], tile: [] };
+    this.bg = null;
+    this.creatures = [];
+    if (base?.kind === 'commons') {
+      const s = shuffled(base.sprites.map((x) => x.src), R);
+      this.slots.hero = s.slice(0, 2).map(img);
+      this.slots.enemy = s.slice(2, 6).map(img);
+      this.slots.item = (s.length > 6 ? s.slice(6) : s).map(img);
+      if (base.bgs?.length) this.bg = img(base.bgs[v % base.bgs.length]);
+      this.slots.tile = [texture(seed, this.hue)];
+    } else if (base?.kind === 'kenney' && kenney?.files) {
+      const files = Object.entries(kenney.files).filter(([, f]) => f.pack === base.pack);
+      const of = (roles, cut = true) => shuffled(files.filter(([, f]) => roles.includes(f.role) && (!cut || f.cut)).map(([n]) => n), R).map(img);
+      this.slots.hero = of(['char', 'ship', 'car']);
+      this.slots.enemy = of(['enemy', 'meteor', 'animal']);
+      this.slots.item = of(['item', 'ball', 'deco', 'fx', 'road']);
+      this.slots.tile = of(['tile', 'block', 'road'], false);
+      const bgs = of(['bg'], false);
+      this.bg = bgs[v % Math.max(1, bgs.length)] || null;
+      if (!this.slots.enemy.length) this.slots.enemy = this.slots.hero.slice(1).length ? this.slots.hero.slice(1) : this.slots.item;
+      if (!this.slots.hero.length) this.slots.hero = this.slots.enemy.length ? this.slots.enemy : this.slots.item;
+      if (!this.slots.item.length) this.slots.item = this.slots.enemy;
+    }
+    // generated cast: always available, and used by games that need animation
+    const ps = t.seed || seed;
+    this.creatures = Array.from({ length: 6 }, (_, k) => monster(ps * 31 + k * 977, this.hue + k * 50, 16 + (k % 3) * 4));
+    this.people = Array.from({ length: 4 }, (_, k) => humanoid(ps * 17 + k * 131, this.hue + k * 90));
+    if (!this.slots.hero.length) { this.slots.hero = [this.people[0].idle, this.creatures[0].frames[0]]; this.procHero = true; }
+    if (!this.slots.enemy.length) this.slots.enemy = this.creatures.slice(1, 5).map((m) => m.frames[0]);
+    if (!this.slots.item.length) this.slots.item = Array.from({ length: 4 }, (_, k) => procItem(ps + k * 13, this.hue + k * 30));
+    if (!this.slots.tile.length) this.slots.tile = [texture(ps, this.hue)];
+  }
+  slotFor(roles) {
+    for (const r of roles) { const s = this.slots[SLOT[r] || 'item']; if (s?.length) return s; }
+    return this.slots.item;
   }
   any(...roles) {
-    const avail = roles.filter((r) => pool(r).length);
-    // chaos: sometimes swap in a random Commons object instead of a game sprite
-    if (props.length && (this.rng() < this.chaos || !avail.length)) return img(props[Math.floor(this.rng() * props.length)]);
-    if (!avail.length) return null;
-    const list = pool(avail[Math.floor(this.rng() * avail.length)]);
-    return img(list[Math.floor(this.rng() * list.length)]);
+    if (props.length && this.chaos && this.rng() < this.chaos && !roles.every((r) => SLOT[r] === 'tile')) return img(props[Math.floor(this.rng() * props.length)]);
+    const s = this.slotFor(roles);
+    return s[Math.floor(this.rng() * s.length)] || null;
   }
-  // same answer every time for a given key
-  pick(key, ...roles) {
-    if (!(key in this.memo)) this.memo[key] = this.any(...roles);
-    return this.memo[key];
-  }
+  pick(key, ...roles) { if (!(key in this.memo)) this.memo[key] = this.any(...roles); return this.memo[key]; }
   list(key, n, ...roles) {
-    if (!(key in this.memo)) this.memo[key] = Array.from({ length: n }, () => this.any(...roles));
+    if (!(key in this.memo)) {
+      const s = shuffled(roles.flatMap((r) => this.slots[SLOT[r] || 'item'] || []).filter((x, i, a) => a.indexOf(x) === i), this.rng);
+      this.memo[key] = Array.from({ length: n }, (_, k) => s[k % Math.max(1, s.length)] || null);
+    }
     return this.memo[key];
   }
-  prop() { return props.length ? img(props[Math.floor(this.rng() * props.length)]) : this.any('item', 'deco', 'enemy'); }
+  prop() { return this.chaos && props.length ? img(props[Math.floor(this.rng() * props.length)]) : this.any('item', 'enemy'); }
 }
 
-// Draw an image centred at x,y fitting a w×h box (keeps aspect). Returns false if not ready.
+// Draw an image or canvas centred at x,y fitting a w×h box (keeps aspect). Returns false if not ready.
 export function drawFit(c, i, x, y, w, h, rot = 0, flip = false) {
   if (!ready(i)) return false;
-  const s = Math.min(w / i.naturalWidth, h / i.naturalHeight);
-  const dw = i.naturalWidth * s, dh = i.naturalHeight * s;
-  if (rot || flip) {
-    c.save(); c.translate(x, y); if (rot) c.rotate(rot); if (flip) c.scale(-1, 1);
-    c.drawImage(i, -dw / 2, -dh / 2, dw, dh); c.restore();
-  } else c.drawImage(i, x - dw / 2, y - dh / 2, dw, dh);
+  const [iw, ih] = dims(i);
+  const s = Math.min(w / iw, h / ih), dw = iw * s, dh = ih * s;
+  const smooth = c.imageSmoothingEnabled;
+  if (i.pixel) c.imageSmoothingEnabled = false;
+  if (rot || flip) { c.save(); c.translate(x, y); if (rot) c.rotate(rot); if (flip) c.scale(-1, 1); c.drawImage(i, -dw / 2, -dh / 2, dw, dh); c.restore(); }
+  else c.drawImage(i, x - dw / 2, y - dh / 2, dw, dh);
+  c.imageSmoothingEnabled = smooth;
   return true;
 }
 // Fill a rect with an image stretched or tiled.
 export function drawRectImg(c, i, x, y, w, h, tile = false) {
   if (!ready(i)) return false;
+  const [, ih] = dims(i);
+  const smooth = c.imageSmoothingEnabled;
+  if (i.pixel) c.imageSmoothingEnabled = false;
   if (tile) {
     const pat = c.createPattern(i, 'repeat');
     c.save(); c.translate(x, y); c.fillStyle = pat;
-    const s = Math.min(1, h / i.naturalHeight); c.scale(s, s); c.fillRect(0, 0, w / s, h / s); c.restore();
+    const s = Math.max(0.5, Math.min(1.5, h / ih)); c.scale(s, s); c.fillRect(0, 0, w / s, h / s); c.restore();
   } else c.drawImage(i, x, y, w, h);
+  c.imageSmoothingEnabled = smooth;
   return true;
 }

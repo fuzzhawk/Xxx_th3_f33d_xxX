@@ -1,9 +1,9 @@
 import { lsGet, lsSet } from './store.js';
 
-export const CATS = ['game', 'wiki', 'video', 'meme', 'product', 'psych', 'selfcare', 'web'];
-export const CAT_LABEL = { game: 'Games', wiki: 'Wikipedia', video: 'Videos', meme: 'Memes', product: 'Products', psych: 'Psychedelic', selfcare: 'Self-care', web: 'From the web' };
-export const CAT_GLYPH = { game: '◐', wiki: '❦', video: '▶', meme: '☺', product: '✦', psych: '✺', selfcare: '☘', web: '⌘' };
-export const DEFAULT_PCT = { game: 20, wiki: 30, video: 20, meme: 10, product: 5, psych: 5, selfcare: 5, web: 5 };
+export const CATS = ['game', 'wiki', 'video', 'meme', 'product', 'psych', 'selfcare', 'web', 'news'];
+export const CAT_LABEL = { game: 'Games', wiki: 'Wikipedia', video: 'Videos', meme: 'Memes', product: 'Products', psych: 'Psychedelic', selfcare: 'Self-care', web: 'From the web', news: 'News' };
+export const CAT_GLYPH = { game: '◐', wiki: '❦', video: '▶', meme: '☺', product: '✦', psych: '✺', selfcare: '☘', web: '⌘', news: '◉' };
+export const DEFAULT_PCT = { game: 20, wiki: 30, video: 20, meme: 10, product: 5, psych: 5, selfcare: 5, web: 5, news: 0 };
 
 const BUILD = window.BUILD || {};
 export const DEFAULTS = {

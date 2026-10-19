@@ -36,7 +36,9 @@ async function fetchPackage(base, id, onProgress) {
   }
   let sprites = [];
   if (manifest.sprites) { try { sprites = await getJSON(`${base}${id}/${manifest.sprites}`, 60000); } catch { /* optional */ } }
-  return { manifest, posts, sprites };
+  let themes = [];
+  if (manifest.themes) { try { themes = await getJSON(`${base}${id}/${manifest.themes}`, 60000); } catch { /* optional */ } }
+  return { manifest, posts, sprites, themes };
 }
 
 export async function downloadPackage(id, onProgress) {

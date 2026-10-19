@@ -14,7 +14,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { productClassics, productParts, selfCare, selfCareFlavors, memeTemplates, fallbackQuotes } from './data/content.mjs';
+import { hasTransparentEdges } from './png.mjs';
+import { productClassics, productParts, selfCare, selfCareFlavors, fallbackQuotes, memeText, memeWeights, memeImageCount } from './data/content.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = parseArgs(process.argv.slice(2));
@@ -132,7 +133,8 @@ function cleanExtract(s) {
 
 // ------------------------------------------------------------------ history (no repeats across packages)
 const historyPath = path.join(OUT, 'history.json');
-const history = readJSON(historyPath, { wiki: [], video: [], web: [], memeImg: [], kym: [], product: [] });
+const history = readJSON(historyPath, { wiki: [], video: [], web: [], memeImg: [], kym: [], product: [], news: [] });
+history.news ||= [];
 if (args.id && !OFFLINE) {
   const old = path.join(OUT, args.id);
   const rd = (f) => readJSON(path.join(old, f), []);
@@ -494,6 +496,28 @@ async function buildWeb() {
   return chosen.map((x) => ({ id: `web${hashStr(x.url).toString(36)}`, cat: 'web', ...x }));
 }
 
+// ------------------------------------------------------------------ news (hidden from the main feed by default)
+async function buildNews() {
+  const out = [];
+  const per = {};
+  const jobs = Object.entries(config.news.groups).flatMap(([g, grp]) => grp.feeds.map(([name, url]) => ({ g, name, url })));
+  await pool(jobs, 4, async (j) => {
+    const feed = await readFeed({ name: j.name, urls: [j.url] });
+    if (!feed) return;
+    for (const it of feed.items.slice(0, config.news.maxPerFeed)) {
+      if (!it.title || !it.link || seen.news?.has(it.link)) continue;
+      // Google News titles end with " - Source"
+      const title = j.url.includes('news.google.com') ? it.title.replace(/\s+-\s+[^-]+$/, '') : it.title;
+      const thumb = firstImg(it.html, it.link);
+      out.push({ id: `n${hashStr(it.link).toString(36)}`, cat: 'news', sub: j.g, source: j.name, title, url: it.link, excerpt: j.url.includes('news.google.com') ? '' : clip(stripTags(it.html), 320), date: isoDate(it.date), thumb: thumb && !/feedburner|gravatar|pixel|emoji|share/i.test(thumb) ? thumb : undefined });
+      per[j.name] = (per[j.name] || 0) + 1;
+    }
+  });
+  report.sources.news = per;
+  // newest first
+  return out.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+}
+
 // ------------------------------------------------------------------ game sprites (transparent PNGs from Commons)
 async function buildSprites() {
   const out = [];
@@ -512,8 +536,7 @@ async function buildSprites() {
       if (!r.ok) return;
       const buf = Buffer.from(await r.arrayBuffer());
       if (buf.length > 60000 || buf.readUInt32BE(0) !== 0x89504e47) return;
-      const colorType = buf[25];
-      if (!(colorType === 6 || colorType === 4 || (colorType === 3 && buf.includes(Buffer.from('tRNS'))))) return;
+      if (!hasTransparentEdges(buf)) return;
       perQuery[x.q] = (perQuery[x.q] || 0) + 1;
       out.push({ src: `data:image/png;base64,${buf.toString('base64')}`, name: x.title.replace(/^File:/, ''), credit: `${clip(stripTags(x.ii.extmetadata?.Artist?.value || 'Unknown'), 40)} · ${x.ii.extmetadata?.LicenseShortName?.value} · Wikimedia Commons` });
     } catch { /* skip */ }
@@ -561,10 +584,76 @@ async function kymMemes() {
   return shuffle([...new Map(out.map((x) => [x.link, x])).values()].filter((x) => !seen.kym.has(x.link)));
 }
 
+// ------------------------------------------------------------------ game theme kits
+const themeDefs = readJSON(path.join(ROOT, 'tools/data/themes.json')).themes;
+const KENNEY_NAMES = { 'racing-pack': 'Grand Prix', 'alien-ufo-pack': 'UFO Invasion', 'tiny-dungeon': 'Dungeon Crawl', 'pixel-platformer': 'Pixel World', 'physics-assets': 'Alien Physics', 'shape-characters': 'Shape Folk', 'emotes-pack': 'Emote Storm', 'monster-builder-pack': 'Monster Builder', 'rolling-ball-assets': 'Marble Run', 'platformer-pack-redux': 'Townscape' };
+async function commonsSearch(q, extra, limit, width) {
+  const j = await fetchJSON(`https://commons.wikimedia.org/w/api.php?${new URLSearchParams({ action: 'query', generator: 'search', gsrsearch: `${q} ${extra}`, gsrnamespace: '6', gsrlimit: String(limit), prop: 'imageinfo', iiprop: 'url|extmetadata|size|mime', iiurlwidth: String(width), format: 'json', formatversion: '2' })}`);
+  return (j.query?.pages || []).map((p) => ({ title: p.title, ii: p.imageinfo?.[0] })).filter((x) => x.ii?.thumburl && /public domain|cc0|cc[- ]by|pd/i.test(x.ii.extmetadata?.LicenseShortName?.value || ''));
+}
+async function vetSprite(x) {
+  try {
+    const r = await fetch(x.ii.thumburl, { headers: { 'User-Agent': UA } });
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 90000 || !hasTransparentEdges(buf)) return null;
+    return { src: x.ii.thumburl, credit: `${clip(stripTags(x.ii.extmetadata?.Artist?.value || 'Unknown'), 40)} · ${x.ii.extmetadata?.LicenseShortName?.value}` };
+  } catch { return null; }
+}
+async function buildThemes() {
+  const kits = [];
+  await pool(themeDefs, 2, async (t) => {
+    const sprites = [];
+    for (const kw of t.sprites) {
+      try {
+        const cands = await commonsSearch(kw, 'filemime:image/png', 10, 128);
+        let got = 0;
+        for (const c of cands) { if (got >= 2) break; const v = await vetSprite(c); if (v && !sprites.some((s) => s.src === v.src)) { sprites.push({ ...v, kw }); got++; } }
+      } catch (e) { warn(`theme ${t.id} ${kw}: ${e.message}`); }
+      await sleep(120);
+    }
+    const bgs = [];
+    for (const q of t.bg) {
+      try { for (const c of (await commonsSearch(q, 'filetype:bitmap', 6, 640)).filter((c) => /jpeg/.test(c.ii.mime || '') && c.ii.width >= c.ii.height * 0.6).slice(0, 2)) bgs.push(c.ii.thumburl); }
+      catch (e) { warn(`theme ${t.id} bg ${q}: ${e.message}`); }
+    }
+    if (sprites.length >= 5) kits.push({ id: t.id, kind: 'commons', name: t.name, hue: t.hue, sprites, bgs });
+    log(`theme ${t.id}: ${sprites.length} sprites, ${bgs.length} backgrounds`);
+  });
+  // Kenney packs bundled with the app are themes too (sprites resolved in the app)
+  const kidx = readJSON(path.join(ROOT, 'www/assets/kenney/index.json'), { files: {} });
+  const perPack = {};
+  for (const [, f] of Object.entries(kidx.files || {})) if (f.cut) perPack[f.pack] = (perPack[f.pack] || 0) + 1;
+  for (const [pack, n] of Object.entries(perPack)) if (n >= 6 && KENNEY_NAMES[pack]) kits.push({ id: `k-${pack}`, kind: 'kenney', name: KENNEY_NAMES[pack], pack, hue: hashStr(pack) % 360 });
+  report.sources.themes = kits.length;
+  return kits;
+}
+const PROC_A = ['Neon', 'Velvet', 'Feral', 'Gloom', 'Candy', 'Rust', 'Astral', 'Bog', 'Chrome', 'Fever', 'Lunar', 'Moss', 'Static', 'Ember', 'Glitch', 'Opal', 'Swamp', 'Solar', 'Ghost', 'Plasma', 'Coral', 'Obsidian', 'Paper', 'Acid'];
+const PROC_B = ['Bestiary', 'Menagerie', 'Critters', 'Goblins', 'Spawn', 'Familiars', 'Creatures', 'Imps', 'Monsters', 'Gremlins', 'Swarm', 'Brood', 'Horde', 'Zoo', 'Kin', 'Mob'];
+// Every game gets a different (theme, variant); a theme appears at most once per game type.
+function assignThemes(games, kits) {
+  const uses = Object.fromEntries(kits.map((k) => [k.id, new Set()]));
+  const count = Object.fromEntries(kits.map((k) => [k.id, 0]));
+  const procNames = new Set();
+  for (const g of games) {
+    const free = kits.filter((k) => !uses[k.id].has(g.sub)).sort((a, b) => count[a.id] - count[b.id] || rand() - 0.5);
+    if (!free.length || rand() < 0.25) {
+      let name; do name = `${pick(PROC_A)} ${pick(PROC_B)}`; while (procNames.has(name) && procNames.size < PROC_A.length * PROC_B.length);
+      procNames.add(name);
+      g.theme = { proc: true, name, hue: Math.floor(rand() * 360), seed: Math.floor(rand() * 2 ** 31) };
+    } else {
+      const k = free[0];
+      uses[k.id].add(g.sub);
+      g.theme = { id: k.id, v: count[k.id]++, name: k.name };
+    }
+  }
+}
+
 // ------------------------------------------------------------------ procedural categories
 const GAME_NAMES = {
   plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', stacker: 'Stacker', pong: 'Pong', peggle: 'Peg Shot', golf: 'Bounce Golf', juggle: 'Juggle',
-  platformer: 'Platformer', racer: 'Road Racer', raycast: 'Maze Shooter', rocks: 'Rocks', sling: 'Slingshot'
+  platformer: 'Platformer', racer: 'Road Racer', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot',
+  necro: 'Necromancer', chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl'
 };
 const ADJ = ['Ember', 'Moss', 'Rust', 'Ochre', 'Clay', 'Amber', 'Dusk', 'Ash', 'Copper', 'Sage', 'Umber', 'Saffron', 'Cedar', 'Flint', 'Honey', 'Basalt', 'Juniper', 'Tangerine', 'Cinder', 'Sienna', 'Lichen', 'Marigold', 'Obsidian', 'Fern', 'Paprika', 'Driftwood', 'Terracotta', 'Pumpkin', 'Gravel', 'Sunset'];
 function buildGames() {
@@ -631,28 +720,53 @@ function buildSelfCare() {
 
 function buildMemes(quotes, wiki, commons, kym) {
   const posts = [];
-  const kymN = Math.min(kym.length, Math.round(want.meme * 0.3));
+  const kymN = Math.min(kym.length, Math.round(want.meme * 0.25));
   for (const k of kym.slice(0, kymN)) posts.push({ id: `mk${hashStr(k.link).toString(36)}`, cat: 'meme', sub: 'kym', style: 'kym', img: k.img, title: k.title, link: k.link, credit: 'via Know Your Meme' });
   const shortQ = shuffle(quotes.filter((q) => q.text.length < 150));
   const facts = shuffle(wiki.filter((w) => w.hook.length < 170));
-  let qi = 0, fi = 0;
-  const imgs = commons.slice(0, want.meme - posts.length);
-  for (const im of imgs) {
-    const t = pick(memeTemplates);
-    const q = shortQ[qi++ % Math.max(1, shortQ.length)] || { text: 'Reality is what you can get away with.', author: 'Robert Anton Wilson' };
-    const f = facts[fi++ % Math.max(1, facts.length)];
-    const fact = f ? f.hook.replace(/\.$/, '').replace(/^(\S)/, (c) => (/^[A-Z][a-z]/.test(f.hook) && !/^[A-Z][a-z]+ [A-Z]/.test(f.hook) ? c.toLowerCase() : c)) : 'nothing is true';
-    const title = f ? f.title.replace(/ \(.*\)$/, '') : 'this';
-    const words = q.text.split(' ');
-    const half = Math.ceil(words.length / 2);
-    const fill = (s) => s.replace(/\{quoteA\}/g, words.slice(0, half).join(' ')).replace(/\{quoteB\}/g, words.slice(half).join(' '))
-      .replace(/\{quote\}/g, q.text.replace(/^"|"$/g, '')).replace(/\{author\}/g, q.author).replace(/\{fact\}/g, fact).replace(/\{title\}/g, title);
-    const post = { id: `mc${hashStr(im.img).toString(36)}`, cat: 'meme', sub: 'remix', style: t.style, img: im.img, credit: im.credit, link: im.link, ratio: im.h && im.w ? +(im.h / im.w).toFixed(3) : undefined };
-    if (t.style === 'impact') { post.top = fill(t.top); post.bottom = fill(t.bottom); } else post.text = fill(t.text);
-    if (/\{(quote|author)\}|quoteA/.test(JSON.stringify(t))) post.src = q.author; else if (f) post.src = f.url;
-    posts.push(post);
+  const topicLabel = Object.fromEntries(Object.entries(topics.wiki).map(([k, t]) => [k, t.label]));
+  let qi = 0, fi = 0, ii = 0;
+  const nextQ = () => shortQ[qi++ % Math.max(1, shortQ.length)] || { text: 'Only the madman is absolutely sure.', author: 'Robert Anton Wilson' };
+  const nextF = () => facts[fi++ % Math.max(1, facts.length)];
+  const nextImg = () => commons[ii++ % Math.max(1, commons.length)];
+  const styles = Object.entries(memeWeights);
+  const total = styles.reduce((s2, [, w]) => s2 + w, 0);
+  const pickStyle = () => { let x = rand() * total; for (const [k, w] of styles) { x -= w; if (x <= 0) return k; } return 'caption'; };
+  const authorUrl = (a) => `https://en.wikipedia.org/wiki/${encodeURIComponent(a.replace(/ /g, '_'))}`;
+  const short = (t) => t.replace(/ \(.*\)$/, '');
+  while (posts.length < want.meme && commons.length) {
+    const style = pickStyle();
+    const f = nextF(), f2 = nextF(), f3 = nextF(), f4 = nextF(), q = nextQ();
+    const usesQuote = (s3) => /\{quote|\{author|quoteA/.test(s3);
+    const factLower = f ? f.hook.replace(/\.$/, '').replace(/^(\S)/, (c) => (/^[A-Z][a-z]+ [a-z]/.test(f.hook) ? c.toLowerCase() : c)) : 'nothing is true';
+    const words = q.text.split(' '), half = Math.ceil(words.length / 2);
+    const fill = (t) => String(t).replace(/\{TITLE\}/g, f ? short(f.title).toUpperCase() : 'THIS').replace(/\{title\}/g, f ? short(f.title) : 'this').replace(/\{title2\}/g, f2 ? short(f2.title) : 'that')
+      .replace(/\{title3\}/g, f3 ? short(f3.title) : 'the other thing').replace(/\{fact\}/g, factLower).replace(/\{quoteA\}/g, words.slice(0, half).join(' ')).replace(/\{quoteB\}/g, words.slice(half).join(' '))
+      .replace(/\{quote\}/g, q.text.replace(/^"|"$/g, '')).replace(/\{author\}/g, q.author).replace(/\{topic\}/g, f ? topicLabel[f.sub] || 'Wikipedia' : 'Wikipedia');
+    const imgs = Array.from({ length: memeImageCount[style] || 1 }, nextImg);
+    const p = { cat: 'meme', sub: 'remix', style, imgs: imgs.map((x) => x.img), img: imgs[0].img, credit: imgs[0].credit, link: imgs[0].link };
+    const T = memeText[style];
+    let src = '';
+    if (style === 'impact' || style === 'demotivator') { const [top, bottom] = pick(T); p.top = fill(top); p.bottom = fill(bottom); src = top + bottom; }
+    else if (style === 'caption' || style === 'pov' || style === 'isthis') { const t = pick(T); p.text = fill(t); src = t; if (style === 'pov') { p.top = p.text; } if (style === 'isthis') p.label = 'me'; }
+    else if (style === 'post' || style === 'quotecard') { p.text = q.text.replace(/^"|"$/g, ''); p.author = q.author; src = '{quote}'; }
+    else if (style === 'chyron') { p.text = factLower; p.ticker = [f2, f3].filter(Boolean).map((x) => short(x.title).toUpperCase()).join(' · '); src = '{fact}'; }
+    else if (style === 'twopanel') { p.a = pick(T.boring); p.b = fill(pick(T.weird)); src = p.b; }
+    else if (style === 'versus') { const [a, b] = pick(T); p.a = fill(a); p.b = fill(b); src = a + b; }
+    else if (style === 'brain') { p.steps = pick(T).map(fill); src = '{title}'; }
+    else if (style === 'starter') {
+      const same = facts.filter((x) => x.sub === f?.sub).slice(fi % 50, (fi % 50) + 4);
+      p.text = fill(pick(T)); p.labels = (same.length >= 4 ? same : [f, f2, f3, f4].filter(Boolean)).map((x) => short(x.title)); src = '{title}';
+    }
+    else if (style === 'labels') { p.labels = pick(T).map(fill); src = '{title}'; }
+    // the send button opens what the meme is about
+    if (usesQuote(src)) { p.wiki = authorUrl(q.author); p.ref = q.author; }
+    else if (f) { p.wiki = f.url; p.ref = short(f.title); }
+    p.id = `mc${hashStr(style + p.img + (p.text || p.top || p.a || p.ref || '')).toString(36)}`;
+    if (!posts.some((x) => x.id === p.id)) posts.push(p);
   }
   report.sources.memesBuilt = posts.length;
+  report.memeStyles = posts.reduce((m, p) => ((m[p.style] = (m[p.style] || 0) + 1), m), {});
   return shuffle(posts);
 }
 
@@ -674,7 +788,7 @@ function offlineFixtures() {
 
 // ------------------------------------------------------------------ main
 async function main() {
-  let wiki, video, web, quotes, commons, kym, sprites = [];
+  let wiki, video, web, quotes, commons, kym, sprites = [], themes = [], news = [];
   if (OFFLINE) ({ wiki, video, web, quotes, commons, kym } = offlineFixtures());
   else {
     quotes = await buildQuotes();
@@ -684,22 +798,27 @@ async function main() {
     commons = await commonsImages();
     kym = await kymMemes();
     sprites = await buildSprites();
+    themes = await buildThemes();
+    news = await buildNews();
   }
+  const games = buildGames();
+  assignThemes(games, themes);
   const posts = {
-    game: buildGames(),
+    game: games,
     wiki: shuffle(wiki),
     video: shuffle(video),
     meme: buildMemes(quotes, wiki, commons, kym),
     product: buildProducts(),
     psych: buildPsych(quotes, wiki),
     selfcare: buildSelfCare(),
-    web: shuffle(web)
+    web: shuffle(web),
+    news
   };
   const counts = Object.fromEntries(Object.entries(posts).map(([k, v]) => [k, v.length]));
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  const estHours = Object.entries(counts).reduce((s, [k, n]) => s + n * cats[k].dwellSec, 0) / 3600;
+  const estHours = Object.entries(counts).reduce((s, [k, n]) => s + (cats[k].pct ? n * cats[k].dwellSec : 0), 0) / 3600;
 
-  for (const [k, n] of Object.entries(counts)) if (n < want[k] * 0.6) warn(`category ${k} is short: ${n}/${want[k]}`);
+  for (const [k, n] of Object.entries(counts)) if (want[k] && n < want[k] * 0.6) warn(`category ${k} is short: ${n}/${want[k]}`);
   report.wanted = want;
 
   let pkgId = id;
@@ -710,6 +829,7 @@ async function main() {
   for (const [k, v] of Object.entries(posts)) { files[k] = `${k}.json`; writeJSON(path.join(dir, files[k]), v); }
 
   if (sprites.length) writeJSON(path.join(dir, 'sprites.json'), sprites);
+  if (themes.length) writeJSON(path.join(dir, 'themes.json'), themes);
   const prompt = fs.readFileSync(path.join(ROOT, 'packages/prompt.md'), 'utf8');
   const manifest = {
     id: pkgId, title: `The Feed · ${pkgId}`, created: new Date().toISOString(), offline: OFFLINE || undefined,
@@ -719,9 +839,10 @@ async function main() {
       wiki: Object.fromEntries(Object.entries(topics.wiki).map(([k, t]) => [k, t.label])),
       video: Object.fromEntries(Object.entries(topics.video).map(([k, t]) => [k, t.label])),
       game: Object.fromEntries(config.gameTypes.map((t) => [t, GAME_NAMES[t] || t])),
-      web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' }
+      web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' },
+      news: Object.fromEntries(Object.entries(config.news.groups).map(([k, g]) => [k, g.label]))
     },
-    files, sprites: sprites.length ? 'sprites.json' : undefined, prompt, report
+    files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, prompt, report
   };
   writeJSON(path.join(dir, 'manifest.json'), manifest, true);
 
@@ -735,9 +856,10 @@ async function main() {
     add('wiki', posts.wiki.map((p) => p.id.slice(1)));
     add('video', posts.video.map((p) => p.vid));
     add('web', posts.web.map((p) => p.url));
-    add('memeImg', posts.meme.filter((p) => p.sub === 'remix').map((p) => p.img));
+    add('memeImg', posts.meme.filter((p) => p.sub === 'remix').flatMap((p) => p.imgs || [p.img]));
     add('kym', posts.meme.filter((p) => p.sub === 'kym').map((p) => p.link));
     add('product', posts.product.map((p) => p.name));
+    add('news', posts.news.map((p) => p.url));
     writeJSON(historyPath, history);
   }
   log(`Wrote ${dir}: ${total} posts, ~${estHours.toFixed(1)} h`, counts);

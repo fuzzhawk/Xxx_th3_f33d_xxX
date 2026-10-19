@@ -2,7 +2,7 @@ import { $, $$, el, fmtDur, toast } from './util.js';
 import { settings, saveSettings, seenSet, flushSeen } from './state.js';
 import { initialPackage, loadPackage, checkForNew, downloadPackage } from './packages.js';
 import { loadFavs } from './favs.js';
-import { loadKenney, setProps } from './games/assets.js';
+import { loadKenney, setProps, setThemes } from './games/assets.js';
 import * as stats from './stats.js';
 import { Feed } from './feed.js';
 import { notice } from './cards.js';
@@ -18,7 +18,7 @@ export function applyImmersive() {
 }
 const app = {
   pkg: () => pkg,
-  async reload() { pkg = await loadPackage(settings.pkg); setProps(pkg.sprites); feed.load(pkg); },
+  async reload() { pkg = await loadPackage(settings.pkg); setProps(pkg.sprites); setThemes(pkg.themes); feed.load(pkg); },
   // settings changed: keep what is on screen, new posts follow the new mix
   softReload() { /* the scheduler reads settings live */ },
   applyImmersive
@@ -83,7 +83,7 @@ async function boot() {
   initSettings($('#view-settings'), app);
   try {
     pkg = await initialPackage();
-    setProps(pkg.sprites);
+    setProps(pkg.sprites); setThemes(pkg.themes);
     feed.load(pkg);
   } catch (err) {
     console.error(err);
@@ -97,7 +97,7 @@ async function boot() {
       // same package id rebuilt on GitHub: refresh it quietly
       const same = remote.packages.find((p) => p.id === pkg.manifest.id);
       if (same && same.created > pkg.manifest.created) {
-        try { pkg = await downloadPackage(same.id); setProps(pkg.sprites); toast(`Updated ${same.id} with the latest build`); feed.load(pkg); } catch { /* keep the old copy */ }
+        try { pkg = await downloadPackage(same.id); setProps(pkg.sprites); setThemes(pkg.themes); toast(`Updated ${same.id} with the latest build`); feed.load(pkg); } catch { /* keep the old copy */ }
       }
       const newest = fresh.at(-1);
       if (newest) document.querySelector('[data-tab=settings]').classList.add('notify');
@@ -116,5 +116,7 @@ async function boot() {
   }
 }
 addEventListener('pagehide', flushSeen);
+// web version: offline support (the Android app serves files itself)
+if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.() && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushSeen(); });
 boot();
