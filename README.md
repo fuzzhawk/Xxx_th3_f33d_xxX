@@ -15,6 +15,18 @@ visuals, self-care nudges and hand-picked links from around the web.
 2. Download `the-feed.apk` and open it. Allow installs from your browser if Android asks.
 3. Later builds install over the old one and keep your favorites, stats and settings.
 
+## Web version (share with friends)
+
+The same app runs in any browser and can be installed to a home screen. To host it on Netlify:
+
+1. Sign in at [app.netlify.com](https://app.netlify.com) with GitHub.
+2. **Add new site → Import an existing project → GitHub**, pick this repository.
+3. Choose the branch to publish. The settings come from `netlify.toml`
+   (build command `node tools/bundle-package.mjs`, publish directory `www`). Click **Deploy**.
+4. Share the `*.netlify.app` link. Each friend's favorites, stats and settings stay in their own browser.
+
+Netlify redeploys whenever that branch changes, so new weekly packages show up for everyone.
+
 ## Using it
 
 - **Feed**: scroll. Games run on autopilot; tap one to play it (drag outside the game
@@ -38,14 +50,15 @@ kept for archiving and to avoid repeats. Each one is sized for 5 hours a day for
 
 | Category | Share | Source |
 |---|---|---|
-| Physics games | 20% | 10 procedurally seeded game types with autopilot |
+| Games | 20% | 21 game types with autopilot, themed sprite kits and random modifiers |
 | Condensed Wikipedia | 30% | Wikipedia API: seed articles, categories, "more like" search |
 | Videos | 20% | YouTube search (short videos), checked for embedding |
 | Memes | 10% | Wikimedia Commons images + Wikiquote/Wikipedia captions, Know Your Meme |
 | Made-up products | 5% | Hand-written parts + generated 80s/90s promo art |
 | Psychedelic | 5% | Generative visuals in the app + quotes |
 | Self-care | 5% | Hand-written prompts, timers, breathing exercises |
-| From the web | 5% | Hacker News, Substack, occasionally Reddit |
+| From the web | 5% | 19 sites (Lobsters, MetaFilter, Atlas Obscura, Quanta…), Hacker News, webcomics |
+| News | 0% (hidden) | 17 feeds in four groups; tap **News** in the stories row |
 
 **To make a new package**, edit [`packages/request.json`](packages/request.json) (for
 example set `"id": "2026-W44"`) and push, or run **Build weekly package** from the
