@@ -10,7 +10,7 @@ const BEATS = { Ember: ['Moss'], Tide: ['Ember'], Moss: ['Tide', 'Volt'], Volt: 
 const MOVE_A = { Ember: ['Cinder', 'Blaze', 'Scorch', 'Flare'], Tide: ['Surge', 'Brine', 'Torrent', 'Drizzle'], Moss: ['Spore', 'Thorn', 'Bloom', 'Vine'], Volt: ['Spark', 'Arc', 'Static', 'Jolt'], Psy: ['Mind', 'Dream', 'Hex', 'Echo'], Void: ['Null', 'Rift', 'Shade', 'Abyss'] };
 const MOVE_B = ['Lash', 'Burst', 'Fang', 'Wave', 'Strike', 'Pulse', 'Crash', 'Bite', 'Storm', 'Ray'];
 
-function mon(seed, level, hue) {
+function mon(seed, level, hue, skin) {
   const R = (n) => ((Math.sin(seed * 9301 + n * 49297) + 1) / 2);
   const type = TYPES[Math.floor(R(1) * TYPES.length)];
   const base = 40 + Math.floor(R(2) * 30);
@@ -19,18 +19,18 @@ function mon(seed, level, hue) {
     return { name: k === 3 ? `Body ${MOVE_B[Math.floor(R(20) * MOVE_B.length)]}` : `${(MOVE_A[t] || MOVE_A.Void)[Math.floor(R(30 + k) * 4)]} ${MOVE_B[Math.floor(R(40 + k) * MOVE_B.length)]}`, type: t, power: [55, 75, 90, 45][k], acc: [1, 0.92, 0.8, 1][k] };
   });
   const hp = Math.round(base * 2 + level * 6);
-  return { seed, name: creatureName(seed), type, level, hp, max: hp, atk: 10 + level * 2 + Math.floor(R(3) * 8), def: 8 + level * 2 + Math.floor(R(4) * 8), spd: 5 + Math.floor(R(5) * 10), moves, sprite: monster(seed, hue + TYPES.indexOf(type) * 60, 24, Math.min(4, Math.floor(level / 3))) };
+  return { seed, name: creatureName(seed), type, level, hp, max: hp, atk: 10 + level * 2 + Math.floor(R(3) * 8), def: 8 + level * 2 + Math.floor(R(4) * 8), spd: 5 + Math.floor(R(5) * 10), moves, sprite: monster(seed, hue + TYPES.indexOf(type) * 60, 24, Math.min(4, Math.floor(level / 3)), { tex: skin?.texFor?.(seed % 9), head: skin && (seed % 3 === 0) ? skin.slots.enemy[seed % Math.max(1, skin.slots.enemy.length)] : null }) };
 }
 export class Monsters extends Game {
   static noMods = ['mirror', 'wobble', 'swarm', 'lowg', 'heavy', 'trails'];
   setup() {
     const s = this.post.seed || 1;
-    this.team = [0, 1, 2].map((k) => mon(s * 7 + k * 131, 5, this.skin.hue));
+    this.team = [0, 1, 2].map((k) => mon(s * 7 + k * 131, 5, this.skin.hue, this.skin));
     this.trainer = 0; this.newFoe();
   }
   newFoe() {
     const s = (this.post.seed || 1) * 13 + this.trainer * 977;
-    this.foes = [0, 1].map((k) => mon(s + k * 61, 4 + this.trainer * 2, this.skin.hue + 180));
+    this.foes = [0, 1].map((k) => mon(s + k * 61, 4 + this.trainer * 2, this.skin.hue + 180, this.skin));
     this.foe = this.foes[0]; this.me = this.team.find((m) => m.hp > 0) || this.team[0];
     this.queue = [`A wild ${this.foe.name} appears!`]; this.busy = 1.2; this.shake = null; this.lunge = null; this.choice = null;
   }

@@ -584,6 +584,27 @@ async function kymMemes() {
   return shuffle([...new Map(out.map((x) => [x.link, x])).values()].filter((x) => !seen.kym.has(x.link)));
 }
 
+// ------------------------------------------------------------------ weathered texture photos (small, embedded)
+async function buildTextures() {
+  const out = [];
+  await pool(config.textureQueries, 3, async (q) => {
+    if (out.length >= config.textureCount) return;
+    try {
+      const cands = (await commonsSearch(q, 'filetype:bitmap', 6, 96)).filter((c) => /jpeg/.test(c.ii.mime || ''));
+      for (const c of cands.slice(0, 2)) {
+        const r = await fetch(c.ii.thumburl, { headers: { 'User-Agent': UA } });
+        if (!r.ok) continue;
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length > 14000) continue;
+        out.push({ src: `data:image/jpeg;base64,${buf.toString('base64')}`, q, credit: c.ii.extmetadata?.LicenseShortName?.value });
+        break;
+      }
+    } catch (e) { warn(`texture ${q}: ${e.message}`); }
+  });
+  report.sources.textures = out.length;
+  return out;
+}
+
 // ------------------------------------------------------------------ game theme kits
 const themeDefs = readJSON(path.join(ROOT, 'tools/data/themes.json')).themes;
 const KENNEY_NAMES = { 'racing-pack': 'Grand Prix', 'alien-ufo-pack': 'UFO Invasion', 'tiny-dungeon': 'Dungeon Crawl', 'pixel-platformer': 'Pixel World', 'physics-assets': 'Alien Physics', 'shape-characters': 'Shape Folk', 'emotes-pack': 'Emote Storm', 'monster-builder-pack': 'Monster Builder', 'rolling-ball-assets': 'Marble Run', 'platformer-pack-redux': 'Townscape' };
@@ -788,7 +809,7 @@ function offlineFixtures() {
 
 // ------------------------------------------------------------------ main
 async function main() {
-  let wiki, video, web, quotes, commons, kym, sprites = [], themes = [], news = [];
+  let wiki, video, web, quotes, commons, kym, sprites = [], themes = [], news = [], textures = [];
   if (OFFLINE) ({ wiki, video, web, quotes, commons, kym } = offlineFixtures());
   else {
     quotes = await buildQuotes();
@@ -799,6 +820,7 @@ async function main() {
     kym = await kymMemes();
     sprites = await buildSprites();
     themes = await buildThemes();
+    textures = await buildTextures();
     news = await buildNews();
   }
   const games = buildGames();
@@ -830,6 +852,7 @@ async function main() {
 
   if (sprites.length) writeJSON(path.join(dir, 'sprites.json'), sprites);
   if (themes.length) writeJSON(path.join(dir, 'themes.json'), themes);
+  if (textures.length) writeJSON(path.join(dir, 'textures.json'), textures);
   const prompt = fs.readFileSync(path.join(ROOT, 'packages/prompt.md'), 'utf8');
   const manifest = {
     id: pkgId, title: `The Feed · ${pkgId}`, created: new Date().toISOString(), offline: OFFLINE || undefined,
@@ -842,7 +865,7 @@ async function main() {
       web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' },
       news: Object.fromEntries(Object.entries(config.news.groups).map(([k, g]) => [k, g.label]))
     },
-    files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, prompt, report
+    files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, textures: textures.length ? 'textures.json' : undefined, prompt, report
   };
   writeJSON(path.join(dir, 'manifest.json'), manifest, true);
 

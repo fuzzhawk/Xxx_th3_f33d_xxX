@@ -166,13 +166,17 @@ class Merge extends Game {
     this.balls.push({ x: Math.max(this.L + r, Math.min(this.R - r, x)), y: 44, vx: 0, vy: 0, r, lv: this.cur, age: 0 });
     this.cur = this.nxt; this.nxt = this.ri(0, 3); this.cool = 0.55;
   }
+  // pick a target once per drop, glide the dropper there smoothly, pause, then drop
   autopilot(dt) {
-    this.autoT = (this.autoT || 0) - dt;
-    if (this.autoT > 0) return;
-    const same = this.balls.filter((b) => b.lv === this.cur && b.age > 0.5).sort((a, b) => a.y - b.y)[0];
-    const target = same ? same.x + this.r(-6, 6) : (this.cur < 2 ? this.r(this.L + 20, this.R - 20) : this.r(0, 1) < 0.5 ? this.L + 40 : this.R - 40);
-    this.aimX += (target - this.aimX) * 0.5;
-    if (Math.abs(this.aimX - target) < 4) { this.dropAt(this.aimX); this.autoT = this.r(0.8, 1.4); }
+    if (this.goalX == null) {
+      if (this.cool > 0) return;
+      const same = this.balls.filter((b) => b.lv === this.cur && b.age > 0.5).sort((a, b) => a.y - b.y)[0];
+      this.goalX = same ? same.x + this.r(-5, 5) : this.cur < 2 ? this.r(this.L + 20, this.R - 20) : this.rng() < 0.5 ? this.L + 40 : this.R - 40;
+      this.hold = this.r(0.25, 0.6);
+    }
+    const d = this.goalX - this.aimX;
+    this.aimX += Math.sign(d) * Math.min(Math.abs(d), 260 * dt);
+    if (Math.abs(d) < 1) { this.hold -= dt; if (this.hold <= 0) { this.dropAt(this.aimX); this.goalX = null; } }
   }
   down(x) { this.aimX = x; }
   move(x) { this.aimX = x; }

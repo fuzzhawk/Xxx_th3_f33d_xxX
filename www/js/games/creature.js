@@ -6,120 +6,188 @@ import { mulberry32 } from '../util.js';
 const cache = new Map();
 const memo = (key, fn) => { if (!cache.has(key)) { cache.set(key, fn()); if (cache.size > 400) cache.delete(cache.keys().next().value); } return cache.get(key); };
 
-export function themePalette(h) {
-  const c = (dh, s, l) => `hsl(${(((h + dh) % 360) + 360) % 360},${s}%,${l}%)`;
-  return { bg: c(0, 28, 8), bg2: c(0, 32, 16), ink: c(0, 30, 92), c: [c(0, 82, 58), c(40, 72, 62), c(160, 45, 45), c(-30, 66, 50), c(10, 30, 78), c(200, 42, 52)] };
+// Colour schemes: every theme picks one, so a game's colours hang together.
+export const SCHEMES = ['earth', 'neon', 'pastel', 'duotone', 'sunset', 'ice', 'toxic', 'ink', 'candy', 'rust'];
+export function themePalette(h, scheme = 'earth') {
+  const c = (dh, s2, l) => `hsl(${(((h + dh) % 360) + 360) % 360},${s2}%,${l}%)`;
+  const P = {
+    earth: [[0, 28, 8], [0, 32, 16], [0, 30, 92], [[0, 82, 58], [40, 72, 62], [160, 45, 45], [-30, 66, 50], [10, 30, 78], [200, 42, 52]]],
+    neon: [[0, 60, 6], [20, 70, 13], [0, 40, 95], [[0, 100, 60], [180, 100, 55], [300, 100, 62], [60, 100, 55], [120, 90, 55], [240, 90, 66]]],
+    pastel: [[0, 25, 22], [0, 25, 30], [0, 40, 96], [[0, 70, 80], [60, 70, 82], [150, 50, 78], [210, 60, 82], [300, 50, 84], [30, 60, 86]]],
+    duotone: [[0, 40, 9], [0, 45, 17], [180, 40, 92], [[0, 80, 58], [180, 70, 55], [0, 60, 40], [180, 55, 38], [0, 50, 78], [180, 45, 75]]],
+    sunset: [[260, 45, 10], [290, 45, 18], [40, 60, 92], [[20, 95, 60], [340, 80, 60], [45, 95, 62], [280, 55, 55], [0, 85, 70], [200, 50, 45]]],
+    ice: [[210, 40, 8], [205, 40, 16], [190, 40, 95], [[190, 80, 62], [210, 70, 72], [170, 60, 55], [230, 55, 58], [195, 35, 85], [260, 40, 66]]],
+    toxic: [[120, 40, 6], [140, 45, 12], [90, 60, 90], [[100, 95, 50], [290, 70, 58], [70, 90, 55], [160, 80, 45], [90, 60, 75], [320, 70, 60]]],
+    ink: [[0, 8, 7], [0, 8, 14], [0, 10, 92], [[0, 85, 52], [0, 0, 78], [0, 0, 45], [0, 70, 35], [0, 0, 90], [0, 0, 60]]],
+    candy: [[320, 40, 12], [300, 40, 20], [330, 70, 95], [[330, 90, 70], [190, 85, 65], [50, 95, 65], [280, 80, 72], [10, 90, 72], [150, 70, 65]]],
+    rust: [[20, 30, 7], [20, 35, 13], [35, 40, 88], [[20, 75, 45], [35, 60, 55], [10, 55, 32], [190, 25, 40], [40, 35, 70], [0, 40, 28]]]
+  }[scheme] || null;
+  const abs = ['sunset', 'ice', 'toxic', 'candy', 'rust'].includes(scheme);
+  const at = (dh, s2, l) => (abs ? `hsl(${dh},${s2}%,${l}%)` : c(dh, s2, l));
+  const [bg, bg2, ink, cs] = P;
+  // absolute schemes still lean a little toward the theme hue
+  const shift = (x) => (abs ? [x[0] + ((h % 40) - 20), x[1], x[2]] : x);
+  return { scheme, bg: at(...shift(bg)), bg2: at(...shift(bg2)), ink: at(...shift(ink)), c: cs.map((x) => at(...shift(x))), hue: h };
 }
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; c.pixel = true; return c; }
 function hsl(h, s, l) { return `hsl(${((h % 360) + 360) % 360},${s}%,${l}%)`; }
 
+// ---------------------------------------------------------------- shared rendering helpers
+const isReady = (i) => !!i && (i instanceof HTMLCanvasElement || (i.complete && i.naturalWidth > 0));
+// redraw a generated sprite once its texture/head images arrive (canvases update in place)
+function whenLoaded(imgs, fn) { for (const i of imgs) if (i && !isReady(i) && i.addEventListener) i.addEventListener('load', fn, { once: true }); }
+// Fill the opaque pixels of `c` with a texture photo multiplied over their colours.
+function textureFill(c, tex, alpha = 0.85) {
+  if (!isReady(tex)) return;
+  const x = c.getContext('2d'), w = c.width, h = c.height;
+  const keep = canvas(w, h); keep.getContext('2d').drawImage(c, 0, 0);
+  x.save(); x.globalCompositeOperation = 'multiply'; x.globalAlpha = alpha; x.imageSmoothingEnabled = true;
+  const tw = tex.naturalWidth || tex.width, th = tex.naturalHeight || tex.height, s = Math.max(w / tw, h / th) * 1.4;
+  x.drawImage(tex, (w - tw * s) / 2, (h - th * s) / 2, tw * s, th * s);
+  x.globalCompositeOperation = 'destination-in'; x.globalAlpha = 1; x.drawImage(keep, 0, 0);
+  x.restore();
+}
+// dark outline around opaque pixels, with a few chips for a worn look
+function outline(c, R, col = [18, 12, 9]) {
+  const x = c.getContext('2d'), w = c.width, h = c.height, d = x.getImageData(0, 0, w, h), o = x.createImageData(w, h);
+  for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) {
+    const i = (y * w + xx) * 4;
+    if (d.data[i + 3]) continue;
+    const n = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const X = xx + a, Y = y + b; return X >= 0 && Y >= 0 && X < w && Y < h && d.data[(Y * w + X) * 4 + 3] > 40; });
+    if (n && R() > 0.08) { o.data[i] = col[0]; o.data[i + 1] = col[1]; o.data[i + 2] = col[2]; o.data[i + 3] = 255; }
+  }
+  const oc = canvas(w, h); oc.getContext('2d').putImageData(o, 0, 0);
+  x.drawImage(oc, 0, 0);
+}
+// grime: dirt specks, a scratch or two, darker lower half
+function weather(c, R, amount = 1) {
+  const x = c.getContext('2d'), w = c.width, h = c.height;
+  x.save(); x.globalCompositeOperation = 'source-atop';
+  const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,240,220,.08)'); g.addColorStop(1, 'rgba(20,10,0,.28)'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+  for (let i = 0; i < w * h * 0.04 * amount; i++) { x.fillStyle = R() < 0.75 ? `rgba(30,20,10,${0.25 + R() * 0.4})` : `rgba(255,245,230,${0.15 + R() * 0.2})`; x.fillRect(Math.floor(R() * w), Math.floor(R() * h), 1, 1); }
+  for (let i = 0; i < 2 * amount; i++) { x.strokeStyle = 'rgba(255,240,220,.18)'; x.lineWidth = 1; x.beginPath(); const sx = R() * w, sy = R() * h; x.moveTo(sx, sy); x.lineTo(sx + R() * 6 - 3, sy + R() * 6); x.stroke(); }
+  x.restore();
+}
+
 // ---------------------------------------------------------------- monsters
-// Returns { frames: [canvas, canvas], name } — two-frame idle/walk animation.
-export function monster(seed, hue = 0, size = 18, tier = 0) {
-  return memo(`m${seed}|${hue}|${size}|${tier}`, () => {
-    const R = mulberry32(seed);
-    const W = size, H = size, half = Math.ceil(W / 2);
-    const grid = new Int8Array(W * H); // 0 empty, 1 body, 2 accent, 3 eye white, 4 pupil, 5 mouth, 6 tooth
-    const rx = W * (0.26 + R() * 0.2 + tier * 0.02), ry = H * (0.26 + R() * 0.18), cy = H * (0.42 + R() * 0.1);
-    const noise = 0.35 + R() * 0.5;
-    for (let y = 0; y < H; y++) for (let x = 0; x < half; x++) {
-      const d = ((x + 0.5 - W / 2) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2;
-      if (1.15 - d + (R() - 0.5) * noise > 0.45) grid[y * W + x] = R() < 0.18 ? 2 : 1;
-    }
-    let top = H, bottom = 0;
-    for (let y = 0; y < H; y++) for (let x = 0; x < half; x++) if (grid[y * W + x]) { top = Math.min(top, y); bottom = Math.max(bottom, y); }
-    // legs
-    const legs = Math.floor(R() * 3) + (tier > 2 ? 1 : 0);
-    for (let k = 0; k < legs; k++) { const lx = Math.max(0, half - 2 - k * 2 - Math.floor(R() * 2)); for (let y = bottom; y < Math.min(H - 1, bottom + 2 + Math.floor(R() * 3)); y++) grid[y * W + lx] = 1; }
-    // horns / antennae
-    if (R() < 0.6 || tier > 1) { let hx = half - 2 - Math.floor(R() * 3), hy = top; for (let i = 0; i < 2 + Math.floor(R() * 3) && hy > 0; i++) { hy--; if (R() < 0.6) hx--; if (hx >= 0) grid[hy * W + hx] = 2; } }
-    // arms
-    if (R() < 0.5) { const ay = Math.floor(cy); let ax = 0; while (ax < half && !grid[ay * W + ax]) ax++; for (let i = 1; i < 3 && ax - i >= 0; i++) grid[(ay - (i > 1 ? 1 : 0)) * W + ax - i] = 1; }
-    // eyes
-    const eyeY = Math.max(top + 1, Math.floor(top + (bottom - top) * (0.25 + R() * 0.2)));
-    const cyclops = R() < 0.25;
-    const ex = cyclops ? half - 1 : Math.max(1, half - 2 - Math.floor(R() * 3));
-    grid[eyeY * W + ex] = 3; grid[(eyeY + 1) * W + ex] = 4;
-    if (ex - 1 >= 0 && R() < 0.5) grid[eyeY * W + ex - 1] = 3;
-    // mouth
-    const my = Math.min(H - 2, eyeY + 2 + Math.floor(R() * 2));
-    for (let x = Math.max(0, half - 1 - Math.floor(R() * 3)); x < half; x++) if (grid[my * W + x]) grid[my * W + x] = R() < 0.3 ? 6 : 5;
-    // mirror
-    for (let y = 0; y < H; y++) for (let x = 0; x < half; x++) grid[y * W + (W - 1 - x)] = grid[y * W + x];
-    const h0 = hue + R() * 50 - 25, h1 = h0 + 120 + R() * 120;
-    const body = (y) => hsl(h0, 55 + tier * 6, 62 - (y / H) * 26);
-    const acc = hsl(h1, 70, 55), outline = hsl(h0, 40, 10);
-    const draw = (bob, legShift) => {
-      const c = canvas(W + 2, H + 2), x = c.getContext('2d');
-      const at = (gx, gy) => (gx < 0 || gy < 0 || gx >= W || gy >= H ? 0 : grid[gy * W + gx]);
-      for (let y = 0; y < H; y++) for (let gx = 0; gx < W; gx++) {
-        const v = at(gx, y);
-        const sy = y + 1 + (y < bottom ? bob : 0), sx = gx + 1 + (y > bottom - 1 && legShift ? (gx < half ? -legShift : legShift) : 0);
-        if (!v) { if (at(gx - 1, y) || at(gx + 1, y) || at(gx, y - 1) || at(gx, y + 1)) { x.fillStyle = outline; x.fillRect(sx, sy, 1, 1); } continue; }
-        x.fillStyle = v === 1 ? body(y) : v === 2 ? acc : v === 3 ? '#fff' : v === 4 ? '#111' : v === 5 ? outline : '#f4f0e0';
-        x.fillRect(sx, sy, 1, 1);
+const PLANS = ['blob', 'biped', 'quad', 'insect', 'serpent', 'floater', 'totem'];
+// Returns { frames: [canvas, canvas], plan } — a two-frame animation.
+// opts.tex: texture photo for the skin; opts.head: a PNG used as the head.
+export function monster(seed, hue = 0, size = 18, tier = 0, opts = {}) {
+  const key = `m${seed}|${hue}|${size}|${tier}|${opts.tex?.src || ''}|${opts.head?.src || ''}`;
+  return memo(key, () => {
+    const R0 = mulberry32(seed);
+    const plan = opts.plan || PLANS[Math.floor(R0() * PLANS.length)];
+    const S = Math.max(16, size + (opts.head ? 8 : 0)), W = S, H = S + 4, half = Math.ceil(W / 2);
+    const h0 = hue + R0() * 50 - 25, h1 = h0 + 120 + R0() * 120;
+    const body = (y) => hsl(h0, 50 + tier * 6, 64 - (y / H) * 30), acc = hsl(h1, 65, 55);
+    const headBox = { x: 0, y: 0, w: 0 };
+    const build = (R, frame) => {
+      const c = canvas(W, H), x = c.getContext('2d');
+      const ell = (cx, cy, rx, ry, col) => { x.fillStyle = col; x.beginPath(); x.ellipse(cx, cy, Math.max(0.5, rx), Math.max(0.5, ry), 0, 0, 7); x.fill(); };
+      const limb = (x0, y0, x1, y1, w2, col) => { x.strokeStyle = col; x.lineWidth = w2; x.lineCap = 'round'; x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); };
+      const sw = frame ? 1 : -1, bob = frame ? 1 : 0, cx = W / 2;
+      const bw = W * (0.26 + R() * 0.12), bh = H * (0.2 + R() * 0.1);
+      let headY = H * 0.28, headR = W * (0.16 + R() * 0.06);
+      if (plan === 'blob') { ell(cx, H * 0.58 + bob, W * 0.38, H * 0.3, body(H * 0.5)); for (let i = 0; i < 6; i++) ell(cx + (R() - 0.5) * W * 0.6, H * 0.6 + (R() - 0.5) * H * 0.4, 2 + R() * 3, 2 + R() * 3, R() < 0.5 ? acc : body(H * 0.6)); headY = H * 0.45 + bob; }
+      else if (plan === 'biped') { limb(cx - 3, H * 0.62, cx - 4 - sw, H - 2, 3, body(H)); limb(cx + 3, H * 0.62, cx + 4 + sw, H - 2, 3, body(H)); ell(cx, H * 0.5 + bob, bw, bh, body(H * 0.5)); limb(cx - bw, H * 0.45 + bob, cx - bw - 4, H * 0.6 - sw * 2, 2, body(H * 0.5)); limb(cx + bw, H * 0.45 + bob, cx + bw + 4, H * 0.6 + sw * 2, 2, body(H * 0.5)); headY = H * 0.26 + bob; }
+      else if (plan === 'quad') { ell(cx, H * 0.55 + bob, W * 0.42, bh, body(H * 0.5)); for (const lx of [-0.32, -0.14, 0.14, 0.32]) limb(cx + lx * W, H * 0.6, cx + lx * W + (lx < 0 ? -sw : sw), H - 2, 2.5, body(H)); headY = H * 0.36 + bob; }
+      else if (plan === 'insect') { for (let k = 0; k < 3; k++) limb(cx - W * 0.1, H * (0.42 + k * 0.1), cx - W * 0.42, H * (0.36 + k * 0.16) + sw * (k % 2 ? 1 : -1), 1.5, outlineCol), limb(cx + W * 0.1, H * (0.42 + k * 0.1), cx + W * 0.42, H * (0.36 + k * 0.16) - sw * (k % 2 ? 1 : -1), 1.5, outlineCol); ell(cx, H * 0.46 + bob, W * 0.16, H * 0.1, body(H * 0.45)); ell(cx, H * 0.7 + bob, W * 0.2, H * 0.17, acc); limb(cx - 2, H * 0.2, cx - 6, H * 0.04, 1, outlineCol); limb(cx + 2, H * 0.2, cx + 6, H * 0.04, 1, outlineCol); headY = H * 0.28 + bob; headR *= 0.8; }
+      else if (plan === 'serpent') { for (let k = 0; k < 7; k++) ell(cx + Math.sin(k * 0.9 + frame) * W * 0.22, H * 0.92 - k * H * 0.09, W * (0.18 - k * 0.012), W * 0.12, k % 2 ? acc : body(H - k * 3)); headY = H * 0.24 + bob; }
+      else if (plan === 'floater') { for (let k = -2; k <= 2; k++) limb(cx + k * 3, H * 0.55, cx + k * 4 + Math.sin(frame * 2 + k) * 2, H - 2, 1.5, acc); ell(cx, H * 0.42 + bob, W * 0.36, H * 0.26, body(H * 0.4)); headY = H * 0.4 + bob; headR *= 1.2; }
+      else { for (let k = 0; k < 3; k++) { x.fillStyle = k % 2 ? acc : body(H * 0.3 + k * 6); x.fillRect(cx - W * (0.3 - k * 0.04), H * (0.2 + k * 0.26), W * (0.6 - k * 0.08), H * 0.24); } headY = H * 0.3; }
+      const pngHead = opts.head && isReady(opts.head);
+      if (pngHead) { headBox.x = cx - headR * 1.5; headBox.y = headY - headR * 1.5; headBox.w = headR * 3; }
+      else if (plan !== 'totem') { ell(cx, headY, headR * 1.2, headR, body(headY)); if (R() < 0.6 || tier > 1) { limb(cx - headR * 0.6, headY - headR * 0.6, cx - headR * 1.6, headY - headR * 2, 1.5, acc); limb(cx + headR * 0.6, headY - headR * 0.6, cx + headR * 1.6, headY - headR * 2, 1.5, acc); } }
+      textureFill(c, opts.tex, 0.75);
+      // face
+      if (!pngHead) {
+        const fy = Math.round(plan === 'totem' ? H * 0.28 : headY - 1), ex = Math.max(1, Math.round(headR * 0.55)), cyc = R() < 0.25;
+        x.fillStyle = '#fff'; if (cyc) x.fillRect(Math.round(cx) - 1, fy - 1, 3, 3); else { x.fillRect(Math.round(cx - ex) - 1, fy - 1, 2, 2); x.fillRect(Math.round(cx + ex) - 1, fy - 1, 2, 2); }
+        x.fillStyle = '#120c08'; if (cyc) x.fillRect(Math.round(cx), fy, 1, 1); else { x.fillRect(Math.round(cx - ex), fy, 1, 1); x.fillRect(Math.round(cx + ex) - 1, fy, 1, 1); }
+        x.fillStyle = '#2a1410'; x.fillRect(Math.round(cx - headR * 0.4), fy + 2, Math.max(2, Math.round(headR * 0.8)), 1);
+        if (R() < 0.4) { x.fillStyle = '#f4ead8'; x.fillRect(Math.round(cx - 1), fy + 2, 1, 1); x.fillRect(Math.round(cx + 1), fy + 2, 1, 1); }
       }
+      outline(c, R);
+      weather(c, R, 1 + tier * 0.2);
+      if (pngHead) { x.imageSmoothingEnabled = true; const hw = headBox.w, ih = opts.head.naturalHeight || opts.head.height, iw = opts.head.naturalWidth || opts.head.width; const s2 = Math.min(hw / iw, hw / ih); x.drawImage(opts.head, cx - (iw * s2) / 2, headBox.y + (hw - ih * s2) / 2 + bob, iw * s2, ih * s2); }
       return c;
     };
-    return { frames: [draw(0, 0), draw(1, 1)], hue: h0 };
+    const outlineCol = '#1a120c';
+    const frames = [canvas(W, H), canvas(W, H)];
+    const paint = () => frames.forEach((f, k) => { const n = build(mulberry32(seed ^ 0x51ed), k); const x = f.getContext('2d'); x.clearRect(0, 0, W, H); x.drawImage(n, 0, 0); });
+    paint();
+    whenLoaded([opts.tex, opts.head], paint);
+    return { frames, plan, hue: h0 };
   });
 }
 
 // ---------------------------------------------------------------- humanoids
-const SKIN = ['#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#ffdbac', '#a0e0a0', '#a8b8ff', '#d9a0e8'];
+const SKIN = ['#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#ffdbac', '#a0e0a0', '#a8b8ff', '#d9a0e8', '#7a5a4a', '#e8d0b8'];
 const POSES = {
-  // shoulder→hand and hip→foot offsets (left, right), relative to a 14×20 sheet cell
-  idle: { arms: [[-2, 5], [2, 5]], legs: [[-1, 6], [1, 6]] },
-  walk1: { arms: [[-3, 4], [3, 5]], legs: [[-3, 5], [2, 6]] },
-  walk2: { arms: [[-1, 5], [1, 4]], legs: [[1, 6], [-2, 5]] },
-  jump: { arms: [[-3, -2], [3, -2]], legs: [[-2, 4], [2, 3]] },
-  punch: { arms: [[-1, 4], [6, 0]], legs: [[-2, 6], [2, 6]] },
-  kick: { arms: [[-3, 2], [2, 3]], legs: [[-1, 6], [6, 1]] },
-  special: { arms: [[5, 0], [6, 1]], legs: [[-2, 6], [2, 6]] },
-  block: { arms: [[1, 1], [2, 0]], legs: [[-2, 6], [2, 6]] },
-  hurt: { arms: [[-3, 1], [-1, 3]], legs: [[-2, 6], [0, 6]], lean: -1 }
+  idle: { arms: [[-3, 7], [3, 7]], legs: [[-1, 9], [1, 9]] },
+  walk1: { arms: [[-4, 6], [4, 7]], legs: [[-4, 8], [3, 9]] },
+  walk2: { arms: [[-1, 7], [1, 6]], legs: [[2, 9], [-3, 8]] },
+  jump: { arms: [[-4, -3], [4, -3]], legs: [[-3, 6], [3, 5]] },
+  punch: { arms: [[-1, 6], [9, 0]], legs: [[-3, 9], [3, 9]] },
+  kick: { arms: [[-4, 3], [3, 4]], legs: [[-1, 9], [9, 2]] },
+  special: { arms: [[8, 0], [9, 1]], legs: [[-3, 9], [3, 9]] },
+  block: { arms: [[2, 1], [3, 0]], legs: [[-3, 9], [3, 9]] },
+  hurt: { arms: [[-4, 1], [-2, 4]], legs: [[-3, 9], [0, 9]], lean: -1 }
 };
-function line(x, x0, y0, x1, y1, col, w = 1) {
-  x.fillStyle = col;
-  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
-  for (let i = 0; i <= n; i++) x.fillRect(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), w, w);
-}
-// Returns { idle, walk: [a, b], jump, punch, kick, special, block, hurt } canvases (facing right).
-export function humanoid(seed, hue = 0) {
-  return memo(`h${seed}|${hue}`, () => {
+const OUTFITS = ['shirt', 'robe', 'armor', 'coat', 'dress', 'rags'];
+// Returns { idle, walk: [a, b], jump, punch, kick, special, block, hurt } canvases (facing right, 24×32).
+export function humanoid(seed, hue = 0, opts = {}) {
+  const key = `h${seed}|${hue}|${opts.tex?.src || ''}|${opts.tex2?.src || ''}|${opts.head?.src || ''}`;
+  return memo(key, () => {
     const R = mulberry32(seed ^ 0x9e3779b9);
     const skin = SKIN[Math.floor(R() * SKIN.length)];
-    const shirt = hsl(hue + R() * 40 - 20, 65, 50), pants = hsl(hue + 180 + R() * 60, 35, 32), hair = hsl(R() * 360, 50, 25 + R() * 30);
-    const hat = R() < 0.4, cape = R() < 0.25, bulky = R() < 0.35, outline = '#120d0a';
+    const shirt = hsl(hue + R() * 40 - 20, 55, 48), pants = hsl(hue + 180 + R() * 60, 30, 30), hair = hsl(R() * 360, 45, 22 + R() * 30);
+    const outfit = OUTFITS[Math.floor(R() * OUTFITS.length)], build = 0.8 + R() * 0.6, tall = R() < 0.3;
+    const hat = R() < 0.45 ? Math.floor(R() * 4) : -1, cape = R() < 0.25, prop = R() < 0.35 ? Math.floor(R() * 3) : -1, beard = R() < 0.2;
     const sheet = {};
+    const frames = {};
     for (const [name, p] of Object.entries(POSES)) {
-      const c = canvas(16, 22), x = c.getContext('2d');
-      const lean = p.lean || 0, cx = 7 + lean;
-      if (cape) { x.fillStyle = hsl(hue + 200, 50, 30); x.fillRect(cx - 3, 7, 6, 8); }
-      // legs
-      p.legs.forEach(([dx, dy], i) => line(x, cx - 1 + i * 2, 13, cx - 1 + i * 2 + dx, 13 + dy, pants, 2));
-      // torso
-      x.fillStyle = shirt; x.fillRect(cx - (bulky ? 3 : 2), 6, bulky ? 6 : 5, 8);
-      x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(cx - 2, 12, 5, 1);
-      // arms
-      p.arms.forEach(([dx, dy], i) => { const sx = i ? cx + 2 : cx - 3; line(x, sx, 7, sx + dx, 7 + dy, shirt, 2); x.fillStyle = skin; x.fillRect(sx + dx, 7 + dy, 2, 2); });
-      // head
-      x.fillStyle = skin; x.fillRect(cx - 2, 1, 5, 5);
-      x.fillStyle = hair; x.fillRect(cx - 2, 0, 5, 2); x.fillRect(cx - 2, 1, 1, 3);
-      if (hat) { x.fillStyle = hsl(hue + 90, 60, 45); x.fillRect(cx - 3, 0, 7, 1); x.fillRect(cx - 2, -1, 5, 1); }
-      x.fillStyle = name === 'hurt' ? '#fff' : outline; x.fillRect(cx + 1, 3, 1, 1);
-      // outline pass
-      const d = x.getImageData(0, 0, 16, 22), o = x.createImageData(16, 22);
-      for (let y = 0; y < 22; y++) for (let xx = 0; xx < 16; xx++) {
-        const i = (y * 16 + xx) * 4;
-        if (d.data[i + 3]) continue;
-        const n = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const X = xx + a, Y = y + b; return X >= 0 && Y >= 0 && X < 16 && Y < 22 && d.data[(Y * 16 + X) * 4 + 3]; });
-        if (n) { o.data[i] = 18; o.data[i + 1] = 13; o.data[i + 2] = 10; o.data[i + 3] = 255; }
-      }
-      const oc = canvas(16, 22); oc.getContext('2d').putImageData(o, 0, 0); oc.getContext('2d').drawImage(c, 0, 0);
-      sheet[name] = oc;
+      frames[name] = canvas(24, 32);
+      const draw = () => {
+        const c = canvas(24, 32), x = c.getContext('2d');
+        const lean = p.lean || 0, cx = 11 + lean, top = tall ? 2 : 4;
+        const ln = (x0, y0, x1, y1, col, w2) => { x.strokeStyle = col; x.lineWidth = w2; x.lineCap = 'round'; x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); };
+        if (cape) { x.fillStyle = hsl(hue + 200, 45, 28); x.beginPath(); x.moveTo(cx - 3, top + 9); x.lineTo(cx + 3, top + 9); x.lineTo(cx + 5, top + 24); x.lineTo(cx - 6, top + 24); x.fill(); }
+        // legs
+        if (outfit !== 'robe' && outfit !== 'dress') p.legs.forEach(([dx, dy], i) => ln(cx - 1.5 + i * 3, top + 18, cx - 1.5 + i * 3 + dx, top + 18 + dy, pants, 3 * build));
+        else p.legs.forEach(([dx, dy], i) => ln(cx - 1.5 + i * 3, top + 22, cx - 1.5 + i * 3 + dx * 0.5, top + 18 + dy, '#2a1e18', 2));
+        // body
+        x.fillStyle = shirt;
+        const tw = 4 * build;
+        if (outfit === 'robe' || outfit === 'dress') { x.beginPath(); x.moveTo(cx - tw, top + 8); x.lineTo(cx + tw, top + 8); x.lineTo(cx + tw + (outfit === 'dress' ? 4 : 2), top + 24); x.lineTo(cx - tw - (outfit === 'dress' ? 4 : 2), top + 24); x.fill(); }
+        else { x.fillRect(cx - tw, top + 8, tw * 2, 11); if (outfit === 'coat') x.fillRect(cx - tw - 1, top + 16, tw * 2 + 2, 6); }
+        if (outfit === 'armor') { x.fillStyle = hsl(hue, 10, 60); x.fillRect(cx - tw - 2, top + 8, 3, 3); x.fillRect(cx + tw - 1, top + 8, 3, 3); }
+        // arms
+        p.arms.forEach(([dx, dy], i) => { const sx = i ? cx + tw - 1 : cx - tw + 1; ln(sx, top + 9, sx + dx, top + 9 + dy, shirt, 2.5); x.fillStyle = skin; x.fillRect(sx + dx - 1, top + 9 + dy - 1, 3, 3); });
+        if (prop >= 0) { const [dx, dy] = p.arms[1], hx = cx + tw - 1 + dx, hy = top + 9 + dy; ln(hx, hy + (prop === 0 ? 6 : 0), hx + (prop === 1 ? 5 : 0), hy - 8, prop === 2 ? '#c9a24a' : '#5a3a22', prop === 1 ? 1.5 : 1.8); }
+        textureFill(c, opts.tex, 0.7);
+        // head
+        if (!(opts.head && isReady(opts.head))) {
+          x.fillStyle = skin; x.fillRect(cx - 3, top, 7, 7);
+          x.fillStyle = hair; x.fillRect(cx - 3, top - 1, 7, 2); x.fillRect(cx - 3, top, 1, 4);
+          if (beard) { x.fillStyle = hair; x.fillRect(cx - 2, top + 5, 6, 3); }
+          x.fillStyle = name === 'hurt' ? '#fff' : '#120d0a'; x.fillRect(cx + 2, top + 3, 1, 1);
+          if (hat === 0) { x.fillStyle = hsl(hue + 90, 50, 35); x.fillRect(cx - 4, top - 1, 9, 1); x.fillRect(cx - 2, top - 4, 5, 3); }
+          else if (hat === 1) { x.fillStyle = hsl(hue + 30, 60, 45); x.beginPath(); x.moveTo(cx - 4, top); x.lineTo(cx + 1, top - 8); x.lineTo(cx + 5, top); x.fill(); }
+          else if (hat === 2) { x.fillStyle = '#d8c070'; x.fillRect(cx - 3, top - 2, 7, 2); x.fillRect(cx - 3, top - 4, 1, 2); x.fillRect(cx, top - 4, 1, 2); x.fillRect(cx + 3, top - 4, 1, 2); }
+          else if (hat === 3) { x.fillStyle = hsl(hue + 200, 40, 30); x.fillRect(cx - 4, top - 2, 9, 3); }
+        }
+        outline(c, R);
+        weather(c, R, outfit === 'rags' ? 2 : 1);
+        if (opts.head && isReady(opts.head)) { const ih = opts.head.naturalHeight || opts.head.width, iw = opts.head.naturalWidth || opts.head.width, s2 = Math.min(11 / iw, 11 / ih); x.drawImage(opts.head, cx - (iw * s2) / 2 + 0.5, top + 4 - (ih * s2) / 2 - 1, iw * s2, ih * s2); }
+        const f = frames[name], fx = f.getContext('2d'); fx.clearRect(0, 0, 24, 32); fx.drawImage(c, 0, 0);
+      };
+      draw();
+      whenLoaded([opts.tex, opts.head], draw);
+      sheet[name] = frames[name];
     }
-    return { ...sheet, walk: [sheet.walk1, sheet.walk2] };
+    return { ...sheet, walk: [sheet.walk1, sheet.walk2], outfit };
   });
 }
 
