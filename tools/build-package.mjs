@@ -398,11 +398,40 @@ function parseFeed(xml) {
 }
 const isoDate = (d) => { const t = new Date(d || ''); return isNaN(t) ? '' : t.toISOString().slice(0, 10); };
 async function readFeed(f) {
-  for (const url of f.urls) {
+  const tryUrl = async (url) => {
     try { const xml = await fetchText(url, { ua: BROWSER_UA, retries: 1 }); const parsed = parseFeed(xml); if (parsed.items.length) return parsed; }
     catch (e) { warn(`feed ${f.name} ${url}: ${e.message}`); }
+    return null;
+  };
+  for (const url of f.urls) { const r = await tryUrl(url); if (r) return r; }
+  // RSS autodiscovery from the home page, then (for webcomics) walk the "previous" links
+  const home = f.home || (f.urls[0] && new URL(f.urls[0]).origin + '/');
+  if (!home) return null;
+  let html;
+  try { html = await fetchText(home, { ua: BROWSER_UA, retries: 1 }); } catch (e) { warn(`feed ${f.name} home: ${e.message}`); return null; }
+  for (const m of html.matchAll(/<link[^>]+>/gi)) {
+    const tag = m[0];
+    if (!/rel=["']?alternate/i.test(tag) || !/application\/(rss|atom)\+xml/i.test(tag)) continue;
+    const href = (tag.match(/href=["']([^"']+)["']/i) || [])[1];
+    if (!href) continue;
+    const r = await tryUrl(new URL(decodeEntities(href), home).href);
+    if (r) { log(`feed ${f.name}: discovered ${href}`); return r; }
   }
-  return null;
+  if (!f.scrape) return null;
+  const items = [];
+  let url = home, page = html;
+  for (let k = 0; k < (f.max || 10) && page; k++) {
+    const title = (page.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) || page.match(/<title>([^<]+)<\/title>/i) || [])[1];
+    const img = (page.match(/<img[^>]+(?:id|class)=["'][^"']*(?:comic|strip|blort|cc-comic|main)[^"']*["'][^>]*>/i) || page.match(/<(?:main|article)[\s\S]*?(<img[^>]+>)/i) || [])[0];
+    const src = img && (img.match(/src=["']([^"']+)["']/i) || [])[1];
+    if (src) items.push({ title: decodeEntities(title || f.name).trim(), link: url, html: `<img src="${src}">`, date: null });
+    const prev = (page.match(/<a[^>]+rel=["']prev["'][^>]*href=["']([^"']+)["']/i) || page.match(/<a[^>]+href=["']([^"']+)["'][^>]*rel=["']prev["']/i) || page.match(/<a[^>]+(?:class|id)=["'][^"']*prev[^"']*["'][^>]*href=["']([^"']+)["']/i) || [])[1];
+    if (!prev) break;
+    url = new URL(decodeEntities(prev), url).href;
+    try { page = await fetchText(url, { ua: BROWSER_UA, retries: 0 }); } catch { page = null; }
+  }
+  if (items.length) log(`feed ${f.name}: scraped ${items.length} pages`);
+  return items.length ? { title: f.name, items } : null;
 }
 function firstImg(html, base) {
   const m = (html || '').match(/<img[^>]+src=["']([^"']+)["']/i);

@@ -51,13 +51,15 @@ kept for archiving and to avoid repeats. Each one is sized for 5 hours a day for
 | Category | Share | Source |
 |---|---|---|
 | Games | 20% | 28 game types with autopilot, themed sprite kits and random modifiers |
-| Condensed Wikipedia | 30% | Wikipedia API: seed articles, categories, "more like" search |
+| Condensed Wikipedia | 25% | Wikipedia API: seed articles, categories, "more like" search |
 | Videos | 20% | YouTube search (short videos), checked for embedding |
 | Memes | 10% | Wikimedia Commons images + Wikiquote/Wikipedia captions, Know Your Meme |
 | Made-up products | 5% | Hand-written parts + generated 80s/90s promo art |
 | Psychedelic | 5% | Generative visuals in the app + quotes |
 | Self-care | 5% | Hand-written prompts, timers, breathing exercises |
 | From the web | 5% | 19 sites (Lobsters, MetaFilter, Atlas Obscura, Quanta…), Hacker News, webcomics |
+| Oracle | 3% | Dice, I Ching, sacred-chicken augury, haruspicy, tarot (old decks scanned on Wikimedia Commons) |
+| Power scale | 2% | Versus cards and tier lists of odd things from history and fiction (Wikipedia) |
 | News | 0% (hidden) | 17 feeds in four groups; tap **News** in the stories row |
 
 **To make a new package**, edit [`packages/request.json`](packages/request.json) (for

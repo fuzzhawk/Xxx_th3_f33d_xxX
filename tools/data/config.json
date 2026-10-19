@@ -397,12 +397,16 @@
       {
         "name": "Everlasting Blort",
         "urls": [
-          "https://everlastingblort.com/feed",
-          "https://www.everlastingblort.com/feed",
-          "https://everlastingblort.com/rss",
-          "https://everlastingblort.tumblr.com/rss"
+          "https://blort.meepzorp.com/feed",
+          "https://blort.meepzorp.com/rss",
+          "https://blort.meepzorp.com/feed.xml",
+          "https://blort.meepzorp.com/atom.xml",
+          "https://blort.meepzorp.com/rss.xml",
+          "https://blort.meepzorp.com/index.xml"
         ],
-        "max": 15
+        "max": 15,
+        "home": "https://blort.meepzorp.com/",
+        "scrape": true
       },
       {
         "name": "SMBC",
