@@ -1,20 +1,22 @@
 {
   "id": "2026-W43",
   "title": "The Feed · 2026-W43",
-  "created": "2026-10-19T19:56:24.681Z",
-  "total": 5669,
+  "created": "2026-10-19T22:22:02.824Z",
+  "total": 5602,
   "counts": {
-    "game": 1140,
-    "wiki": 1715,
-    "video": 912,
-    "meme": 570,
-    "product": 285,
-    "psych": 285,
-    "selfcare": 285,
-    "web": 285,
-    "news": 192
+    "game": 1116,
+    "wiki": 1400,
+    "video": 1114,
+    "meme": 558,
+    "product": 279,
+    "psych": 279,
+    "selfcare": 279,
+    "web": 279,
+    "news": 19,
+    "oracle": 167,
+    "power": 112
   },
-  "estHours": 36.7,
+  "estHours": 39.2,
   "categories": {
     "game": {
       "label": "Physics games",
@@ -22,7 +24,7 @@
     },
     "wiki": {
       "label": "Condensed Wikipedia",
-      "pct": 30
+      "pct": 25
     },
     "video": {
       "label": "Videos",
@@ -51,6 +53,14 @@
     "news": {
       "label": "News",
       "pct": 0
+    },
+    "oracle": {
+      "label": "Oracle",
+      "pct": 3
+    },
+    "power": {
+      "label": "Power scale",
+      "pct": 2
     }
   },
   "topics": {
@@ -96,7 +106,14 @@
       "dice": "Yacht Dice",
       "cards": "Joker Hands",
       "monsters": "Monster Battle",
-      "fighter": "Street Brawl"
+      "fighter": "Street Brawl",
+      "starfox": "Sky Fox",
+      "mystery": "Manor Mystery",
+      "ski": "Downhill",
+      "graves": "Grave Merge",
+      "survivors": "Cave Horde",
+      "robotron": "Robo Arena",
+      "crokinole": "Crokinole"
     },
     "web": {
       "hn": "Hacker News",
@@ -120,71 +137,72 @@
     "psych": "psych.json",
     "selfcare": "selfcare.json",
     "web": "web.json",
-    "news": "news.json"
+    "news": "news.json",
+    "oracle": "oracle.json",
+    "power": "power.json"
   },
   "sprites": "sprites.json",
   "themes": "themes.json",
+  "textures": "textures.json",
+  "oracle": "tarot.json",
   "prompt": "# The Feed — package prompt\n\nThis is the living spec for each weekly package. It is editable from the app\n(Settings → Package prompt) and synced back here. Each new package is\ngenerated from this file, `tools/data/config.json`, and the newest file in\n`feedback/`.\n\n## Goals\n- Replace 3–5 hours/day of doomscrolling with a feed that is curious, weird and kind.\n- One package lasts a full week (target: 5 h/day × 7 days) with **no repeated posts**,\n  and nothing repeated from earlier packages.\n- Mostly offline. Only videos (and, optionally, images) need the network.\n- Keep AI-generated images and text to a minimum unless a category asks for it.\n- Use favorites, saves and more/less marks from `feedback/` to steer the next package.\n\n## Categories and share of the feed\n\n### Physics games — 20%\nSimple 2D physics games: bouncing objects, merging items, breaking blocks,\nside-scrolling dash mechanics and other classic casual styles. Each card runs on\nauto-pilot when it appears and becomes playable when tapped.\n\n### Condensed Wikipedia — 30%\nArticles condensed to 5 sentences or fewer. Each card shows a one-sentence hook;\ntapping it expands the summary and links to the full article. Topics:\n- **Music history**: all genres, especially underground trip-hop, punk, avant-garde,\n  electronic, hip-hop, heavy metal and transgressive experimental.\n- **Literature**: all genres, especially sci-fi, sex and erotica, Beat Generation authors,\n  esoteric and occult, experimental, offbeat non-fiction, poetry and alternative science.\n- **Science**: especially biology, sociology, psychology, technology and mathematics.\n- **History**: especially revolutionary periods, indigenous history and art history.\n- **Transgressive art**: especially queer artists and artists imprisoned or persecuted for their work.\n- **Unsolved mysteries**: especially esoteric and supernatural mysteries.\n- **Occult and religious customs**: indigenous spirituality, Gnosticism and cult activities.\n\n### YouTube videos — 20%\nMostly short videos and reels. They autoplay muted and have an unmute button. Topics:\ncute animals, retro gaming, vintage sci-fi and fantasy films and shows, plus every\nWikipedia topic above.\n\n### Memes — 10%\nHumorous images juxtaposed with snippets from the Wikipedia section, plus quotes\nfrom Robert Anton Wilson, William S. Burroughs, Tom Robbins and other offbeat authors.\nAlso memes collected from knowyourmeme.com.\n\n### Made-up products — 5%\nWeird, absurd products that don't exist and serve surreal purposes, with 80s/90s-style\npromo graphics and absurdist product descriptions.\n\n### Psychedelic visuals — 5%\nFractals, tunnels, fading colors and other generative, math-based imagery, each with a\nshort quote from the sections above.\n\n### Self-care reminders — 5%\nPrompts to make art and music, go for walks, work out, breathe, meditate and so on.\n\n### From around the web — 5%\nCarefully picked posts and articles from Substack, Hacker News and occasionally Reddit,\nchosen to match the topics above.\n",
   "report": {
     "sources": {
       "wikiquote": 2052,
-      "wikipedia": 1715,
-      "youtube": 912,
-      "hackernews": 499,
+      "wikipedia": 1400,
+      "youtube": 1114,
+      "hackernews": 496,
       "sites": {
-        "Lobsters": 25,
         "Tildes ~science": 8,
         "Tildes ~music": 8,
         "Tildes ~books": 8,
+        "Lobsters": 25,
+        "MetaFilter": 14,
         "Tildes ~humanities": 6,
         "Tildes ~arts": 6,
         "Slashdot": 12,
         "Kottke": 15,
-        "MetaFilter": 17,
-        "JSTOR Daily": 10,
-        "Quanta Magazine": 5,
-        "The Public Domain Review": 15,
         "Atlas Obscura": 20,
-        "Aeon": 15,
+        "JSTOR Daily": 10,
+        "The Public Domain Review": 15,
         "Nautilus": 10,
+        "Aeon": 15,
         "Hackaday": 7,
-        "Hyperallergic": 15,
-        "Open Culture": 15,
+        "Quanta Magazine": 5,
         "The Marginalian": 12,
+        "Hyperallergic": 15,
         "Colossal": 10,
         "The Daily Grail": 10,
         "Bandcamp Daily": 15,
         "Experimental History": 6,
-        "The Quietus": 15
+        "The Quietus": 15,
+        "Open Culture": 15
       },
       "comics": 137,
       "reddit": 0,
       "commons": 851,
       "knowyourmeme": 0,
-      "sprites": 26,
-      "themes": 64,
+      "sprites": 31,
+      "themes": 65,
+      "textures": 40,
       "news": {
-        "Mondoweiss": 10,
-        "Al Jazeera English": 20,
-        "Middle East Eye": 20,
-        "Drop Site News": 20,
-        "Tricontinental": 10,
-        "Peoples Dispatch": 12,
-        "Democracy Now!": 20,
-        "Common Dreams": 20,
-        "Reuters": 20,
-        "AP": 20,
-        "Geopolitical Economy Report": 10,
-        "Declassified UK": 10
+        "Middle East Eye": 6,
+        "Al Jazeera English": 10,
+        "Reuters": 2,
+        "AP": 1
       },
-      "memesBuilt": 570
+      "tarotCards": 78,
+      "tarotImages": 144,
+      "power": 192,
+      "memesBuilt": 558
     },
     "warnings": [
-      "youtube mysteries: 1/8 searches failed",
-      "feed Everlasting Blort https://everlastingblort.com/feed: fetch failed",
-      "feed Everlasting Blort https://www.everlastingblort.com/feed: fetch failed",
-      "feed Everlasting Blort https://everlastingblort.com/rss: fetch failed",
-      "feed Everlasting Blort https://everlastingblort.tumblr.com/rss: HTTP 404",
+      "feed Everlasting Blort https://blort.meepzorp.com/feed: HTTP 404",
+      "feed Everlasting Blort https://blort.meepzorp.com/rss: HTTP 404",
+      "feed Everlasting Blort https://blort.meepzorp.com/feed.xml: HTTP 404",
+      "feed Everlasting Blort https://blort.meepzorp.com/atom.xml: HTTP 404",
+      "feed Everlasting Blort https://blort.meepzorp.com/rss.xml: HTTP 404",
+      "feed Everlasting Blort https://blort.meepzorp.com/index.xml: HTTP 404",
       "reddit occult: HTTP 403",
       "reddit HighStrangeness: HTTP 403",
       "reddit AskHistorians: HTTP 403",
@@ -195,38 +213,43 @@
       "reddit experimentalmusic: HTTP 403",
       "reddit retrogaming: HTTP 403",
       "reddit Psychonaut: HTTP 403",
-      "reddit WeirdWheels: HTTP 403",
       "reddit AlternativeHistory: HTTP 403",
+      "reddit WeirdWheels: HTTP 403",
       "knowyourmeme https://knowyourmeme.com/memes/trending: HTTP 404",
-      "feed The Cradle https://thecradlemedia.substack.com/feed: HTTP 403",
       "feed The Electronic Intifada https://electronicintifada.net/rss.xml: HTTP 403",
-      "feed +972 Magazine https://972mag.com/feed: HTTP 403"
+      "feed The Cradle https://thecradlemedia.substack.com/feed: HTTP 403",
+      "feed The Electronic Intifada home: HTTP 403",
+      "feed The Cradle home: HTTP 403",
+      "feed +972 Magazine https://972mag.com/feed: HTTP 403",
+      "feed +972 Magazine home: HTTP 403"
     ],
     "memeStyles": {
-      "isthis": 37,
-      "chyron": 30,
-      "labels": 44,
-      "pov": 28,
-      "caption": 107,
-      "post": 31,
-      "quotecard": 25,
-      "demotivator": 46,
-      "brain": 24,
-      "starter": 34,
-      "impact": 74,
-      "twopanel": 51,
-      "versus": 39
+      "impact": 82,
+      "twopanel": 54,
+      "pov": 30,
+      "demotivator": 44,
+      "chyron": 35,
+      "quotecard": 47,
+      "starter": 26,
+      "brain": 34,
+      "isthis": 16,
+      "versus": 23,
+      "post": 34,
+      "labels": 28,
+      "caption": 105
     },
     "wanted": {
-      "game": 1140,
-      "wiki": 1711,
-      "video": 1140,
-      "meme": 570,
-      "product": 285,
-      "psych": 285,
-      "selfcare": 285,
-      "web": 285,
-      "news": 0
+      "game": 1116,
+      "wiki": 1395,
+      "video": 1116,
+      "meme": 558,
+      "product": 279,
+      "psych": 279,
+      "selfcare": 279,
+      "web": 279,
+      "news": 0,
+      "oracle": 167,
+      "power": 112
     }
   }
 }
