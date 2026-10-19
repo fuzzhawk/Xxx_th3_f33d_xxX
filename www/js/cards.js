@@ -14,13 +14,15 @@ import { actionSheet } from './sheet.js';
 import { saveFromPost } from './save.js';
 import { renderMeme } from './memes.js';
 import * as stats from './stats.js';
+import { oracleMedia, oracleLabel } from './oracle.js';
+import { powerBody } from './power.js';
 
 const TOPIC_COLOR = {
   music: '#e8742a', literature: '#c9952b', science: '#8a9a52', history: '#c4623a', transgressive: '#d06a8c', mysteries: '#6d9bb0', occult: '#a283c4',
   animals: '#d8a25a', retrogaming: '#5b9aa9', vintagescifi: '#a77bd0'
 };
 const TOPIC_GLYPH = { music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉' };
-const CAT_FACE = { news: ['◉', '#8a2b2b'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'] };
+const CAT_FACE = { news: ['◉', '#8a2b2b'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'] };
 let soundOn = false;
 
 export function labelOf(post) {
@@ -37,6 +39,8 @@ const handleFor = (post, ctx) => {
     case 'selfcare': return ['self.care', post.title];
     case 'web': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'web', `${post.sub === 'comic' ? 'Comic' : post.sub === 'hn' ? 'Hacker News' : post.source || 'Web'}${post.date ? ` · ${post.date}` : ''}`];
     case 'news': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'news', `${ctx.topics?.news?.[post.sub] || 'News'}${post.date ? ` · ${post.date}` : ''}`];
+    case 'oracle': return ['the.oracle', `${oracleLabel(post.sub)} · ask, then cast`];
+    case 'power': return ['power.scale', post.sub === 'tier' ? 'Tier list · binding in no jurisdiction' : 'Who would win?'];
     default: return [post.cat, ''];
   }
 };
@@ -363,12 +367,25 @@ function comic(p, ctx) {
   return post('comic', p, ctx, { media, ext: p.url, caption: capt(handleFor(p, ctx)[0], p.title, p.excerpt ? el('div.muted', { style: { marginTop: '4px' } }, p.excerpt) : null), metaLine: p.date || null });
 }
 
+// ------------------------------------------------ oracle and power scale
+function oracle(p, ctx) {
+  const o = oracleMedia(p);
+  const card = post('oracle', p, ctx, { media: o.media, body: o.body, mediaInteractive: true });
+  card._activate = o.activate; card._deactivate = o.deactivate; card._heavy = true;
+  return card;
+}
+function power(p, ctx) {
+  const card = post('power', p, ctx, { body: powerBody(p), ext: p.sub === 'versus' ? p.a.url : p.ents?.[0]?.url });
+  card._activate = () => card.classList.add('shown');
+  return card;
+}
+
 // ------------------------------------------------ special
 export function notice(title, text, buttons = []) {
   return el('article.notice', el('h3', title), el('p', text), el('div.btnrow', { style: { justifyContent: 'center' } }, buttons));
 }
 
-const RENDER = { wiki, video, game, psych, meme, product, selfcare, web, news: web };
+const RENDER = { wiki, video, game, psych, meme, product, selfcare, web, news: web, oracle, power };
 export function renderCard(p, ctx) {
   const fn = RENDER[p.cat];
   if (!fn) return null;

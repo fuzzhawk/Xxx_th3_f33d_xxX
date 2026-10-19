@@ -40,7 +40,9 @@ async function fetchPackage(base, id, onProgress) {
   if (manifest.themes) { try { themes = await getJSON(`${base}${id}/${manifest.themes}`, 60000); } catch { /* optional */ } }
   let textures = [];
   if (manifest.textures) { try { textures = await getJSON(`${base}${id}/${manifest.textures}`, 60000); } catch { /* optional */ } }
-  return { manifest, posts, sprites, themes, textures };
+  let oracle = null;
+  if (manifest.oracle) { try { oracle = await getJSON(`${base}${id}/${manifest.oracle}`, 60000); } catch { /* optional */ } }
+  return { manifest, posts, sprites, themes, textures, oracle };
 }
 
 export async function downloadPackage(id, onProgress) {

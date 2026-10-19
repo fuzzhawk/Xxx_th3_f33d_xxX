@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hasTransparentEdges } from './png.mjs';
+import { DECK, QUESTIONS } from '../www/js/oracle-data.js';
 import { productClassics, productParts, selfCare, selfCareFlavors, fallbackQuotes, memeText, memeWeights, memeImageCount } from './data/content.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -605,6 +606,109 @@ async function buildTextures() {
   return out;
 }
 
+// ------------------------------------------------------------------ oracle: tarot scans from Commons
+const TAROT_ALT = [['fool', 'le fou', 'matto'], ['magician', 'bateleur', 'bagatto'], ['high priestess', 'papesse', 'popess'], ['empress', 'impératrice', 'imperatrice'], ['emperor', 'empereur', 'imperatore'],
+  ['hierophant', 'le pape', 'papa'], ['lovers', 'amoureux', 'amanti'], ['chariot', 'carro'], ['strength', 'la force', 'forza', 'fortitude'], ['hermit', 'hermite', 'eremita', 'ermite'], ['wheel of fortune', 'roue de fortune', 'ruota'],
+  ['justice', 'giustizia'], ['hanged man', 'le pendu', 'appeso'], ['death', 'la mort', 'morte'], ['temperance', 'tempérance', 'temperanza'], ['devil', 'diable', 'diavolo'], ['tower', 'maison dieu', 'maison-dieu', 'torre'],
+  ['star', 'étoile', 'etoile', 'stella'], ['moon', 'la lune', 'luna'], ['sun', 'soleil', 'il sole'], ['judgement', 'judgment', 'jugement', 'giudizio'], ['world', 'le monde', 'mondo']];
+async function buildTarot() {
+  const out = {};
+  const add = (id, url) => { const l = (out[id] ||= []); if (url && !l.includes(url) && l.length < 4) l.push(url); };
+  // the 1909 Rider–Waite–Smith deck, by file name
+  for (let i = 0; i < DECK.length; i += 50) {
+    const batch = DECK.slice(i, i + 50);
+    try {
+      const j = await fetchJSON(`https://commons.wikimedia.org/w/api.php?${new URLSearchParams({ action: 'query', titles: batch.map((c) => `File:${c.rws}`).join('|'), prop: 'imageinfo', iiprop: 'url|mime', iiurlwidth: '320', format: 'json', formatversion: '2' })}`);
+      const norm = Object.fromEntries((j.query?.normalized || []).map((n) => [n.to, n.from]));
+      for (const pg of j.query?.pages || []) {
+        const t = norm[pg.title] || pg.title, c = batch.find((x) => `File:${x.rws}` === t || `File:${x.rws}`.replace(/_/g, ' ') === pg.title);
+        if (c && pg.imageinfo?.[0]?.thumburl) add(c.id, pg.imageinfo[0].thumburl);
+      }
+    } catch (e) { warn(`tarot RWS batch ${i}: ${e.message}`); }
+    await sleep(100);
+  }
+  // older decks for the major arcana (Marseille, Visconti-Sforza, Sola Busca…)
+  const best = (t) => { let bi = -1, bl = 0; TAROT_ALT.forEach((names, i) => { for (const n of names) if (t.includes(n) && n.length > bl) { bl = n.length; bi = i; } }); return bi; };
+  await pool(TAROT_ALT.map((n, i) => [n, i]), 3, async ([names, i]) => {
+    for (const q of new Set([`tarot ${names[0]}`, `tarot ${names[1]}`, `tarocchi ${names[names.length - 1]}`])) {
+      try {
+        for (const c of await commonsSearch(q, 'filetype:bitmap', 15, 320)) {
+          const t = c.title.toLowerCase();
+          if (/rws|rider|waite/.test(t) || !/tarot|tarocc|trionf|trump|carte|card/.test(t) || best(t) !== i) continue;
+          if (c.ii.width && c.ii.height && c.ii.height < c.ii.width * 1.25) continue; // single portrait cards only
+          add(`M${String(i).padStart(2, '0')}`, c.ii.thumburl);
+        }
+      } catch (e) { warn(`tarot search ${q}: ${e.message}`); }
+      await sleep(100);
+    }
+  });
+  report.sources.tarotCards = Object.keys(out).length;
+  report.sources.tarotImages = Object.values(out).reduce((a, l) => a + l.length, 0);
+  return { tarot: out };
+}
+function buildOracle() {
+  const subs = ['tarot', 'iching', 'augury', 'tarot', 'haruspicy', 'dice'];
+  return shuffle(Array.from({ length: want.oracle || 0 }, (_, i) => {
+    const seed = Math.floor(rand() * 2 ** 31), sub = subs[i % subs.length];
+    return { id: `o${seed.toString(36)}`, cat: 'oracle', sub, seed, question: pick(QUESTIONS), spread: sub === 'tarot' && rand() < 0.5 ? 3 : 1 };
+  }));
+}
+
+// ------------------------------------------------------------------ absurd power scale
+async function buildPower() {
+  const P = readJSON(path.join(ROOT, 'tools/data/power.json'));
+  const all = Object.entries(P.entities).flatMap(([kind, ts]) => ts.map((t) => ({ t, kind })));
+  const ents = new Map();
+  if (OFFLINE) for (const e of all) ents.set(e.t, { t: e.t, k: e.kind, b: `${e.t} is a placeholder entry for offline testing.`, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(e.t.replace(/ /g, '_'))}`, views: 500 + (hashStr(e.t) % 90000), len: 3000 + (hashStr(e.t) % 60000) });
+  else {
+    for (let i = 0; i < all.length; i += 20) {
+      const batch = all.slice(i, i + 20);
+      try {
+        const j = await fetchJSON(wq({ action: 'query', prop: 'extracts|pageimages|info|pageviews', exintro: '1', explaintext: '1', exsentences: '2', exlimit: '20', piprop: 'thumbnail', pithumbsize: '320', pilimit: '20', pvipdays: '30', inprop: 'url', redirects: '1', titles: batch.map((e) => e.t).join('|') }));
+        const back = {};
+        for (const n of j.query?.normalized || []) back[n.to] = n.from;
+        for (const r of j.query?.redirects || []) back[r.to] = back[r.from] || r.from;
+        for (const pg of j.query?.pages || []) {
+          if (pg.missing || !pg.extract) continue;
+          const orig = back[pg.title] || pg.title, e = batch.find((x) => x.t === orig) || batch.find((x) => x.t === pg.title);
+          if (!e || ents.has(pg.title)) continue;
+          const views = Object.values(pg.pageviews || {}).reduce((a, v) => a + (v || 0), 0);
+          ents.set(pg.title, { t: pg.title, k: e.kind, b: clip(cleanExtract(pg.extract), 170), img: pg.thumbnail?.source, url: pg.fullurl || `https://en.wikipedia.org/wiki/${encodeURIComponent(pg.title.replace(/ /g, '_'))}`, views, len: pg.length || 0 });
+        }
+      } catch (e) { warn(`power batch ${i}: ${e.message}`); }
+      await sleep(80);
+    }
+  }
+  const list = [...ents.values()];
+  if (list.length < 8) { warn('power scale: too few entities'); return []; }
+  // stats: two from real numbers (pageviews, article length), the rest are fate
+  const statOf = (e) => {
+    const h = hashStr(e.t), s = {};
+    P.stats.forEach((name, k) => { s[name] = name === 'Lore' ? Math.min(10, Math.max(1, Math.round(Math.log10(e.len + 10) * 2.2 - 5))) : name === 'Cult following' ? Math.min(10, Math.max(1, Math.round(Math.log10(e.views + 10) * 1.9 - 2))) : 1 + ((h >>> (k * 3)) % 10); });
+    return s;
+  };
+  for (const e of list) { e.s = statOf(e); e.pw = Math.round(Math.sqrt(e.views + 50) * Math.sqrt(e.len + 500) / 40 * (1 + (hashStr(e.t) % 13) / 4)); delete e.views; delete e.len; }
+  const fill = (tpl, o) => tpl.replace(/\{(\w+)\}/g, (_, k) => o[k] ?? '');
+  const n = want.power || 0, posts = [];
+  const TIER_TITLES = ['Official power ranking', 'Who would win in a pub', 'Strongest when wet', 'Most dangerous at a dinner party', 'Best to have in a lifeboat', 'Tier list of the unknowable', 'Ranked by how hard they are to explain to a customs officer', 'Most likely to survive the heat death of the universe', 'Who you’d want on a pub quiz team', 'Ranked by sheer audacity'];
+  for (let i = 0; i < n; i++) {
+    const seed = Math.floor(rand() * 2 ** 31), unit = pick(P.units);
+    if (i % 10 < 7) {
+      let a = pick(list), b = pick(list), g = 0;
+      while ((b === a || (b.k === a.k && rand() < 0.7)) && g++ < 20) b = pick(list);
+      const w = a.pw === b.pw ? (rand() < 0.5 ? 0 : 1) : a.pw > b.pw ? 0 : 1, win = [a, b][w], lose = [a, b][1 - w];
+      const stat = Object.entries(win.s).sort((x, y) => (y[1] - lose.s[y[0]]) - (x[1] - lose.s[x[0]]))[0][0];
+      posts.push({ id: `pw${seed.toString(36)}`, cat: 'power', sub: 'versus', seed, unit, a, b, winner: w, how: `${win.t} wins ${fill(pick(P.wins), { stat: stat.toLowerCase(), loser: lose.t })}.`, verdict: pick(P.verdicts) });
+    } else {
+      const picks = new Set(); while (picks.size < 6) picks.add(pick(list));
+      const ranked = [...picks].sort((x, y) => y.pw - x.pw);
+      posts.push({ id: `pt${seed.toString(36)}`, cat: 'power', sub: 'tier', seed, unit, title: pick(TIER_TITLES), ents: ranked, tiers: ['S', 'A', 'B', 'C', 'D', 'F'] });
+    }
+  }
+  report.sources.power = list.length;
+  return posts;
+}
+
 // ------------------------------------------------------------------ game theme kits
 const themeDefs = readJSON(path.join(ROOT, 'tools/data/themes.json')).themes;
 const KENNEY_NAMES = { 'racing-pack': 'Grand Prix', 'alien-ufo-pack': 'UFO Invasion', 'tiny-dungeon': 'Dungeon Crawl', 'pixel-platformer': 'Pixel World', 'physics-assets': 'Alien Physics', 'shape-characters': 'Shape Folk', 'emotes-pack': 'Emote Storm', 'monster-builder-pack': 'Monster Builder', 'rolling-ball-assets': 'Marble Run', 'platformer-pack-redux': 'Townscape' };
@@ -810,7 +914,7 @@ function offlineFixtures() {
 
 // ------------------------------------------------------------------ main
 async function main() {
-  let wiki, video, web, quotes, commons, kym, sprites = [], themes = [], news = [], textures = [];
+  let wiki, video, web, quotes, commons, kym, sprites = [], themes = [], news = [], textures = [], oracleData = null;
   if (OFFLINE) ({ wiki, video, web, quotes, commons, kym } = offlineFixtures());
   else {
     quotes = await buildQuotes();
@@ -823,7 +927,9 @@ async function main() {
     themes = await buildThemes();
     textures = await buildTextures();
     news = await buildNews();
+    oracleData = await buildTarot();
   }
+  const power = await buildPower();
   const games = buildGames();
   assignThemes(games, themes);
   const posts = {
@@ -835,7 +941,9 @@ async function main() {
     psych: buildPsych(quotes, wiki),
     selfcare: buildSelfCare(),
     web: shuffle(web),
-    news
+    news,
+    oracle: buildOracle(),
+    power
   };
   const counts = Object.fromEntries(Object.entries(posts).map(([k, v]) => [k, v.length]));
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -854,6 +962,7 @@ async function main() {
   if (sprites.length) writeJSON(path.join(dir, 'sprites.json'), sprites);
   if (themes.length) writeJSON(path.join(dir, 'themes.json'), themes);
   if (textures.length) writeJSON(path.join(dir, 'textures.json'), textures);
+  if (oracleData) writeJSON(path.join(dir, 'tarot.json'), oracleData);
   const prompt = fs.readFileSync(path.join(ROOT, 'packages/prompt.md'), 'utf8');
   const manifest = {
     id: pkgId, title: `The Feed · ${pkgId}`, created: new Date().toISOString(), offline: OFFLINE || undefined,
@@ -866,7 +975,7 @@ async function main() {
       web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' },
       news: Object.fromEntries(Object.entries(config.news.groups).map(([k, g]) => [k, g.label]))
     },
-    files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, textures: textures.length ? 'textures.json' : undefined, prompt, report
+    files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, textures: textures.length ? 'textures.json' : undefined, oracle: oracleData ? 'tarot.json' : undefined, prompt, report
   };
   writeJSON(path.join(dir, 'manifest.json'), manifest, true);
 

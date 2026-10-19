@@ -10,7 +10,7 @@
     },
     "wiki": {
       "label": "Condensed Wikipedia",
-      "pct": 30,
+      "pct": 25,
       "dwellSec": 16
     },
     "video": {
@@ -47,6 +47,16 @@
       "label": "News",
       "pct": 0,
       "dwellSec": 20
+    },
+    "oracle": {
+      "label": "Oracle",
+      "pct": 3,
+      "dwellSec": 30
+    },
+    "power": {
+      "label": "Power scale",
+      "pct": 2,
+      "dwellSec": 22
     }
   },
   "gameTypes": [

@@ -1,9 +1,9 @@
 import { lsGet, lsSet } from './store.js';
 
-export const CATS = ['game', 'wiki', 'video', 'meme', 'product', 'psych', 'selfcare', 'web', 'news'];
-export const CAT_LABEL = { game: 'Games', wiki: 'Wikipedia', video: 'Videos', meme: 'Memes', product: 'Products', psych: 'Psychedelic', selfcare: 'Self-care', web: 'From the web', news: 'News' };
-export const CAT_GLYPH = { game: '◐', wiki: '❦', video: '▶', meme: '☺', product: '✦', psych: '✺', selfcare: '☘', web: '⌘', news: '◉' };
-export const DEFAULT_PCT = { game: 20, wiki: 30, video: 20, meme: 10, product: 5, psych: 5, selfcare: 5, web: 5, news: 0 };
+export const CATS = ['game', 'wiki', 'video', 'meme', 'product', 'psych', 'selfcare', 'web', 'oracle', 'power', 'news'];
+export const CAT_LABEL = { game: 'Games', wiki: 'Wikipedia', video: 'Videos', meme: 'Memes', product: 'Products', psych: 'Psychedelic', selfcare: 'Self-care', web: 'From the web', oracle: 'Oracle', power: 'Power scale', news: 'News' };
+export const CAT_GLYPH = { game: '◐', wiki: '❦', video: '▶', meme: '☺', product: '✦', psych: '✺', selfcare: '☘', web: '⌘', oracle: '☯', power: '⚔', news: '◉' };
+export const DEFAULT_PCT = { game: 20, wiki: 25, video: 20, meme: 10, product: 5, psych: 5, selfcare: 5, web: 5, oracle: 3, power: 2, news: 0 };
 
 const BUILD = window.BUILD || {};
 export const DEFAULTS = {
@@ -48,7 +48,7 @@ export function resetSettings(keep = ['token', 'repo', 'branch', 'pkg']) {
 
 export function pctFor(manifest) {
   const base = settings.pct || Object.fromEntries(CATS.map((c) => [c, manifest?.categories?.[c]?.pct ?? DEFAULT_PCT[c]]));
-  return Object.fromEntries(CATS.map((c) => [c, Math.max(0, +base[c] || 0)]));
+  return Object.fromEntries(CATS.map((c) => [c, Math.max(0, +(base[c] ?? manifest?.categories?.[c]?.pct ?? DEFAULT_PCT[c]) || 0)]));
 }
 export function subWeight(cat, sub) {
   const u = settings.subWeights?.[cat]?.[sub] ?? 1;
