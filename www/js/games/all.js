@@ -4,6 +4,12 @@ import { Sling } from './sling.js';
 import { Necro } from './necro.js';
 import { Chess, Dice, Cards } from './board.js';
 import { Monsters, Fighter } from './battle.js';
+import { Flight } from './flight.js';
+import { Ski } from './ski.js';
+import { Robotron } from './robotron.js';
+import { Crokinole } from './crokinole.js';
+import { Survivors } from './survivors.js';
+import { Graves } from './graves.js';
 import { Game, W, H, circleRect, reflect, circlePeg, walls, roundRect, drawFit, drawRectImg } from './engine.js';
 
 // ================================================================ Plinko
@@ -698,12 +704,19 @@ class Juggle extends Game {
 }
 
 export const GAMES = { plinko: Plinko, breakout: Breakout, merge: Merge, dash: Dash, flappy: Flap, stacker: Stacker, pong: Pong, peggle: PegShot, golf: Golf, juggle: Juggle, platformer: Platformer, racer: Racer, raycast: Doom, rocks: Rocks, sling: Sling,
-  necro: Necro, chess: Chess, dice: Dice, cards: Cards, monsters: Monsters, fighter: Fighter };
+  necro: Necro, chess: Chess, dice: Dice, cards: Cards, monsters: Monsters, fighter: Fighter,
+  starfox: Flight, ski: Ski, robotron: Robotron, crokinole: Crokinole, survivors: Survivors, graves: Graves };
 export const GAME_HINT = {
   plinko: 'tap to drop a ball', breakout: 'drag to move the paddle', merge: 'drag to aim, release to drop', dash: 'tap to jump (twice to double-jump)',
   flappy: 'tap to flap', stacker: 'tap to drop the block', pong: 'drag to move your paddle', peggle: 'aim, release to shoot', golf: 'drag back from anywhere, release to putt', juggle: 'tap the balls to keep them up',
   platformer: 'tap to jump, twice to double-jump, stomp enemies', racer: 'hold left or right to steer', raycast: 'drag sideways to turn, up/down to walk, tap to fire, tap the HUD to switch weapons',
   rocks: 'tap to shoot, hold to thrust toward your finger', sling: 'drag down and release to fire upward',
   necro: 'summon skulls, drag matching undead together to merge', chess: 'tap a white piece, then its destination', dice: 'roll, tap dice to hold, tap a row to score',
-  cards: 'tap up to five cards, then play or discard', monsters: 'tap a move', fighter: 'buttons: ◀ ▶ jump, punch, kick, special · hold away to block'
+  cards: 'tap up to five cards, then play or discard', monsters: 'tap a move', fighter: 'buttons: ◀ ▶ jump, punch, kick, special · hold away to block',
+  starfox: 'hold and drag to steer, lasers fire while you hold · fly through rings',
+  ski: 'tap to jump, hold in the air to backflip, land along the slope',
+  robotron: 'left thumb moves, right thumb shoots (one thumb auto-aims) · rescue the humans',
+  crokinole: 'touch near the bottom arc to place, drag back and release to flick · hit their discs or lose yours',
+  survivors: 'drag anywhere to walk · weapons fire by themselves · tap an upgrade on level up',
+  graves: 'tap a grave to raise, drag two alike together to merge, drag or tap to fill orders'
 };

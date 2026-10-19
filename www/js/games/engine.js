@@ -285,3 +285,42 @@ export function roundRect(c, x, y, w, h, r) {
   c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
   c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
 }
+
+// CSS colour → [r, g, b] (palette colours are hsl() strings)
+const rgbMemo = new Map();
+let rgbCtx = null;
+export function rgbOf(css) {
+  let v = rgbMemo.get(css);
+  if (v) return v;
+  rgbCtx ||= Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).getContext('2d', { willReadFrequently: true });
+  rgbCtx.clearRect(0, 0, 1, 1); rgbCtx.fillStyle = css; rgbCtx.fillRect(0, 0, 1, 1);
+  v = [...rgbCtx.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  rgbMemo.set(css, v);
+  return v;
+}
+// Tileable fractal value noise on an n×n grid, values 0..1.
+export function noiseMap(R, n = 256, octaves = 5, base = 4) {
+  const out = new Float32Array(n * n);
+  let amp = 1, total = 0;
+  for (let o = 0; o < octaves; o++) {
+    const g = base << o, lat = Float32Array.from({ length: g * g }, () => R());
+    const sm = (t) => t * t * (3 - 2 * t);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const fx = (x / n) * g, fy = (y / n) * g, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = sm(fx - x0), ty = sm(fy - y0);
+      const a = lat[y0 * g + x0], b = lat[y0 * g + ((x0 + 1) % g)], c = lat[((y0 + 1) % g) * g + x0], d = lat[((y0 + 1) % g) * g + ((x0 + 1) % g)];
+      out[y * n + x] += (a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty) * amp;
+    }
+    total += amp; amp *= 0.5;
+  }
+  for (let i = 0; i < out.length; i++) out[i] /= total;
+  return out;
+}
+// Pixels of an image drawn over w×h (tiled), or null if it isn't loaded yet.
+export function imagePixels(i, w, h) {
+  if (!ready(i)) return null;
+  try {
+    const c = Object.assign(document.createElement('canvas'), { width: w, height: h }), x = c.getContext('2d');
+    x.fillStyle = x.createPattern(i, 'repeat'); x.fillRect(0, 0, w, h);
+    return x.getImageData(0, 0, w, h).data;
+  } catch { return null; }
+}

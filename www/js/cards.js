@@ -227,9 +227,10 @@ function game(p, ctx) {
   };
   const bump = () => { clearTimeout(idle); idle = setTimeout(() => { if (!g?.auto) setPlaying(false); }, 25000); };
   stage.addEventListener('click', (e) => { if (!g || g.auto) { setPlaying(true); const q = g.local(e); g.tap(q.x, q.y); } });
-  canvas.addEventListener('pointerdown', (e) => { if (!g || g.auto) return; canvas.setPointerCapture(e.pointerId); const q = g.local(e); g.pointer.down = true; g.down(q.x, q.y); bump(); });
-  canvas.addEventListener('pointermove', (e) => { if (!g || g.auto) return; const q = g.local(e); g.move(q.x, q.y); });
-  canvas.addEventListener('pointerup', (e) => { if (!g || g.auto) return; const q = g.local(e); g.pointer.down = false; g.up(q.x, q.y); });
+  canvas.addEventListener('pointerdown', (e) => { if (!g || g.auto) return; canvas.setPointerCapture(e.pointerId); const q = g.local(e); g.pointer.down = true; g.down(q.x, q.y, e.pointerId); bump(); });
+  canvas.addEventListener('pointermove', (e) => { if (!g || g.auto) return; const q = g.local(e); g.move(q.x, q.y, e.pointerId); });
+  canvas.addEventListener('pointerup', (e) => { if (!g || g.auto) return; const q = g.local(e); g.pointer.down = false; g.up(q.x, q.y, e.pointerId); });
+  canvas.addEventListener('pointercancel', (e) => { if (!g || g.auto) return; const q = g.local(e); g.pointer.down = false; g.up(q.x, q.y, e.pointerId); });
   autobtn.onclick = (e) => { e.stopPropagation(); setPlaying(false); };
   card._activate = () => { ensure(); if (settings.autopilot || !g.auto) g.start(); else { g.resize(); g.frame(performance.now()); } };
   card._deactivate = () => { g?.stop(); };
