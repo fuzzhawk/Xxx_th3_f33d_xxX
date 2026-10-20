@@ -302,7 +302,8 @@ export class Hack extends Game {
       }
       h.moving = moving; if (moving) h.anim += dt;
       if (this.tileOf(h) !== this.lastTile || (this.visT = (this.visT || 0) - dt) <= 0) { this.visT = 0.25; this.track(); }
-      for (const l of this.loot) if (!l.got && Math.hypot(l.x - h.x, l.y - h.y) < 0.55) { if (this.take(l)) l.got = true; else l.skip = true; }
+      const ht = this.tileOf(h);
+      for (const l of this.loot) if (!l.got && (this.tileOf(l) === ht || Math.hypot(l.x - h.x, l.y - h.y) < 0.55)) { if (this.take(l)) l.got = true; else l.skip = true; }
       this.loot = this.loot.filter((l) => !l.got);
       if (!h.path.length && !h.tgt && m[this.tileOf(h)] === 2) { this.descend(); return; }
     }
@@ -386,7 +387,7 @@ export class Hack extends Game {
     const here = this.tileOf(h);
     let lb = null, ld = 9;
     for (const l of this.loot) { if (l.skip) continue; const d = Math.hypot(l.x - h.x, l.y - h.y); if (d < ld && this.dist[this.tileOf(l)] >= 0) { ld = d; lb = l; } }
-    if (lb) { if (this.goal !== lb) { h.path = this.path(here, this.tileOf(lb)) || []; this.goal = lb; if (!h.path.length && ld > 0.6) lb.skip = true; } if (h.path.length || ld < 0.6) return; }
+    if (lb) { if (this.goal !== lb) { h.path = this.path(here, this.tileOf(lb)) || []; this.goal = lb; if (!h.path.length && ld > 0.6) lb.skip = true; } if (h.path.length) return; lb.skip = true; }
     if (h.path.length && this.goal) return;
     const seenStairs = this.seen[this.stairs];
     let explored = 0; for (const i of this.floors) explored += this.seen[i];
