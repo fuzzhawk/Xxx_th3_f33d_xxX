@@ -4,7 +4,8 @@
 import { el } from './util.js';
 import { img, ready, getTextures } from './games/assets.js';
 import { themePalette } from './games/creature.js';
-import { HEX, hexNumber, DECK, LIVER, MARKS, CAPUT, AUGURY, DICE3, QUESTIONS } from './oracle-data.js';
+import { HEX, hexNumber, DECK, AUGURY, DICE3, QUESTIONS } from './oracle-data.js';
+import { Haruspex } from './haruspex.js';
 
 let tarotImgs = {};
 export function setOracle(data) { tarotImgs = data?.tarot || {}; }
@@ -23,15 +24,19 @@ export function oracleMedia(p) {
   const media = el('div.media.oracle', canvas);
   const body = el('div.oracle-body', q, reading, el('div.btnrow', btn));
   const o = new Oracle(canvas, p, reading);
-  btn.onclick = (e) => { e.stopPropagation(); o.cast(); btn.textContent = 'Cast again'; };
-  return { media, body, activate: () => { o.start(); if (!o.casts) { setTimeout(() => { if (o.running && !o.casts) { o.cast(); btn.textContent = 'Cast again'; } }, 700); } }, deactivate: () => o.stop() };
+  const label = () => { btn.textContent = o.hx ? o.hx.label() : 'Cast again'; };
+  if (o.hx) btn.textContent = 'Bring a beast';
+  btn.onclick = (e) => { e.stopPropagation(); if (o.hx?.state === 'altar') o.hx.sacrifice(); else o.cast(); label(); };
+  canvas.addEventListener('click', (e) => { if (!o.hx) return; const r = canvas.getBoundingClientRect(); if (o.hx.tap((e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H)) { e.stopPropagation(); label(); } });
+  return { media, body, activate: () => { o.start(); if (!o.casts) { setTimeout(() => { if (o.running && !o.casts) { o.cast(); label(); } }, 700); } }, deactivate: () => o.stop() };
 }
 
 class Oracle {
   constructor(canvas, p, out) {
     this.c = canvas; this.x = canvas.getContext('2d'); this.p = p; this.out = out;
     this.pal = themePalette((p.seed || 1) % 360, ['earth', 'rust', 'ink', 'sunset', 'duotone'][(p.seed >>> 4) % 5]);
-    this.casts = 0; this.t = 0; this.anim = null; this.running = false;
+    this.casts = 0; this.t = 0; this.anim = null; this.running = false; this.rnd = rnd;
+    if (p.sub === 'haruspicy') this.hx = new Haruspex(this);
     this.tex = getTextures().filter(Boolean)[(p.seed || 0) % Math.max(1, getTextures().length)] || null;
   }
   start() {
@@ -71,10 +76,7 @@ class Oracle {
       this.anim = { t: 0, o, hens, grain };
       this.after(4, () => this.say(o.title, [o.text]));
     } else if (s === 'haruspicy') {
-      const marks = [0, 1, 2].slice(0, 2 + (rnd() < 0.5 ? 1 : 0)).map(() => ({ region: Math.floor(rnd() * LIVER.length), mark: Math.floor(rnd() * MARKS.length), u: rnd(), v: rnd() }));
-      const r = rnd(), caput = CAPUT[r < 0.55 ? 0 : r < 0.7 ? 1 : r < 0.9 ? 2 : 3];
-      this.anim = { t: 0, marks, caput, wobble: rnd() };
-      this.after(3, () => this.say(`The liver: head ${caput[0]}`, [caput[1], ...marks.map((m) => `${MARKS[m.mark][0][0].toUpperCase()}${MARKS[m.mark][0].slice(1)} in the house of ${LIVER[m.region][0]} (${LIVER[m.region][1]}): ${MARKS[m.mark][1]}.`)]));
+      this.hx.bring();
     } else {
       const n = (this.p.spread || 1) === 3 ? 3 : 1, used = new Set();
       const cards = Array.from({ length: n }, () => { let c; do c = pick(DECK); while (used.has(c.id)); used.add(c.id); const imgs = tarotImgs[c.id] || []; return { c, rev: rnd() < 0.3, i: imgs.length ? img(pick(imgs)) : null }; });
@@ -92,11 +94,11 @@ class Oracle {
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     if (ready(this.tex)) { c.globalCompositeOperation = 'overlay'; c.globalAlpha = 0.35; c.fillStyle = c.createPattern(this.tex, 'repeat'); c.fillRect(0, 0, W, H); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; }
     const s = this.p.sub, a = this.anim;
+    if (this.hx) { if (!this.hx.draw(c)) this.idle(c); return; }
     if (!a) { this.idle(c); return; }
     if (s === 'dice') this.drawDice(c, a);
     else if (s === 'iching') this.drawIChing(c, a);
     else if (s === 'augury') this.drawAugury(c, a);
-    else if (s === 'haruspicy') this.drawLiver(c, a);
     else this.drawTarot(c, a);
     // grime
     c.fillStyle = 'rgba(0,0,0,.25)'; for (let i = 0; i < 30; i++) c.fillRect((i * 137 + Math.floor(this.t * 9) * 53) % W, (i * 71 + Math.floor(this.t * 9) * 31) % H, 1, 1);
@@ -188,36 +190,6 @@ class Oracle {
     c.fillStyle = '#e8b04a'; c.beginPath(); c.moveTo(hx + 5, hy - 1); c.lineTo(hx + 11, hy + 1); c.lineTo(hx + 5, hy + 3); c.fill();
     c.fillStyle = '#111'; c.fillRect(hx + 1, hy - 2, 2, 2);
     c.restore();
-  }
-  // ---- haruspicy: a lobed liver divided into the sixteen houses
-  drawLiver(c, a) {
-    const cx = W / 2, cy = 150, w = a.wobble;
-    const shape = () => { c.beginPath(); c.moveTo(cx - 130, cy - 10); c.bezierCurveTo(cx - 120, cy - 90, cx - 10, cy - 100, cx + 20, cy - 70); c.bezierCurveTo(cx + 70, cy - 105, cx + 140, cy - 60, cx + 130, cy + 10); c.bezierCurveTo(cx + 120, cy + 80, cx + 20, cy + 95 + w * 10, cx - 30, cy + 75); c.bezierCurveTo(cx - 90, cy + 90, cx - 140, cy + 50, cx - 130, cy - 10); c.closePath(); };
-    shape();
-    const g = c.createRadialGradient(cx - 30, cy - 30, 10, cx, cy, 160); g.addColorStop(0, '#9c3b33'); g.addColorStop(1, '#4a1612');
-    c.fillStyle = g; c.fill();
-    c.save(); shape(); c.clip();
-    c.strokeStyle = 'rgba(255,220,200,.25)'; c.lineWidth = 1;
-    for (let i = 0; i < 16; i++) { const an = (i / 16) * Math.PI * 2; c.beginPath(); c.moveTo(cx + Math.cos(an) * 50, cy + Math.sin(an) * 34); c.lineTo(cx + Math.cos(an) * 200, cy + Math.sin(an) * 140); c.stroke(); }
-    c.beginPath(); c.ellipse(cx, cy, 50, 34, 0, 0, 7); c.stroke();
-    c.fillStyle = 'rgba(255,240,220,.6)'; c.font = '600 8px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    LIVER.forEach(([name], i) => { const an = ((i + 0.5) / 16) * Math.PI * 2; c.fillText(name, cx + Math.cos(an) * 95, cy + Math.sin(an) * 64); });
-    // gloss + marks
-    c.fillStyle = 'rgba(255,255,255,.08)'; c.beginPath(); c.ellipse(cx - 40, cy - 40, 60, 20, -0.3, 0, 7); c.fill();
-    a.marks.forEach((m, k) => {
-      if (a.t < 0.8 + k * 0.6) return;
-      const an = ((m.region + 0.3 + m.u * 0.4) / 16) * Math.PI * 2, r = 0.55 + m.v * 0.35, x = cx + Math.cos(an) * 110 * r, y = cy + Math.sin(an) * 75 * r;
-      const kind = m.mark;
-      c.fillStyle = ['rgba(255,235,200,.75)', 'rgba(20,0,0,.8)', 'rgba(200,90,70,.9)', 'rgba(20,0,0,.8)', 'rgba(255,255,255,.5)', 'rgba(60,10,10,.7)', 'rgba(120,20,60,.9)', 'rgba(240,230,200,.9)'][kind];
-      if (kind === 3 || kind === 6) { c.strokeStyle = c.fillStyle; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 10, y - 4); c.quadraticCurveTo(x, y + 6, x + 12, y - 2); c.stroke(); if (kind === 6) { c.beginPath(); c.moveTo(x - 10, y + 2); c.quadraticCurveTo(x, y + 12, x + 12, y + 4); c.stroke(); } }
-      else { c.beginPath(); c.arc(x, y, kind === 2 ? 9 : 5, 0, 7); c.fill(); }
-      c.strokeStyle = this.pal.c[1]; c.lineWidth = 1; c.beginPath(); c.arc(x, y, 14 + Math.sin(this.t * 4) * 2, 0, 7); c.stroke();
-    });
-    c.restore();
-    // the caput (processus pyramidalis)
-    if (a.caput[2] > -2) { const s = a.caput[2] === 0 ? 0.6 : 1; for (let d = 0; d < (a.caput[2] === 2 ? 2 : 1); d++) { c.fillStyle = '#7d2a24'; c.beginPath(); c.moveTo(cx + 20 + d * 22, cy - 70); c.lineTo(cx + 30 + d * 22, cy - 70 - 30 * s); c.lineTo(cx + 42 + d * 22, cy - 68); c.fill(); } }
-    // the haruspex's lamp sweeping across
-    if (a.t < 2.6) { const lx = cx - 120 + (a.t / 2.6) * 240; const lg = c.createRadialGradient(lx, cy, 5, lx, cy, 60); lg.addColorStop(0, 'rgba(255,220,150,.35)'); lg.addColorStop(1, 'rgba(255,220,150,0)'); c.fillStyle = lg; c.fillRect(0, 0, W, H); }
   }
   // ---- tarot
   drawTarot(c, a) {

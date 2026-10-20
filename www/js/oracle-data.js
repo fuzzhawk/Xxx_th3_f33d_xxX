@@ -153,8 +153,40 @@ export const CAPUT = [
   ['present and plump', 'The head of the liver is present and plump: the gods accept the sacrifice.', 1],
   ['doubled', 'The head of the liver is doubled — very rare, very good. Act boldly.', 2],
   ['small and shrivelled', 'The head of the liver is small and shrivelled: lukewarm approval. Proceed with care.', 0],
-  ['missing', 'There is no head on the liver at all. This is what the priest found for Caesar on the Ides of March. Maybe stay in today.', -2]
+  ['missing', 'There is no head on the liver at all — the omen the consul Marcellus received before he rode into an ambush. Maybe stay in today.', -2]
 ];
+
+// the other exta, each with a few possible states (w = how often) and a reading
+export const EXTA = {
+  heart: { name: 'Cor — the heart', states: [
+    { k: 'normal', w: 50, s: 'firm and still twitching', r: 'Courage is with you. Say the thing.' },
+    { k: 'small', w: 15, s: 'small and pale', r: 'Your nerve is low. Pick a smaller battle.' },
+    { k: 'huge', w: 12, s: 'enormous', r: 'Too much feeling for one body. Share some of it.' },
+    { k: 'two', w: 8, s: 'doubled — two hearts', r: 'Two loyalties pull at you. Both can be kept, briefly.' },
+    { k: 'stone', w: 5, s: 'cold as stone', r: 'Someone has stopped caring. Possibly you.' },
+    { k: 'none', w: 10, s: 'missing entirely', r: 'No heart in the beast: the omen Spurinna read for Caesar before the Ides of March. Beware the next big meeting.' }] },
+  lungs: { name: 'Pulmo — the lungs', states: [
+    { k: 'normal', w: 55, s: 'pink and full', r: 'Breathe; there is room. Good for travel and speaking.' },
+    { k: 'spotted', w: 15, s: 'spotted', r: 'Something small is wearing you down. Rest before it grows.' },
+    { k: 'one', w: 10, s: 'only one', r: 'Half your strength is elsewhere. Call in a friend.' },
+    { k: 'black', w: 8, s: 'black as soot', r: 'Bad air around you — a room, a job, a group chat.' },
+    { k: 'gills', w: 12, s: 'gills, not lungs', r: 'This beast belonged to the water. So, perhaps, do you. Go swimming.' }] },
+  gall: { name: 'Fel — the gall bladder', states: [
+    { k: 'normal', w: 55, s: 'green and calm', r: 'Your anger is where it belongs.' },
+    { k: 'swollen', w: 20, s: 'swollen with bile', r: 'Bitterness is building. Let it out somewhere harmless.' },
+    { k: 'tiny', w: 15, s: 'tiny', r: 'You are too forgiving this week. Charge the fee.' },
+    { k: 'burst', w: 10, s: 'burst', r: 'A quarrel is about to spill over. Mop up early.' }] },
+  stomach: { name: 'Venter — the stomach', states: [
+    { k: 'normal', w: 40, s: 'ordinary', r: 'Nothing to digest. Carry on.' },
+    { k: 'grain', w: 25, s: 'full of grain', r: 'Plenty is coming. Make room in the cupboards.' },
+    { k: 'empty', w: 20, s: 'empty', r: 'You are hungry for something that isn’t food.' },
+    { k: 'trinket', w: 15, s: 'holding something it swallowed', r: 'A small, odd gift is on its way. Accept it without asking where it’s been.' }] },
+  gut: { name: 'Intestina — the coils', states: [
+    { k: 'normal', w: 55, s: 'long and neatly coiled', r: 'A long road, but a tidy one.' },
+    { k: 'knot', w: 25, s: 'tied in a knot', r: 'Things are more tangled than they look. Untie, don’t cut.' },
+    { k: 'black', w: 10, s: 'dark and twisted', r: 'Something you swallowed recently disagrees with you. Spit it out.' },
+    { k: 'none', w: 10, s: 'absent — just empty space', r: 'No gut, no instinct. Do not trust your hunches today.' }] }
+};
 
 // ---------------------------------------------------------------- augury with the sacred chickens
 export const AUGURY = [
