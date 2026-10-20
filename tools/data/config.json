@@ -10,12 +10,12 @@
     },
     "wiki": {
       "label": "Condensed Wikipedia",
-      "pct": 25,
+      "pct": 23,
       "dwellSec": 16
     },
     "video": {
       "label": "Videos",
-      "pct": 20,
+      "pct": 18,
       "dwellSec": 40
     },
     "meme": {
@@ -25,12 +25,12 @@
     },
     "product": {
       "label": "Made-up products",
-      "pct": 5,
+      "pct": 4,
       "dwellSec": 12
     },
     "psych": {
       "label": "Psychedelic",
-      "pct": 5,
+      "pct": 4,
       "dwellSec": 12
     },
     "selfcare": {
@@ -57,6 +57,16 @@
       "label": "Power scale",
       "pct": 2,
       "dwellSec": 22
+    },
+    "studio": {
+      "label": "Studio",
+      "pct": 2,
+      "dwellSec": 40
+    },
+    "read": {
+      "label": "Long reads",
+      "pct": 4,
+      "dwellSec": 60
     }
   },
   "gameTypes": [
@@ -664,5 +674,30 @@
     "velvet",
     "straw"
   ],
-  "textureCount": 40
+  "textureCount": 40,
+  "reads": {
+    "gutenbergTopics": [
+      "occult",
+      "ghost stories",
+      "horror tales",
+      "gothic fiction",
+      "science fiction",
+      "fantasy fiction",
+      "detective and mystery stories",
+      "psychological fiction",
+      "mythology",
+      "magic",
+      "utopias",
+      "satire",
+      "philosophy",
+      "voyages, imaginary"
+    ],
+    "booksPerTopic": 4,
+    "books": 36,
+    "perBook": 3,
+    "poemsFetch": 150,
+    "poems": 70,
+    "poemMaxLines": 70,
+    "articles": 30
+  }
 }

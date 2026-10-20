@@ -374,3 +374,31 @@ details.subw[open] summary::after { transform: rotate(90deg); }
 .dnd-stats i { display: block; font: 9px var(--mono); color: var(--faint); font-style: normal; }
 .dnd-skills { font-size: 11.5px !important; color: var(--muted); }
 .oracle-body .btnrow { flex-wrap: wrap; gap: 6px; }
+
+/* ------------------------------------------------ long reads */
+.textpost.read { margin: 0 12px; border-radius: 16px; padding: 18px 18px 14px; background: linear-gradient(160deg, #2a2219, #171310 70%); border: 1px solid var(--line); cursor: pointer; }
+.textpost.read .kicker { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--ochre); }
+.textpost.read h3 { font-family: var(--serif); font-size: 22px; line-height: 1.2; font-weight: 600; margin: 6px 0 2px; }
+.read-by { font-size: 13px; color: var(--muted); font-style: italic; margin-bottom: 8px; }
+.textpost.read p { font-family: var(--serif); font-size: 16px; line-height: 1.6; color: #e6d9c8; margin: 10px 0 0; }
+.read-poem { font-family: var(--serif); font-size: 16px; line-height: 1.6; color: #e6d9c8; white-space: pre-wrap; margin-top: 8px; }
+.textpost.read .rest { overflow: hidden; max-height: 0; transition: max-height .5s ease; }
+.textpost.read.open .rest { max-height: 9000px; }
+.textpost.read .tapmore { display: inline-block; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+
+/* ------------------------------------------------ studio */
+.write { margin: 0 12px; padding: 16px; border-radius: 16px; background: #1b1714; border: 1px solid var(--line); }
+.write-prompt { font-family: var(--serif); font-size: 18px; line-height: 1.4; color: var(--sand); margin-bottom: 10px; }
+.write-prompt.blank { color: var(--muted); font-style: italic; font-size: 15px; }
+.write-area { width: 100%; box-sizing: border-box; background: #f3ead9; color: #2a2016; border: none; border-radius: 6px; padding: 12px 14px; font: 16px/1.6 var(--serif); resize: vertical;
+  background-image: repeating-linear-gradient(transparent 0 25px, rgba(120,90,60,.18) 25px 26px); background-attachment: local; }
+.write-count { display: block; font-size: 11.5px; margin-top: 6px; }
+.media.creator { background: #120d0a; display: grid; place-items: center; }
+.creator-cv { width: 240px; height: 240px; image-rendering: pixelated; }
+.creator-body { padding: 10px 14px; }
+.creator-name { width: 100%; box-sizing: border-box; background: var(--card2); color: var(--text); border: 1px solid var(--line2); border-radius: 10px; padding: 10px 12px; font: 600 16px var(--sans); margin-bottom: 8px; }
+.creator-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.creator-row { display: grid; grid-template-columns: 1fr 30px 70px 30px; align-items: center; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.creator-row b { text-align: center; color: var(--text); font-size: 12px; text-transform: capitalize; }
+.btn.sm { padding: 4px 0; min-width: 0; font-size: 16px; line-height: 1; }
+.creator-status { font-size: 12px; margin-top: 8px; }

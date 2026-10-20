@@ -137,14 +137,19 @@ const POSES = {
 };
 const OUTFITS = ['shirt', 'robe', 'armor', 'coat', 'dress', 'rags'];
 // Returns { idle, walk: [a, b], jump, punch, kick, special, block, hurt } canvases (facing right, 24×32).
+export const LOOK = { skins: SKIN.length, outfits: OUTFITS };
 export function humanoid(seed, hue = 0, opts = {}) {
-  const key = `h${seed}|${hue}|${opts.tex?.src || ''}|${opts.tex2?.src || ''}|${opts.head?.src || ''}`;
+  const L = opts.look || {};
+  const key = `h${seed}|${hue}|${opts.tex?.src || ''}|${opts.tex2?.src || ''}|${opts.head?.src || ''}|${JSON.stringify(L)}`;
   return memo(key, () => {
     const R = mulberry32(seed ^ 0x9e3779b9);
-    const skin = SKIN[Math.floor(R() * SKIN.length)];
-    const shirt = hsl(hue + R() * 40 - 20, 55, 48), pants = hsl(hue + 180 + R() * 60, 30, 30), hair = hsl(R() * 360, 45, 22 + R() * 30);
-    const outfit = OUTFITS[Math.floor(R() * OUTFITS.length)], build = 0.8 + R() * 0.6, tall = R() < 0.3;
-    const hat = R() < 0.45 ? Math.floor(R() * 4) : -1, cape = R() < 0.25, prop = R() < 0.35 ? Math.floor(R() * 3) : -1, beard = R() < 0.2;
+    // opts.look overrides any part (used by the character creator)
+    const pickOr = (v, d) => (v ?? d);
+    const skin = SKIN[pickOr(L.skin, Math.floor(R() * SKIN.length))];
+    const sh = R() * 40 - 20, ph = R() * 60, hh = R() * 360, hl = 22 + R() * 30;
+    const shirt = hsl(pickOr(L.shirt, hue + sh), 55, 48), pants = hsl(pickOr(L.pants, hue + 180 + ph), 30, 30), hair = hsl(pickOr(L.hair, hh), 45, hl);
+    const outfit = OUTFITS[pickOr(L.outfit, Math.floor(R() * OUTFITS.length))], build = pickOr(L.build, 0.8 + R() * 0.6), tall = pickOr(L.tall, R() < 0.3);
+    const hat = pickOr(L.hat, R() < 0.45 ? Math.floor(R() * 4) : -1), cape = pickOr(L.cape, R() < 0.25), prop = pickOr(L.prop, R() < 0.35 ? Math.floor(R() * 3) : -1), beard = pickOr(L.beard, R() < 0.2);
     const sheet = {};
     const frames = {};
     for (const [name, p] of Object.entries(POSES)) {
@@ -153,7 +158,7 @@ export function humanoid(seed, hue = 0, opts = {}) {
         const c = canvas(24, 32), x = c.getContext('2d');
         const lean = p.lean || 0, cx = 11 + lean, top = tall ? 2 : 4;
         const ln = (x0, y0, x1, y1, col, w2) => { x.strokeStyle = col; x.lineWidth = w2; x.lineCap = 'round'; x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); };
-        if (cape) { x.fillStyle = hsl(hue + 200, 45, 28); x.beginPath(); x.moveTo(cx - 3, top + 9); x.lineTo(cx + 3, top + 9); x.lineTo(cx + 5, top + 24); x.lineTo(cx - 6, top + 24); x.fill(); }
+        if (cape) { x.fillStyle = hsl(pickOr(L.capeHue, hue + 200), 45, 28); x.beginPath(); x.moveTo(cx - 3, top + 9); x.lineTo(cx + 3, top + 9); x.lineTo(cx + 5, top + 24); x.lineTo(cx - 6, top + 24); x.fill(); }
         // legs
         if (outfit !== 'robe' && outfit !== 'dress') p.legs.forEach(([dx, dy], i) => ln(cx - 1.5 + i * 3, top + 18, cx - 1.5 + i * 3 + dx, top + 18 + dy, pants, 3 * build));
         else p.legs.forEach(([dx, dy], i) => ln(cx - 1.5 + i * 3, top + 22, cx - 1.5 + i * 3 + dx * 0.5, top + 18 + dy, '#2a1e18', 2));

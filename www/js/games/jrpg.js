@@ -19,7 +19,7 @@ const SPELLS = {
 };
 const GEAR = ['Bronze', 'Iron', 'Steel', 'Silver', 'Mithril', 'Rune', 'Dragon', 'Star', 'Void'];
 const DNAME = ['Cave', 'Crypt', 'Tower', 'Ruins', 'Mines', 'Temple', 'Lair', 'Vault'];
-const need = (lv) => Math.round(14 * lv ** 1.75);
+const need = (lv) => Math.round(12 * lv ** 1.7);
 
 export class Jrpg extends Game {
   static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'giant', 'tiny', 'trails'];
@@ -76,10 +76,10 @@ export class Jrpg extends Game {
       if (bi < 0) bi = pick((i) => map[i] !== TOWN && !placed.includes(i));
       placed.push(bi); map[bi] = CAVE;
       const [x, y] = cxy(bi), lv = 2 + this.dCount * 3;
-      this.dungeons.push({ x, y, k: this.dCount, lv, floors: Math.min(3, 2 + (this.dCount > 1 ? 1 : 0)), done: false, name: `${DNAME[(s + k) % DNAME.length]} of ${creatureName(s * 7 + k * 31)}`, d0: dist[bi] });
+      this.dungeons.push({ x, y, k: this.dCount, lv, floors: 2, done: false, name: `${DNAME[(s + k) % DNAME.length]} of ${creatureName(s * 7 + k * 31)}`, d0: dist[bi] });
       this.dCount++;
     }
-    this.dungeons.sort((a, b) => a.d0 - b.d0).forEach((d, k) => { d.lv = 2 + (this.dCount - 4 + k) * 3; d.k = this.dCount - 4 + k; });
+    this.dungeons.sort((a, b) => a.d0 - b.d0).forEach((d, k) => { d.k = this.dCount - 4 + k; d.lv = 2 + d.k * 3; d.floors = d.k >= 2 ? 3 : 2; });
     // roads: town to town, and towns to the first dungeon
     this.wm = map;
     const road = (a, b) => { const p = this.findRoute(N, (j) => this.passW(map[j]), a % N, (a / N) | 0, (j) => j === b); for (const [x, y] of p || []) { const j = y * N + x; if (map[j] !== TOWN && map[j] !== CAVE) map[j] = ROAD; } };
@@ -178,7 +178,7 @@ export class Jrpg extends Game {
   }
   // ---------------------------------------------------------------- battles
   encounter(boss = false) {
-    const dg = this.dg, base = dg ? dg.d.lv + dg.floor : 1 + this.cleared * 2 + this.world;
+    const dg = this.dg, base = dg ? dg.d.lv + dg.floor : (this.dungeons.find((q) => !q.done)?.lv || 2) - 1;
     const lv = Math.max(1, boss ? base + 1 : base + this.ri(-1, 0));
     const n = boss ? 1 : this.ri(1, Math.min(4, 2 + (lv >> 2)));
     const zone = dg ? dg.d.k : this.cleared, s0 = (this.post.seed || 1) * 131 + zone * 17;
@@ -240,7 +240,7 @@ export class Jrpg extends Game {
   act(a, ch) {
     const b = this.bt, foesA = this.alive(b.foes), herosA = this.alive(this.party);
     const enemies = a.hero ? foesA : herosA;
-    b.anim = { u: a, t: 0.5, k: ch.k }; b.phase = 'act'; b.wait = 0.9; b.actor = a.hero ? a : null;
+    b.anim = { u: a, t: 0.5, k: ch.k }; b.phase = 'act'; b.wait = this.auto ? 0.75 : 0.9; b.actor = a.hero ? a : null; b.hl = a.hero ? { atk: 0, spell: 1, item: 2, run: 3 }[ch.k] : -1;
     if (ch.k === 'atk') {
       const t = ch.t && ch.t.hp > 0 ? ch.t : enemies[this.ri(0, enemies.length - 1)];
       const [n, crit] = this.phys(a, t);
@@ -364,7 +364,7 @@ export class Jrpg extends Game {
     if (ch) return this.openChest(ch);
     if (g.boss && g.boss.x === L.x && g.boss.y === L.y) { this.route = []; return this.encounter(true); }
     if (g.map[i] === 2) { this.route = []; g.floor++; this.genFloor(); this.say = { who: g.d.name, s: `The party descends to B${g.floor + 1}F.`, t: this.auto ? 0.9 : 1.6 }; return; }
-    if (this.grace <= 0 && this.rng() < 0.05) this.encounter();
+    if (this.grace <= 0 && this.rng() < 0.04) this.encounter();
   }
   moving() { const L = this.walkers[0]; return this.arrive || Math.abs(L.x - L.fx) + Math.abs(L.y - L.fy) > 0.001; }
   step(dt) {
@@ -378,7 +378,7 @@ export class Jrpg extends Game {
   // ---------------------------------------------------------------- autopilot
   autopilot(dt) {
     if (this.say) return;
-    if (this.mode === 'battle') { const b = this.bt; if (b.phase === 'cmd' && !b.pick) b.pick = this.aiPick(b.actor); return; }
+    if (this.mode === 'battle') { const b = this.bt; if (b.phase === 'cmd' && !b.pick && (b.aiT = (b.aiT || 0) + dt) > 0.25) { b.aiT = 0; b.pick = this.aiPick(b.actor); } return; }
     if (this.moving() || this.route.length) return;
     if ((this.think -= dt) > 0) return;
     this.think = 0.12;
@@ -404,7 +404,7 @@ export class Jrpg extends Game {
     const d = this.dungeons.find((q) => !q.done);
     if (!d) return;
     const lv = al.reduce((a, h) => a + h.lv, 0) / 3;
-    if (lv < d.lv - 1.5) {
+    if (lv < d.lv + d.floors - 3.5) {
       // grind in the wilds nearby, preferring forest
       let bt = null, bv = -1;
       for (let n = 0; n < 30; n++) { const x = L.x + this.ri(-6, 6), y = L.y + this.ri(-6, 6); if (x < 0 || y < 0 || x >= N || y >= N) continue; const t = this.wm[y * N + x]; if (!this.passW(t) || t === TOWN || t === CAVE) continue; const v = ENC[t] + this.r(0, 0.02); if (v > bv) { bv = v; bt = y * N + x; } }
@@ -554,16 +554,16 @@ export class Jrpg extends Game {
     const isF = (x, y) => x >= 0 && y >= 0 && x < DN && y < DN && m[y * DN + x] > 0;
     c.beginPath();
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (g.seen[y * DN + x] && m[y * DN + x]) c.rect(x * T, y * T, T, T);
-    c.fillStyle = `hsl(${(this.skin.hue + g.d.k * 40) % 360},14%,20%)`; c.fill();
-    if (fp) { c.save(); c.globalCompositeOperation = 'overlay'; c.globalAlpha = 0.6; c.fillStyle = fp; c.fill(); c.restore(); }
+    c.fillStyle = `hsl(${(this.skin.hue + g.d.k * 40) % 360},16%,32%)`; c.fill();
+    if (fp) { c.save(); c.globalCompositeOperation = 'overlay'; c.globalAlpha = 0.7; c.fillStyle = fp; c.fill(); c.restore(); }
     c.beginPath();
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (g.seen[y * DN + x] && !m[y * DN + x] && [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => isF(x + dx, y + dy)))) c.rect(x * T, y * T - 6, T, T);
-    c.fillStyle = this.pal.bg2; c.fill();
-    if (wp) { c.save(); c.globalAlpha = 0.5; c.fillStyle = wp; c.fill(); c.restore(); }
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (g.seen[y * DN + x] && !m[y * DN + x] && [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => isF(x + dx, y + dy)))) c.rect(x * T, y * T, T, T);
+    c.fillStyle = `hsl(${(this.skin.hue + g.d.k * 40) % 360},12%,10%)`; c.fill();
+    if (wp) { c.save(); c.globalAlpha = 0.25; c.fillStyle = wp; c.fill(); c.restore(); }
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
       if (!g.seen[y * DN + x]) continue;
       const t = m[y * DN + x];
-      if (!t && isF(x, y + 1)) { c.fillStyle = 'rgba(0,0,0,.45)'; c.fillRect(x * T, y * T + T - 6, T, 6); c.fillStyle = this.col(5); c.globalAlpha = 0.3; c.fillRect(x * T, y * T + T - 7, T, 1); c.globalAlpha = 1; }
+      if (!t && isF(x, y + 1)) { c.fillStyle = `hsl(${(this.skin.hue + g.d.k * 40 + 20) % 360},14%,22%)`; c.fillRect(x * T, y * T + 8, T, T - 8); if (wp) { c.save(); c.globalAlpha = 0.45; c.fillStyle = wp; c.fillRect(x * T, y * T + 8, T, T - 8); c.restore(); } c.fillStyle = this.col(5); c.globalAlpha = 0.5; c.fillRect(x * T, y * T + 8, T, 1.5); c.globalAlpha = 1; c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(x * T, y * T + T, T, 4); }
       if (t === 2) { for (let k = 0; k < 4; k++) { c.fillStyle = k % 2 ? '#1a1410' : '#6a5a48'; c.fillRect(x * T + 2 + k, y * T + 3 + k * 4, T - 4 - k * 2, 4); } }
     }
     for (const ch of g.chests) {
@@ -634,17 +634,16 @@ export class Jrpg extends Game {
     if (b.phase === 'intro') { c.fillStyle = `rgba(0,0,0,${Math.max(0, b.wait - 0.3)})`; c.fillRect(0, 82, W, 218); }
     // command panel
     c.fillStyle = 'rgba(10,7,5,.92)'; c.fillRect(0, 300, W, H - 300); c.fillStyle = this.col(0); c.fillRect(0, 300, W, 2);
-    const cmd = b.phase === 'cmd' && b.actor;
-    const items = cmd ? this.menuItems() : [];
+    const cmd = b.phase === 'cmd' && b.actor && !this.auto;
+    const items = cmd ? this.menuItems() : ['Attack', 'Magic', `Potion ×${this.potions}`, 'Run'].map((s) => ({ s, on: false }));
     this.btnRects().forEach(([x, y, w, h], k) => {
-      const it = items[k], on = it?.on && !this.auto;
-      c.fillStyle = it?.s ? (on ? this.pal.bg2 : 'rgba(255,255,255,.05)') : 'rgba(255,255,255,.03)'; roundRect(c, x, y, w, h, 7); c.fill();
-      c.strokeStyle = on ? this.col(k) : 'rgba(255,255,255,.12)'; c.lineWidth = 1.5; c.stroke();
-      if (it?.s) this.text(c, it.s, x + w / 2, y + h / 2, 12, it.on ? this.pal.ink : 'rgba(255,255,255,.35)');
+      const it = items[k], on = it?.on, hl = !cmd && b.hl === k && b.phase === 'act';
+      c.fillStyle = hl ? this.col(k) : it?.s ? (on ? this.pal.bg2 : 'rgba(255,255,255,.05)') : 'rgba(255,255,255,.03)'; roundRect(c, x, y, w, h, 7); c.fill();
+      c.strokeStyle = on || hl ? this.col(k) : 'rgba(255,255,255,.12)'; c.lineWidth = 1.5; c.stroke();
+      if (it?.s) this.text(c, it.s, x + w / 2, y + h / 2, 12, hl ? this.pal.bg : on ? this.pal.ink : 'rgba(255,255,255,.35)');
     });
-    if (!cmd) this.text(c, b.foes.filter((f) => f.hp > 0).map((f) => f.name).slice(0, 2).join(', '), 94, 410, 9, 'rgba(255,255,255,.4)');
     this.party.forEach((h, k) => {
-      const x = 186, y = 308 + k * 37, act = b.actor === h && b.phase === 'cmd';
+      const x = 186, y = 308 + k * 37, act = b.actor === h && (b.phase === 'cmd' || b.phase === 'act');
       if (act) { c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(x - 4, y - 2, W - x, 35); }
       this.text(c, `${h.name}`, x, y + 6, 10, h.hp > 0 ? (act ? this.col(1) : this.pal.ink) : '#777', 'left');
       this.text(c, `Lv${h.lv} ${h.job}`, W - 8, y + 6, 9, 'rgba(255,255,255,.5)', 'right');

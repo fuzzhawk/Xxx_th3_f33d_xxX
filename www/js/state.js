@@ -1,9 +1,9 @@
 import { lsGet, lsSet } from './store.js';
 
-export const CATS = ['game', 'wiki', 'video', 'meme', 'product', 'psych', 'selfcare', 'web', 'oracle', 'power', 'news'];
-export const CAT_LABEL = { game: 'Games', wiki: 'Wikipedia', video: 'Videos', meme: 'Memes', product: 'Products', psych: 'Psychedelic', selfcare: 'Self-care', web: 'From the web', oracle: 'Oracle', power: 'Power scale', news: 'News' };
-export const CAT_GLYPH = { game: '◐', wiki: '❦', video: '▶', meme: '☺', product: '✦', psych: '✺', selfcare: '☘', web: '⌘', oracle: '☯', power: '⚔', news: '◉' };
-export const DEFAULT_PCT = { game: 20, wiki: 25, video: 20, meme: 10, product: 5, psych: 5, selfcare: 5, web: 5, oracle: 3, power: 2, news: 0 };
+export const CATS = ['game', 'wiki', 'video', 'meme', 'product', 'psych', 'selfcare', 'web', 'oracle', 'power', 'read', 'studio', 'news'];
+export const CAT_LABEL = { game: 'Games', wiki: 'Wikipedia', video: 'Videos', meme: 'Memes', product: 'Products', psych: 'Psychedelic', selfcare: 'Self-care', web: 'From the web', oracle: 'Oracle', power: 'Power scale', read: 'Long reads', studio: 'Studio', news: 'News' };
+export const CAT_GLYPH = { game: '◐', wiki: '❦', video: '▶', meme: '☺', product: '✦', psych: '✺', selfcare: '☘', web: '⌘', oracle: '☯', power: '⚔', read: '❧', studio: '✎', news: '◉' };
+export const DEFAULT_PCT = { game: 20, wiki: 23, video: 18, meme: 10, product: 4, psych: 4, selfcare: 5, web: 5, oracle: 3, power: 2, read: 4, studio: 2, news: 0 };
 
 const BUILD = window.BUILD || {};
 export const DEFAULTS = {

@@ -22,7 +22,7 @@ const NOUN = { weapon: ['Bite', 'Edge', 'Fang', 'Thirst', 'Song', 'Cleaver', 'Re
 const UNIQ = { weapon: ['The Gravedigger', 'Kingsbane', 'Widowmaker', 'Bonesaw of Ruin', 'The Undertaker'], armor: ['Corpsehide', 'Shroud of the Penitent', 'The Iron Maiden', 'Carrion Wind'], helm: ['Crown of Ash', 'The Undead Visage', 'Gravelord Helm', 'Skull of the Martyr'], shield: ['Stormwall', 'The Bone Door', 'Lid of the Sarcophagus'], ring: ['Band of the Ninth Circle', 'Eye of the Worm', 'The Weeping Loop'] };
 const CH = [['Bone', 'Gore', 'Rot', 'Blood', 'Grave', 'Gut', 'Skull', 'Ash', 'Bile', 'Maggot', 'Vile', 'Corpse', 'Pox'], ['gnaw', 'maw', 'rend', 'hide', 'tooth', 'fist', 'belly', 'claw', 'spine', 'fang', 'flay', 'drool'], ['the Unclean', 'the Defiler', 'the Hungry', 'the Rotten', 'the Flayer', 'the Cursed', 'the Mad', 'the Vile', 'the Butcher', 'the Wretched', 'the Foul']];
 const CMOD = ['Extra Fast', 'Stone Skin', 'Extra Strong', 'Vampiric'];
-const ZONES = ['Cathedral', 'Catacombs', 'Crypt', 'Caves', 'Ossuary', 'Hell'];
+const ZONES = ['Cathedral', 'Catacombs', 'Crypt', 'Ossuary', 'Hell'];
 
 export class Hack extends Game {
   static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'trails'];
@@ -129,7 +129,7 @@ export class Hack extends Game {
     this.camX = h.x; this.camY = h.y; this.lastTile = -1;
     this.floorTex = this.skin.texFor?.(d * 2) || this.skin.slots.tile[1] || this.skin.slots.tile[0];
     this.wallTex = this.skin.texFor?.(d * 2 + 1) || this.skin.slots.tile[0];
-    this.zone = cave ? 'Caves' : ZONES[(d - 1) % ZONES.length === 3 ? 0 : (d - 1) % ZONES.length];
+    this.zone = cave ? 'Caves' : ZONES[Math.min(ZONES.length - 1, Math.floor((d - 1) / 3))];
     this.banner = { s: `${this.zone.toUpperCase()} · LEVEL ${d}`, t: 3 };
     this.track();
   }
@@ -161,7 +161,7 @@ export class Hack extends Game {
       const tx = x + 0.5, ty = y + 0.5, dx = tx - h.x, dy = ty - h.y, n = Math.ceil(Math.hypot(dx, dy) * 3) || 1;
       for (let k = 1; k <= n; k++) { const i = Math.floor(h.y + dy * k / n) * G + Math.floor(h.x + dx * k / n); this.vis[i] = this.seen[i] = 1; if (!this.map[i]) break; }
     }
-    this.vis[ti] = this.seen[ti] = 1;
+    this.vis[ti] = this.seen[ti] = 1; for (const [dx, dy] of DIRS) this.seen[ti + dx + dy * G] = 1;
     if (ti !== this.lastTile) { this.lastTile = ti; this.dist = this.flood(ti); }
   }
   // ------------------------------------------------------------ stats & loot
@@ -394,6 +394,7 @@ export class Hack extends Game {
     if (!seenStairs || (explored < this.floors.length * 0.7 && this.lvT < 80)) {
       const p = this.bfs(here, (i) => this.seen[i] && this.map[i] && DIRS.some(([dx, dy]) => !this.seen[i + dx + dy * G]));
       if (p && p.length) { h.path = p; this.goal = 'explore'; return; }
+      this.seen[this.stairs] = 1;
     }
     if (this.seen[this.stairs]) { h.path = this.path(here, this.stairs) || []; this.goal = 'stairs'; }
   }
@@ -482,7 +483,7 @@ export class Hack extends Game {
     const g = c.createRadialGradient(hsx, hsy - 8, 10, hsx, hsy - 8, R);
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.55, 'rgba(0,0,0,.12)'); g.addColorStop(1, 'rgba(3,2,1,.9)');
     c.fillStyle = g; c.fillRect(0, 0, W, H);
-    c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.07; c.fillStyle = this.col(0); c.beginPath(); c.arc(hsx, hsy - 8, R * 0.6, 0, 7); c.fill(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    const wg = c.createRadialGradient(hsx, hsy - 8, 0, hsx, hsy - 8, R * 0.7); wg.addColorStop(0, 'rgba(255,150,60,.12)'); wg.addColorStop(1, 'rgba(255,150,60,0)'); c.globalCompositeOperation = 'lighter'; c.fillStyle = wg; c.fillRect(hsx - R, hsy - R, R * 2, R * 2); c.globalCompositeOperation = 'source-over';
     // loot labels, names, damage numbers
     c.font = '700 8px ui-monospace, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
     for (const l of this.loot) {

@@ -6,6 +6,7 @@
 // ask for by role. Online images are cached so they keep working offline.
 import { mulberry32 } from '../util.js';
 import { monster, humanoid, item as procItem, texture, themePalette, SCHEMES } from './creature.js';
+import { getHero, heroSheet } from '../hero.js';
 
 const cache = new Map();
 let kenney = null;
@@ -101,6 +102,9 @@ export class Skin {
     const ps = t.seed || seed;
     this.creatures = Array.from({ length: 6 }, (_, k) => monster(ps * 31 + k * 977, this.hue + k * 50, 16 + (k % 3) * 4, 0, { tex: pickTex(k + 3), head: head(k, 0.45) }));
     this.people = Array.from({ length: 4 }, (_, k) => humanoid(ps * 17 + k * 131, this.hue + k * 90, { tex: pickTex(k + 9), head: head(k + 6, 0.35) }));
+    // your own character from the Studio takes the lead role
+    const mine = getHero();
+    if (mine) { this.people[0] = heroSheet(mine); this.heroName = mine.name; this.procHero = true; this.slots.hero = [this.people[0].idle, ...this.slots.hero]; }
     if (!this.slots.hero.length) { this.slots.hero = [this.people[0].idle, this.creatures[0].frames[0]]; this.procHero = true; }
     if (!this.slots.enemy.length) this.slots.enemy = this.creatures.slice(1, 5).map((m) => m.frames[0]);
     if (!this.slots.item.length) this.slots.item = props.length ? props.slice((seed % 30), (seed % 30) + 6).map(img) : Array.from({ length: 4 }, (_, k) => procItem(ps + k * 13, this.hue + k * 30));

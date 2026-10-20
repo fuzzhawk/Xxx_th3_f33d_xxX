@@ -736,6 +736,74 @@ async function buildVocab() {
   return out;
 }
 
+// ------------------------------------------------------------------ studio: writing pages and the character creator
+function buildStudio() {
+  const P = readJSON(path.join(ROOT, 'tools/data/prompts.json'));
+  const prompts = shuffle([...P.prompts]);
+  return Array.from({ length: want.studio || 0 }, (_, i) => {
+    const seed = Math.floor(rand() * 2 ** 31), k = i % 10;
+    if (k === 9) return { id: `st${seed.toString(36)}`, cat: 'studio', sub: 'creator', seed, title: 'Character creator' };
+    if (k % 3 === 2) return { id: `st${seed.toString(36)}`, cat: 'studio', sub: 'blank', seed, title: pick(P.blankTitles) };
+    return { id: `st${seed.toString(36)}`, cat: 'studio', sub: 'prompt', seed, prompt: prompts[i % prompts.length] };
+  });
+}
+
+// ------------------------------------------------------------------ long reads: novels (Gutenberg), poems (PoetryDB), long articles (Wikipedia)
+async function buildReads(wiki) {
+  const R = config.reads || {}, n = want.read || 0, out = [];
+  if (!n) return out;
+  if (OFFLINE) {
+    for (let i = 0; i < n; i++) out.push(i % 3 === 1 ? { kind: 'poem', title: `Offline poem ${i}`, author: 'Anonymous', lines: Array.from({ length: 14 }, (_, k) => `Placeholder line ${k + 1} of a poem for layout testing`) } : { kind: i % 3 ? 'article' : 'novel', title: `Offline long read ${i}`, book: 'A Test Book', author: 'A. Writer', paras: Array.from({ length: 5 }, (_, k) => `Paragraph ${k + 1}. This is placeholder text for the long reads layout, written so the card has something to fold and unfold. It is never committed.`) });
+    return out.map((x, i) => ({ id: `rd-off-${i}`, cat: 'read', sub: x.kind, ...x }));
+  }
+  // novels: popular public-domain books on our themes, excerpts of five paragraphs
+  const books = [];
+  await pool(R.gutenbergTopics || [], 3, async (topic) => {
+    try {
+      const j = await fetchJSON(`https://gutendex.com/books/?${new URLSearchParams({ topic, languages: 'en', sort: 'popular' })}`, { timeout: 30000 });
+      for (const b of (j.results || []).slice(0, R.booksPerTopic || 4)) {
+        const txt = Object.entries(b.formats || {}).find(([k, v]) => k.startsWith('text/plain') && !v.endsWith('.zip'))?.[1];
+        if (txt && !books.some((x) => x.id === b.id)) books.push({ id: b.id, title: b.title, author: (b.authors?.[0]?.name || '').split(', ').reverse().join(' '), year: b.authors?.[0]?.death_year, txt, topic });
+      }
+    } catch (e) { warn(`gutendex ${topic}: ${e.message}`); }
+  });
+  await pool(shuffle(books).slice(0, R.books || 30), 3, async (b) => {
+    try {
+      let t = await fetchText(b.txt, { timeout: 40000, retries: 1 });
+      t = t.replace(/\r/g, '');
+      const s0 = t.search(/\*\*\* ?START OF [^\n]*\n/i), s1 = t.search(/\*\*\* ?END OF /i);
+      if (s0 >= 0) t = t.slice(t.indexOf('\n', s0) + 1, s1 > s0 ? s1 : undefined);
+      const paras = t.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').replace(/_/g, '').trim()).filter(Boolean);
+      const good = (p) => p.length > 160 && p.length < 1600 && !/^(chapter|book|part|contents|illustration|\[)/i.test(p) && p.replace(/[^A-Z]/g, '').length < p.length * 0.3;
+      const per = R.perBook || 3, start = Math.floor(paras.length * 0.08);
+      for (let k = 0, tries = 0; k < per && tries < 60; tries++) {
+        const i = start + Math.floor(rand() * Math.max(1, paras.length - start - 6));
+        const run = paras.slice(i, i + 5);
+        if (run.length < 4 || !run.every(good)) continue;
+        out.push({ kind: 'novel', title: b.title.split(/[:;]/)[0], book: b.title.split(/[:;]/)[0], author: b.author, year: b.year, paras: run, url: `https://www.gutenberg.org/ebooks/${b.id}`, source: 'Project Gutenberg', topic: b.topic });
+        k++;
+      }
+    } catch (e) { warn(`gutenberg ${b.id}: ${e.message}`); }
+  });
+  // whole poems
+  try {
+    const j = await fetchJSON(`https://poetrydb.org/random/${R.poemsFetch || 120}`, { timeout: 30000 });
+    for (const p of shuffle(j || []).filter((p) => +p.linecount >= 8 && +p.linecount <= (R.poemMaxLines || 70)).slice(0, R.poems || 60)) out.push({ kind: 'poem', title: p.title, author: p.author, lines: p.lines, url: `https://www.google.com/search?q=${encodeURIComponent(`${p.title} ${p.author}`)}`, source: 'PoetryDB' });
+  } catch (e) { warn(`poetrydb: ${e.message}`); }
+  // long articles: the first five paragraphs of this week's longest Wikipedia picks
+  const long = [...wiki].sort((a, b) => (b.summary?.length || 0) - (a.summary?.length || 0)).slice(0, R.articles || 30);
+  await pool(long, 3, async (w) => {
+    try {
+      const j = await fetchJSON(wq({ action: 'query', prop: 'extracts', explaintext: '1', exsectionformat: 'plain', titles: w.title, redirects: '1' }));
+      const txt = j.query?.pages?.[0]?.extract || '';
+      const paras = txt.split(/\n+/).map((p) => p.trim()).filter((p) => p.length > 140 && !/^(See also|References|External links)/.test(p)).slice(0, 5);
+      if (paras.length >= 4) out.push({ kind: 'article', title: w.title, author: 'Wikipedia', paras: paras.map((p) => clip(cleanExtract(p), 1400)), url: w.url, source: 'Wikipedia' });
+    } catch (e) { warn(`long article ${w.title}: ${e.message}`); }
+  });
+  report.sources.reads = { novels: out.filter((x) => x.kind === 'novel').length, poems: out.filter((x) => x.kind === 'poem').length, articles: out.filter((x) => x.kind === 'article').length, books: books.length };
+  return shuffle(out).slice(0, n).map((x) => ({ id: `rd${hashStr(`${x.title}${x.paras?.[0] || x.lines?.[0] || ''}`).toString(36)}`, cat: 'read', sub: x.kind, ...x }));
+}
+
 // ------------------------------------------------------------------ absurd power scale
 async function buildPower() {
   const P = readJSON(path.join(ROOT, 'tools/data/power.json'));
@@ -1027,7 +1095,9 @@ async function main() {
     web: shuffle(web),
     news,
     oracle: buildOracle(),
-    power
+    power,
+    studio: buildStudio(),
+    read: await buildReads(wiki)
   };
   const counts = Object.fromEntries(Object.entries(posts).map(([k, v]) => [k, v.length]));
   const total = Object.values(counts).reduce((a, b) => a + b, 0);

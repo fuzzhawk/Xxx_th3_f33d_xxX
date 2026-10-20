@@ -16,13 +16,15 @@ import { renderMeme } from './memes.js';
 import * as stats from './stats.js';
 import { oracleMedia, oracleLabel } from './oracle.js';
 import { powerBody } from './power.js';
+import { writingBody, creatorMedia } from './studio.js';
+import { readBody } from './reads.js';
 
 const TOPIC_COLOR = {
   music: '#e8742a', literature: '#c9952b', science: '#8a9a52', history: '#c4623a', transgressive: '#d06a8c', mysteries: '#6d9bb0', occult: '#a283c4',
   animals: '#d8a25a', retrogaming: '#5b9aa9', vintagescifi: '#a77bd0'
 };
 const TOPIC_GLYPH = { music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉' };
-const CAT_FACE = { news: ['◉', '#8a2b2b'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'] };
+const CAT_FACE = { news: ['◉', '#8a2b2b'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], read: ['❧', '#6a5a3a'], studio: ['✎', '#3a6a5a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'] };
 let soundOn = false;
 
 export function labelOf(post) {
@@ -40,6 +42,8 @@ const handleFor = (post, ctx) => {
     case 'web': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'web', `${post.sub === 'comic' ? 'Comic' : post.sub === 'hn' ? 'Hacker News' : post.source || 'Web'}${post.date ? ` · ${post.date}` : ''}`];
     case 'news': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'news', `${ctx.topics?.news?.[post.sub] || 'News'}${post.date ? ` · ${post.date}` : ''}`];
     case 'oracle': return ['the.oracle', `${oracleLabel(post.sub)} · ask, then cast`];
+    case 'studio': return ['the.studio', post.sub === 'creator' ? 'Character creator · you star in the games' : post.sub === 'blank' ? 'A blank page · tap ✈ to download' : 'Writing prompt · tap ✈ to download'];
+    case 'read': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'longread', `${post.kind === 'poem' ? 'Poem' : post.kind === 'novel' ? 'From a novel' : 'Long read'}${post.author ? ` · ${post.author}` : ''}`];
     case 'power': return ['power.scale', post.sub === 'tier' ? 'Tier list · binding in no jurisdiction' : 'Who would win?'];
     default: return [post.cat, ''];
   }
@@ -82,7 +86,7 @@ function actions(post, ctx, ext) {
   save.onclick = (e) => { e.stopPropagation(); toast(favs.toggle('save', post, ctx.pkgId) ? 'Saved' : 'Removed from saved'); sync(); };
   up.onclick = (e) => { e.stopPropagation(); toast(setMark(post, 1, labelOf(post)) ? 'More like this' : 'Mark cleared'); sync(); };
   down.onclick = (e) => { e.stopPropagation(); toast(setMark(post, -1, labelOf(post)) ? 'Less like this' : 'Mark cleared'); sync(); };
-  if (share) share.onclick = (e) => { e.stopPropagation(); window.open(ext, '_blank'); };
+  if (share) share.onclick = (e) => { e.stopPropagation(); if (typeof ext === 'function') ext(); else window.open(ext, '_blank'); };
   sync();
   const bar = el('div.actions', fav, up, down, share, el('span.spacer'), save);
   bar._sync = sync;
@@ -383,12 +387,28 @@ function power(p, ctx) {
   return card;
 }
 
+function studio(p, ctx) {
+  if (p.sub === 'creator') {
+    const o = creatorMedia();
+    const card = post('studio', p, ctx, { media: o.media, body: o.body, mediaInteractive: true });
+    card._activate = o.activate; card._deactivate = o.deactivate; card._heavy = true;
+    return card;
+  }
+  const w = writingBody(p);
+  return post('studio', p, ctx, { body: w.body, ext: w.send });
+}
+function read(p, ctx) {
+  const body = readBody(p);
+  const card = post('read', p, ctx, { body, ext: p.url });
+  return card;
+}
+
 // ------------------------------------------------ special
 export function notice(title, text, buttons = []) {
   return el('article.notice', el('h3', title), el('p', text), el('div.btnrow', { style: { justifyContent: 'center' } }, buttons));
 }
 
-const RENDER = { wiki, video, game, psych, meme, product, selfcare, web, news: web, oracle, power };
+const RENDER = { wiki, video, game, psych, meme, product, selfcare, web, news: web, oracle, power, studio, read };
 export function renderCard(p, ctx) {
   const fn = RENDER[p.cat];
   if (!fn) return null;
