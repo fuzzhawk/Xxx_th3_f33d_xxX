@@ -1,6 +1,6 @@
 // Draws memes onto a canvas so what you see is exactly what gets saved.
 // Styles: impact, caption, demotivator, post, chyron, twopanel, brain, starter,
-// versus, labels, quotecard, pov, isthis.
+// versus, labels, quotecard, pov, isthis, and four-panel surreal comic strips.
 
 const CACHE = 'feed-img-v1';
 const W = 720;
@@ -61,6 +61,7 @@ export async function renderMeme(p, canvas) {
   const ctx = canvas.getContext('2d');
   const set = (h) => { canvas.width = W; canvas.height = Math.round(h); };
   const style = p.style;
+  if (style === 'strip') { await drawStrip(ctx, p, imgs, set); return canvas; }
   if (style === 'kym' || style === 'plain') { set(W * ratio); cover(ctx, im, 0, 0, W, W * ratio); }
   else if (style === 'impact' || style === 'pov') {
     set(W * ratio); cover(ctx, im, 0, 0, W, W * ratio);
@@ -146,4 +147,67 @@ export async function renderMeme(p, canvas) {
   } else { set(W * ratio); cover(ctx, im, 0, 0, W, W * ratio); }
   canvas.tainted = imgs.some((i) => i?.tainted);
   return canvas;
+}
+
+// ------------------------------------------------ surreal comic strip
+const hashCol = (s, l = 45) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360},40%,${l}%)`; };
+function balloon(ctx, text, x, y, w, maxH, tailX, tailY) {
+  let size = 24, ls;
+  for (; size >= 13; size--) { ctx.font = `700 ${size}px "Comic Neue", "Comic Sans MS", "Chalkboard SE", ui-rounded, system-ui, sans-serif`; ls = wrap(ctx, text, w - 28); if (ls.length * size * 1.18 + 22 <= maxH) break; }
+  const h = ls.length * size * 1.18 + 22;
+  ctx.fillStyle = '#fffaf0'; ctx.strokeStyle = '#111'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 18); ctx.fill(); ctx.stroke();
+  const bx = Math.max(x + 24, Math.min(x + w - 24, tailX));
+  ctx.beginPath(); ctx.moveTo(bx - 12, y + h - 1); ctx.lineTo(tailX, tailY); ctx.lineTo(bx + 12, y + h - 1); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(bx - 12, y + h); ctx.lineTo(tailX, tailY); ctx.lineTo(bx + 12, y + h); ctx.stroke();
+  ctx.fillStyle = '#111'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ls.forEach((l, i) => ctx.fillText(l, x + w / 2, y + 12 + i * size * 1.18));
+}
+function figure(ctx, x, y, s, img, name, flip, tilt = 0) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(flip ? -s : s, s);
+  ctx.fillStyle = hashCol(name, 30); ctx.strokeStyle = '#111'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-34, 0); ctx.lineTo(-22, -92); ctx.lineTo(22, -92); ctx.lineTo(34, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = hashCol(name, 22); ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-18, -80); ctx.lineTo(-40, -44); ctx.moveTo(18, -80); ctx.lineTo(36, -58); ctx.lineTo(48, -76); ctx.stroke();
+  ctx.restore();
+  // the head: their portrait, cut into a circle and pushed toward a print look
+  const r = 40 * s, hx = x, hy = y - 92 * s - r * 0.8;
+  ctx.save(); ctx.beginPath(); ctx.arc(hx, hy, r, 0, 7); ctx.closePath();
+  if (img) { ctx.clip(); ctx.filter = 'grayscale(.35) contrast(1.35) sepia(.2)'; const k = Math.max(2 * r / img.naturalWidth, 2 * r / img.naturalHeight) * 1.1; ctx.drawImage(img, hx - img.naturalWidth * k / 2, hy - img.naturalHeight * k * 0.42, img.naturalWidth * k, img.naturalHeight * k); ctx.filter = 'none'; }
+  else { ctx.fillStyle = '#e9d6b8'; ctx.fill(); ctx.fillStyle = '#111'; ctx.font = `800 ${Math.round(r)}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(name.split(' ').map((w) => w[0]).slice(0, 2).join(''), hx, hy + 2); }
+  ctx.restore();
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(hx, hy, r, 0, 7); ctx.stroke();
+  return [hx, hy - r];
+}
+async function drawStrip(ctx, p, bgs, set) {
+  const faces = await Promise.all((p.cast || []).map((c) => (c.img ? loadImg(c.img).catch(() => null) : null)));
+  const pad = 14, gap = 12, pw = (W - pad * 2 - gap) / 2, top = 74;
+  set(top + pw * 2 + gap + pad);
+  ctx.fillStyle = '#f2e8d5'; ctx.fillRect(0, 0, W, top + pw * 2 + gap + pad);
+  ctx.fillStyle = '#111'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = serif(28, 700);
+  ctx.fillText(p.title.length > 46 ? `${p.title.slice(0, 45)}…` : p.title, pad + 4, 40);
+  p.panels.forEach((pn, i) => {
+    const x = pad + (i % 2) * (pw + gap), y = top + Math.floor(i / 2) * (pw + gap);
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, pw, pw); ctx.clip();
+    ctx.filter = pn.event ? 'hue-rotate(140deg) saturate(1.8) contrast(1.1)' : `sepia(.3) saturate(1.2) hue-rotate(${i * 25}deg)`;
+    cover(ctx, bgs[i % Math.max(1, bgs.length)] || null, x, y, pw, pw); ctx.filter = 'none';
+    ctx.fillStyle = pn.event ? 'rgba(40,0,60,.25)' : 'rgba(255,240,215,.18)'; ctx.fillRect(x, y, pw, pw);
+    // dot screen for a printed feel
+    ctx.fillStyle = 'rgba(0,0,0,.07)'; for (let yy = y + 4; yy < y + pw; yy += 8) for (let xx = x + ((yy / 8) % 2) * 4; xx < x + pw; xx += 8) ctx.fillRect(xx, yy, 2, 2);
+    const ground = y + pw - 8;
+    if (pn.event) {
+      figure(ctx, x + pw * 0.27, ground, 0.62, faces[0], p.cast[0].name, false, -0.25);
+      figure(ctx, x + pw * 0.73, ground, 0.62, faces[1], p.cast[1].name, true, 0.3);
+      ctx.fillStyle = '#ffe36b'; ctx.strokeStyle = '#111'; ctx.lineWidth = 3; ctx.beginPath(); ctx.rect(x + 10, y + 10, pw - 20, 96); ctx.fill(); ctx.stroke();
+      textBlock(ctx, pn.event, x + 22, y + 22, pw - 44, `italic 700 21px Georgia, serif`, '#111', 1.2);
+    } else {
+      const sp = pn.who, other = 1 - sp;
+      const posS = sp === 0 ? 0.3 : 0.7, posO = sp === 0 ? 0.76 : 0.24;
+      figure(ctx, x + pw * posO, ground, 0.7, faces[other], p.cast[other].name, other === 1);
+      const [tx, ty] = figure(ctx, x + pw * posS, ground, 0.95, faces[sp], p.cast[sp].name, sp === 1);
+      balloon(ctx, `${pn.say}`, x + 10, y + 10, pw - 20, pw * 0.5, tx + (sp ? -20 : 20), ty - 6);
+      if (i === 0 || i === 1) { ctx.font = sans(15, 700); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x + 8, ground - 26, ctx.measureText(p.cast[sp].name).width + 16, 22); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(p.cast[sp].name, x + 16, ground - 15); }
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.strokeRect(x, y, pw, pw);
+  });
 }

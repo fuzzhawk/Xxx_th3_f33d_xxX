@@ -995,6 +995,33 @@ function buildSelfCare() {
   return shuffle(posts);
 }
 
+// ------------------------------------------------------------------ surreal comic strips: odd thinkers talk past each other in their own (Wikiquote) words
+async function buildStrips(quotes, commons, n) {
+  const S = config.strips || {}, byAuthor = {};
+  for (const q of quotes) if (q.text.length >= 25 && q.text.length <= 150) (byAuthor[q.author] ||= []).push(q.text.replace(/^"|"$/g, ''));
+  const cast = Object.keys(byAuthor).filter((a) => byAuthor[a].length >= 3);
+  if (cast.length < 2 || !n) return [];
+  const portraits = {};
+  if (!OFFLINE) for (let i = 0; i < cast.length; i += 20) {
+    try {
+      const j = await fetchJSON(wq({ action: 'query', prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '240', pilimit: '20', redirects: '1', titles: cast.slice(i, i + 20).join('|') }));
+      const back = {}; for (const r of [...(j.query?.normalized || []), ...(j.query?.redirects || [])]) back[r.to] = back[r.from] || r.from;
+      for (const pg of j.query?.pages || []) if (pg.thumbnail?.source) portraits[back[pg.title] || pg.title] = pg.thumbnail.source;
+    } catch (e) { warn(`strip portraits: ${e.message}`); }
+  }
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    const a = pick(cast); let b = pick(cast), g = 0; while (b === a && g++ < 10) b = pick(cast);
+    const qa = shuffle([...byAuthor[a]]), qb = shuffle([...byAuthor[b]]);
+    const bgs = Array.from({ length: 4 }, () => pick(commons)?.img).filter(Boolean);
+    const panels = [{ who: 0, say: qa[0] }, { who: 1, say: qb[0] }, { event: pick(S.events || ['Something strange happens.']) }, rand() < 0.75 ? { who: rand() < 0.5 ? 0 : 1, say: rand() < 0.5 ? qa[1] : qb[1] } : { who: 1, say: pick(S.sfx || ['…']) }];
+    const theme = pick(S.themes || ['the void']);
+    out.push({ id: `ms${hashStr(a + b + qa[0] + qb[0]).toString(36)}`, cat: 'meme', sub: 'strip', style: 'strip', title: `${a} and ${b} on ${theme}`, cast: [{ name: a, img: portraits[a] }, { name: b, img: portraits[b] }], panels, imgs: bgs, wiki: `https://en.wikiquote.org/wiki/${encodeURIComponent(a.replace(/ /g, '_'))}`, ref: `${a} & ${b}`, credit: 'Words from Wikiquote · pictures from Wikimedia Commons' });
+  }
+  report.sources.strips = out.length;
+  return out;
+}
+
 function buildMemes(quotes, wiki, commons, kym) {
   const posts = [];
   const kymN = Math.min(kym.length, Math.round(want.meme * 0.25));
@@ -1088,7 +1115,7 @@ async function main() {
     game: games,
     wiki: shuffle(wiki),
     video: shuffle(video),
-    meme: buildMemes(quotes, wiki, commons, kym),
+    meme: await (async () => { const strips = await buildStrips(quotes, commons, Math.round(want.meme * (config.strips?.share ?? 0.2))); return shuffle([...strips, ...buildMemes(quotes, wiki, commons, kym).slice(0, want.meme - strips.length)]); })(),
     product: buildProducts(),
     psych: buildPsych(quotes, wiki),
     selfcare: buildSelfCare(),
