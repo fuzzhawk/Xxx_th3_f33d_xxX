@@ -459,7 +459,9 @@ async function scrapeBlog(f, home, html) {
     const title = (page.html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) || page.html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1];
     const date = (page.html.match(/<meta[^>]+property=["']article:published_time["'][^>]+content=["']([^"']+)["']/i) || page.html.match(/<time[^>]+datetime=["']([^"']+)["']/i) || [])[1];
     const body = (page.html.match(/<(?:article|main)[^>]*>([\s\S]*?)<\/(?:article|main)>/i) || [])[1] || '';
-    const text = page.desc || clip(stripTags(body), 400);
+    // the post's own words beat a site-wide meta description
+    const own = clip(stripTags(body || page.html.replace(/<(head|nav|header|footer|script|style)[\s\S]*?<\/\1>/gi, '')), 400);
+    const text = own.length > 80 ? own : page.desc || own;
     if (!text && !page.image) continue;
     items.push({ title: decodeEntities(stripTags(title || l.text)).trim(), link: l.href, html: `${page.image ? `<img src="${page.image}">` : ''}<p>${text || ''}</p>`, date: date || null });
   }
