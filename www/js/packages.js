@@ -52,7 +52,9 @@ async function fetchPackage(base, id, onProgress) {
   if (manifest.textures) { try { textures = await getJSON(`${base}${id}/${manifest.textures}`, 60000); } catch { /* optional */ } }
   let oracle = null;
   if (manifest.oracle) { try { oracle = await getJSON(`${base}${id}/${manifest.oracle}`, 60000); } catch { /* optional */ } }
-  return { manifest, posts, sprites, themes, textures, oracle };
+  let vocab = [];
+  if (manifest.vocab) { try { vocab = await getJSON(`${base}${id}/${manifest.vocab}`, 60000); } catch { /* optional */ } }
+  return { manifest, posts, sprites, themes, textures, oracle, vocab };
 }
 
 export async function downloadPackage(id, onProgress) {

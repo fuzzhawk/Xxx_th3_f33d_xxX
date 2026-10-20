@@ -717,6 +717,25 @@ function buildOracle() {
   }));
 }
 
+// ------------------------------------------------------------------ vocabulary (definitions from Wiktionary)
+async function buildVocab() {
+  const list = readJSON(path.join(ROOT, 'tools/data/vocab.json')).words.filter((w) => /^[a-z]+$/.test(w));
+  if (OFFLINE) return list.map((w) => ({ w, pos: 'noun', d: `placeholder definition of ${w} for offline testing` }));
+  const out = [];
+  await pool(list, 4, async (w) => {
+    try {
+      const j = await fetchJSON(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(w)}`);
+      for (const sense of j.en || []) {
+        const d = (sense.definitions || []).map((x) => stripTags(x.definition || '')).find((x) => x.length > 8 && !/^(plural|alternative|obsolete|archaic) (of|form|spelling)/i.test(x) && !/^(misspelling|initialism) of/i.test(x));
+        if (d) { out.push({ w, pos: sense.partOfSpeech?.toLowerCase(), d: clip(d.replace(/\s*\.$/, ''), 160) }); return; }
+      }
+    } catch (e) { warn(`vocab ${w}: ${e.message}`); }
+    await sleep(50);
+  });
+  report.sources.vocab = out.length;
+  return out;
+}
+
 // ------------------------------------------------------------------ absurd power scale
 async function buildPower() {
   const P = readJSON(path.join(ROOT, 'tools/data/power.json'));
@@ -842,7 +861,8 @@ const GAME_NAMES = {
   plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', stacker: 'Stacker', pong: 'Pong', peggle: 'Peg Shot', golf: 'Bounce Golf', juggle: 'Juggle',
   platformer: 'Platformer', racer: 'Road Racer', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot',
   necro: 'Necromancer', chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl',
-  starfox: 'Sky Fox', mystery: 'Manor Mystery', ski: 'Downhill', graves: 'Grave Merge', survivors: 'Cave Horde', robotron: 'Robo Arena', crokinole: 'Crokinole'
+  starfox: 'Sky Fox', mystery: 'Manor Mystery', ski: 'Downhill', graves: 'Grave Merge', survivors: 'Cave Horde', robotron: 'Robo Arena', crokinole: 'Crokinole',
+  wordle: 'Five Letters', bee: 'Spelling Hive', wordsearch: 'Word Search', wheel: 'Letter Wheel', hangman: 'Hangman', vocab: 'Vocab Quiz', ladder: 'Word Ladder'
 };
 const ADJ = ['Ember', 'Moss', 'Rust', 'Ochre', 'Clay', 'Amber', 'Dusk', 'Ash', 'Copper', 'Sage', 'Umber', 'Saffron', 'Cedar', 'Flint', 'Honey', 'Basalt', 'Juniper', 'Tangerine', 'Cinder', 'Sienna', 'Lichen', 'Marigold', 'Obsidian', 'Fern', 'Paprika', 'Driftwood', 'Terracotta', 'Pumpkin', 'Gravel', 'Sunset'];
 function buildGames() {
@@ -993,6 +1013,7 @@ async function main() {
     oracleData = await buildTarot();
   }
   const power = await buildPower();
+  const vocab = await buildVocab();
   const games = buildGames();
   assignThemes(games, themes);
   const posts = {
@@ -1026,6 +1047,7 @@ async function main() {
   if (themes.length) writeJSON(path.join(dir, 'themes.json'), themes);
   if (textures.length) writeJSON(path.join(dir, 'textures.json'), textures);
   if (oracleData) writeJSON(path.join(dir, 'tarot.json'), oracleData);
+  if (vocab.length) writeJSON(path.join(dir, 'vocab.json'), vocab);
   const prompt = fs.readFileSync(path.join(ROOT, 'packages/prompt.md'), 'utf8');
   const manifest = {
     id: pkgId, title: `The Feed · ${pkgId}`, created: new Date().toISOString(), offline: OFFLINE || undefined,
@@ -1038,7 +1060,7 @@ async function main() {
       web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' },
       news: Object.fromEntries(Object.entries(config.news.groups).map(([k, g]) => [k, g.label]))
     },
-    files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, textures: textures.length ? 'textures.json' : undefined, oracle: oracleData ? 'tarot.json' : undefined, prompt, report
+    files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, textures: textures.length ? 'textures.json' : undefined, oracle: oracleData ? 'tarot.json' : undefined, vocab: vocab.length ? 'vocab.json' : undefined, prompt, report
   };
   writeJSON(path.join(dir, 'manifest.json'), manifest, true);
 

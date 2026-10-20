@@ -87,7 +87,14 @@
     "graves",
     "survivors",
     "robotron",
-    "crokinole"
+    "crokinole",
+    "wordle",
+    "bee",
+    "wordsearch",
+    "wheel",
+    "hangman",
+    "vocab",
+    "ladder"
   ],
   "quoteAuthors": [
     "Robert Anton Wilson",

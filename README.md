@@ -51,7 +51,7 @@ kept for archiving and to avoid repeats. Each one is sized for 5 hours a day for
 
 | Category | Share | Source |
 |---|---|---|
-| Games | 20% | 28 game types with autopilot, themed sprite kits and random modifiers |
+| Games | 20% | 35 game types with autopilot, themed sprite kits and random modifiers, including word games (five-letter guessing, spelling hive, word search, letter wheel, hangman, vocabulary quiz, word ladders) |
 | Condensed Wikipedia | 25% | Wikipedia API: seed articles, categories, "more like" search |
 | Videos | 20% | YouTube search (short videos), checked for embedding |
 | Memes | 10% | Wikimedia Commons images + Wikiquote/Wikipedia captions, Know Your Meme |
@@ -59,7 +59,7 @@ kept for archiving and to avoid repeats. Each one is sized for 5 hours a day for
 | Psychedelic | 5% | Generative visuals in the app + quotes |
 | Self-care | 5% | Hand-written prompts, timers, breathing exercises |
 | From the web | 5% | 19 sites (Lobsters, MetaFilter, Atlas Obscura, Quanta…), Hacker News, webcomics |
-| Oracle | 3% | Dice, I Ching, sacred-chicken augury, haruspicy, tarot (old decks scanned on Wikimedia Commons) |
+| Oracle | 3% | Dice, I Ching, sacred-chicken augury, haruspicy (sacrifice a generated beast, read its entrails), tarot (old decks scanned on Wikimedia Commons) |
 | Power scale | 2% | Versus cards and tier lists of odd things from history and fiction (Wikipedia) |
 | News | 0% (hidden) | 17 feeds in four groups; tap **News** in the stories row |
 
@@ -73,6 +73,10 @@ What goes into a package is described in [`packages/prompt.md`](packages/prompt.
 shares in `config.json`, Wikipedia seeds and video searches in `topics.json`, and
 hand-written products, self-care prompts and meme templates in `content.mjs`.
 Feedback synced from the app lands in [`feedback/`](feedback/).
+
+## Credits
+
+Word list: [SCOWL](http://wordlist.aspell.net/) by Kevin Atkinson (see `www/data/words-LICENSE.txt`). Vocabulary definitions: [Wiktionary](https://en.wiktionary.org/) (CC BY-SA). Tarot scans and other images: Wikimedia Commons (public domain and CC licences, credited per image). Game art: [Kenney](https://kenney.nl) (CC0).
 
 ## Development
 

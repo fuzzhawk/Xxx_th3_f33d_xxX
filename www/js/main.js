@@ -4,6 +4,7 @@ import { initialPackage, loadPackage, checkForNew, downloadPackage } from './pac
 import { loadFavs } from './favs.js';
 import { loadKenney, setProps, setThemes, setTextures } from './games/assets.js';
 import { setOracle } from './oracle.js';
+import { setVocab } from './games/words.js';
 import * as stats from './stats.js';
 import { Feed } from './feed.js';
 import { notice } from './cards.js';
@@ -19,7 +20,7 @@ export function applyImmersive() {
 }
 const app = {
   pkg: () => pkg,
-  async reload() { pkg = await loadPackage(settings.pkg); setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle); feed.load(pkg); },
+  async reload() { pkg = await loadPackage(settings.pkg); setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle); setVocab(pkg.vocab); feed.load(pkg); },
   // settings changed: keep what is on screen, new posts follow the new mix
   softReload() { /* the scheduler reads settings live */ },
   applyImmersive
@@ -84,7 +85,7 @@ async function boot() {
   initSettings($('#view-settings'), app);
   try {
     pkg = await initialPackage();
-    setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle);
+    setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle); setVocab(pkg.vocab);
     feed.load(pkg);
   } catch (err) {
     console.error(err);
@@ -98,7 +99,7 @@ async function boot() {
       // same package id rebuilt on GitHub: refresh it quietly
       const same = remote.packages.find((p) => p.id === pkg.manifest.id);
       if (same && same.created > pkg.manifest.created) {
-        try { pkg = await downloadPackage(same.id); setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle); toast(`Updated ${same.id} with the latest build`); feed.load(pkg); } catch { /* keep the old copy */ }
+        try { pkg = await downloadPackage(same.id); setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle); setVocab(pkg.vocab); toast(`Updated ${same.id} with the latest build`); feed.load(pkg); } catch { /* keep the old copy */ }
       }
       const newest = fresh.at(-1);
       if (newest) document.querySelector('[data-tab=settings]').classList.add('notify');

@@ -2,7 +2,7 @@
 // bundled package available offline. Same-origin GETs are served from cache
 // and refreshed in the background; everything else goes to the network.
 const CACHE = 'feed-shell-v2';
-const SHELL = ['./', 'index.html', 'css/style.css', 'icon.svg', 'manifest.webmanifest', 'bundled/index.json', 'assets/kenney/index.json'];
+const SHELL = ['./', 'index.html', 'css/style.css', 'icon.svg', 'manifest.webmanifest', 'bundled/index.json', 'assets/kenney/index.json', 'data/words.txt'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => Promise.all(SHELL.map((u) => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
