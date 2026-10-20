@@ -128,7 +128,7 @@ export class Twenty48 extends Game {
   pos(i) { const s = 70, g = 8, x0 = (W - (s * 4 + g * 5)) / 2 + g, y0 = 88 + g; return [x0 + (i % 4) * (s + g) + s / 2, y0 + Math.floor(i / 4) * (s + g) + s / 2]; }
   tileCol(v) {
     this.tc ||= {};
-    if (this.tc[v]) return this.tc[v];
+    if (this.tc[v]) return this.tc[v][0];
     const p = this.pal, base = p.c[(v - 1) % p.c.length], col = v <= 6 ? mix(base, p.bg, 0.12) : mix(base, '#fff', Math.min(0.55, (v - 6) * 0.11));
     return (this.tc[v] = [col, lum(col) > 0.55 ? p.bg : '#fff'])[0];
   }

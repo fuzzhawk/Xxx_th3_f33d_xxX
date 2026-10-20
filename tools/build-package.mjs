@@ -710,7 +710,7 @@ async function buildTarot() {
   return { tarot: out };
 }
 function buildOracle() {
-  const subs = ['tarot', 'iching', 'augury', 'tarot', 'haruspicy', 'dice'];
+  const subs = ['tarot', 'iching', 'augury', 'dnd', 'tarot', 'haruspicy', 'dice', 'die'];
   return shuffle(Array.from({ length: want.oracle || 0 }, (_, i) => {
     const seed = Math.floor(rand() * 2 ** 31), sub = subs[i % subs.length];
     return { id: `o${seed.toString(36)}`, cat: 'oracle', sub, seed, question: pick(QUESTIONS), spread: sub === 'tarot' && rand() < 0.5 ? 3 : 1 };

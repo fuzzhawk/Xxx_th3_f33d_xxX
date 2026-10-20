@@ -6,6 +6,7 @@ import { img, ready, getTextures } from './games/assets.js';
 import { themePalette } from './games/creature.js';
 import { HEX, hexNumber, DECK, AUGURY, DICE3, QUESTIONS } from './oracle-data.js';
 import { Haruspex } from './haruspex.js';
+import { rollCharacter, sheet, sheetText, drawCharacter } from './dnd.js';
 
 let tarotImgs = {};
 export function setOracle(data) { tarotImgs = data?.tarot || {}; }
@@ -13,7 +14,10 @@ export function setOracle(data) { tarotImgs = data?.tarot || {}; }
 const W = 360, H = 300;
 const rnd = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
 const pick = (a) => a[Math.floor(rnd() * a.length)];
-const LABEL = { dice: 'Dice', iching: 'I Ching', augury: 'Augury', haruspicy: 'Haruspicy', tarot: 'Tarot' };
+const LABEL = { dice: 'Dice', die: 'One die', iching: 'I Ching', augury: 'Augury', haruspicy: 'Haruspicy', tarot: 'Tarot', dnd: 'Character' };
+const D20 = ['A natural 1. Stay in bed; the universe has your number.', 'Something will break. Let it be something cheap.', 'A detour, then a worse detour.', 'Ask for help before you need it.', 'Proceed with snacks and caution.', 'Middling luck. Bring a towel.', 'An old friend, or an old debt, comes calling.', 'Fine, if you keep it small.', 'The answer is in your pocket.', 'A coin flip in a trench coat.', 'Slightly in your favour.', 'Someone is rooting for you quietly.', 'Unlucky number, lucky result.', 'Yes, but read the small print.', 'The door is unlocked. Push.', 'Momentum is on your side.', 'Go now, before you think about it.', 'Strong yes. Dress for it.', 'Nearly perfect. Take it.', 'A natural 20. Whatever it is: do it, and narrate it out loud.'];
+const dieLine = (n, v) => (n === 20 ? D20[v - 1] : v === 1 ? 'The lowest face. Retreat and regroup.' : v === n ? 'The highest face. Fortune is loud today.' : v / n < 0.34 ? 'Low. Keep expectations modest.' : v / n < 0.67 ? 'Middling. It depends on you, annoyingly.' : 'High. The odds lean your way.');
+function download(name, text) { const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: name }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
 export const oracleLabel = (sub) => LABEL[sub] || 'Oracle';
 
 export function oracleMedia(p) {
@@ -22,9 +26,12 @@ export function oracleMedia(p) {
   const q = el('div.oracle-q', `“${p.question || pick(QUESTIONS)}”`);
   const btn = el('button.btn.primary', 'Cast');
   const media = el('div.media.oracle', canvas);
-  const body = el('div.oracle-body', q, reading, el('div.btnrow', btn));
+  const row = el('div.btnrow', btn);
+  const body = el('div.oracle-body', p.sub === 'dnd' ? null : q, reading, row);
   const o = new Oracle(canvas, p, reading);
-  const label = () => { btn.textContent = o.hx ? o.hx.label() : 'Cast again'; };
+  if (p.sub === 'die') { btn.remove(); for (const n of [4, 6, 8, 10, 12, 20, 100]) row.append(el('button.btn', { onclick: (e) => { e.stopPropagation(); o.sides = n; o.cast(); } }, `d${n}`)); }
+  if (p.sub === 'dnd') { btn.textContent = 'Roll a character'; row.append(el('button.btn', { onclick: (e) => { e.stopPropagation(); if (o.ch) download(`${o.ch.name.replace(/\W+/g, '_')}.txt`, sheetText(o.ch)); } }, 'Save sheet')); }
+  const label = () => { btn.textContent = o.hx ? o.hx.label() : p.sub === 'dnd' ? 'Roll another' : 'Cast again'; };
   if (o.hx) btn.textContent = 'Bring a beast';
   btn.onclick = (e) => { e.stopPropagation(); if (o.hx?.state === 'altar') o.hx.sacrifice(); else o.cast(); label(); };
   canvas.addEventListener('click', (e) => { if (!o.hx) return; const r = canvas.getBoundingClientRect(); if (o.hx.tap((e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H)) { e.stopPropagation(); label(); } });
@@ -53,7 +60,15 @@ class Oracle {
     this.casts++;
     const s = this.p.sub;
     this.out.replaceChildren(el('p.muted', 'Consulting…'));
-    if (s === 'dice') {
+    if (s === 'die') {
+      const n = this.sides || 20, v = 1 + Math.floor(rnd() * n);
+      this.anim = { t: 0, n, v, spin: rnd() * 7 };
+      this.after(1.1, () => this.say(`d${n}: ${v}`, [dieLine(n, v)]));
+    } else if (s === 'dnd') {
+      const ch = rollCharacter(rnd); this.ch = ch;
+      this.anim = { t: 0, ch };
+      this.after(2, () => this.out.replaceChildren(sheet(ch)));
+    } else if (s === 'dice') {
       const dice = [1, 2, 3].map(() => 1 + Math.floor(rnd() * 6));
       this.anim = { t: 0, dice, seeds: dice.map(() => rnd()) };
       this.after(1.4, () => { const sum = dice.reduce((a, b) => a + b, 0); this.say(`${dice.join(' · ')} = ${sum}`, [DICE3[sum]]); });
@@ -96,7 +111,9 @@ class Oracle {
     const s = this.p.sub, a = this.anim;
     if (this.hx) { if (!this.hx.draw(c)) this.idle(c); return; }
     if (!a) { this.idle(c); return; }
-    if (s === 'dice') this.drawDice(c, a);
+    if (s === 'die') this.drawDie(c, a);
+    else if (s === 'dnd') drawCharacter(c, a.ch, a.t, this.pal, W, H);
+    else if (s === 'dice') this.drawDice(c, a);
     else if (s === 'iching') this.drawIChing(c, a);
     else if (s === 'augury') this.drawAugury(c, a);
     else this.drawTarot(c, a);
@@ -104,7 +121,7 @@ class Oracle {
   idle(c) {
     c.fillStyle = this.pal.ink; c.globalAlpha = 0.6 + Math.sin(this.t * 2) * 0.2;
     c.font = '600 46px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillText({ dice: '⚄', iching: '☯', augury: '𓅬', haruspicy: '⛤', tarot: '🂠' }[this.p.sub] || '✶', W / 2, H / 2 - 10);
+    c.fillText({ die: '⚅', dnd: '⚔', dice: '⚄', iching: '☯', augury: '𓅬', haruspicy: '⛤', tarot: '🂠' }[this.p.sub] || '✶', W / 2, H / 2 - 10);
     c.font = '600 13px ui-monospace, monospace'; c.fillText('tap Cast', W / 2, H / 2 + 40); c.globalAlpha = 1;
   }
   // ---- dice
@@ -122,6 +139,22 @@ class Oracle {
       for (const [px, py] of P) { c.beginPath(); c.arc(px * 14, py * 14, 5, 0, 7); c.fill(); }
       c.restore();
     });
+  }
+  // ---- one polyhedral die
+  drawDie(c, a) {
+    const k = Math.min(1, a.t / 1), e = 1 - (1 - k) ** 3, n = a.n, sides = { 4: 3, 6: 4, 8: 4, 10: 5, 12: 5, 20: 6, 100: 5 }[n] || 6;
+    const x = W / 2 + (1 - e) * 120 * Math.cos(a.spin), y = H / 2 - Math.abs(Math.sin(e * Math.PI * 3)) * (1 - e) * 70, r = 70, rot = (1 - e) * 9 + (n === 4 ? -Math.PI / 2 : n === 8 || n === 6 ? Math.PI / 4 : -Math.PI / 2);
+    c.save(); c.translate(x, y); c.rotate(rot);
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); for (let i = 0; i < sides; i++) { const an = i / sides * Math.PI * 2; c.lineTo(Math.cos(an) * r + 6, Math.sin(an) * r * (n === 8 ? 1.25 : 1) + 8); } c.fill();
+    c.fillStyle = this.pal.c[0]; c.beginPath(); for (let i = 0; i < sides; i++) { const an = i / sides * Math.PI * 2; c.lineTo(Math.cos(an) * r, Math.sin(an) * r * (n === 8 ? 1.25 : 1)); } c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.25)'; c.lineWidth = 2; c.stroke();
+    if (n === 20 || n === 12) { c.beginPath(); for (let i = 0; i < sides; i++) { const an = i / sides * Math.PI * 2 + Math.PI / sides; c.lineTo(Math.cos(an) * r * 0.55, Math.sin(an) * r * 0.55); } c.closePath(); c.stroke(); }
+    c.rotate(-rot);
+    const face = k < 1 ? 1 + Math.floor((this.t * 23) % n) : a.v;
+    c.fillStyle = this.pal.ink; c.font = `800 ${n === 100 ? 34 : 42}px ui-monospace, monospace`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(face), 0, 3);
+    c.restore();
+    c.fillStyle = this.pal.ink; c.font = '600 13px ui-monospace, monospace'; c.textAlign = 'center'; c.fillText(`d${n}`, W / 2, H - 20);
+    if (k >= 1 && n === 20 && (a.v === 20 || a.v === 1)) { c.fillStyle = a.v === 20 ? '#ffd24a' : '#d23a2a'; c.font = '900 20px Georgia, serif'; c.fillText(a.v === 20 ? 'CRITICAL!' : 'FUMBLE', W / 2, 36); }
   }
   // ---- I Ching
   drawIChing(c, a) {
