@@ -4,7 +4,17 @@
 import { idbGet, idbSet, idbKeys, idbDel } from './store.js';
 import { settings, saveSettings } from './state.js';
 
-const remoteBase = () => `https://raw.githubusercontent.com/${settings.repo}/${settings.branch}/packages/`;
+const githubBase = () => `https://raw.githubusercontent.com/${settings.repo}/${settings.branch}/packages/`;
+// On the web version the whole repo is deployed, so packages/ sits next to the app
+// on the same site; the Android app (and local dev) read them from GitHub instead.
+const siteBase = () => new URL('../packages/', location.href).href;
+const onWeb = () => !window.Capacitor?.isNativePlatform?.() && /^https?:$/.test(location.protocol);
+let chosenBase = null;
+async function remoteBaseAsync() {
+  if (chosenBase) return chosenBase;
+  if (onWeb()) { try { await getJSON(`${siteBase()}index.json?t=${Date.now()}`, 8000); return (chosenBase = siteBase()); } catch { /* not deployed with the repo */ } }
+  return (chosenBase = githubBase());
+}
 
 async function getJSON(url, timeout = 20000) {
   const ctl = new AbortController();
@@ -19,7 +29,7 @@ async function getJSON(url, timeout = 20000) {
 export async function bundledIndex() {
   try { return await getJSON('bundled/index.json'); } catch { return { packages: [] }; }
 }
-export async function remoteIndex() { return getJSON(`${remoteBase()}index.json?t=${Date.now()}`); }
+export async function remoteIndex() { return getJSON(`${await remoteBaseAsync()}index.json?t=${Date.now()}`); }
 
 export async function localIds() {
   return (await idbKeys('kv')).filter((k) => String(k).startsWith('pkg:')).map((k) => k.slice(4));
@@ -46,7 +56,7 @@ async function fetchPackage(base, id, onProgress) {
 }
 
 export async function downloadPackage(id, onProgress) {
-  const pkg = await fetchPackage(remoteBase(), id, onProgress);
+  const pkg = await fetchPackage(await remoteBaseAsync(), id, onProgress);
   await idbSet('kv', `pkg:${id}`, pkg);
   return pkg;
 }

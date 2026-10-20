@@ -1,0 +1,5 @@
+# Netlify: serve the app in www/ at the site root. Files that exist at the
+# root (packages/, this repo's own files) are served as they are.
+/            /www/index.html   200!
+/index.html  /www/index.html   200!
+/*           /www/:splat       200

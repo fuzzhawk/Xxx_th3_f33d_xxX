@@ -17,15 +17,16 @@ visuals, self-care nudges and hand-picked links from around the web.
 
 ## Web version (share with friends)
 
-The same app runs in any browser and can be installed to a home screen. To host it on Netlify:
+The repo is a plain static site: no build step, no npm. To host it on Netlify:
 
 1. Sign in at [app.netlify.com](https://app.netlify.com) with GitHub.
-2. **Add new site → Import an existing project → GitHub**, pick this repository.
-3. Choose the branch to publish. The settings come from `netlify.toml`
-   (build command `node tools/bundle-package.mjs`, publish directory `www`). Click **Deploy**.
+2. **Add new site → Import an existing project → GitHub**, pick this repository and the branch to publish.
+3. Leave **Build command** empty and **Publish directory** empty (the repo root). Click **Deploy**.
 4. Share the `*.netlify.app` link. Each friend's favorites, stats and settings stay in their own browser.
 
-Netlify redeploys whenever that branch changes, so new weekly packages show up for everyone.
+`_redirects` serves the app in `www/` at the site root, and the app reads the weekly
+packages straight from `packages/` on the same site, so every push of a new package
+shows up for everyone. Other static hosts work too (the root `index.html` hops to `www/`).
 
 ## Using it
 

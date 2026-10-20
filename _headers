@@ -1,0 +1,6 @@
+/sw.js
+  Cache-Control: no-cache
+/www/sw.js
+  Cache-Control: no-cache
+/packages/index.json
+  Cache-Control: no-cache
