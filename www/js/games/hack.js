@@ -136,7 +136,7 @@ export class Hack extends Game {
   spawnMob(kind, x, y, rank, pack) {
     const K = this.kinds[kind], d = this.depth, mul = rank === 'boss' ? 12 : rank ? 3.5 : 1;
     const hp = (6 + d * 5 + d * d * 0.5) * K.hp * mul;
-    const mb = { x, y, K, hp, max: hp, dmg: (1.6 + d * 1.5) * K.dmg * (rank === 'boss' ? 2 : rank ? 1.4 : 1), sp: K.sp * (rank === 'boss' ? 0.9 : 1), r: K.sz * 0.3 * (rank === 'boss' ? 1.6 : rank ? 1.25 : 1),
+    const mb = { x, y, K, hp, max: hp, dmg: (1.6 + d * 1.7) * K.dmg * (rank === 'boss' ? 2 : rank ? 1.4 : 1), sp: K.sp * (rank === 'boss' ? 0.9 : 1), r: K.sz * 0.3 * (rank === 'boss' ? 1.6 : rank ? 1.25 : 1),
       rank, pack, cd: 0, ph: this.r(0, 7), flash: 0, aggro: false, lost: 0, xp: (3 + d * 2.2) * mul * K.hp, name: K.name, art: K.art };
     if (rank === 'champ') {
       mb.name = `${this.pick(CH[0])}${this.pick(CH[1])} ${this.pick(CH[2])}`; mb.mod = this.pick(CMOD);
@@ -391,7 +391,7 @@ export class Hack extends Game {
     const seenStairs = this.seen[this.stairs];
     let explored = 0; for (const i of this.floors) explored += this.seen[i];
     if (this.lvT > 150) this.seen[this.stairs] = 1;
-    if (!seenStairs || (explored < this.floors.length * 0.7 && this.lvT < 80)) {
+    if (!seenStairs || (explored < this.floors.length * 0.6 && this.lvT < 60)) {
       const p = this.bfs(here, (i) => this.seen[i] && this.map[i] && DIRS.some(([dx, dy]) => !this.seen[i + dx + dy * G]));
       if (p && p.length) { h.path = p; this.goal = 'explore'; return; }
       this.seen[this.stairs] = 1;
@@ -514,7 +514,7 @@ export class Hack extends Game {
     c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(x - 3 * s, y, 1.5 * s, 2.5 * s);
   }
   drawMob(c, o, hsx) {
-    const [sx, sy] = this.P(o.x, o.y), s = o.r * 92 * this.S, im = o.art?.frames?.[Math.floor(o.ph * 4) % 2];
+    const [sx, sy] = this.P(o.x, o.y), s = o.r * 108 * this.S, im = o.art?.frames?.[Math.floor(o.ph * 4) % 2];
     c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.ellipse(sx, sy, s * 0.4, s * 0.2, 0, 0, 7); c.fill();
     if (o.rank) { c.strokeStyle = o.rank === 'boss' ? '#e0412b' : RAR[1]; c.lineWidth = 1.5; c.globalAlpha = 0.6 + Math.sin(this.t * 6) * 0.3; c.beginPath(); c.ellipse(sx, sy, s * 0.5, s * 0.25, 0, 0, 7); c.stroke(); c.globalAlpha = 1; }
     if (o.flash) c.filter = 'brightness(2.4)';

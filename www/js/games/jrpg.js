@@ -184,7 +184,7 @@ export class Jrpg extends Game {
     const zone = dg ? dg.d.k : this.cleared, s0 = (this.post.seed || 1) * 131 + zone * 17;
     const foes = [];
     for (let k = 0; k < n; k++) {
-      const sp = boss ? s0 + 999 : s0 + this.ri(0, 3), m = boss ? 1 : this.r(0.9, 1.1), hp = Math.round((16 + lv * 13) * (boss ? 5.5 : 1) * m);
+      const sp = boss ? s0 + 999 : s0 + this.ri(0, 3), m = boss ? 1 : this.r(0.9, 1.1), hp = Math.round((14 + lv * 11) * (boss ? 4.2 : 1) * m);
       const art = this.foeArt(sp, lv, boss);
       foes.push({ name: boss ? `${creatureName(sp)} the Dread` : creatureName(sp), lv, hp, max: hp, atk: (3.5 + lv * 2) * (boss ? 1.25 : 1), def: 2 + lv * 1.3, mag: 3 + lv * 1.8, spd: 3 + lv * 0.5 + this.r(0, 3), xp: Math.round((6 + lv * 5) * (boss ? 7 : 1)), gp: Math.round((4 + lv * 3) * (boss ? 6 : 1) * this.r(0.8, 1.2)), art, boss, dead: 0 });
     }
@@ -210,7 +210,7 @@ export class Jrpg extends Game {
       if (!b.order.length) {
         b.round++;
         const us = [...this.alive(this.party), ...this.alive(b.foes)];
-        if (b.boss) us.push(...this.alive(b.foes));
+        if (b.boss && b.foes[0].lv >= 7) us.push(...this.alive(b.foes));
         b.order = us.map((u) => [u, u.spd * this.r(0.75, 1.25)]).sort((a, c) => c[1] - a[1]).map((x) => x[0]);
       }
       const a = b.order.shift();
@@ -333,7 +333,6 @@ export class Jrpg extends Game {
     this.nextTurn();
   }
   // ---------------------------------------------------------------- walking
-  pass(i) { return this.mode === 'dungeon' ? this.passD(i) : this.passW(this.wm[i]); }
   stepWalk(dt) {
     const ws = this.walkers, sp = (this.mode === 'world' ? 6 : 5) * dt;
     for (const w of ws) { const dx = w.x - w.fx, dy = w.y - w.fy; if (Math.abs(dx) + Math.abs(dy) > 0.001) { w.fx += Math.sign(dx) * Math.min(Math.abs(dx), sp); w.fy += Math.sign(dy) * Math.min(Math.abs(dy), sp); w.walk = (w.walk || 0) + dt; } }
@@ -396,10 +395,10 @@ export class Jrpg extends Game {
     }
     const al = this.party, ratio = al.reduce((a, h) => a + h.hp, 0) / al.reduce((a, h) => a + h.max, 0);
     const mpLow = al[1].mp < 6 && al[2].mp < 5;
-    const town = (i) => this.wm[i] === TOWN, pw = (i) => this.passW(this.wm[i]);
+    const town = (i) => this.wm[i] === TOWN;
     if (ratio < 0.5 || (mpLow && ratio < 0.8) || (this.potions < 2 && this.gold >= 30)) {
       if (town(L.y * N + L.x)) { this.visitTown(this.towns.find((tw) => tw.x === L.x && tw.y === L.y)); return; }
-      this.route = this.findRoute(N, pw, L.x, L.y, town) || []; return;
+      this.route = this.wRoute(town) || []; return;
     }
     const d = this.dungeons.find((q) => !q.done);
     if (!d) return;
@@ -408,11 +407,13 @@ export class Jrpg extends Game {
       // grind in the wilds nearby, preferring forest
       let bt = null, bv = -1;
       for (let n = 0; n < 30; n++) { const x = L.x + this.ri(-6, 6), y = L.y + this.ri(-6, 6); if (x < 0 || y < 0 || x >= N || y >= N) continue; const t = this.wm[y * N + x]; if (!this.passW(t) || t === TOWN || t === CAVE) continue; const v = ENC[t] + this.r(0, 0.02); if (v > bv) { bv = v; bt = y * N + x; } }
-      if (bt != null) this.route = this.findRoute(N, (i) => pw(i) && this.wm[i] !== CAVE, L.x, L.y, (i) => i === bt) || [];
+      if (bt != null) this.route = this.wRoute((i) => i === bt) || [];
       return;
     }
-    this.route = this.findRoute(N, pw, L.x, L.y, (i) => i === d.y * N + d.x) || [];
+    this.route = this.wRoute((i) => i === d.y * N + d.x) || [];
   }
+  // world paths go round dungeon entrances that aren't the goal
+  wRoute(goal) { const L = this.walkers[0]; return this.findRoute(N, (i) => this.wm[i] !== CAVE && this.passW(this.wm[i]), L.x, L.y, goal) || this.findRoute(N, (i) => this.passW(this.wm[i]), L.x, L.y, goal); }
   fieldHeal() {
     const al = this.alive(this.party), low = this.lowest(al), cl = this.party[2];
     if (low.hp >= low.max * 0.6) return false;
@@ -458,7 +459,7 @@ export class Jrpg extends Game {
     if (y > H - 24) return;
     const n = this.mode === 'dungeon' ? DN : N, tx = Math.floor((x + this.camX) / T), ty = Math.floor((y + this.camY) / T);
     if (tx < 0 || ty < 0 || tx >= n || ty >= n) return;
-    const L = this.walkers[0], r = this.findRoute(n, (i) => this.pass(i), L.x, L.y, (i) => i === ty * n + tx);
+    const L = this.walkers[0], goal = (i) => i === ty * n + tx, r = this.mode === 'world' ? this.wRoute(goal) : this.findRoute(n, (i) => this.passD(i), L.x, L.y, goal);
     if (r) this.route = r;
   }
   tap(x, y) { this.down(x, y); }
@@ -510,13 +511,13 @@ export class Jrpg extends Game {
       if (h.mmp) { c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(x + 24, H - 9, 58, 3); c.fillStyle = '#5fa8ff'; c.fillRect(x + 24, H - 9, 58 * h.mp / h.mmp, 3); }
     });
     this.text(c, `${this.gold}g ◆${this.potions}`, W - 6, H - 12, 10, this.col(1), 'right');
-    if (this.label) { c.globalAlpha = Math.min(1, this.label.t * 2); c.fillStyle = 'rgba(8,6,4,.7)'; c.fillRect(0, 60, W, 22); this.text(c, this.label.s, W / 2, 71, 11, this.pal.ink); c.globalAlpha = 1; }
+    if (this.label) { c.globalAlpha = Math.min(1, this.label.t * 2); const lw = dun ? W : W - 76; c.fillStyle = 'rgba(8,6,4,.7)'; c.fillRect(0, 60, lw, 22); this.text(c, this.label.s, lw / 2, 71, 10, this.pal.ink); c.globalAlpha = 1; }
   }
   drawWorldTiles(c, x0, y0, x1, y1) {
     const m = this.wm, tex = { [GRASS]: this.texK(1), [FOREST]: this.texK(4), [HILL]: this.texK(5), [MOUNT]: this.texK(2), [SAND]: this.texK(6), [ROAD]: this.texK(3), [TOWN]: this.texK(1), [CAVE]: this.texK(5) };
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const t = m[y * N + x]; c.fillStyle = this.tileCol(t); c.fillRect(x * T, y * T, T, T); }
     // photo textures laid over each terrain
-    c.save(); c.globalCompositeOperation = 'overlay'; c.globalAlpha = 0.55;
+    c.save(); c.globalCompositeOperation = 'overlay'; c.globalAlpha = 0.45;
     for (const k of [GRASS, FOREST, HILL, MOUNT, SAND, ROAD]) {
       const p = this.pat(c, tex[k]); if (!p) continue;
       c.beginPath(); for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const t = m[y * N + x]; if (t === k || (k === GRASS && t === TOWN) || (k === HILL && t === CAVE)) c.rect(x * T, y * T, T, T); }
