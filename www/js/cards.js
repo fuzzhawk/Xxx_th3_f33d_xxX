@@ -230,7 +230,10 @@ function game(p, ctx) {
     bump();
   };
   const bump = () => { clearTimeout(idle); idle = setTimeout(() => { if (!g?.auto) setPlaying(false); }, 25000); };
-  stage.addEventListener('click', (e) => { if (!g || g.auto) { setPlaying(true); const q = g.local(e); g.tap(q.x, q.y); } });
+  stage.addEventListener('click', (e) => {
+    if (g?.auto && g.autoTap) { const q = g.local(e); if (g.autoTap(q.x, q.y)) return; }
+    if (!g || g.auto) { setPlaying(true); const q = g.local(e); g.tap(q.x, q.y); }
+  });
   canvas.addEventListener('pointerdown', (e) => { if (!g || g.auto) return; canvas.setPointerCapture(e.pointerId); const q = g.local(e); g.pointer.down = true; g.down(q.x, q.y, e.pointerId); bump(); });
   canvas.addEventListener('pointermove', (e) => { if (!g || g.auto) return; const q = g.local(e); g.move(q.x, q.y, e.pointerId); });
   canvas.addEventListener('pointerup', (e) => { if (!g || g.auto) return; const q = g.local(e); g.pointer.down = false; g.up(q.x, q.y, e.pointerId); });

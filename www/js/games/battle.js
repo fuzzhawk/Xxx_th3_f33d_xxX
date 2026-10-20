@@ -119,13 +119,39 @@ export class Monsters extends Game {
 const MOVES = { punch: { t: 0.28, hitAt: 0.1, range: 30, dmg: 6, h: 0 }, kick: { t: 0.4, hitAt: 0.18, range: 40, dmg: 9, h: 10 }, special: { t: 0.55, hitAt: 0.3, range: 0, dmg: 12 } };
 export class Fighter extends Game {
   static noMods = ['mirror', 'wobble', 'swarm'];
-  setup() {
-    this.cast = this.skin.people;
-    this.p = [this.mk(0, 90, 1), this.mk(1, W - 90, -1)];
-    this.round = 1; this.wins = [0, 0]; this.timer = 60; this.balls = []; this.pause = 1.2; this.banner = 'ROUND 1';
-    this.names = [creatureName((this.post.seed || 1) * 3), creatureName((this.post.seed || 1) * 5 + 1)];
+  setup() { this.matchN = 0; this.salt = loadSalt(); this.newMatch(); }
+  // each match: two fresh fighters with their own stats, and (on autopilot) a betting window first
+  newMatch() {
+    const s = (this.post.seed || 1) * 13 + this.matchN * 7919; this.matchN++;
+    this.roster = [0, 1].map((k) => {
+      const seed = s * 31 + k * 977, head = this.rng() < 0.45 ? this.skin.any('enemy', 'hero', 'item') : null;
+      return { sheet: this.matchN === 1 ? this.skin.people[k] : humanoid(seed, this.ri(0, 359), { tex: this.skin.texFor?.(seed % 23), head }), name: `${creatureName(seed)}${this.rng() < 0.6 ? ` ${EPITHETS[this.ri(0, EPITHETS.length - 1)]}` : ''}`, pow: this.r(0.75, 1.35), spd: this.r(0.75, 1.3), tough: this.r(0.8, 1.3) };
+    });
+    this.names = this.roster.map((r) => r.name);
+    const rate = (r) => r.pow * r.spd * r.tough * this.r(0.8, 1.25), ra = rate(this.roster[0]), rb = rate(this.roster[1]), crowd = 3000 + this.ri(0, 12000);
+    this.pool = [Math.round(crowd * ra / (ra + rb)), Math.round(crowd * rb / (ra + rb))];
+    this.bet = null; this.betT = 8; this.wins = [0, 0]; this.round = 1; this.resetRound();
   }
-  mk(i, x, face) { return { i, x, y: 0, vx: 0, vy: 0, face, hp: this.mods.glass ? 40 : 100, act: null, at: 0, block: false, stun: 0, ai: 0, sheet: this.cast[i] }; }
+  resetRound() { this.p = [this.mk(0, 90, 1), this.mk(1, W - 90, -1)]; this.timer = 60; this.balls = []; this.pause = Math.max(this.pause || 0, 1.2); this.banner = `ROUND ${this.round}`; }
+  mk(i, x, face) { const r = this.roster[i], max = Math.round((this.mods.glass ? 40 : 100) * r.tough); return { i, x, y: 0, vx: 0, vy: 0, face, hp: max, max, act: null, at: 0, block: false, stun: 0, ai: 0, sheet: r.sheet, pow: r.pow, spd: r.spd }; }
+  // taps on the betting panel while the autopilot fights
+  autoTap(x, y) {
+    if (!(this.betT > 0) || y < 150 || y > 360) return false;
+    const side = x < W / 2 ? 0 : 1, step = Math.max(10, Math.round(this.salt * 0.1));
+    if (this.bet && this.bet.side !== side) { this.salt += this.bet.amt; this.bet = null; }
+    const amt = Math.min(this.salt, step);
+    if (amt <= 0) return true;
+    this.salt -= amt; this.bet = { side, amt: (this.bet?.amt || 0) + amt }; saveSalt(this.salt);
+    return true;
+  }
+  settle(w) {
+    if (!this.bet) { this.result = `${this.names[w]} wins`; return; }
+    const total = this.pool[0] + this.pool[1] + this.bet.amt, mine = this.pool[this.bet.side] + this.bet.amt;
+    if (this.bet.side === w) { const pay = Math.floor(this.bet.amt * total / mine); this.salt += pay; this.result = `You win $${pay - this.bet.amt}!`; this.score += pay - this.bet.amt; }
+    else this.result = `You lose $${this.bet.amt}`;
+    if (this.salt < 10) { this.salt = 100; this.result += ' · bailout: $100'; }
+    saveSalt(this.salt);
+  }
   floor() { return H - 70; }
   doMove(f, a) { if (f.act || f.stun > 0 || f.hp <= 0) return; if (a === 'jump') { if (f.y === 0) f.vy = -560 * Math.sqrt(this.G); return; } f.act = a; f.at = 0; f.hit = false; }
   ai(f, o, dt) {
@@ -135,7 +161,7 @@ export class Fighter extends Game {
     if (f.ai > 0) return;
     f.ai = this.r(0.12, 0.35);
     if (dist > 140 && this.rng() < 0.25) return this.doMove(f, 'special');
-    if (dist > 46) { f.vx = Math.sign(o.x - f.x) * 130; if (this.rng() < 0.08) this.doMove(f, 'jump'); }
+    if (dist > 46) { f.vx = Math.sign(o.x - f.x) * 130 * (f.spd || 1); if (this.rng() < 0.08) this.doMove(f, 'jump'); }
     else { f.vx = 0; this.doMove(f, this.rng() < 0.55 ? 'punch' : 'kick'); if (this.rng() < 0.15) f.vx = -Math.sign(o.x - f.x) * 160; }
   }
   autopilot(dt) { this.ai(this.p[0], this.p[1], dt); }
@@ -151,6 +177,8 @@ export class Fighter extends Game {
   tap(x, y) { this.down(x, y); this.up(); }
   step(dt) {
     if (this.pause > 0) { this.pause -= dt; if (this.pause <= 0) this.banner = ''; return; }
+    if (!this.auto) this.betT = 0;
+    if (this.betT > 0) { this.betT -= dt; if (this.betT <= 0) { this.pause = 1; this.banner = 'ROUND 1'; } return; }
     const [a, b] = this.p;
     this.ai(b, a, dt);
     if (!this.auto) a.block = a.hold === -a.face || (a.hold && Math.sign(b.x - a.x) === -a.hold);
@@ -163,8 +191,8 @@ export class Fighter extends Game {
         const m = MOVES[f.act]; f.at += dt;
         if (!f.hit && f.at >= m.hitAt) {
           f.hit = true;
-          if (f.act === 'special') this.balls.push({ x: f.x + f.face * 24, y: this.floor() - 48, vx: f.face * 260, owner: f.i });
-          else if (Math.abs(o.x - f.x) < m.range + 14 && Math.abs(o.y - f.y) < 50) this.hitF(o, m.dmg, f.face);
+          if (f.act === 'special') this.balls.push({ x: f.x + f.face * 24, y: this.floor() - 48, vx: f.face * 260, owner: f.i, pow: f.pow || 1 });
+          else if (Math.abs(o.x - f.x) < m.range + 14 && Math.abs(o.y - f.y) < 50) this.hitF(o, m.dmg * (f.pow || 1), f.face);
         }
         if (f.at >= m.t) f.act = null;
       }
@@ -176,7 +204,7 @@ export class Fighter extends Game {
     for (const ball of this.balls) {
       ball.x += ball.vx * dt;
       const o = this.p[1 - ball.owner];
-      if (Math.abs(ball.x - o.x) < 20 && o.y > -50) { this.hitF(o, MOVES.special.dmg, Math.sign(ball.vx)); ball.dead = true; }
+      if (Math.abs(ball.x - o.x) < 20 && o.y > -50) { this.hitF(o, MOVES.special.dmg * ball.pow, Math.sign(ball.vx)); ball.dead = true; }
       if (ball.x < -20 || ball.x > W + 20) ball.dead = true;
     }
     this.balls = this.balls.filter((x) => !x.dead);
@@ -184,10 +212,8 @@ export class Fighter extends Game {
       const w = a.hp === b.hp ? -1 : a.hp > b.hp ? 0 : 1;
       if (w >= 0) this.wins[w]++;
       this.banner = w < 0 ? 'DRAW' : `${this.names[w]} WINS`;
-      if (this.wins[0] >= 2 || this.wins[1] >= 2) { this.score += this.wins[0] >= 2 ? 1000 : 0; this.wins = [0, 0]; this.round = 0; this.p.forEach((f, i) => (f.sheet = this.cast[(this.round + i + this.ri(0, 3)) % this.cast.length])); }
-      this.round++; this.timer = 60; this.pause = 2; this.balls = [];
-      const keep = this.p.map((f) => f.sheet);
-      this.p = [this.mk(0, 90, 1), this.mk(1, W - 90, -1)]; this.p[0].sheet = keep[0]; this.p[1].sheet = keep[1];
+      if (this.wins[0] >= 2 || this.wins[1] >= 2) { const mw = this.wins[0] >= 2 ? 0 : 1; this.settle(mw); this.banner = `${this.names[mw]} WINS`; this.pause = 3; this.newMatch(); this.banner = this.result; return; }
+      this.round++; this.pause = 2; const bn = this.banner; this.resetRound(); this.banner = bn;
       setTimeout(() => { if (!this.banner.includes('WINS') && this.banner !== 'DRAW') return; this.banner = `ROUND ${this.round}`; }, 1000);
     }
   }
@@ -221,13 +247,36 @@ export class Fighter extends Game {
     this.p.forEach((f, i) => {
       const x = i ? W / 2 + 22 : 12, w = W / 2 - 34;
       c.fillStyle = '#2a1e18'; c.fillRect(x, 36, w, 12);
-      c.fillStyle = f.hp > 30 ? '#ffd23a' : '#ff5a3a'; const hw = (w * f.hp) / (this.mods.glass ? 40 : 100); c.fillRect(i ? x + w - hw : x, 36, hw, 12);
+      c.fillStyle = f.hp > f.max * 0.3 ? '#ffd23a' : '#ff5a3a'; const hw = (w * f.hp) / f.max; c.fillRect(i ? x + w - hw : x, 36, hw, 12);
       this.text(c, this.names[i], i ? x + w : x, 58, 10, this.pal.ink, i ? 'right' : 'left');
       this.text(c, '●'.repeat(this.wins[i]), i ? x + w - 60 : x + 70, 58, 10, this.col(0));
     });
     this.text(c, String(Math.max(0, Math.ceil(this.timer))), W / 2, 42, 16, this.pal.ink);
     if (this.banner) this.text(c, this.banner, W / 2, H / 2 - 40, 26, this.col(1));
+    if (this.auto) this.text(c, `$${this.salt}${this.bet ? ` · $${this.bet.amt} on ${this.names[this.bet.side].split(' ')[0]}` : ''}`, W / 2, 72, 10, '#ffd23a');
+    if (this.betT > 0 && this.auto) this.betPanel(c);
     if (!this.auto) ['◀', '▶', '▲', 'P', 'K', 'S'].forEach((t, i) => { c.fillStyle = 'rgba(0,0,0,.45)'; roundRect(c, i * (W / 6) + 4, H - 48, W / 6 - 8, 42, 8); c.fill(); this.text(c, t, i * (W / 6) + W / 12, H - 27, 16, '#fff'); });
   }
-  hud() { return `round ${this.round} · ${this.score}`; }
+  betPanel(c) {
+    c.fillStyle = 'rgba(8,6,5,.88)'; roundRect(c, 8, 84, W - 16, 290, 12); c.fill();
+    this.text(c, 'PLACE YOUR BETS', W / 2, 104, 14, '#ffd23a');
+    c.fillStyle = 'rgba(255,255,255,.15)'; c.fillRect(30, 118, W - 60, 4); c.fillStyle = '#ffd23a'; c.fillRect(30, 118, (W - 60) * (this.betT / 8), 4);
+    const total = this.pool[0] + this.pool[1] + (this.bet?.amt || 0);
+    this.roster.forEach((r, i) => {
+      const cx = i ? W * 0.75 : W * 0.25, col = i ? '#4f8cff' : '#ff4f4f', mine = this.bet?.side === i;
+      c.fillStyle = mine ? col : 'rgba(255,255,255,.06)'; c.globalAlpha = mine ? 0.35 : 1; roundRect(c, cx - 78, 130, 156, 236, 10); c.fill(); c.globalAlpha = 1;
+      c.strokeStyle = col; c.lineWidth = 2; roundRect(c, cx - 78, 130, 156, 236, 10); c.stroke();
+      drawFit(c, r.sheet.idle, cx, 196, 72, 96, 0, i === 1);
+      this.text(c, r.name.length > 20 ? `${r.name.slice(0, 19)}…` : r.name, cx, 256, 10, '#fff');
+      [['POW', r.pow], ['SPD', r.spd], ['TUF', r.tough]].forEach(([k, v], j) => { const y = 274 + j * 14; this.text(c, k, cx - 66, y, 9, '#aaa', 'left'); c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(cx - 38, y - 3, 100, 6); c.fillStyle = col; c.fillRect(cx - 38, y - 3, 100 * (v - 0.7) / 0.7, 6); });
+      const pool = this.pool[i] + (mine ? this.bet.amt : 0);
+      this.text(c, `$${pool.toLocaleString()} · ${(total / pool).toFixed(2)}×`, cx, 326, 11, col);
+      this.text(c, mine ? `your bet $${this.bet.amt}` : 'tap to bet', cx, 346, 10, mine ? '#ffd23a' : '#ccc');
+    });
+    this.text(c, `wallet $${this.salt} · tap again to raise · tap outside to play yourself`, W / 2, 384, 9, '#bbb');
+  }
+  hud() { return `round ${this.round} · $${this.salt}`; }
 }
+const EPITHETS = ['the Unwashed', 'of the Ninth Circle', 'Jr.', 'the Inevitable', 'Who Shall Not Be Named', 'the Moist', 'from Accounting', 'the Thrice-Banned', 'XXL', 'of Ill Repute', 'the Beige', 'Prime', 'the Damp Knight', '(Mythic Tier)', 'the Unlikely', 'Classic', 'with a Chair'];
+const loadSalt = () => { try { return +localStorage.getItem('feed-salt') || 400; } catch { return 400; } };
+const saveSalt = (v) => { try { localStorage.setItem('feed-salt', String(v)); } catch { /* private mode */ } };

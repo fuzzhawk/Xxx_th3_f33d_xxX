@@ -126,7 +126,12 @@ export class Twenty48 extends Game {
   }
   tap() {}
   pos(i) { const s = 70, g = 8, x0 = (W - (s * 4 + g * 5)) / 2 + g, y0 = 88 + g; return [x0 + (i % 4) * (s + g) + s / 2, y0 + Math.floor(i / 4) * (s + g) + s / 2]; }
-  tileCol(v) { const p = this.pal, base = p.c[(v - 1) % p.c.length]; return v <= 6 ? mix(base, p.bg, 0.12) : mix(base, '#fff', Math.min(0.55, (v - 6) * 0.11)); }
+  tileCol(v) {
+    this.tc ||= {};
+    if (this.tc[v]) return this.tc[v];
+    const p = this.pal, base = p.c[(v - 1) % p.c.length], col = v <= 6 ? mix(base, p.bg, 0.12) : mix(base, '#fff', Math.min(0.55, (v - 6) * 0.11));
+    return (this.tc[v] = [col, lum(col) > 0.55 ? p.bg : '#fff'])[0];
+  }
   draw(c) {
     const p = this.pal, s = 70, g = 8, bw = s * 4 + g * 5, bx = (W - bw) / 2, by = 88;
     this.clear(c);
@@ -146,7 +151,7 @@ export class Twenty48 extends Game {
       const ic = this.icons[(t.v - 1) % this.icons.length];
       if (ready(ic)) { c.globalAlpha = 0.9; drawFit(c, ic, x + w * 0.3, y - w * 0.3, w * 0.28, w * 0.28); c.globalAlpha = 1; }
       const n = 1 << t.v, str = `${n}`;
-      this.text(c, str, x, y + 2, sc * (str.length <= 2 ? 30 : str.length === 3 ? 25 : str.length === 4 ? 20 : 16), lum(col) > 0.55 ? p.bg : '#fff');
+      this.text(c, str, x, y + 2, sc * (str.length <= 2 ? 30 : str.length === 3 ? 25 : str.length === 4 ? 20 : 16), this.tc[t.v][1]);
     }
     if (this.overT) {
       c.fillStyle = 'rgba(0,0,0,.6)'; roundRect(c, bx, by, bw, bw, 12); c.fill();
