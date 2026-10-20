@@ -8,13 +8,18 @@ export class Flight extends Game {
   static noMods = ['mirror', 'lowg', 'heavy', 'trails'];
   setup() {
     const R = this.rng;
-    const hm = noiseMap(R, N, 5, 4), ridge = noiseMap(R, N, 3, 2);
+    // mountain ranges only where a broad mask says so; plains, low hills and lakes in between
+    const hm = noiseMap(R, N, 5, 4), ridge = noiseMap(R, N, 4, 3), mask = noiseMap(R, N, 2, 2), wet = noiseMap(R, N, 3, 2);
     this.hgt = new Float32Array(N * N);
-    this.sea = 14 + R() * 10;
-    const amp = 70 + R() * 50;
+    this.sea = 12 + R() * 6;
+    const amp = (70 + R() * 50) * this.G, cut = 0.5 + R() * 0.1;
+    const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
     for (let i = 0; i < N * N; i++) {
-      const r = 1 - Math.abs(ridge[i] * 2 - 1);
-      this.hgt[i] = Math.max(this.sea, (hm[i] ** 1.6) * amp + r * r * 40 * this.G);
+      const m = sm(cut, cut + 0.18, mask[i]), r = 1 - Math.abs(ridge[i] * 2 - 1);
+      const plains = this.sea + 4 + hm[i] * 10 + sm(0.55, 0.8, hm[i]) * 14;
+      const peaks = (r ** 3 * 0.7 + hm[i] ** 1.5 * 0.5) * amp;
+      const lake = sm(0.62, 0.72, wet[i]) * (1 - m) * 16;
+      this.hgt[i] = Math.max(this.sea, plains + peaks * m - lake);
     }
     this.buildColors();
     this.buf = Object.assign(document.createElement('canvas'), { width: RW, height: RH });

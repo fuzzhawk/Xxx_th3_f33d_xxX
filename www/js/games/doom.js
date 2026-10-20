@@ -66,6 +66,7 @@ export class Doom extends Game {
     if (fresh) { this.hp = this.mods.glass ? 30 : 100; this.armor = 0; this.ammo = { shells: 10, bullets: 60, cells: 4 }; this.owned = [true, true, false, false]; this.weapon = 0; }
     this.cool = 0; this.flash = 0; this.recoil = 0; this.path = []; this.shots = []; this.hurt = 0; this.stuck = 0; this.lastPos = [this.px, this.py];
     this.tex = [0, 1, 2, 3, 4].map((k) => this.makeTex(k));
+    this.surf = null;
     const free = [], deco = [];
     for (const r of rooms.slice(1)) for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) if (!m[yy][xx]) free.push([xx, yy]);
     const take = () => free.splice(this.ri(0, free.length - 1), 1)[0];
@@ -102,6 +103,45 @@ export class Doom extends Game {
     const t = this.skin.slots.tile[k % this.skin.slots.tile.length];
     if (t && !ready(t)) t.addEventListener?.('load', paint, { once: true });
     return cv;
+  }
+  // floor and ceiling textures as raw pixels (photo textures tinted to the palette)
+  surfaces() {
+    if (this.surf?.ok) return this.surf;
+    const src = [this.skin.texFor?.(31) || this.skin.slots.tile[1 % this.skin.slots.tile.length], this.skin.texFor?.(37) || this.skin.slots.tile[2 % this.skin.slots.tile.length], this.skin.texFor?.(43) || this.skin.slots.tile[0]];
+    const tint = [this.col(5), this.pal.bg2, '#3f5a2a'];
+    let ok = true;
+    const px = src.map((t, k) => {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d', { willReadFrequently: true });
+      x.fillStyle = tint[k]; x.fillRect(0, 0, 64, 64);
+      if (ready(t)) { x.globalAlpha = 0.85; x.drawImage(t, 0, 0, 64, 64); x.globalAlpha = 1; x.globalCompositeOperation = 'multiply'; x.fillStyle = tint[k]; x.globalAlpha = 0.45; x.fillRect(0, 0, 64, 64); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; } else if (t) ok = false;
+      if (k === 0) { x.fillStyle = 'rgba(0,0,0,.3)'; for (let q = 0; q < 64; q += 32) { x.fillRect(q, 0, 1, 64); x.fillRect(0, q, 64, 1); } }
+      return new Uint32Array(x.getImageData(0, 0, 64, 64).data.buffer);
+    });
+    this.surf = { px, ok: ok || this.t > 4 };
+    return this.surf;
+  }
+  // cast the floor and ceiling into a low-res buffer; courtyards leave the ceiling clear so the sky shows
+  drawSurfaces(c, horizon, viewH, fov) {
+    const cols = 120, rows = 100, { px } = this.surfaces();
+    if (!this.sbuf) { this.sbuf = Object.assign(document.createElement('canvas'), { width: cols, height: rows }); this.sctx = this.sbuf.getContext('2d'); this.simg = this.sctx.createImageData(cols, rows); this.s32 = new Uint32Array(this.simg.data.buffer); }
+    const out = this.s32, k = (H * 0.85) / 2;
+    const dirs = Array.from({ length: cols }, (_, i) => { const a = (i / cols - 0.5) * fov; return [Math.cos(this.pa + a) / Math.cos(a), Math.sin(this.pa + a) / Math.cos(a)]; });
+    out.fill(0);
+    for (let r = 0; r < rows; r++) {
+      const y = (r + 0.5) / rows * viewH, below = y > horizon, dy = Math.abs(y - horizon);
+      if (dy < 1) continue;
+      const d = k / dy, shade = Math.max(0.12, 1 - d / 13);
+      for (let i = 0; i < cols; i++) {
+        const wx = this.px + dirs[i][0] * d, wy = this.py + dirs[i][1] * d, cx = Math.floor(wx), cy = Math.floor(wy);
+        const outdoor = !!this.out[cy]?.[cx];
+        if (!below && outdoor) continue;
+        const tex = below ? (outdoor ? px[2] : px[0]) : px[1];
+        const v = tex[((Math.floor((wy - cy) * 64) & 63) << 6) | (Math.floor((wx - cx) * 64) & 63)];
+        out[r * cols + i] = 0xff000000 | (((v >> 16) & 255) * shade << 16) | (((v >> 8) & 255) * shade << 8) | ((v & 255) * shade);
+      }
+    }
+    this.sctx.putImageData(this.simg, 0, 0);
+    c.imageSmoothingEnabled = false; c.drawImage(this.sbuf, 0, 0, W, viewH); c.imageSmoothingEnabled = true;
   }
   cell(x, y) { const X = Math.floor(x), Y = Math.floor(y); return X < 0 || Y < 0 || X >= this.N || Y >= this.N ? 1 : this.map[Y][X]; }
   blocked(x, y) { return this.cell(x - R, y - R) || this.cell(x + R, y - R) || this.cell(x - R, y + R) || this.cell(x + R, y + R); }
@@ -277,9 +317,7 @@ export class Doom extends Game {
   draw(c) {
     const fov = 1.1, cols = 160, cw = W / cols, horizon = H * 0.46, viewH = H - 34;
     this.drawSky(c, horizon);
-    const floorIn = c.createLinearGradient(0, horizon, 0, viewH); floorIn.addColorStop(0, '#120e0b'); floorIn.addColorStop(1, this.col(5));
-    const floorOut = c.createLinearGradient(0, horizon, 0, viewH); floorOut.addColorStop(0, this.col(2)); floorOut.addColorStop(1, '#1a1410');
-    const ceil = c.createLinearGradient(0, 0, 0, horizon); ceil.addColorStop(0, '#0b0807'); ceil.addColorStop(1, this.pal.bg);
+    this.drawSurfaces(c, horizon, viewH, fov);
     const zbuf = new Float32Array(cols);
     for (let i = 0; i < cols; i++) {
       const ra = this.pa + (i / cols - 0.5) * fov;
@@ -287,9 +325,6 @@ export class Doom extends Game {
       const dist = r.dist * Math.cos(ra - this.pa);
       zbuf[i] = dist;
       const h = Math.min(H * 3, (H * 0.85) / Math.max(0.06, dist)), top = horizon - h / 2, x = i * cw;
-      // indoor columns get a ceiling; columns looking into a courtyard keep the sky
-      if (!r.open) { c.fillStyle = ceil; c.fillRect(x, 0, cw + 0.6, Math.max(0, top)); }
-      c.fillStyle = r.open ? floorOut : floorIn; c.fillRect(x, top + h, cw + 0.6, viewH - top - h);
       c.drawImage(this.tex[r.w % 5], Math.floor(r.hit * 63), 0, 1, 64, x, top, cw + 0.6, h);
       c.fillStyle = `rgba(6,4,3,${Math.min(0.85, (r.side ? 0.22 : 0) + dist / (r.open ? 22 : 14))})`; c.fillRect(x, top, cw + 0.6, h);
     }
