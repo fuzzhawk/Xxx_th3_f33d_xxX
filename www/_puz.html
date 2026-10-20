@@ -1,9 +1,0 @@
-<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="css/style.css"></head><body><canvas id="c" style="width:360px;height:420px"></canvas>
-<script type="module">
-import { loadKenney } from './js/games/assets.js';
-import * as P from './js/games/puzzles.js';
-await loadKenney();
-const q = new URLSearchParams(location.search), s = +(q.get('s')||1), C = P[q.get('g')||'Twenty48'];
-const g = new C(document.getElementById('c'), { id:'t', cat:'game', sub:'x', seed: s*7919+5, title:'t', theme: { proc: true, name: 'Test', hue: s*47%360, seed: s*1000 } });
-window.g = g; g.start();
-</script></body></html>

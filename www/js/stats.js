@@ -22,6 +22,7 @@ function save() { if (dirty) { lsSet('stats', data); dirty = false; } }
 export function interact() { lastInteract = Date.now(); }
 export function onTick(fn) { listeners.push(fn); }
 export const today = () => day();
+export const sessionSec = () => session?.sec || 0;
 
 export function init() {
   ['pointerdown', 'wheel', 'keydown', 'touchmove'].forEach((e) => addEventListener(e, interact, { passive: true }));

@@ -22,6 +22,7 @@ export const DEFAULTS = {
   cacheImages: true,
   skipVideosOffline: true,
   dailyBudgetMin: 0,
+  doomscrollMin: 30,
   grayscaleOverBudget: false,
   repeatWhenDone: false,
   immersive: true,

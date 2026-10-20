@@ -43,6 +43,7 @@ export async function render() {
       toggle('showWikiImages', 'Show Wikipedia thumbnails', 'Needs the network unless images are downloaded'),
       toggle('skipVideosOffline', 'Skip videos while offline')),
     group('Wellbeing', 'Gentle guard rails for the scroll.',
+      number('doomscrollMin', 'Doomscroll warning (minutes)', 'A reminder card after this long of non-stop scrolling. 0 = off.', { max: 240, step: 5 }),
       number('dailyBudgetMin', 'Daily time budget (minutes)', '0 = no budget. The timer turns orange and the feed nudges you when you go over.', { max: 1440, step: 15 }),
       toggle('grayscaleOverBudget', 'Fade to grayscale over budget', 'Makes the feed less shiny once you pass your budget'),
       number('selfcareEveryMin', 'Self-care prompt at least every (minutes)', '0 = only at the normal 5% share', { max: 240, step: 5 }),

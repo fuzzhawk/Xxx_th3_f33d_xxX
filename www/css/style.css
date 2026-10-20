@@ -402,3 +402,12 @@ details.subw[open] summary::after { transform: rotate(90deg); }
 .creator-row b { text-align: center; color: var(--text); font-size: 12px; text-transform: capitalize; }
 .btn.sm { padding: 4px 0; min-width: 0; font-size: 16px; line-height: 1; }
 .creator-status { font-size: 12px; margin-top: 8px; }
+.notice.doom { border: 1px solid var(--orange); background: linear-gradient(160deg, #3a1f12, #1a1310); }
+.doom-icon { font-size: 34px; text-align: center; }
+.doom-veil { position: fixed; inset: 0; z-index: 80; background: rgba(8,6,5,.94); display: grid; place-items: center; padding: 24px; }
+.doom-box { max-width: 420px; text-align: center; }
+.doom-box h2 { font-family: var(--serif); font-size: 30px; margin-bottom: 10px; }
+.doom-box p { color: var(--sand); line-height: 1.5; }
+.doom-count { font: 800 42px var(--mono); color: var(--orange); margin: 18px 0; }
+.doom-box .ball { width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffb35c, #b5532f); animation: doombreath 10s ease-in-out infinite; }
+@keyframes doombreath { 0%, 100% { transform: scale(.6); } 40% { transform: scale(1.15); } }

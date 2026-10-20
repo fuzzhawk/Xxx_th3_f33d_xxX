@@ -104,7 +104,9 @@
     "wheel",
     "hangman",
     "vocab",
-    "ladder"
+    "ladder",
+    "t2048",
+    "arrows"
   ],
   "quoteAuthors": [
     "Robert Anton Wilson",

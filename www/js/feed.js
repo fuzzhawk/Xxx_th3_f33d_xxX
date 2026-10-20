@@ -163,6 +163,9 @@ export class Feed {
     this.trim();
   }
   maybeNudge() {
+    const every = (settings.doomscrollMin ?? 30) * 60, sess = stats.sessionSec();
+    if (every > 0 && sess >= every * ((this.warned || 0) + 1)) { this.warned = Math.floor(sess / every); return doomscrollCard(sess); }
+    if (every > 0 && sess < every) this.warned = 0;
     const budget = settings.dailyBudgetMin * 60;
     if (!budget) return null;
     const used = stats.today().sec;
@@ -202,4 +205,26 @@ export class Feed {
     const isNew = markSeen(this.pkg.manifest.id, post.id);
     stats.view(post, ms, isNew);
   }
+}
+
+// ------------------------------------------------ doomscroll warning
+const BREAKS = ['Stand up and stretch your arms over your head.', 'Look at something at least six metres away for twenty seconds.', 'Drink a glass of water.', 'Step outside and find three different sounds.', 'Text someone you actually like.', 'Put your phone in another room for ten minutes.', 'Do five slow breaths: four in, six out.', 'Wash your face with cold water.', 'Make a cup of tea and drink it without a screen.', 'Write down one thing you want to do today that isn’t this.'];
+function doomscrollCard(sec) {
+  const min = Math.round(sec / 60), tip = BREAKS[Math.floor(Math.random() * BREAKS.length)];
+  const card = el('article.notice.doom',
+    el('div.doom-icon', '⏳'),
+    el('h3', `You’ve been scrolling for ${min} minutes`),
+    el('p', `This is your ${min >= 60 ? 'gentle-but-firm' : 'gentle'} reminder that the feed will still be here later. ${tip}`),
+    el('div.btnrow', { style: { justifyContent: 'center' } },
+      el('button.btn.primary', { onclick: () => takeBreak(tip) }, 'Take a 2-minute break'),
+      el('button.btn', { onclick: () => card.remove() }, 'Keep scrolling')));
+  return card;
+}
+function takeBreak(tip) {
+  let left = 120;
+  const n = el('div.doom-count', '2:00');
+  const veil = el('div.doom-veil', el('div.doom-box', el('h2', 'Break time'), el('p', tip), n, el('div.ball'), el('button.btn', { onclick: () => close() }, 'End break')));
+  const iv = setInterval(() => { left--; n.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`; if (left <= 0) close(); }, 1000);
+  const close = () => { clearInterval(iv); veil.remove(); };
+  document.body.append(veil);
 }
