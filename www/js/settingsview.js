@@ -40,7 +40,6 @@ export async function render() {
       toggle('rememberSound', 'Keep sound on once unmuted', 'Next videos follow your last mute choice'),
       toggle('autopilot', 'Game autopilot', 'Games play themselves until you tap them'),
       toggle('reduceMotion', 'Calmer psychedelic visuals', 'Slows the animations down'),
-      toggle('grit', 'Gritty game filter', 'Film grain, vignette and dust over the games'),
       toggle('showWikiImages', 'Show Wikipedia thumbnails', 'Needs the network unless images are downloaded'),
       toggle('skipVideosOffline', 'Skip videos while offline')),
     group('Wellbeing', 'Gentle guard rails for the scroll.',

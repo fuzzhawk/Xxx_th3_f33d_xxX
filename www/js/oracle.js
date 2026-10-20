@@ -100,8 +100,6 @@ class Oracle {
     else if (s === 'iching') this.drawIChing(c, a);
     else if (s === 'augury') this.drawAugury(c, a);
     else this.drawTarot(c, a);
-    // grime
-    c.fillStyle = 'rgba(0,0,0,.25)'; for (let i = 0; i < 30; i++) c.fillRect((i * 137 + Math.floor(this.t * 9) * 53) % W, (i * 71 + Math.floor(this.t * 9) * 31) % H, 1, 1);
   }
   idle(c) {
     c.fillStyle = this.pal.ink; c.globalAlpha = 0.6 + Math.sin(this.t * 2) * 0.2;

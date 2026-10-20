@@ -38,6 +38,7 @@ function physics(ds, dt) {
 const ringScore = (d) => { const r = Math.hypot(d.x - CX, d.y - CY); return r < RINGS[1] - DR ? 15 : r < RINGS[2] - DR ? 10 : r < RINGS[3] - DR ? 5 : 0; };
 
 export class Crokinole extends Game {
+  static noAuto = true;
   static noMods = ['mirror', 'lowg', 'heavy', 'giant', 'tiny', 'wobble'];
   setup() { this.stats = { foul: [0, 0], shots: [0, 0], pts: [0, 0] }; this.totals = [0, 0]; this.round = 0; this.newRound(); }
   newRound() {
@@ -98,7 +99,7 @@ export class Crokinole extends Game {
   up() { if (!this.drag) return; this.drag = null; if (this.aim?.pow > 40) { const a = this.aim; this.aim = null; this.shoot(0, a.u, a.ang, a.pow); } }
   tap() {}
   step(dt) {
-    if (this.phase === 'aim' && (this.turn === 1 || this.auto)) this.ai(dt);
+    if (this.phase === 'aim' && (this.turn === 1 || (this.auto && this.autoOK))) this.ai(dt);
     if (this.phase === 'roll') {
       physics(this.discs, dt); this.rollT += dt;
       for (const d of this.discs) if (d.out === 'twenty' && !d.counted) { d.counted = true; this.twenties[d.side]++; this.burst(CX, CY, this.col(1), 18, 160); this.msg = { s: '20!', t: 1 }; }

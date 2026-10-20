@@ -7,11 +7,12 @@ const shuffleWith = (rng, a) => { a = [...a]; for (let i = a.length - 1; i > 0; 
 const maskOf = (w) => { let m = 0; for (const ch of w) m |= 1 << (ch.charCodeAt(0) - 97); return m; };
 
 class WordGame extends Game {
-  static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'giant', 'tiny', 'swarm', 'glass', 'trails', 'pixel', 'chaos'];
+  static noAuto = true;
+  static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'giant', 'tiny', 'swarm', 'glass', 'trails', 'chaos'];
   setup() { this.ready = false; this.msg = null; this.thinkT = 1; loadWords().then((d) => { if (d) { this.dict = d; this.newRound(); this.ready = true; } }); }
   pick(list) { return list[Math.floor(this.rng() * list.length)]; }
   flash(s, t = 1.4) { this.msg = { s, t }; }
-  step(dt) { if (this.msg && (this.msg.t -= dt) <= 0) this.msg = null; if (this.ready) this.tick(dt); }
+  step(dt) { if (this.msg && (this.msg.t -= dt) <= 0) this.msg = null; if (this.ready && (this.autoOK || !this.auto)) this.tick(dt); }
   tick() {}
   draw(c) {
     this.clear(c);

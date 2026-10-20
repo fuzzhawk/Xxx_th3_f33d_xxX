@@ -1,6 +1,5 @@
 // Tiny 2D game base: fixed logical resolution, fixed-step physics, autopilot hook.
 import { mulberry32 } from '../util.js';
-import { settings } from '../state.js';
 import { Skin, drawFit, drawRectImg, ready } from './assets.js';
 export { drawFit, drawRectImg, ready };
 
@@ -17,8 +16,6 @@ export const MUTATORS = {
   wobble: { label: 'WOBBLE', w: 0.12 },
   hue: { label: 'ACID', w: 0.6 },
   invert: { label: 'NEGATIVE', w: 0.35 },
-  junk: { label: 'JUNK RAIN', w: 0.5 },
-  pixel: { label: '8-BIT', w: 0.8 },
   party: { label: 'PARTY', w: 0.8 },
   chaos: { label: 'CHAOS', w: 0.4 },
   swarm: { label: 'SWARM', w: 1.2 },
@@ -26,17 +23,6 @@ export const MUTATORS = {
   mono: { label: 'MONO', w: 1 }
 };
 const EXCLUSIVE = [['lowg', 'heavy'], ['fast', 'slow'], ['giant', 'tiny'], ['hue', 'invert', 'mono']];
-
-// film grain, made once and shared
-let grain = null;
-function grainCanvas() {
-  if (grain) return grain;
-  grain = document.createElement('canvas'); grain.width = grain.height = 128;
-  const x = grain.getContext('2d'), d = x.createImageData(128, 128);
-  for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; }
-  x.putImageData(d, 0, 0);
-  return grain;
-}
 
 export const PALETTES = [
   { bg: '#1b1511', bg2: '#2a1f18', ink: '#f1e3cf', c: ['#ff7a1a', '#c9952b', '#7d8a4a', '#b5532f', '#d8c3a5', '#4f7a6f'] },
@@ -59,6 +45,7 @@ export class Game {
     this.pal = PALETTES[(post.seed >>> 3) % PALETTES.length]; // replaced by the theme palette below
     this.W = W; this.H = H;
     this.auto = true;
+    this.autoOK = !this.constructor.noAuto; // some games wait for a tap instead of playing themselves
     this.score = 0;
     this.best = 0;
     this.t = 0;
@@ -75,7 +62,6 @@ export class Game {
     this.bgImg = this.skin.bg || this.skin.slots.tile[0];
     this.bgStyle = this.skin.bg ? 'image' : 'pattern';
     this.wall = this.mods.chaos ? Array.from({ length: 9 }, () => ({ i: this.skin.prop(), x: this.r(0, W), y: this.r(0, H), s: this.r(40, 110), r: this.r(-0.6, 0.6) })) : null;
-    this.junk = [];
     this.setup();
   }
   rollMutators(post) {
@@ -105,8 +91,7 @@ export class Game {
 
   resize() {
     const cw = this.canvas.clientWidth || 360;
-    const dpr = this.mods.pixel ? 0.42 : Math.min(2, window.devicePixelRatio || 1);
-    this.canvas.style.imageRendering = this.mods.pixel ? 'pixelated' : '';
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     this.canvas.style.filter = this.mods.hue ? `hue-rotate(${(this.post.seed % 300) + 30}deg) saturate(1.6)` : this.mods.invert ? 'invert(1) hue-rotate(180deg)' : '';
     this.canvas.width = Math.round(cw * dpr);
     this.canvas.height = Math.round(cw * (H / W) * dpr);
@@ -131,7 +116,7 @@ export class Game {
     this.acc += dt;
     let n = 0;
     while (this.acc >= STEP && n++ < 12) {
-      if (this.auto) this.autopilot(STEP);
+      if (this.auto && this.autoOK) this.autopilot(STEP);
       this.step(STEP);
       this.stepParticles(STEP);
       this.t += STEP;
@@ -143,10 +128,8 @@ export class Game {
     if (this.mods.wobble) { c.translate(W / 2, H / 2); c.rotate(Math.sin(this.t * 1.7) * 0.06); c.scale(1 + Math.sin(this.t * 2.3) * 0.03, 1); c.translate(-W / 2, -H / 2); }
     this.draw(c);
     this.drawParticles(c);
-    if (this.mods.junk) this.drawJunk(c);
     c.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     if (this.mods.mono) { c.globalCompositeOperation = 'color'; c.fillStyle = `hsl(${this.monoHue},45%,50%)`; c.fillRect(0, 0, W, H); c.globalCompositeOperation = 'source-over'; }
-    if (settings.grit !== false) this.grit(c);
     if (this.score > this.best) this.best = this.score;
     this.onHud?.(this.hud());
   }
@@ -181,11 +164,6 @@ export class Game {
   stepParticles(dt) {
     for (const p of this.particles) { p.vy += 300 * this.G * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
     this.particles = this.particles.filter((p) => p.life > 0);
-    if (this.mods.junk) {
-      if (this.rng() < dt * 1.6) this.junk.push({ i: this.skin.prop(), x: this.r(0, W), y: -40, vy: this.r(40, 120), vr: this.r(-2, 2), r: 0, s: this.r(26, 60) });
-      for (const j of this.junk) { j.vy += 120 * this.G * dt; j.y += j.vy * dt; j.r += j.vr * dt; }
-      this.junk = this.junk.filter((j) => j.y < H + 80);
-    }
   }
   drawParticles(c) {
     for (const p of this.particles) {
@@ -195,20 +173,6 @@ export class Game {
     }
     c.globalAlpha = 1;
   }
-  // weathered look: grain, vignette, dust and the odd scratch
-  grit(c) {
-    if (!this.gritPat) { this.gritPat = c.createPattern(grainCanvas(), 'repeat'); this.vig = c.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.75); this.vig.addColorStop(0, 'rgba(0,0,0,0)'); this.vig.addColorStop(1, 'rgba(10,6,3,.55)'); }
-    c.save();
-    c.globalCompositeOperation = 'overlay'; c.globalAlpha = 0.16;
-    c.translate((this.t * 977) % 128, (this.t * 613) % 128); c.fillStyle = this.gritPat; c.fillRect(-128, -128, W + 256, H + 256);
-    c.restore();
-    c.fillStyle = this.vig; c.fillRect(0, 0, W, H);
-    const k = Math.floor(this.t * 12);
-    if (k !== this.dustK) { this.dustK = k; this.dust = Array.from({ length: 6 }, () => [Math.random() * W, Math.random() * H, Math.random() * 2 + 0.5, Math.random() < 0.5]); this.scratch = Math.random() < 0.12 ? Math.random() * W : -1; }
-    for (const [x, y, r, light] of this.dust) { c.fillStyle = light ? 'rgba(255,240,220,.25)' : 'rgba(0,0,0,.35)'; c.fillRect(x, y, r, r); }
-    if (this.scratch > 0) { c.fillStyle = 'rgba(255,240,220,.12)'; c.fillRect(this.scratch, 0, 1, H); }
-  }
-  drawJunk(c) { for (const j of this.junk) { c.globalAlpha = 0.85; drawFit(c, j.i, j.x, j.y, j.s, j.s, j.r); } c.globalAlpha = 1; }
   clear(c) {
     if (this.mods.trails && this.t > 0.5) { c.fillStyle = this.pal.bg; c.globalAlpha = 0.22; c.fillRect(0, 0, W, H); c.globalAlpha = 1; return; }
     const g = c.createLinearGradient(0, 0, 0, H);

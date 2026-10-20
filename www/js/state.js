@@ -25,7 +25,6 @@ export const DEFAULTS = {
   grayscaleOverBudget: false,
   repeatWhenDone: false,
   immersive: true,
-  grit: true,
   showNsfw: true,
   blurNsfw: false,
   repo: 'fuzzhawk/Xxx_th3_f33d_xxX',

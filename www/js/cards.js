@@ -201,7 +201,7 @@ function video(p, ctx) {
 // ------------------------------------------------ games
 function game(p, ctx) {
   const canvas = el('canvas');
-  const mode = el('span.pill.auto', 'AUTO');
+  const mode = el('span.pill.auto', (GAMES[p.sub] || GAMES.plinko).noAuto ? 'READY' : 'AUTO');
   const score = el('span.pill', '0');
   const hud = el('div.hud', mode, score);
   const autobtn = el('button.pillbtn.autobtn', { html: `${icon('replay')}<span>Autopilot</span>` });
@@ -223,7 +223,7 @@ function game(p, ctx) {
   const setPlaying = (on) => {
     ensure().setAuto(!on);
     stage.classList.toggle('playing', on);
-    mode.textContent = on ? 'YOU' : 'AUTO';
+    mode.textContent = on ? 'YOU' : g.autoOK ? 'AUTO' : 'READY';
     mode.className = `pill ${on ? 'live' : 'auto'}`;
     hint.textContent = on ? `${GAME_HINT[p.sub] || ''} · scroll from outside the game` : GAME_HINT[p.sub] || '';
     if (on && !g.running) g.start();
@@ -235,7 +235,7 @@ function game(p, ctx) {
   canvas.addEventListener('pointermove', (e) => { if (!g || g.auto) return; const q = g.local(e); g.move(q.x, q.y, e.pointerId); });
   canvas.addEventListener('pointerup', (e) => { if (!g || g.auto) return; const q = g.local(e); g.pointer.down = false; g.up(q.x, q.y, e.pointerId); });
   canvas.addEventListener('pointercancel', (e) => { if (!g || g.auto) return; const q = g.local(e); g.pointer.down = false; g.up(q.x, q.y, e.pointerId); });
-  autobtn.onclick = (e) => { e.stopPropagation(); setPlaying(false); };
+  autobtn.onclick = (e) => { e.stopPropagation(); ensure().autoOK = true; setPlaying(false); };
   card._activate = () => { ensure(); if (settings.autopilot || !g.auto) g.start(); else { g.resize(); g.frame(performance.now()); } };
   card._deactivate = () => { g?.stop(); };
   card._heavy = true;

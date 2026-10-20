@@ -88,7 +88,7 @@ function search(s, depth, alpha, beta, rng) {
   return best;
 }
 export class Chess extends Game {
-  static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'junk', 'trails', 'swarm', 'glass', 'giant', 'tiny'];
+  static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'trails', 'swarm', 'glass', 'giant', 'tiny'];
   setup() { this.newGame(); this.wins = [0, 0]; }
   newGame() { this.s = { b: START.split(''), ep: -1, castle: 'KQkq', white: true }; this.sel = -1; this.legal = []; this.wait = 0.8; this.plies = 0; this.lastMove = null; this.msg = ''; this.over = 0; }
   think() {
@@ -160,6 +160,7 @@ const sum = (a) => a.reduce((s, x) => s + x, 0);
 const counts = (d) => [0, 1, 2, 3, 4, 5, 6].map((v) => d.filter((x) => x === v).length);
 const maxCount = (d) => Math.max(...counts(d));
 export class Dice extends Game {
+  static noAuto = true;
   static noMods = ['mirror', 'wobble', 'swarm', 'glass', 'trails'];
   setup() { this.best = 0; this.newGame(); }
   newGame() { this.card = CATS.map(() => null); this.round = 0; this.newTurn(); this.total = 0; this.score = 0; }
@@ -283,6 +284,7 @@ function classify(cards) {
   return { name: 'High card', cards: [cards.reduce((a, b) => (b.r > a.r ? b : a))] };
 }
 export class Cards extends Game {
+  static noAuto = true;
   static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'swarm', 'trails'];
   setup() { this.ante = 1; this.jokers = []; this.addJoker(); this.addJoker(); this.newBlind(); }
   addJoker() {
