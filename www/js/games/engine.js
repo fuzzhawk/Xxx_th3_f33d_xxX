@@ -70,7 +70,7 @@ export class Game {
     const keys = Object.keys(MUTATORS).filter((k) => !banned.includes(k));
     const total = keys.reduce((s, k) => s + (MUTATORS[k].w ?? 1), 0);
     const n = post.mods ? 0 : [0, 1, 1, 2, 2, 3][Math.floor(R() * 6)];
-    const picked = new Set(post.mods || []);
+    const picked = new Set((post.mods || []).filter((k) => MUTATORS[k]));
     let guard = 0;
     while (picked.size < n && guard++ < 50) {
       let x = R() * total, k = keys[0];
