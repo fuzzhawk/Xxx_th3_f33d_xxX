@@ -16,7 +16,7 @@ const FALLBACK = [
   ['hiraeth', 'noun', 'homesickness for a home you can’t return to'], ['tittynope', 'noun', 'a small quantity of something left over'], ['cattywampus', 'adjective', 'askew; not lined up']
 ].map(([w, pos, d]) => ({ w, pos, d }));
 
-export function setVocab(list) { vocab = (list || []).filter((v) => v.w && v.d); }
+export function setVocab(list) { vocab = (list || []).filter((v) => v.w && v.d).map((v) => ({ ...v, d: v.d.replace(/\s+([,.;:)])/g, '$1').replace(/\(\s+/g, '(') })); }
 export const getVocab = () => (vocab.length >= 12 ? vocab : FALLBACK);
 
 export const BLOCK = /^(fuck|shit|cunt|cock|dick|piss|twat|wank|slut|whore|nigg|fag|spic|kike|chink|gook|retard|tits|boob|porn|rape|anal|anus|penis|vagin|dildo|bitch|bastard|nazi)/;

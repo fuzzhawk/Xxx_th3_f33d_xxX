@@ -727,7 +727,7 @@ async function buildVocab() {
       const j = await fetchJSON(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(w)}`);
       for (const sense of j.en || []) {
         const d = (sense.definitions || []).map((x) => stripTags(x.definition || '')).find((x) => x.length > 8 && !/^(plural|alternative|obsolete|archaic) (of|form|spelling)/i.test(x) && !/^(misspelling|initialism) of/i.test(x));
-        if (d) { out.push({ w, pos: sense.partOfSpeech?.toLowerCase(), d: clip(d.replace(/\s*\.$/, ''), 160) }); return; }
+        if (d) { out.push({ w, pos: sense.partOfSpeech?.toLowerCase(), d: clip(d.replace(/\s+([,.;:)])/g, '$1').replace(/\(\s+/g, '(').replace(/\s*\.$/, ''), 160) }); return; }
       }
     } catch (e) { warn(`vocab ${w}: ${e.message}`); }
     await sleep(50);
