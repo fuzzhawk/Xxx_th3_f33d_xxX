@@ -36,6 +36,7 @@ shows up for everyone. Other static hosts work too (the root `index.html` hops t
 - **♥ / 🔖 / ▲ / ▼** on every post: favorite, save, more like this, less like this.
   Marks nudge topic weights straight away and steer the next package.
 - **Favorites tab**: favorites, saved posts and marks, filterable by category.
+- **Doomscroll warning**: after 30 minutes of non-stop scrolling a reminder card offers a two-minute break (change or turn off in Settings).
 - **Timer** (top right): tap for usage today and over 7 days, time of day, sessions,
   scroll distance, time per post by category and how much of the package you've seen.
 - **Settings**: feed mix per category, topic weights, playback, a daily time budget,
@@ -51,16 +52,18 @@ kept for archiving and to avoid repeats. Each one is sized for 5 hours a day for
 
 | Category | Share | Source |
 |---|---|---|
-| Games | 20% | 35 game types with autopilot, themed sprite kits and random modifiers, including word games (five-letter guessing, spelling hive, word search, letter wheel, hangman, vocabulary quiz, word ladders) |
-| Condensed Wikipedia | 25% | Wikipedia API: seed articles, categories, "more like" search |
-| Videos | 20% | YouTube search (short videos), checked for embedding |
-| Memes | 10% | Wikimedia Commons images + Wikiquote/Wikipedia captions, Know Your Meme |
-| Made-up products | 5% | Hand-written parts + generated 80s/90s promo art |
-| Psychedelic | 5% | Generative visuals in the app + quotes |
+| Games | 20% | 41 game types (arcade, physics, shooters, RPGs, roguelike, word games, 2048, arrow puzzles…) with autopilot, themed sprite kits and random modifiers; puzzle-type games wait for a tap; the brawler takes bets while it plays itself |
+| Condensed Wikipedia | 23% | Wikipedia API: seed articles, categories, "more like" search |
+| Videos | 18% | YouTube search (short videos), checked for embedding |
+| Memes | 10% | Wikimedia Commons images + Wikiquote/Wikipedia captions, Know Your Meme, surreal four-panel strips |
+| Made-up products | 4% | Hand-written parts + generated 80s/90s promo art |
+| Psychedelic | 4% | Generative visuals in the app + quotes |
 | Self-care | 5% | Hand-written prompts, timers, breathing exercises |
-| From the web | 5% | 19 sites (Lobsters, MetaFilter, Atlas Obscura, Quanta…), Hacker News, webcomics |
-| Oracle | 3% | Dice, I Ching, sacred-chicken augury, haruspicy (sacrifice a generated beast, read its entrails), tarot (old decks scanned on Wikimedia Commons) |
+| From the web | 5% | 20 sites (Lobsters, MetaFilter, Atlas Obscura, Quanta, Everlasting Blort…), Hacker News, webcomics |
+| Long reads | 4% | Excerpts from public-domain novels (Project Gutenberg), whole poems (PoetryDB), long Wikipedia passages; tap to expand |
+| Oracle | 3% | Dice, a single polyhedral die, D&D character generator, I Ching, sacred-chicken augury, haruspicy (sacrifice a generated beast, read its entrails), tarot (old decks scanned on Wikimedia Commons) |
 | Power scale | 2% | Versus cards and tier lists of odd things from history and fiction (Wikipedia) |
+| Studio | 2% | Occult writing prompts and blank pages (✈ downloads a .txt), and a character creator whose hero stars in the games |
 | News | 0% (hidden) | 17 feeds in four groups; tap **News** in the stories row |
 
 **To make a new package**, edit [`packages/request.json`](packages/request.json) (for
