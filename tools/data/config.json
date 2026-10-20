@@ -391,23 +391,29 @@
           "https://www.experimental-history.com/feed"
         ],
         "max": 6
-      }
-    ],
-    "comics": [
+      },
       {
         "name": "Everlasting Blort",
         "urls": [
           "https://blort.meepzorp.com/feed",
+          "https://blort.meepzorp.com/feed/",
           "https://blort.meepzorp.com/rss",
+          "https://blort.meepzorp.com/rss/",
           "https://blort.meepzorp.com/feed.xml",
           "https://blort.meepzorp.com/atom.xml",
           "https://blort.meepzorp.com/rss.xml",
-          "https://blort.meepzorp.com/index.xml"
+          "https://blort.meepzorp.com/index.xml",
+          "https://blort.meepzorp.com/feeds/posts/default?alt=rss",
+          "https://blort.meepzorp.com/?feed=rss2",
+          "https://blort.meepzorp.com/blog/feed",
+          "https://blort.meepzorp.com/blog/rss.xml"
         ],
-        "max": 15,
         "home": "https://blort.meepzorp.com/",
-        "scrape": true
-      },
+        "scrape": "blog",
+        "max": 12
+      }
+    ],
+    "comics": [
       {
         "name": "SMBC",
         "urls": [

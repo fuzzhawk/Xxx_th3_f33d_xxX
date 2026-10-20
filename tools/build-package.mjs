@@ -418,6 +418,7 @@ async function readFeed(f) {
     if (r) { log(`feed ${f.name}: discovered ${href}`); return r; }
   }
   if (!f.scrape) return null;
+  if (f.scrape === 'blog') return scrapeBlog(f, home, html);
   const items = [];
   let url = home, page = html;
   for (let k = 0; k < (f.max || 10) && page; k++) {
@@ -435,6 +436,35 @@ async function readFeed(f) {
   }
   if (items.length) log(`feed ${f.name}: scraped ${items.length} pages`);
   else report.sources[`${f.name} home`] = { bytes: html.length, links: [...html.matchAll(/<(?:link|a)[^>]+href=["']([^"']+)["']/gi)].map((m) => m[1]).slice(0, 30), imgs: [...html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map((m) => m[1]).slice(0, 15) };
+  return items.length ? { title: f.name, items } : null;
+}
+// A blog without a feed: follow post-looking links on the home page and read each
+// post's Open Graph tags.
+async function scrapeBlog(f, home, html) {
+  const host = new URL(home).host, links = [];
+  const blocks = [...html.matchAll(/<(article|h1|h2|h3)[^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => m[2]);
+  for (const b of [...blocks, html]) for (const m of b.matchAll(/<a[^>]+href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    let u; try { u = new URL(decodeEntities(m[1]), home); } catch { continue; }
+    const text = stripTags(m[2]).trim();
+    if (u.host !== host || u.pathname.length < 3 || /\/(tag|tags|category|categories|page|author|about|contact|search|feed|wp-|login|archive)s?\b/i.test(u.pathname) || /\.(png|jpe?g|gif|css|js|xml)$/i.test(u.pathname) || text.length < 4) continue;
+    const href = u.href.replace(/\/$/, '');
+    if (!links.some((l) => l.href === href)) links.push({ href, text });
+    if (links.length >= (f.max || 10) * 2) break;
+  }
+  const items = [];
+  for (const l of links) {
+    if (items.length >= (f.max || 10)) break;
+    const page = await ogMeta(l.href);
+    if (!page.html) continue;
+    const title = (page.html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) || page.html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1];
+    const date = (page.html.match(/<meta[^>]+property=["']article:published_time["'][^>]+content=["']([^"']+)["']/i) || page.html.match(/<time[^>]+datetime=["']([^"']+)["']/i) || [])[1];
+    const body = (page.html.match(/<(?:article|main)[^>]*>([\s\S]*?)<\/(?:article|main)>/i) || [])[1] || '';
+    const text = page.desc || clip(stripTags(body), 400);
+    if (!text && !page.image) continue;
+    items.push({ title: decodeEntities(stripTags(title || l.text)).trim(), link: l.href, html: `${page.image ? `<img src="${page.image}">` : ''}<p>${text || ''}</p>`, date: date || null });
+  }
+  if (items.length) log(`feed ${f.name}: scraped ${items.length} posts`);
+  else report.sources[`${f.name} home`] = { bytes: html.length, links: [...html.matchAll(/<a[^>]+href=["']([^"']+)["']/gi)].map((m) => m[1]).slice(0, 40) };
   return items.length ? { title: f.name, items } : null;
 }
 function firstImg(html, base) {
