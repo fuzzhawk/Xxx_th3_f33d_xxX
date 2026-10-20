@@ -135,8 +135,8 @@ export class Hack extends Game {
   }
   spawnMob(kind, x, y, rank, pack) {
     const K = this.kinds[kind], d = this.depth, mul = rank === 'boss' ? 12 : rank ? 3.5 : 1;
-    const hp = (6 + d * 5 + d * d * 0.5) * K.hp * mul;
-    const mb = { x, y, K, hp, max: hp, dmg: (1.6 + d * 1.7) * K.dmg * (rank === 'boss' ? 2 : rank ? 1.4 : 1), sp: K.sp * (rank === 'boss' ? 0.9 : 1), r: K.sz * 0.3 * (rank === 'boss' ? 1.6 : rank ? 1.25 : 1),
+    const hp = (6 + d * 6 + d * d * 0.6) * K.hp * mul;
+    const mb = { x, y, K, hp, max: hp, dmg: (2 + d * 1.9 + d * d * 0.06) * K.dmg * (rank === 'boss' ? 2 : rank ? 1.4 : 1), sp: K.sp * (rank === 'boss' ? 0.9 : 1), r: K.sz * 0.3 * (rank === 'boss' ? 1.6 : rank ? 1.25 : 1),
       rank, pack, cd: 0, ph: this.r(0, 7), flash: 0, aggro: false, lost: 0, xp: (3 + d * 2.2) * mul * K.hp, name: K.name, art: K.art };
     if (rank === 'champ') {
       mb.name = `${this.pick(CH[0])}${this.pick(CH[1])} ${this.pick(CH[2])}`; mb.mod = this.pick(CMOD);
@@ -232,7 +232,7 @@ export class Hack extends Game {
     const ni = m.rank === 'boss' ? 3 : m.rank ? 2 : this.rng() < 0.13 ? 1 : 0;
     for (let k = 0; k < ni; k++) drop({ it: this.makeItem(d + (m.rank ? 1 : 0), m.rank === 'boss' ? 2 : m.rank ? 1 : 0, m.rank === 'boss') });
     if (this.rng() < (m.rank ? 1 : 0.42)) drop({ gold: Math.round(this.r(2, 6) * (d + 1) * (m.rank ? 4 : 1)) });
-    if (this.rng() < (m.rank ? 0.9 : 0.13)) drop({ pot: this.rng() < 0.68 ? 'hp' : 'mp' });
+    if (this.rng() < (m.rank ? 0.9 : 0.09)) drop({ pot: this.rng() < 0.68 ? 'hp' : 'mp' });
     if (h.tgt === m) h.tgt = null;
   }
   cast(tx, ty) {

@@ -52,7 +52,7 @@ kept for archiving and to avoid repeats. Each one is sized for 5 hours a day for
 
 | Category | Share | Source |
 |---|---|---|
-| Games | 20% | 41 game types (arcade, physics, shooters, RPGs, roguelike, word games, 2048, arrow puzzles…) with autopilot, themed sprite kits and random modifiers; puzzle-type games wait for a tap; the brawler takes bets while it plays itself |
+| Games | 20% | 39 game types (arcade, physics, shooters, RPGs, roguelike, word games, 2048, arrow puzzles…) with autopilot, themed sprite kits and random modifiers; puzzle-type games wait for a tap; the brawler takes bets while it plays itself |
 | Condensed Wikipedia | 23% | Wikipedia API: seed articles, categories, "more like" search |
 | Videos | 18% | YouTube search (short videos), checked for embedding |
 | Memes | 10% | Wikimedia Commons images + Wikiquote/Wikipedia captions, Know Your Meme, surreal four-panel strips |
