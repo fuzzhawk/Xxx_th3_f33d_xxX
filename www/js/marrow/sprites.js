@@ -4,7 +4,7 @@
 // character is only ever built once.
 import { idbGet, idbSet } from '../store.js';
 
-const VER = 'm3';
+const VER = 'm4';
 let worker = null, nextId = 1;
 const pending = new Map(), queue = [];
 let busy = false;
@@ -69,7 +69,7 @@ export function marrowSheet(seed, opts = {}, placeholder = null) {
   const t = { walk: walkCycle, turn: one('idle'), jump: one('jump'), punch: one('punch'), kick: one('kick'), hadouken: one('special'), block: one('block'), hurt: one('hurt') };
   const ko = mk(ph.hurt || ph.idle);
   const sheet = { idle: t.turn[0], walk: [walkCycle[1], walkCycle[5]], walk1: walkCycle[1], walk2: walkCycle[5], walkCycle, jump: t.jump[0], punch: t.punch[0], kick: t.kick[0], special: t.hadouken[0], block: t.block[0], hurt: t.hurt[0], ko, outfit: 'marrow' };
-  sheet.ready = fill(key, { seed, look, monsters: opts.monsters, W: W0, H: H0, anims: PICK, grit: g, shadow: false, anchorX: 0.5, scale: SCALE0 }, t).then((r) => {
+  sheet.ready = fill(key, { seed, look, monsters: opts.monsters, W: W0, H: H0, anims: PICK, grit: g, face: true, shadow: false, anchorX: 0.5, scale: SCALE0 }, t).then((r) => {
     if (r) { sheet.outfit = r.outfit; const x = ko.getContext('2d'); x.clearRect(0, 0, W0, H0); x.save(); x.translate(W0 / 2, H0 - 3); x.rotate(-Math.PI / 2); x.scale(0.75, 0.75); x.drawImage(t.hurt[0], -12, -24); x.restore(); }
     return sheet;
   });

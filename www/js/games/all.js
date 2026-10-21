@@ -3,7 +3,8 @@ import { Doom } from './doom.js';
 import { Sling } from './sling.js';
 import { Necro } from './necro.js';
 import { Chess, Dice, Cards } from './board.js';
-import { Monsters, Fighter } from './battle.js';
+import { Monsters } from './battle.js';
+import { Fighter } from './brawl.js';
 import { Flight } from './flight.js';
 import { Ski } from './ski.js';
 import { Robotron } from './robotron.js';
@@ -718,7 +719,7 @@ export const GAME_HINT = {
   platformer: 'tap to jump, twice to double-jump, stomp enemies', racer: 'hold left or right to steer', raycast: 'drag sideways to turn, up/down to walk, tap to fire, tap the HUD to switch weapons',
   rocks: 'tap to shoot, hold to thrust toward your finger', sling: 'drag down and release to fire upward',
   necro: 'summon skulls, drag matching undead together to merge', chess: 'tap a white piece, then its destination', dice: 'roll, tap dice to hold, tap a row to score',
-  cards: 'tap up to five cards, then play or discard', monsters: 'tap a move', fighter: 'buttons: ◀ ▶ jump, punch, kick, special · hold away to block',
+  cards: 'tap up to five cards, then play or discard', monsters: 'tap a move', fighter: '◀ ▶ walk (hold away to block) · ▲ jump · ▼ crouch for sweeps and uppercuts · P K S attack · land hits to chain combos, fill the meter for an ULTRA · on autopilot, bet on the fight',
   starfox: 'hold and drag to steer, lasers fire while you hold · fly through rings',
   ski: 'tap to jump, hold in the air to backflip, land along the slope',
   robotron: 'left thumb moves, right thumb shoots (one thumb auto-aims) · rescue the humans',

@@ -104,7 +104,7 @@ export class Game {
     this.last = performance.now();
     const loop = (now) => {
       if (!this.running) return;
-      this.frame(now);
+      try { this.frame(now); } catch (e) { if (!this.warned) { this.warned = true; console.error(e); } }
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
