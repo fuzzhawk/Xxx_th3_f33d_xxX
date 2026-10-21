@@ -3,6 +3,7 @@
 // side-view turn-based battles with spells, potions and level ups.
 import { Game, W, H, drawFit, ready, roundRect, noiseMap } from './engine.js';
 import { monster, creatureName } from './creature.js';
+import { crystalSheet, Actor, S } from '../crystal/sprites.js';
 
 const T = 20, N = 64, DN = 36;
 const GRASS = 0, FOREST = 1, HILL = 2, MOUNT = 3, WATER = 4, ROAD = 5, TOWN = 6, CAVE = 7, SAND = 8;
@@ -20,16 +21,27 @@ const SPELLS = {
 const GEAR = ['Bronze', 'Iron', 'Steel', 'Silver', 'Mithril', 'Rune', 'Dragon', 'Star', 'Void'];
 const DNAME = ['Cave', 'Crypt', 'Tower', 'Ruins', 'Mines', 'Temple', 'Lair', 'Vault'];
 const need = (lv) => Math.round(12 * lv ** 1.7);
+// Crystal Sprite party: the classes wear the matching FF jobs, in four directions
+const DIR4 = ['S', 'W', 'N', 'E'], CJOB = { Knight: 'Knight', Mage: 'Black Mage', Cleric: 'White Mage' };
+const LUNGE = -42, BSC = 2; // battle step-forward distance and sprite scale
 
 export class Jrpg extends Game {
   static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'giant', 'tiny', 'trails'];
   setup() {
     const s = this.post.seed || 1;
-    this.party = CLASSES.map((cl, k) => ({ hero: true, k, cl, job: cl.job, name: creatureName(s * 3 + k * 71).slice(0, 7), lv: 1, xp: 0, max: cl.hp, hp: cl.hp, mmp: cl.mp, mp: cl.mp, atk: cl.atk, def: cl.def, mag: cl.mag, spd: cl.spd, art: this.skin.people[k] }));
+    this.party = CLASSES.map((cl, k) => ({ hero: true, k, cl, job: cl.job, name: creatureName(s * 3 + k * 71).slice(0, 7), lv: 1, xp: 0, max: cl.hp, hp: cl.hp, mmp: cl.mp, mp: cl.mp, atk: cl.atk, def: cl.def, mag: cl.mag, spd: cl.spd, bo: 0, actor: new Actor(this.partySheet(k, s), { mode: 'four', dir: 'S', walkSpeed: 4, runSpeed: 160, walkStride: 12, runStride: 16 }) }));
     this.gold = 40; this.potions = 3; this.wpn = 0; this.arm = 0; this.world = 0; this.cleared = 0; this.dCount = 0;
     this.pops = []; this.patMemo = new Map(); this.route = []; this.think = 0; this.grace = 6; this.mode = 'world';
     this.newWorld();
   }
+  partySheet(k, s) {
+    if (k === 0 && this.skin.heroName) return this.skin.crystal(0, 'Fantasy', DIR4);
+    const o = S.options, v = ((s >>> 0) % 12) + 1, job = CJOB[CLASSES[k].job];
+    const char = S.setCharacter({ job, hairColor: o.hairColor[(v * 3 + k * 5) % o.hairColor.length], ...(job === 'Black Mage' ? {} : { skin: o.skin[(v + k * 2) % o.skin.length] }) }, v * 7 + k);
+    return crystalSheet(v * 7 + k, { char, dirs: DIR4 });
+  }
+  // emote for the whole living party (or just the leader)
+  emoteParty(name, secs, lead = false) { for (const h of lead ? [this.party[0]] : this.party) if (h.hp > 0) h.actor.emote(name, secs); }
   // ---------------------------------------------------------------- world generation
   newWorld() {
     const R = () => this.rng();
@@ -109,6 +121,7 @@ export class Jrpg extends Game {
   enterDungeon(d) {
     this.dg = { d, floor: 0 }; this.mode = 'dungeon'; this.genFloor();
     this.say = { who: d.name, s: `Recommended Lv ${d.lv}. ${d.floors} floors deep. Something stirs below…`, t: this.auto ? 1.4 : 2.5 };
+    this.emoteParty('think', this.say.t);
   }
   genFloor() {
     const g = this.dg, d = g.d, map = new Uint8Array(DN * DN), rooms = [];
@@ -157,12 +170,15 @@ export class Jrpg extends Game {
     else { this.arm++; s = `${GEAR[Math.min(8, this.arm)]} Mail! The party's defence rises.`; }
     this.say = { who: 'Treasure chest', s: `Found ${s}`, t: this.auto ? 1.1 : 2, chest: true };
     this.score += 20; this.burst(W / 2, H / 2 - 20, this.col(1), 18, 140);
+    this.emoteParty(r < 0.8 ? 'cheer' : 'love', this.say.t, true); for (const h of this.party.slice(1)) h.actor.emote('surprise', 0.7);
   }
   clearDungeon(d) {
     d.done = true; this.cleared++; this.score += 300 * d.lv; this.mode = 'world'; this.dg = null; this.place(d.x, d.y);
     const all = this.dungeons.every((x) => x.done);
     this.say = { who: d.name, s: all ? 'The last seal is broken! The party sails on to a new land…' : 'The dungeon is cleared! Its evil fades from the land.', t: this.auto ? 2 : 3, then: all ? () => { this.world++; this.newWorld(); } : null };
     this.burst(W / 2, H / 2, this.col(0), 40, 220);
+    for (const h of this.party) h.actor.face('S');
+    this.emoteParty('cheer', this.say.t);
   }
   // ---------------------------------------------------------------- towns
   visitTown(tw) {
@@ -175,6 +191,8 @@ export class Jrpg extends Game {
     let n = 0; while (this.potions < 6 && this.gold >= 12) { this.gold -= 12; this.potions++; n++; }
     if (n) lines.push(`Bought ${n} Potion${n > 1 ? 's' : ''}.`);
     this.say = { who: tw.name, s: lines.join(' '), t: this.auto ? 1.6 : 3 };
+    for (const h of this.party) { if (h.actor.isKO) h.actor.revive(); h.actor.face('S'); }
+    this.party.forEach((h, k) => h.actor.emote(k ? (lines.length > 1 && k === 1 ? 'think' : 'nod') : 'wave', this.say.t));
   }
   // ---------------------------------------------------------------- battles
   encounter(boss = false) {
@@ -190,6 +208,8 @@ export class Jrpg extends Game {
     }
     this.bt = { foes, boss, from: this.mode, order: [], actor: null, phase: 'intro', wait: 0.9, msg: boss ? `${foes[0].name} blocks the way!` : `${n > 1 ? `${n} monsters` : `A ${foes[0].name}`} attack${n > 1 ? '' : 's'}!`, menu: 'main', anim: null, shake: null, msgs: [], round: 0 };
     this.mode = 'battle'; this.grace = 5;
+    // the party lines up facing the monsters (west) and starts at the sight of them
+    for (const h of this.party) { h.bo = 0; h.castT = 0; if (h.hp > 0 && h.actor.isKO) h.actor.revive(); h.actor.stopCast(); h.actor.face('W'); if (h.hp > 0) h.actor.emote('surprise', 0.9); }
   }
   foeArt(sp, lv, boss) { return monster(sp, this.skin.hue + 150 + (sp % 5) * 40, boss ? 28 : 16 + (sp % 3) * 3, Math.min(4, lv >> 2), { tex: this.skin.texFor?.(sp % 9), head: !boss && sp % 3 === 0 ? this.skin.slots.enemy[sp % Math.max(1, this.skin.slots.enemy.length)] : null }); }
   heroPos(k) { return [292 + k * 12, 132 + k * 58]; }
@@ -234,19 +254,28 @@ export class Jrpg extends Game {
     const [x, y] = this.posOf(t);
     this.pops.push({ x: x + this.r(-8, 8), y: y - 20, s: `${n}`, col: col || '#fff', life: 1 });
     this.bt.shake = { u: t, t: 0.3 };
+    if (t.hero) { if (t.hp <= 0) t.actor.ko(); else t.actor.hurt(); }
     if (t.hp <= 0) { this.burst(x, y, t.hero ? this.col(3) : this.col(0), 14, 150); if (t.hero) this.bt.order = this.bt.order.filter((u) => u !== t); }
   }
   heal(t, n) { t.hp = Math.min(t.max, t.hp + n); const [x, y] = this.posOf(t); this.pops.push({ x, y: y - 20, s: `+${n}`, col: '#7dffa8', life: 1 }); }
   act(a, ch) {
+    const b = this.bt;
+    b.phase = 'act'; b.wait = this.auto ? 0.75 : 0.9; b.actor = a.hero ? a : null; b.hl = a.hero ? { atk: 0, spell: 1, item: 2, run: 3 }[ch.k] : -1;
+    if (!a.hero) b.anim = { u: a, t: 0.5, k: ch.k };
+    // heroes step forward, swing / cast / throw, and the effect lands on the animation's event (see heroSeq)
+    if (a.hero && ch.k !== 'run') { b.seq = { h: a, ch, st: 'adv', t: 0 }; b.msg = ch.k === 'atk' ? `${a.name} attacks!` : ch.k === 'spell' ? `${a.name} begins to cast ${ch.s}…` : `${a.name} throws a Potion!`; return; }
+    this.resolve(a, ch);
+  }
+  resolve(a, ch) {
     const b = this.bt, foesA = this.alive(b.foes), herosA = this.alive(this.party);
     const enemies = a.hero ? foesA : herosA;
-    b.anim = { u: a, t: 0.5, k: ch.k }; b.phase = 'act'; b.wait = this.auto ? 0.75 : 0.9; b.actor = a.hero ? a : null; b.hl = a.hero ? { atk: 0, spell: 1, item: 2, run: 3 }[ch.k] : -1;
     if (ch.k === 'atk') {
       const t = ch.t && ch.t.hp > 0 ? ch.t : enemies[this.ri(0, enemies.length - 1)];
       const [n, crit] = this.phys(a, t);
       b.msg = `${a.name} attacks ${t.name}${crit ? ' — critical!' : '!'}`; this.hurt(t, n, crit ? '#ffd23a' : '#fff');
     } else if (ch.k === 'spell') {
       const sp = SPELLS[ch.s]; a.mp -= sp.mp; b.msg = `${a.name} casts ${ch.s}!`;
+      if (a.hero) { const [x, y] = this.heroPos(a.k); this.burst(x + a.bo - 14, y - 6, sp.col, 10, 70); }
       if (sp.heal) {
         for (const t of sp.all ? herosA : [ch.t && ch.t.hp > 0 ? ch.t : this.lowest(herosA)]) { this.heal(t, Math.round(a.mag * sp.pow * 1.6 + 8)); const [x, y] = this.posOf(t); this.burst(x, y, sp.col, 10, 90); }
       } else {
@@ -258,7 +287,7 @@ export class Jrpg extends Game {
     } else if (ch.k === 'run') {
       if (b.boss) b.msg = 'There is no escape!';
       else if (this.rng() < 0.65) { b.msg = 'The party got away!'; b.phase = 'fled'; b.wait = 0.8; }
-      else b.msg = 'Couldn\'t escape!';
+      else { b.msg = 'Couldn\'t escape!'; a.actor.emote('sad', 0.6); }
     } else if (ch.k === 'breath') {
       b.msg = `${a.name} unleashes Dark Flame!`;
       for (const t of herosA) { this.hurt(t, Math.max(1, Math.round(a.mag * 1.15 * this.r(0.85, 1.1) - this.defOf(t) * 0.3)), '#c070ff'); const [x, y] = this.posOf(t); this.burst(x, y, '#9a5aff', 8, 100); }
@@ -302,6 +331,7 @@ export class Jrpg extends Game {
       }
     }
     b.phase = 'end'; b.wait = this.auto ? 1.1 : 1.6; b.msg = b.msgs.shift(); b.won = true;
+    this.emoteParty('cheer', 6);
   }
   loseBattle() {
     const b = this.bt;
@@ -311,10 +341,13 @@ export class Jrpg extends Game {
   endBattle() {
     const b = this.bt;
     this.mode = b.from; this.bt = null;
+    // back to the field: stop the victory cheer, get the fallen up
+    for (const h of this.party) { h.bo = 0; h.actor.stopCast(); h.actor.revive(); h.actor.face('S'); }
     if (b.phase === 'fled') return;
     if (!b.won) {
       this.gold = Math.floor(this.gold / 2); for (const h of this.party) { h.hp = h.max; h.mp = h.mmp; }
-      this.mode = 'world'; this.dg = null; this.place(this.lastTown.x, this.lastTown.y); this.grace = 8; return;
+      this.mode = 'world'; this.dg = null; this.place(this.lastTown.x, this.lastTown.y); this.grace = 8;
+      this.emoteParty('sad', 1.4); this.think = 1.4; return;
     }
     for (const h of this.party) if (h.hp <= 0) h.hp = 1;
     if (b.boss) this.clearDungeon(this.dg.d);
@@ -324,6 +357,7 @@ export class Jrpg extends Game {
     if (b.anim && (b.anim.t -= dt) <= 0) b.anim = null;
     if (b.shake && (b.shake.t -= dt) <= 0) b.shake = null;
     for (const f of b.foes) if (f.hp <= 0) f.dead += dt;
+    if (b.seq) return; // a hero is mid-action
     if (b.phase === 'cmd') { if (b.pick) { const p = b.pick; b.pick = null; this.act(b.actor, p); } return; }
     if ((b.wait -= dt) > 0) return;
     if (b.phase === 'end') { if (b.msgs.length) { b.msg = b.msgs.shift(); b.wait = this.auto ? 1 : 1.5; } else this.endBattle(); return; }
@@ -366,7 +400,54 @@ export class Jrpg extends Game {
     if (this.grace <= 0 && this.rng() < 0.04) this.encounter();
   }
   moving() { const L = this.walkers[0]; return this.arrive || Math.abs(L.x - L.fx) + Math.abs(L.y - L.fy) > 0.001; }
+  // ---------------------------------------------------------------- sprites
+  animate(dt) {
+    for (const h of this.party) {
+      if (h.hp > 0 && h.actor.isKO) h.actor.revive();
+      if (h.castT > 0 && (h.castT -= dt) <= 0) h.actor.stopCast();
+    }
+    if (this.mode === 'battle' && this.bt) return this.animBattle(dt);
+    const sp = (this.mode === 'world' ? 6 : 5) * T;
+    this.party.forEach((h, k) => {
+      const w = this.walkers[k], dx = w.x - w.fx, dy = w.y - w.fy;
+      let vx = 0, vy = 0;
+      if (Math.abs(dx) + Math.abs(dy) > 0.001) { w.vx = vx = Math.abs(dx) > 0.001 ? Math.sign(dx) * sp : 0; w.vy = vy = Math.abs(dy) > 0.001 ? Math.sign(dy) * sp : 0; w.vt = 0.1; }
+      else if ((w.vt = (w.vt || 0) - dt) > 0) { vx = w.vx; vy = w.vy; } // bridge the one-frame pause between tiles
+      h.actor.update(dt, { vx, vy, lowHealth: h.hp > 0 && h.hp < h.max * 0.25 });
+    });
+  }
+  animBattle(dt) {
+    const b = this.bt, q = b.seq;
+    for (const h of this.party) {
+      let tgt = 0, spd = 220;
+      if (b.phase === 'fled') tgt = 300;
+      else if (q?.h === h) tgt = q.st === 'back' ? 0 : LUNGE;
+      else if (b.actor === h && b.phase === 'cmd') { tgt = -14; spd = 90; }
+      if (h.hp <= 0 || h.actor.locked) tgt = h.bo;
+      const d = tgt - h.bo, m = Math.sign(d) * Math.min(Math.abs(d), spd * dt);
+      h.bo += m;
+      const ev = h.actor.update(dt, { vx: dt > 0 ? m / dt : 0, vy: 0, lowHealth: h.hp > 0 && h.hp < h.max * 0.25 });
+      if (!m && b.phase !== 'fled' && h.hp > 0 && !h.actor.locked && h.actor.dir !== 'W') h.actor.face('W');
+      if (q?.h === h) this.heroSeq(q, ev, dt);
+    }
+  }
+  // a hero's turn: run up, attack / cast / throw, effect on hit / cast / fire, run back
+  heroSeq(q, ev, dt) {
+    const h = q.h, k = q.ch.k, A = h.actor;
+    q.t += dt;
+    if (q.st === 'adv') {
+      if (Math.abs(h.bo - LUNGE) < 0.5 || q.t > 1.5) { q.st = 'act'; q.t = 0; if (k === 'atk') A.attack(); else if (k === 'spell') A.cast(); else A.shoot(); }
+    } else if (q.st === 'act') {
+      if (!q.done && (ev.some((e) => e === 'hit' || e === 'cast' || e === 'fire') || q.t > 1.2)) { q.done = true; q.dt = 0; this.resolve(h, q.ch); }
+      if (q.done) {
+        q.dt += dt;
+        if (k === 'spell' && q.dt > 0.45) A.stopCast();
+        if ((q.dt > 0.2 && !A.a.action) || q.t > 2.5) { A.stopCast(); q.st = 'back'; }
+      }
+    } else if (Math.abs(h.bo) < 0.5) { this.bt.seq = null; this.bt.wait = this.auto ? 0.3 : 0.45; A.face('W'); }
+  }
   step(dt) {
+    this.animate(dt);
     for (const p of this.pops) { p.y -= 28 * dt; p.life -= dt; }
     this.pops = this.pops.filter((p) => p.life > 0);
     if (this.label && (this.label.t -= dt) <= 0) this.label = null;
@@ -418,8 +499,8 @@ export class Jrpg extends Game {
     const al = this.alive(this.party), low = this.lowest(al), cl = this.party[2];
     if (low.hp >= low.max * 0.6) return false;
     const [x, y] = [W / 2, H / 2];
-    if (cl.hp > 0 && cl.mp >= SPELLS.Cure.mp) { cl.mp -= SPELLS.Cure.mp; const n = Math.round(cl.mag * SPELLS.Cure.pow * 1.6 + 8); low.hp = Math.min(low.max, low.hp + n); this.pops.push({ x, y: y - 30, s: `${low.name} +${n}`, col: '#7dffa8', life: 1 }); this.burst(x, y, '#7dffa8', 10, 80); return true; }
-    if (low.hp < low.max * 0.3 && this.potions > 0) { this.potions--; const n = Math.round(low.max * 0.45 + 20); low.hp = Math.min(low.max, low.hp + n); this.pops.push({ x, y: y - 30, s: `Potion +${n}`, col: '#7dffa8', life: 1 }); return true; }
+    if (cl.hp > 0 && cl.mp >= SPELLS.Cure.mp) { cl.mp -= SPELLS.Cure.mp; cl.actor.cast(); cl.castT = 0.6; this.think = 0.5; const n = Math.round(cl.mag * SPELLS.Cure.pow * 1.6 + 8); low.hp = Math.min(low.max, low.hp + n); this.pops.push({ x, y: y - 30, s: `${low.name} +${n}`, col: '#7dffa8', life: 1 }); this.burst(x, y, '#7dffa8', 10, 80); return true; }
+    if (low.hp < low.max * 0.3 && this.potions > 0) { this.potions--; low.actor.emote('love', 0.6); this.think = 0.5; const n = Math.round(low.max * 0.45 + 20); low.hp = Math.min(low.max, low.hp + n); this.pops.push({ x, y: y - 30, s: `Potion +${n}`, col: '#7dffa8', life: 1 }); return true; }
     return false;
   }
   // ---------------------------------------------------------------- input
@@ -476,10 +557,9 @@ export class Jrpg extends Game {
     return [`hsl(${95 + hs},30%,30%)`, `hsl(${125 + hs},32%,19%)`, `hsl(${70 + hs},26%,36%)`, 'hsl(28,12%,38%)', 'hsl(205,42%,24%)', 'hsl(34,30%,40%)', `hsl(${95 + hs},30%,30%)`, `hsl(${70 + hs},26%,36%)`, 'hsl(42,36%,52%)'][t];
   }
   hash(x, y) { let h = (x * 374761393 + y * 668265263 + this.world * 1013) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
-  person(c, w, k, x, y, s = 1) {
-    const a = this.party[k].art, mv = Math.abs(w.x - w.fx) + Math.abs(w.y - w.fy) > 0.001;
-    c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x, y + 12 * s, 7 * s, 2.5 * s, 0, 0, 7); c.fill();
-    drawFit(c, mv ? a.walk[Math.floor((w.walk || 0) * 8) % 2] : a.idle, x, y, 22 * s, 30 * s, 0, w.face < 0);
+  person(c, w, k, x, y) {
+    c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(x, y + 12, 7, 2.5, 0, 0, 7); c.fill();
+    this.party[k].actor.draw(c, x, y + 12, 1);
   }
   draw(c) {
     if (this.mode === 'battle') this.drawBattle(c); else this.drawMap(c);
@@ -620,14 +700,9 @@ export class Jrpg extends Game {
     }
     // heroes
     for (const h of this.party) {
-      const [x, y] = this.heroPos(h.k);
-      let dx = b.actor === h && b.phase === 'cmd' ? -18 : 0, fr = h.art.idle;
-      if (b.anim?.u === h) { dx = -18 - Math.sin((0.5 - b.anim.t) / 0.5 * Math.PI) * (b.anim.k === 'atk' ? 30 : 6); fr = b.anim.k === 'atk' ? h.art.punch : h.art.special; }
-      if (b.shake?.u === h) { dx += Math.sin(this.t * 80) * 3; fr = h.art.hurt; }
-      if (h.hp > 0 && h.hp < h.max * 0.25 && !b.anim) fr = h.art.block;
-      c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x + dx, y + 22, 12, 3.5, 0, 0, 7); c.fill();
-      if (h.hp <= 0) { c.globalAlpha = 0.55; drawFit(c, h.art.hurt, x + 6, y + 14, 36, 48, -Math.PI / 2); c.globalAlpha = 1; }
-      else drawFit(c, fr, x + dx, y, 36, 48, 0, true);
+      const [x, y] = this.heroPos(h.k), dx = h.bo;
+      c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x + dx, y + 22, 13, 3.5, 0, 0, 7); c.fill();
+      h.actor.draw(c, x + dx, y + 22, BSC, { alpha: h.hp <= 0 ? 0.8 : 1 });
     }
     // message
     c.fillStyle = 'rgba(8,6,4,.78)'; c.fillRect(0, 58, W, 24);
