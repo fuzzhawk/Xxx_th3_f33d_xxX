@@ -2,6 +2,7 @@
 // characters with full animation sheets, items and wall textures. Everything is
 // seeded, so the same post always produces the same cast.
 import { mulberry32 } from '../util.js';
+import { marrowSheet } from '../marrow/sprites.js';
 
 const cache = new Map();
 const memo = (key, fn) => { if (!cache.has(key)) { cache.set(key, fn()); if (cache.size > 400) cache.delete(cache.keys().next().value); } return cache.get(key); };
@@ -138,7 +139,8 @@ const POSES = {
 const OUTFITS = ['shirt', 'robe', 'armor', 'coat', 'dress', 'rags'];
 // Returns { idle, walk: [a, b], jump, punch, kick, special, block, hurt } canvases (facing right, 24×32).
 export const LOOK = { skins: SKIN.length, outfits: OUTFITS };
-export function humanoid(seed, hue = 0, opts = {}) {
+// the old hand-drawn pixel people, now only a stand-in while MARROW renders the real ones
+export function legacyHumanoid(seed, hue = 0, opts = {}) {
   const L = opts.look || {};
   const key = `h${seed}|${hue}|${opts.tex?.src || ''}|${opts.tex2?.src || ''}|${opts.head?.src || ''}|${JSON.stringify(L)}`;
   return memo(key, () => {
@@ -233,4 +235,13 @@ export function creatureName(seed) {
   let s = '';
   for (let i = 0; i < n; i++) s += SYL[Math.floor(R() * SYL.length)];
   return s[0].toUpperCase() + s.slice(1);
+}
+
+// People: MARROW characters (physically simulated bodies, cloth and hair, pixel
+// renders). Theme seeds share a pool of 120 characters so each is built once.
+export function humanoid(seed, hue = 0, opts = {}) {
+  const ph = legacyHumanoid(seed, hue, opts);
+  if (typeof Worker === 'undefined' || opts.legacy) return ph;
+  const id = opts.marrow ? seed : (((seed >>> 0) * 2654435761) >>> 0) % 120 + 1;
+  return memo(`mh${id}|${JSON.stringify(opts.marrow || null)}|${opts.monsters ? 1 : 0}`, () => marrowSheet(id, { look: opts.marrow, monsters: opts.monsters }, ph));
 }
