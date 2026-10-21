@@ -3,6 +3,7 @@
 // seeded, so the same post always produces the same cast.
 import { mulberry32 } from '../util.js';
 import { marrowSheet } from '../marrow/sprites.js';
+import { beast } from '../beasts.js';
 
 const cache = new Map();
 const memo = (key, fn) => { if (!cache.has(key)) { cache.set(key, fn()); if (cache.size > 400) cache.delete(cache.keys().next().value); } return cache.get(key); };
@@ -74,7 +75,7 @@ function weather(c, R, amount = 1) {
 const PLANS = ['blob', 'biped', 'quad', 'insect', 'serpent', 'floater', 'totem'];
 // Returns { frames: [canvas, canvas], plan } — a two-frame animation.
 // opts.tex: texture photo for the skin; opts.head: a PNG used as the head.
-export function monster(seed, hue = 0, size = 18, tier = 0, opts = {}) {
+export function legacyMonster(seed, hue = 0, size = 18, tier = 0, opts = {}) {
   const key = `m${seed}|${hue}|${size}|${tier}|${opts.tex?.src || ''}|${opts.head?.src || ''}`;
   return memo(key, () => {
     const R0 = mulberry32(seed);
@@ -244,4 +245,10 @@ export function humanoid(seed, hue = 0, opts = {}) {
   if (typeof Worker === 'undefined' || opts.legacy) return ph;
   const id = opts.marrow ? seed : (((seed >>> 0) * 2654435761) >>> 0) % 120 + 1;
   return memo(`mh${id}|${JSON.stringify(opts.marrow || null)}|${opts.monsters ? 1 : 0}`, () => marrowSheet(id, { look: opts.marrow, monsters: opts.monsters }, ph));
+}
+
+// Creatures: BEASTS (skeleton + signed-distance pixel renderer, procedural poses).
+// Returns { frames: [a, b], walk, attack, hurt, dead, plan, hue }.
+export function monster(seed, hue = 0, size = 18, tier = 0, opts = {}) {
+  return memo(`b${seed}|${Math.round(hue)}|${size}|${tier}|${opts.plan || ''}`, () => beast(seed, hue, size, tier, { plan: opts.plan, grit: opts.grit }));
 }
