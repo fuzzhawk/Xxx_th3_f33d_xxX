@@ -115,7 +115,7 @@ export class Racer extends Game {
       this.segs[i].sprites.push({ i: this.rng() < 0.25 ? this.skin.prop() : roadside[this.ri(0, 4)], off: side * this.r(1.15, 2.6), s: this.r(0.8, 1.6) });
     }
     this.cars = Array.from({ length: 16 }, () => ({ z: this.r(2000, this.len), off: this.r(-0.75, 0.75), speed: this.r(4000, 8000), i: this.skin.any('car', 'animal', 'prop') }));
-    this.carImg = this.skin.pick('player', 'car', 'ship');
+    this.carImg = this.skin.vehicle('car');
     this.pos = 0; this.speed = 0; this.max = 12000 * (this.T > 1 ? 1.2 : 1); this.px = 0; this.steer = 0; this.target = 0; this.laps = 0;
     this.sky = [this.r(0, 360) | 0, this.rng() < 0.5];
   }
@@ -447,7 +447,7 @@ export class Rocks extends Game {
     c.fillStyle = this.col(1); for (const b of this.shots) { c.beginPath(); c.arc(b.x, b.y, 2.5, 0, 7); c.fill(); }
     const s = this.ship;
     if (!this.dead && (s.inv <= 0 || Math.floor(this.t * 10) % 2)) {
-      if (!drawFit(c, this.skin.pick('ship', 'ship', 'car'), s.x, s.y, 34 * this.S, 34 * this.S, s.a + Math.PI / 2)) {
+      if (!drawFit(c, this.skin.vehicle('ship'), s.x, s.y, 34 * this.S, 34 * this.S, s.a + Math.PI / 2)) {
         c.save(); c.translate(s.x, s.y); c.rotate(s.a); c.strokeStyle = this.pal.ink; c.lineWidth = 2; c.beginPath(); c.moveTo(14, 0); c.lineTo(-10, -9); c.lineTo(-6, 0); c.lineTo(-10, 9); c.closePath(); c.stroke(); c.restore();
       }
       if (this.thrust > 0) { c.fillStyle = this.col(0); c.beginPath(); c.arc(s.x - Math.cos(s.a) * 16, s.y - Math.sin(s.a) * 16, 4 + Math.random() * 3, 0, 7); c.fill(); }

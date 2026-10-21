@@ -215,7 +215,7 @@ export class Flight extends Game {
     if (sh) { c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(sh.x, sh.y, 5 * sh.k * 0.6, 1.6 * sh.k * 0.4, 0, 0, 7); c.fill(); }
     const p = this.project(s.x, sy, s.h);
     if (p) {
-      const sz = 6.5 * p.k * this.S, img = this.skin.pick('ship', 'ship', 'hero', 'car');
+      const sz = 6.5 * p.k * this.S, img = this.skin.vehicle('ship');
       if (!drawFit(c, img, p.x, p.y, sz, sz, s.bank * 0.8)) {
         c.save(); c.translate(p.x, p.y); c.rotate(s.bank * 0.8); c.fillStyle = this.col(0);
         c.beginPath(); c.moveTo(0, -sz * 0.3); c.lineTo(sz * 0.5, sz * 0.2); c.lineTo(-sz * 0.5, sz * 0.2); c.closePath(); c.fill(); c.restore();

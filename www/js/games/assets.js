@@ -6,7 +6,8 @@
 // ask for by role. Online images are cached so they keep working offline.
 import { mulberry32 } from '../util.js';
 import { monster, humanoid, item as procItem, texture, themePalette, SCHEMES } from './creature.js';
-import { getHero, heroSheet } from '../hero.js';
+import { getHero, heroSheet, heroCrystal } from '../hero.js';
+import { crystalPool } from '../crystal/sprites.js';
 
 const cache = new Map();
 let kenney = null;
@@ -115,6 +116,21 @@ export class Skin {
       this.bg = kits.length && R() < 0.5 ? img(kits[seed % kits.length].bgs[v % kits[seed % kits.length].bgs.length]) : pickTex(7);
     }
     this.texFor = pickTex;
+    this.cseed = ps;
+  }
+  // Crystal Sprite characters: role k (0 = the lead, your own hero when saved) from an era's pool
+  crystal(k = 0, era = 'Fantasy', dirs) {
+    if (k === 0 && this.heroName) return heroCrystal(undefined, dirs);
+    return crystalPool(this.cseed * 17 + k * 131 + era.length, era, dirs);
+  }
+  // a random PNG for ships and cars: never a generated person
+  vehicle(key) {
+    if (!(key in this.memo)) {
+      const own = [...this.slots.hero, ...this.slots.enemy].filter((i) => i && !(i instanceof HTMLCanvasElement));
+      const pool = props.length && this.rng() < 0.7 ? props.map(img) : own.length ? own : props.map(img);
+      this.memo[key] = pool.length ? pool[Math.floor(this.rng() * pool.length)] : null;
+    }
+    return this.memo[key];
   }
   slotFor(roles) {
     for (const r of roles) { const s = this.slots[SLOT[r] || 'item']; if (s?.length) return s; }
