@@ -9,7 +9,9 @@ import { humanoid, creatureName } from './creature.js';
 import { marrowAnims } from '../marrow/sprites.js';
 
 // frames per animation rendered by MARROW (fractions for single held poses)
-const ANIMS = { guard: [0.02, 0.06, 0.1], walk: 8, jump: 8, punch: 6, kick: 7, palm: 6, sidekick: 7, sweep: 7, overhead: 7, flyknee: 8, flurry: 10, uppercut: 8, hadouken: 7, spinkick: 9, hurt: 5, knockdown: 8, block: [0.7], dance: 8 };
+// about twice the frames of a typical fighter sheet, so moves read smoothly; guard breathes in and out
+const BREATH = [0.02, 0.035, 0.05, 0.065, 0.08, 0.095, 0.11, 0.095, 0.08, 0.065, 0.05, 0.035];
+const ANIMS = { guard: BREATH, walk: 12, jump: 12, punch: 10, kick: 11, palm: 10, sidekick: 11, sweep: 11, overhead: 11, flyknee: 12, flurry: 16, uppercut: 12, hadouken: 11, spinkick: 14, hurt: 8, knockdown: 12, block: [0.6, 0.7], dance: 16 };
 // gameplay for each attack: duration, when it hits (fraction), reach, damage, hits, effects
 const MOVES = {
   punch: { t: 0.32, at: [0.45], reach: 46, dmg: 5, chain: ['punch', 'palm', 'kick'] },
@@ -256,7 +258,7 @@ export class Fighter extends Game {
     if (f.victory) return pick('dance', (this.t * 0.8) % 1);
     if (f.stun > 0) return pick('hurt', Math.min(1, (f.hurtT || 0) / 0.4));
     if (f.act) return pick(f.act, f.at / MOVES[f.act].t);
-    if (f.block > 0) return A.block[0];
+    if (f.block > 0) return A.block[A.block.length - 1];
     if (f.y < 0) return pick('jump', 0.35 + Math.min(0.4, -f.vy / 2000));
     if (Math.abs(f.vx) > 1) return pick('walk', (this.t * 1.2) % 1);
     return pick('guard', (this.t * 0.7) % 1);

@@ -397,9 +397,9 @@ details.subw[open] summary::after { transform: rotate(90deg); }
 .creator-cv { width: 240px; height: 240px; image-rendering: pixelated; }
 .creator-body { padding: 10px 14px; }
 .creator-name { width: 100%; box-sizing: border-box; background: var(--card2); color: var(--text); border: 1px solid var(--line2); border-radius: 10px; padding: 10px 12px; font: 600 16px var(--sans); margin-bottom: 8px; }
-.creator-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
-.creator-row { display: grid; grid-template-columns: 1fr 30px 70px 30px; align-items: center; gap: 4px; font-size: 12.5px; color: var(--muted); }
-.creator-row b { text-align: center; color: var(--text); font-size: 12px; text-transform: capitalize; }
+.creator-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; }
+.creator-row { display: grid; grid-template-columns: minmax(0, 1fr) 26px 72px 26px; line-height: 1.1; align-items: center; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.creator-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; color: var(--text); font-size: 12px; text-transform: capitalize; }
 .btn.sm { padding: 4px 0; min-width: 0; font-size: 16px; line-height: 1; }
 .creator-status { font-size: 12px; margin-top: 8px; }
 .notice.doom { border: 1px solid var(--orange); background: linear-gradient(160deg, #3a1f12, #1a1310); }
@@ -411,3 +411,4 @@ details.subw[open] summary::after { transform: rotate(90deg); }
 .doom-count { font: 800 42px var(--mono); color: var(--orange); margin: 18px 0; }
 .doom-box .ball { width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffb35c, #b5532f); animation: doombreath 10s ease-in-out infinite; }
 @keyframes doombreath { 0%, 100% { transform: scale(.6); } 40% { transform: scale(1.15); } }
+.creator-tabs { display: flex; gap: 6px; margin-bottom: 8px; }

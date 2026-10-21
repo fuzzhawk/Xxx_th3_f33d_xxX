@@ -44,19 +44,20 @@ const mem = new Map();
 export function crystalSheet(seed, opts = {}) {
   const dirs = opts.dirs || ALL_DIRS, era = opts.char ? '' : (opts.era || '');
   const key = `${VER}|${seed}|${era}|${opts.char ? JSON.stringify(opts.char) : ''}|${dirs.join('')}`;
-  if (mem.has(key)) return mem.get(key);
+  if (opts.cache !== false && mem.has(key)) return mem.get(key);
   const cv = document.createElement('canvas'); cv.width = 1; cv.height = 1; cv.pixel = true;
   const sheet = { cv, meta: layout(dirs), char: opts.char || null, ok: false, seed };
   sheet.ready = (async () => {
-    try { const rec = await idbGet('kv', key); if (rec?.blob) { const bm = await createImageBitmap(rec.blob); cv.width = bm.width; cv.height = bm.height; cv.getContext('2d').drawImage(bm, 0, 0); sheet.char = rec.char; sheet.ok = true; return sheet; } } catch { /* no cache */ }
+    if (opts.cache !== false) try { const rec = await idbGet('kv', key); if (rec?.blob) { const bm = await createImageBitmap(rec.blob); cv.width = bm.width; cv.height = bm.height; cv.getContext('2d').drawImage(bm, 0, 0); sheet.char = rec.char; sheet.ok = true; return sheet; } } catch { /* no cache */ }
     const r = await bake({ seed, era, char: opts.char, dirs });
     if (r.error) { console.warn('crystal:', r.error); return sheet; }
     cv.width = r.w; cv.height = r.h; cv.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(r.data.buffer), r.w, r.h), 0, 0);
     sheet.meta = r.meta; sheet.char = r.char; sheet.ok = true;
-    cv.toBlob((blob) => blob && idbSet('kv', key, { blob, char: r.char }).catch(() => {}), 'image/png');
+    if (opts.cache !== false) cv.toBlob((blob) => blob && idbSet('kv', key, { blob, char: r.char }).catch(() => {}), 'image/png');
     return sheet;
   })();
-  mem.set(key, sheet); if (mem.size > 80) mem.delete(mem.keys().next().value);
+  if (opts.cache !== false) mem.set(key, sheet);
+  if (mem.size > 80) mem.delete(mem.keys().next().value);
   return sheet;
 }
 // a random character from a pool of 90 per era (quick once cached)
