@@ -6,6 +6,7 @@ import * as favs from './favs.js';
 import * as stats from './stats.js';
 import { buildFeedback, sync } from './github.js';
 import { lsGet, lsSet } from './store.js';
+import { GAMES, GAME_NAMES } from './games/all.js';
 
 let root, app;
 export function initSettings(view, appApi) { root = view; app = appApi; }
@@ -28,6 +29,7 @@ export async function render() {
   const pkg = app.pkg();
   const man = pkg?.manifest;
   root.replaceChildren(el('div.settings', el('h2', 'Settings'),
+    jumpGroup(pkg),
     await packageGroup(man),
     balanceGroup(man),
     group('Display', null,
@@ -57,6 +59,24 @@ export async function render() {
     group('About', null, el('div.kv', `The Feed · build ${window.BUILD?.sha || 'dev'} · ${window.BUILD?.branch || ''} · ${window.BUILD?.date || ''}`, el('br'),
       `Packages from github.com/${settings.repo} (${settings.branch})`))
   ));
+}
+
+// ---------------------------------------------------------------- shortcuts
+// Every game first, then each kind of post and its sub-types. Tapping one returns to
+// the feed showing only that; games the package has run out of are dealt fresh.
+function jumpGroup(pkg) {
+  const man = pkg?.manifest, chip = (label, cat, sub, n) => el('button.jump', { onclick: () => app.jump(cat, sub) }, label, n !== undefined ? el('small', n ? String(n) : '+') : null);
+  const names = { ...GAME_NAMES, ...(man?.topics?.game || {}) };
+  const games = Object.keys(GAMES).sort((a, b) => (names[a] || a).localeCompare(names[b] || b));
+  const label = (cat, sub) => man?.topics?.[cat]?.[sub] || String(sub).replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  const rows = CATS.filter((c) => c !== 'game' && pkg?.posts?.[c]?.length).map((c) => {
+    const subs = [...new Set(pkg.posts[c].map((p) => p.sub).filter(Boolean))];
+    return el('div.jump-cat', el('div.jump-head', chip(CAT_LABEL[c], c, null, app.remaining(c))),
+      subs.length > 1 ? el('div.jumps', subs.map((s) => chip(label(c, s), c, s, app.remaining(c, s)))) : null);
+  });
+  return group('Jump to', 'Show only one game or one kind of post. The feed goes back to its normal mix when you tap “Show everything”.',
+    el('div.jump-cat', el('div.jump-head', chip('All games', 'game', null, app.remaining('game'))), el('div.jumps', games.map((g) => chip(names[g] || g, 'game', g, app.remaining('game', g))))),
+    ...rows);
 }
 
 // ---------------------------------------------------------------- packages

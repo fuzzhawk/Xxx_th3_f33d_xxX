@@ -23,6 +23,9 @@ const app = {
   async reload() { pkg = await loadPackage(settings.pkg); setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle); setVocab(pkg.vocab); feed.load(pkg); },
   // settings changed: keep what is on screen, new posts follow the new mix
   softReload() { /* the scheduler reads settings live */ },
+  // Settings → Jump to: back to the feed, showing only that kind of post
+  jump(cat, sub) { show('feed'); feed.setFocus(cat, sub); },
+  remaining: (cat, sub) => (sub ? feed.pools?.[cat]?.get(sub)?.length || 0 : feed.remaining(cat)),
   applyImmersive
 };
 

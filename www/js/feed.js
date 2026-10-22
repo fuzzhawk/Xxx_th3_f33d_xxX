@@ -1,6 +1,7 @@
 import { el, weightedPick, fmtDur } from './util.js';
 import { settings, saveSettings, pctFor, subWeight, seenSet, markSeen, resetSeen, CATS, CAT_LABEL } from './state.js';
 import { renderCard, notice } from './cards.js';
+import { GAMES, GAME_NAMES } from './games/all.js';
 import * as stats from './stats.js';
 
 // Activates heavy cards when they are mostly visible, tears them down when they
@@ -88,10 +89,15 @@ export class Feed {
     const bubble = (c) => el(`button.story${(this.focus || 'all') === c ? '.on' : ''}`, { onclick: () => this.setFocus(c === 'all' ? null : c) },
       el('div.ring', el('div.face', { style: { background: FACE[c][1] } }, FACE[c][0])), el('span', NAME[c] || CAT_LABEL[c]));
     this.storiesEl.replaceChildren(el('div.stories', items.map(bubble)),
-      this.focus ? el('div.focusbar', el('span', 'Showing only ', el('b', CAT_LABEL[this.focus])), el('button.btn.small', { onclick: () => this.setFocus(null) }, 'Show everything')) : '');
+      this.focus ? el('div.focusbar', el('span', 'Showing only ', el('b', this.focusSub ? this.subLabel(this.focus, this.focusSub) : CAT_LABEL[this.focus])), el('button.btn.small', { onclick: () => this.setFocus(null) }, 'Show everything')) : '');
   }
-  setFocus(cat) {
-    this.focus = cat;
+  subLabel(cat, sub) {
+    const t = this.pkg?.manifest.topics?.[cat]?.[sub] || (cat === 'game' && GAME_NAMES[sub]);
+    return t || String(sub).replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  }
+  // Posts of one kind (and optionally one sub-type, e.g. a single game), as listed in Settings → Jump to.
+  setFocus(cat, sub = null) {
+    this.focus = cat; this.focusSub = cat ? sub : null;
     [...this.list.children].forEach((c) => this.obs.remove(c));
     this.list.replaceChildren();
     this.spacer.style.height = '0px';
@@ -122,6 +128,13 @@ export class Feed {
   // Weighted round-robin: the category furthest behind its target share goes next.
   nextPost() {
     const now = Date.now();
+    if (this.focus && this.focusSub) {
+      const l = this.pools[this.focus]?.get(this.focusSub);
+      if (l?.length) { this.emitted[this.focus]++; this.total++; this.last = this.focus; return l.shift(); }
+      // a game the package has no more of (or none at all yet): deal a fresh one
+      if (this.focus === 'game' && GAMES[this.focusSub]) return this.freshGame(this.focusSub);
+      this.focusSub = null; this.renderStories();
+    }
     if (this.focus) {
       if (this.remaining(this.focus)) return this.take(this.focus);
       this.focus = null; this.renderStories();
@@ -138,6 +151,11 @@ export class Feed {
       if (score > bestScore) { bestScore = score; best = c; }
     }
     return this.take(best);
+  }
+  freshGame(sub) {
+    const seed = Math.floor(Math.random() * 2 ** 31), ADJ = ['Ember', 'Moss', 'Rust', 'Ochre', 'Dusk', 'Ash', 'Copper', 'Sage', 'Cinder', 'Lichen', 'Obsidian', 'Driftwood'];
+    const name = GAME_NAMES[sub] || sub;
+    return { id: `gx${seed.toString(36)}`, cat: 'game', sub, seed, title: `${ADJ[seed % ADJ.length]} ${name}`, theme: { proc: true, name: `${ADJ[(seed >>> 4) % ADJ.length]} ${name}`, hue: seed % 360, seed } };
   }
   take(cat) {
     const subs = [...this.pools[cat].entries()].filter(([, l]) => l.length);

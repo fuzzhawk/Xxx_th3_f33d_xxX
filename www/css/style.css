@@ -412,3 +412,12 @@ details.subw[open] summary::after { transform: rotate(90deg); }
 .doom-box .ball { width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffb35c, #b5532f); animation: doombreath 10s ease-in-out infinite; }
 @keyframes doombreath { 0%, 100% { transform: scale(.6); } 40% { transform: scale(1.15); } }
 .creator-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+/* ------------------------------------------------ settings → jump to */
+.jump-cat { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.jump-cat:last-child { border-bottom: 0; }
+.jump-head { margin-bottom: 6px; }
+.jump-head .jump { font-weight: 700; }
+.jumps { display: flex; flex-wrap: wrap; gap: 6px; }
+.jump { display: inline-flex; align-items: center; gap: 6px; background: var(--card2); color: var(--text); border: 1px solid var(--line2); border-radius: 999px; padding: 6px 11px; font: 600 12.5px var(--sans); cursor: pointer; }
+.jump small { color: var(--muted); font-weight: 600; font-size: 10.5px; }
+.jump:active { transform: scale(0.97); }
