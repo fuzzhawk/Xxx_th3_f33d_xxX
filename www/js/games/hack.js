@@ -3,6 +3,7 @@
 // rarity colours and take the stairs ever deeper. Champions and bosses guard the way.
 import { Game, W, H, drawFit, ready, roundRect } from './engine.js';
 import { monster, creatureName, item as itemArt } from './creature.js';
+import { Actor, dirOf } from '../crystal/sprites.js';
 
 const G = 46, TW = 16, TH = 8, WH = 18, CY = 212, LIGHT = 7, HS = 3.3, COST = 12, PY = 362;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -23,6 +24,7 @@ const UNIQ = { weapon: ['The Gravedigger', 'Kingsbane', 'Widowmaker', 'Bonesaw o
 const CH = [['Bone', 'Gore', 'Rot', 'Blood', 'Grave', 'Gut', 'Skull', 'Ash', 'Bile', 'Maggot', 'Vile', 'Corpse', 'Pox'], ['gnaw', 'maw', 'rend', 'hide', 'tooth', 'fist', 'belly', 'claw', 'spine', 'fang', 'flay', 'drool'], ['the Unclean', 'the Defiler', 'the Hungry', 'the Rotten', 'the Flayer', 'the Cursed', 'the Mad', 'the Vile', 'the Butcher', 'the Wretched', 'the Foul']];
 const CMOD = ['Extra Fast', 'Stone Skin', 'Extra Strong', 'Vampiric'];
 const ZONES = ['Cathedral', 'Catacombs', 'Crypt', 'Ossuary', 'Hell'];
+const SOFT = new Set(['cast', 'wave', 'cheer', 'nod', 'shake', 'laugh', 'surprise', 'sad', 'think', 'angry', 'love']);
 
 export class Hack extends Game {
   static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'trails'];
@@ -31,6 +33,8 @@ export class Hack extends Game {
     this.ox = this.oy = 0; this.gear = {}; this.pots = { hp: 2, mp: 1 }; this.log = []; this.pops = []; this.pats = new Map();
     this.h = { x: 0, y: 0, hp: 1, mp: 1, path: [], tgt: null, cd: 0, anim: 0, face: 1, heal: 0, rp: 0, sw: 0 };
     this.st = this.calc();
+    // the hero is a Crystal Sprite character (your own when saved), animated in 8 directions
+    this.hero = new Actor(this.skin.crystal(0, 'Fantasy'), { mode: 'eight', walkSpeed: 4, runSpeed: 30, runStride: 6.5 * this.S, walkStride: 5 * this.S });
     this.newLevel(1);
     this.h.hp = this.st.maxHp; this.h.mp = this.st.maxMp;
   }
@@ -150,7 +154,7 @@ export class Hack extends Game {
     this.mobs.push(mb);
     return mb;
   }
-  descend() { this.score += this.depth * 50; this.newLevel(this.depth + 1); this.say(`Descended to level ${this.depth}`, this.pal.ink); }
+  descend() { const h = this.h; h.pend = null; h.hold = 0.9; h.cheer = 0.9; this.score += this.depth * 50; this.newLevel(this.depth + 1); this.say(`Descended to level ${this.depth}`, this.pal.ink); }
   // what the hero can see: rays out to the light radius
   track() {
     const h = this.h, ti = this.tileOf(h);
@@ -207,6 +211,7 @@ export class Hack extends Game {
       this.xp -= this.need; this.lvl++; this.need = this.needFor(this.lvl); this.st = this.calc(); this.h.hp = this.st.maxHp; this.h.mp = this.st.maxMp;
       this.say(`Level up! Now level ${this.lvl}`, RAR[2]); this.pop(this.h.x, this.h.y, 'LEVEL UP', RAR[2]);
       const [sx, sy] = this.P(this.h.x, this.h.y); this.burst(sx, sy - 14, RAR[2], 24, 160);
+      this.h.cheer = 1.2; this.h.hold = Math.max(this.h.hold || 0, 0.8); // stop to celebrate
     }
   }
   say(s, c) { this.log.push({ s, c, t: 5 }); if (this.log.length > 4) this.log.shift(); }
@@ -239,6 +244,7 @@ export class Hack extends Game {
     const h = this.h;
     if (h.mp < COST || h.dead) return false;
     h.mp -= COST; h.cast = 0.3;
+    this.faceHero(tx, ty); this.hero.cast(); h.chan = 0.45;
     const a = Math.atan2(ty - h.y, tx - h.x);
     this.bolts.push({ x: h.x, y: h.y, vx: Math.cos(a) * 8, vy: Math.sin(a) * 8, life: 1.2, dmg: 8 + this.lvl * 3 + (this.st.min + this.st.max) * 0.8 });
     return true;
@@ -247,20 +253,35 @@ export class Hack extends Game {
     const h = this.h;
     if (!this.pots[k] || h.dead) return;
     this.pots[k]--;
+    this.hero.cast(); h.chan = 0.35;
     if (k === 'hp') h.heal += this.st.maxHp * 0.65; else h.mp = Math.min(this.st.maxMp, h.mp + this.st.maxMp * 0.7);
     const [sx, sy] = this.P(h.x, h.y); this.burst(sx, sy - 14, k === 'hp' ? '#e04040' : '#5a7dff', 12, 90);
   }
   solidAt(x, y, r) { const m = this.map; return !m[Math.floor(y - r) * G + Math.floor(x - r)] || !m[Math.floor(y - r) * G + Math.floor(x + r)] || !m[Math.floor(y + r) * G + Math.floor(x - r)] || !m[Math.floor(y + r) * G + Math.floor(x + r)]; }
   slide(o, vx, vy, r) { if (!this.solidAt(o.x + vx, o.y, r)) o.x += vx; if (!this.solidAt(o.x, o.y + vy, r)) o.y += vy; }
+  // turn the sprite toward a world point (screen-space direction on the iso grid)
+  faceHero(tx, ty) { const dx = tx - this.h.x, dy = ty - this.h.y; if (Math.hypot(dx, dy) > 0.01) this.hero.face(dirOf((dx - dy) * TW, (dx + dy) * TH)); }
+  landHit() { const p = this.h.pend; this.h.pend = null; if (p && !p.m.dead && !this.h.dead) this.hit(p.m, p.dmg, p.crit); }
+  // feed the animator the hero's screen-space motion; melee damage lands on the swing's 'hit' frame
+  animHero(dt, x0, y0, wasDead) {
+    const h = this.h, A = this.hero;
+    let vx = ((h.x - x0) - (h.y - y0)) * TW / dt, vy = ((h.x - x0) + (h.y - y0)) * TH / dt;
+    if (wasDead || h.dead || !h.moving || !(dt > 0) || Math.hypot(vx, vy) > 400) vx = vy = 0;
+    if (h.chan > 0 && (h.chan -= dt) <= 0) A.stopCast();
+    if (!h.dead && vx * vx + vy * vy > 16 && SOFT.has(A.a.action)) { A.stopCast(); A.revive(); } // walking cancels emotes and channelling
+    if (h.cheer > 0) { h.cheer -= dt; if (!h.dead && !h.moving && A.emote('cheer', Math.max(0.6, h.cheer))) h.cheer = 0; }
+    for (const e of A.update(dt, { vx, vy, lowHealth: !h.dead && h.hp < this.st.maxHp * 0.25 })) if (e === 'hit') this.landHit();
+    if (h.pend && (h.pend.t -= dt) <= 0) this.landHit();
+  }
   faceTo(dx, dy) { const s = dx - dy; if (Math.abs(s) > 0.05) this.h.face = Math.sign(s); }
   die() {
     const h = this.h, lost = Math.floor(this.gold * 0.25);
-    h.dead = 2.2; h.path = []; h.tgt = null; this.deaths++; this.gold -= lost;
+    h.dead = 2.2; h.path = []; h.tgt = null; h.pend = null; this.hero.ko(); this.deaths++; this.gold -= lost;
     this.say(`You have died. Lost ${lost} gold.`, '#e04040'); this.banner = { s: 'YOU HAVE DIED', t: 2.2, c: '#c8201c' };
     const [sx, sy] = this.P(h.x, h.y); this.burst(sx, sy - 10, '#8a1414', 40, 200);
   }
   respawn() {
-    const h = this.h; h.dead = 0; h.hp = this.st.maxHp; h.mp = this.st.maxMp; h.heal = 0;
+    const h = this.h; h.dead = 0; this.hero.revive(); h.hp = this.st.maxHp; h.mp = this.st.maxMp; h.heal = 0;
     h.x = this.home % G + 0.5; h.y = ((this.home / G) | 0) + 0.5; this.goal = null;
     for (const m of this.mobs) { m.aggro = false; m.hp = Math.min(m.max, m.hp + m.max * 0.25); }
     this.track();
@@ -269,6 +290,7 @@ export class Hack extends Game {
   step(dt) {
     const h = this.h, st = this.st, m = this.map;
     this.lvT += dt;
+    const x0 = h.x, y0 = h.y, wasDead = !!h.dead;
     for (const l of this.log) l.t -= dt;
     this.log = this.log.filter((l) => l.t > 0);
     for (const p of this.pops) { p.t -= dt; p.y -= dt * 0.6; p.x -= dt * 0.6; }
@@ -283,18 +305,24 @@ export class Hack extends Game {
       if (!this.auto && !h.tgt && !h.path.length) { let b = null, bd = 1.4; for (const o of this.mobs) { const dd = Math.hypot(o.x - h.x, o.y - h.y); if (o.aggro && dd < bd) { bd = dd; b = o; } } if (b) this.engage(b); }
       let moving = false;
       const t = h.tgt;
+      if (h.hold > 0) h.hold -= dt;
       if (t && t.dead) h.tgt = null;
-      if (h.tgt) {
+      if (h.hold > 0) { /* cheering on the new level */ } else if (h.tgt) {
         const dx = t.x - h.x, dy = t.y - h.y, d = Math.hypot(dx, dy);
         if (d <= 0.72 + t.r) {
           h.path.length = 0; this.faceTo(dx, dy);
-          if (h.cd <= 0) { h.cd = 0.62 / (1 + st.spd); h.swing = 0.22; h.sw++; const crit = this.rng() < 0.1; this.hit(t, this.r(st.min, st.max) * (crit ? 2 : 1), crit); }
+          if (h.cd <= 0) {
+            h.cd = 0.62 / (1 + st.spd); h.swing = 0.22; h.sw++; const crit = this.rng() < 0.1, dmg = this.r(st.min, st.max) * (crit ? 2 : 1);
+            this.faceHero(t.x, t.y);
+            if (h.pend) this.landHit();
+            if (this.hero.attack()) h.pend = { m: t, dmg, crit, t: 0.3 }; else this.hit(t, dmg, crit);
+          }
         } else {
           if ((h.rp -= dt) <= 0) { h.rp = 0.3; const p = this.path(this.tileOf(h), this.tileOf(t)); if (p) h.path = p; else { t.ign = this.t + 3; h.tgt = null; } }
           if (!h.path.length && h.tgt) { const s = HS * dt; this.slide(h, dx / d * s, dy / d * s, 0.2); this.faceTo(dx, dy); moving = true; }
         }
       }
-      if (h.path.length) {
+      if (h.path.length && !(h.hold > 0)) {
         const n = h.path[0], tx = n % G + 0.5, ty = ((n / G) | 0) + 0.5, dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy), s = HS * dt;
         if (d <= s) { h.x = tx; h.y = ty; h.path.shift(); if (!h.path.length && this.goal === 'explore') for (const [ex, ey] of DIRS) this.seen[n + ex + ey * G] = 1; }
         else { h.x += dx / d * s; h.y += dy / d * s; }
@@ -307,6 +335,7 @@ export class Hack extends Game {
       this.loot = this.loot.filter((l) => !l.got);
       if (!h.path.length && !h.tgt && m[this.tileOf(h)] === 2) { this.descend(); return; }
     }
+    this.animHero(dt, x0, y0, wasDead);
     // monsters
     for (const o of this.mobs) {
       o.ph += dt; o.flash = Math.max(0, o.flash - dt); o.cd -= dt; o.atk = Math.max(0, (o.atk || 0) - dt);
@@ -317,7 +346,7 @@ export class Hack extends Game {
         if (o.cd <= 0) {
           o.cd = o.rank === 'boss' ? 1.3 : 1.1; o.atk = 0.25;
           const dmg = o.dmg * 50 / (50 + st.ar) * (this.mods.glass ? 2 : 1) * this.r(0.7, 1.2);
-          h.hp -= dmg; h.hurt = 0.2; this.pop(h.x, h.y, String(Math.max(1, Math.round(dmg))), '#ff5a3a');
+          h.hp -= dmg; h.hurt = 0.2; if (h.hp > 0 && this.hero.anim !== 'attack') this.hero.hurt(); this.pop(h.x, h.y, String(Math.max(1, Math.round(dmg))), '#ff5a3a');
           if (o.mod === 'Vampiric') o.hp = Math.min(o.max, o.hp + dmg);
           if (h.hp <= 0) { this.die(); break; }
         }
@@ -525,10 +554,10 @@ export class Hack extends Game {
     if (o.hp < o.max) { c.fillStyle = 'rgba(0,0,0,.6)'; c.fillRect(sx - 10, sy - s - 2, 20, 3); c.fillStyle = '#c01c1c'; c.fillRect(sx - 10, sy - s - 2, 20 * Math.max(0, o.hp / o.max), 3); }
   }
   drawHero(c) {
-    const h = this.h, [sx, sy] = this.P(h.x, h.y), per = this.skin.people[0], S = this.S;
+    const h = this.h, [sx, sy] = this.P(h.x, h.y), S = this.S;
     c.fillStyle = 'rgba(0,0,0,.5)'; c.beginPath(); c.ellipse(sx, sy, 8, 4, 0, 0, 7); c.fill();
-    const im = h.dead ? per.hurt : h.cast > 0 ? per.special : h.swing > 0 ? (h.sw % 2 ? per.kick : per.punch) : h.hurt > 0 ? per.hurt : h.moving ? per.walk[Math.floor(h.anim * 7) % 2] : per.idle;
-    if (!drawFit(c, im, sx, sy - 14 * S + (h.dead ? 8 : 0), 22 * S, 30 * S, h.dead ? 1.4 * h.face : 0, h.face < 0)) { c.fillStyle = this.pal.ink; c.fillRect(sx - 4, sy - 24, 8, 22); }
+    // prone body fades out over the last half second before respawn
+    this.hero.draw(c, sx, sy, S, { alpha: h.dead ? Math.min(1, h.dead / 0.6) : 1 });
     if (h.swing > 0 && h.tgt) {
       const [tx, ty] = this.P(h.tgt.x, h.tgt.y), a = Math.atan2(ty - sy, tx - sx), k = h.swing / 0.22;
       c.strokeStyle = this.pal.ink; c.globalAlpha = k; c.lineWidth = 2.5; c.beginPath(); c.arc(sx, sy - 12, 14, a - 1.2 + (1 - k) * 1.6, a - 0.4 + (1 - k) * 1.6); c.stroke(); c.globalAlpha = 1;
