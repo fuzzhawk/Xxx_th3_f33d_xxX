@@ -1,7 +1,12 @@
 // Alto's Adventure-style endless downhill: tap to jump, hold in the air to backflip,
 // land with your board along the slope. Obstacles are dark rocks and stumps on the snow;
 // anything glowing in a bubble is a pick-up: coins, boost, shield and magnet.
+// The rider is a Crystal Sprite character: walk/run strides by speed, a crouch into jumps,
+// rise/apex/fall frames in the air, a landing on every touch-down, a flinch on a shield save
+// or a sloppy landing, a knockdown on a wipeout (revived on restart), cheers for flips and
+// pick-ups, and surprise when a power-up bubble comes into view.
 import { Game, W, H, drawFit, drawRectImg, ready } from './engine.js';
+import { Actor } from '../crystal/sprites.js';
 
 const STEP_X = 16, FLIP = 7.5, TAU = Math.PI * 2;
 const wrapA = (a) => { a %= TAU; if (a > Math.PI) a -= TAU; if (a < -Math.PI) a += TAU; return a; };
@@ -17,7 +22,8 @@ export class Ski extends Game {
     this.holding = false; this.trail = []; this.combo = 0; this.dist = 0; this.fx = { boost: 0, shield: 0, magnet: 0 };
     this.stats = { crash: 0, flips: 0 };
     this.mtn = [0, 1].map((k) => Array.from({ length: 24 }, () => this.r(0.3, 1)));
-    this.msg = null;
+    this.msg = null; this.coinRun = 0;
+    this.rider = new Actor(this.skin.crystal(0, 'Present day', ['W', 'E']), { mode: 'side', dir: 'E', walkSpeed: 4, runSpeed: 38, walkStride: 5, runStride: 7 });
   }
   ensure(x) {
     while (this.genX < x) {
@@ -49,7 +55,7 @@ export class Ski extends Game {
   isGap(x) { return !!this.gap[Math.floor(x / STEP_X) + 1]; }
   slopeAt(x) { return Math.atan2(this.groundY(x + 6) - this.groundY(x - 6), 12); }
 
-  jump() { const p = this.p; if (p.air || p.crash) return; p.air = true; p.vx = p.v * Math.cos(p.ang) + Math.sin(p.ang) * 240; p.vy = p.v * Math.sin(p.ang) - Math.cos(p.ang) * 240; p.rot = 0; }
+  jump() { const p = this.p; if (p.air || p.crash) return; this.rider.jump(); p.air = true; p.vx = p.v * Math.cos(p.ang) + Math.sin(p.ang) * 240; p.vy = p.v * Math.sin(p.ang) - Math.cos(p.ang) * 240; p.rot = 0; }
   down() { this.holding = true; this.jump(); }
   up() { this.holding = false; }
   tap() { this.jump(); }
@@ -80,13 +86,22 @@ export class Ski extends Game {
     p.crash = 1.2; this.combo = 0; this.stats.crash++; this.score = Math.max(0, this.score - 50);
     this.burst(W * 0.35, H * 0.55, this.pal.ink, 26, 220);
     this.msg = { s: 'WIPEOUT', t: 1.2 };
+    this.rider.ko();
   }
+  cheer(s) { if (!this.p.crash) this.rider.emote('cheer', s); }
   step(dt) {
+    const p = this.p;
+    this.sim(dt);
+    // speeds are scaled down so the strides read as skating pushes, not a sprint
+    const ev = this.rider.update(dt, { vx: p.crash ? 0 : p.v / 6, grounded: !p.air || !!p.crash, airVy: p.vy });
+    if (ev.includes('land')) this.burst(this.sx(p.x), this.sy(p.y), this.pal.ink, 10, 110);
+  }
+  sim(dt) {
     const p = this.p;
     this.ensure(p.x + 900);
     if (p.crash) {
       p.crash -= dt; p.ang += 9 * dt; p.v = 60;
-      if (p.crash <= 0) { p.crash = 0; let x = p.x + 30; while (this.isGap(x) || this.isGap(x + 20)) x += STEP_X; p.x = x; p.y = this.groundY(x); p.air = false; p.ang = this.slopeAt(x); p.v = 120; }
+      if (p.crash <= 0) { p.crash = 0; this.rider.revive(); let x = p.x + 30; while (this.isGap(x) || this.isGap(x + 20)) x += STEP_X; p.x = x; p.y = this.groundY(x); p.air = false; p.ang = this.slopeAt(x); p.v = 120; }
       return;
     }
     if (!p.air) {
@@ -99,7 +114,7 @@ export class Ski extends Game {
       if (this.isGap(nx) || ny - fly > 3) { p.air = true; p.vx = p.v * Math.cos(a); p.vy = p.v * Math.sin(a); p.rot = 0; }
       else { p.x = nx; p.y = ny; }
       if (this.rng() < 0.6) this.particles.push({ x: this.sx(p.x) - 6, y: this.sy(p.y), vx: -this.r(20, 80), vy: -this.r(20, 90), life: 0.4, max: 0.4, color: this.pal.ink, r: this.r(1, 2.5) });
-      for (const r of this.rocks) if (!r.hit && Math.abs(r.x - p.x) < r.s * 0.4) { r.hit = true; if (this.fx.shield > 0) { this.fx.shield = 0; this.burst(this.sx(r.x), this.sy(this.groundY(r.x)), this.col(4), 18, 160); this.msg = { s: 'SHIELD SAVED YOU', t: 1 }; } else { this.crash(); return; } }
+      for (const r of this.rocks) if (!r.hit && Math.abs(r.x - p.x) < r.s * 0.4) { r.hit = true; if (this.fx.shield > 0) { this.fx.shield = 0; this.burst(this.sx(r.x), this.sy(this.groundY(r.x)), this.col(4), 18, 160); this.msg = { s: 'SHIELD SAVED YOU', t: 1 }; this.rider.hurt(); } else { this.crash(); return; } }
       if (this.fx.boost > 0) p.v = Math.max(p.v, 420);
     }
     if (p.air) {
@@ -118,20 +133,22 @@ export class Ski extends Game {
           const flips = Math.floor((-p.rot + 0.7) / TAU);
           p.air = false; p.y = g; p.av = 0;
           p.v = Math.hypot(p.vx, p.vy) * 0.92 + flips * 60;
-          if (flips > 0) { this.stats.flips += flips; this.combo += flips; const pts = 100 * flips * this.combo; this.score += pts; this.msg = { s: `${flips > 1 ? flips + '× ' : ''}BACKFLIP +${pts}`, t: 1.2 }; }
+          if (flips > 0) { this.stats.flips += flips; this.combo += flips; const pts = 100 * flips * this.combo; this.score += pts; this.msg = { s: `${flips > 1 ? flips + '× ' : ''}BACKFLIP +${pts}`, t: 1.2 }; this.cheer(0.5 + 0.25 * Math.min(4, this.combo)); }
           else if (Math.abs(d) < 0.12) { this.score += 20; this.msg = { s: 'CLEAN', t: 0.6 }; }
+          else if (Math.abs(d) > 0.35) this.rider.hurt(); // sloppy landing: a wobble
         }
       }
     }
     for (const k of Object.keys(this.fx)) if (k !== 'shield') this.fx[k] = Math.max(0, this.fx[k] - dt);
     for (const c of this.coins) {
       if (c.got) continue;
+      if (c.power && !c.seen && c.x - p.x < W * 0.6) { c.seen = true; if (!p.air) this.rider.emote('surprise', 0.4); }
       const cy = this.groundY(c.x) + c.dy;
       if (this.fx.magnet > 0 && !c.power && Math.hypot(c.x - p.x, cy - p.y) < 150) { c.x += (p.x - c.x) * 6 * dt; c.dy += (p.y - 12 - cy) * 6 * dt; }
       if (Math.abs(c.x - p.x) < (c.power ? 22 : 16) && Math.abs(cy - p.y + 12) < (c.power ? 30 : 22)) {
         c.got = true; this.burst(this.sx(c.x), this.sy(cy), c.power ? this.col(4) : '#ffd24a', c.power ? 20 : 8, 140);
-        if (c.power) { this.fx[c.power] = c.power === 'shield' ? 1 : 5; this.msg = { s: { boost: 'BOOST!', shield: 'SHIELD UP', magnet: 'COIN MAGNET' }[c.power], t: 1.1 }; this.score += 50; }
-        else this.score += 25;
+        if (c.power) { this.fx[c.power] = c.power === 'shield' ? 1 : 5; this.msg = { s: { boost: 'BOOST!', shield: 'SHIELD UP', magnet: 'COIN MAGNET' }[c.power], t: 1.1 }; this.score += 50; this.cheer(0.7); }
+        else { this.score += 25; if (++this.coinRun % 5 === 0) this.cheer(0.5); }
       }
     }
     this.dist = p.x;
@@ -199,11 +216,12 @@ export class Ski extends Game {
     this.trail.forEach(([x, y], k) => { const X = this.sx(x) - (this.trail.length - k) * 2, Y = this.sy(y) - 16 + Math.sin(this.t * 14 + k) * 1.5; k ? c.lineTo(X, Y) : c.moveTo(X, Y); });
     c.stroke();
     // rider
-    const x = this.sx(p.x), y = this.sy(p.y), per = this.skin.people[0], fr = p.air ? per.jump : per.walk[Math.floor(this.t * 6) % 2];
-    c.save(); c.translate(x, y); c.rotate(p.ang);
-    c.fillStyle = this.col(3); c.fillRect(-14, -3, 28, 4);
-    const hero = this.skin.procHero ? null : this.skin.slots.hero[0];
-    if (!hero || !drawFit(c, hero, 0, -16 * this.S, 26 * this.S, 28 * this.S)) drawFit(c, fr, 0, -17 * this.S, 24 * this.S, 32 * this.S);
+    const x = this.sx(p.x), y = this.sy(p.y);
+    // a wipeout tumbles for a moment, then the rider lies along the slope until restarting
+    const ang = p.crash && p.crash < 0.85 ? this.slopeAt(p.x) : p.ang;
+    c.save(); c.translate(x, y); c.rotate(ang);
+    c.fillStyle = this.col(3); c.fillRect(p.crash ? 4 : -14, -3, 28, 4);
+    this.rider.draw(c, 0, -3, 1.25 * this.S);
     c.restore();
     if (this.msg) { c.globalAlpha = Math.min(1, this.msg.t * 2); this.text(c, this.msg.s, W / 2, 70, 18, this.pal.ink); c.globalAlpha = 1; }
     const on = Object.entries(this.fx).filter(([, v]) => v > 0);
