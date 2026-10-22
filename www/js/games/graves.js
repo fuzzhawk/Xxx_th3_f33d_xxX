@@ -3,6 +3,7 @@
 // top for coins and xp. Levelling up digs new generators and asks for bigger things.
 import { Game, W, H, drawFit, roundRect } from './engine.js';
 import { monster } from './creature.js';
+import { Actor } from '../crystal/sprites.js';
 
 const COLS = 6, ROWS = 6, CS = 50, X0 = (W - COLS * CS) / 2, Y0 = 116;
 const CHAINS = [
@@ -11,7 +12,7 @@ const CHAINS = [
   { gen: 'Cauldron', names: ['Toadstool', 'Eye of Newt', 'Potion', 'Elixir', 'Homunculus', 'Mandrake King', 'Philosopher Toad'], png: true },
   { gen: 'Bat Tower', names: ['Fluff', 'Bat', 'Bat Swarm', 'Vampire Bat', 'Count', 'Night Baron', 'Eternal Sire'], plan: ['blob', 'insect', 'insect', 'insect', 'biped', 'biped', 'quad'] }
 ];
-const MAXT = 6;
+const MAXT = 6, PATIENCE = 70; // seconds a customer waits before giving up
 
 export class Graves extends Game {
   static noMods = ['mirror', 'wobble', 'lowg', 'heavy', 'giant', 'tiny'];
@@ -25,6 +26,8 @@ export class Graves extends Game {
     for (let i = 0; i < this.cells.length; i++) if (Math.floor(i / COLS) >= 3 && this.rng() < 0.55) this.cells[i] = { web: true };
     this.gens = 0; this.addGen(0); this.addGen(1);
     this.energy = 30; this.coins = 0; this.lvl = 1; this.xp = 0; this.need = 6; this.eT = 0;
+    // customers are Crystal characters: mostly graveyard-gothic fantasy folk
+    this.era = s % 4 === 3 ? 'Present day' : 'Fantasy'; this.served = 0;
     this.orders = []; for (let k = 0; k < 3; k++) this.newOrder(k);
     this.anims = []; this.drag = null; this.thinkT = 1;
   }
@@ -38,7 +41,9 @@ export class Graves extends Game {
     const gens = [...new Set(this.cells.filter((c) => c?.gen != null).map((c) => c.gen))];
     const chain = gens[Math.floor(this.rng() * gens.length)] ?? 0;
     const tier = Math.min(MAXT, 1 + Math.floor(this.rng() * Math.min(4, 1 + this.lvl / 2)));
-    this.orders[k] = { chain, tier, who: this.skin.people[k % 4], reward: 5 * 2 ** tier, xp: tier + 1, done: 0 };
+    const who = new Actor(this.skin.crystal(1 + this.served++, this.era, ['S']), { mode: 'four', dir: 'S' });
+    who.emote('wave', 1.2); // hello
+    this.orders[k] = { chain, tier, who, reward: 5 * 2 ** tier, xp: tier + 1, done: 0, left: 0, wait: 0, fidget: this.r(2, 4) };
   }
   cellXY(i) { return [X0 + (i % COLS) * CS + CS / 2, Y0 + Math.floor(i / COLS) * CS + CS / 2]; }
   cellAt(x, y) { const c = Math.floor((x - X0) / CS), r = Math.floor((y - Y0) / CS); return c >= 0 && c < COLS && r >= 0 && r < ROWS ? r * COLS + c : -1; }
@@ -71,8 +76,10 @@ export class Graves extends Game {
   }
   deliver(i, k) {
     const c = this.cells[i], o = this.orders[k];
-    if (!this.isItem(c) || !o || o.done || c.chain !== o.chain || c.t !== o.tier) return false;
-    this.cells[i] = null; o.done = 0.6;
+    if (!o || o.done || o.left) return false;
+    if (!this.isItem(c) || c.chain !== o.chain || c.t !== o.tier) { if (this.isItem(c)) o.who.emote('shake', 0.9); return false; } // not what they asked for
+    this.cells[i] = null; o.done = 1.4;
+    this.mood(o, o.tier >= 4 || o.wait < 12 ? 'love' : 'cheer', 1.4);
     this.coins += o.reward; this.xp += o.xp; this.score += o.reward * 3;
     this.burst(W / 6 + k * W / 3, 76, this.col(1), 20, 160);
     if (this.xp >= this.need) { this.lvl++; this.xp -= this.need; this.need = Math.round(this.need * 1.4); this.energy += 15; this.addGen(Math.min(CHAINS.length - 1, this.gens)); this.msg = { s: `LEVEL ${this.lvl}`, t: 1.5 }; }
@@ -83,7 +90,7 @@ export class Graves extends Game {
     if (this.thinkT > 0 || this.anims.length || this.drag) return;
     this.thinkT = this.r(0.35, 0.7);
     // fill an order
-    for (let k = 0; k < 3; k++) { const o = this.orders[k]; if (o.done) continue; const i = this.cells.findIndex((c) => this.isItem(c) && c.chain === o.chain && c.t === o.tier); if (i >= 0) { this.slide(i, null, k); return; } }
+    for (let k = 0; k < 3; k++) { const o = this.orders[k]; if (o.done || o.left) continue; const i = this.cells.findIndex((c) => this.isItem(c) && c.chain === o.chain && c.t === o.tier); if (i >= 0) { this.slide(i, null, k); return; } }
     // merge, preferring what the orders want
     const wanted = new Set(this.orders.map((o) => o.chain));
     let pair = null;
@@ -109,7 +116,7 @@ export class Graves extends Game {
   }
   down(x, y) {
     const k = this.orderAt(x, y);
-    if (k >= 0 && y < 110) { const o = this.orders[k]; const i = this.cells.findIndex((c) => this.isItem(c) && c.chain === o.chain && c.t === o.tier); if (i >= 0) this.deliver(i, k); return; }
+    if (k >= 0 && y < 110) { const o = this.orders[k]; if (o.done || o.left) return; const i = this.cells.findIndex((c) => this.isItem(c) && c.chain === o.chain && c.t === o.tier); if (i >= 0) this.deliver(i, k); return; }
     const i = this.cellAt(x, y);
     if (i < 0) return;
     const c = this.cells[i];
@@ -142,9 +149,23 @@ export class Graves extends Game {
     }
     this.anims = this.anims.filter((a) => a.k < 1);
     for (const c of this.cells) { if (c?.pulse) c.pulse = Math.max(0, c.pulse - dt); if (c?.pop) c.pop = Math.max(0, c.pop - dt); }
-    this.orders.forEach((o, k) => { if (o.done && (o.done -= dt) <= 0) this.newOrder(k); });
+    this.orders.forEach((o, k) => {
+      o.who.update(dt);
+      if (o.done) { if ((o.done -= dt) <= 0) this.newOrder(k); return; }
+      if (o.left) { if ((o.left -= dt) <= 0) this.newOrder(k); return; }
+      o.wait += dt;
+      if (o.wait > PATIENCE) { o.left = 1.6; this.mood(o, 'sad', 1.6); this.burst(W / 6 + k * W / 3, 76, this.pal.ink, 8, 60); return; } // gives up and leaves
+      if ((o.fidget -= dt) > 0 || o.who.a.action) return;
+      // waiting: ponder, perk up when their thing is on the board, fume when kept too long
+      const onBoard = this.cells.some((cl) => this.isItem(cl) && cl.chain === o.chain && cl.t === o.tier);
+      const late = o.wait / PATIENCE;
+      const e = late > 0.75 ? (this.rng() < 0.6 ? 'angry' : 'sad') : late > 0.5 ? (this.rng() < 0.5 ? 'angry' : 'think') : onBoard ? (this.rng() < 0.5 ? 'nod' : 'surprise') : this.rng() < 0.15 ? 'laugh' : 'think';
+      o.who.emote(e, this.r(1, 2)); o.fidget = this.r(1.5, 4);
+    });
     if (this.msg && (this.msg.t -= dt) <= 0) this.msg = null;
   }
+  // cut short whatever the customer is doing and play this emote
+  mood(o, e, secs) { if (o.who.a.action) o.who.a.revive(); o.who.emote(e, secs); }
   itemArt(chain, t) { const a = this.art[chain][t]; return Array.isArray(a) ? a[Math.floor(this.t * 2.5 + t) % 2] : a; }
   drawItem(c, chain, t, x, y, s = 1) {
     c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(x, y + 16 * s, 14 * s, 4 * s, 0, 0, 7); c.fill();
@@ -182,8 +203,12 @@ export class Graves extends Game {
     // orders
     this.orders.forEach((o, k) => {
       const x = k * W / 3 + 4, w = W / 3 - 8;
-      c.fillStyle = this.pal.bg2; c.globalAlpha = o.done ? 0.4 : 0.92; roundRect(c, x, 44, w, 64, 8); c.fill(); c.globalAlpha = 1;
-      drawFit(c, o.who.idle, x + 18, 70, 24, 32);
+      c.fillStyle = this.pal.bg2; c.globalAlpha = o.done || o.left ? 0.4 : 0.92; roundRect(c, x, 44, w, 64, 8); c.fill(); c.globalAlpha = 1;
+      c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(x + 20, 99, 9, 3, 0, 0, 7); c.fill();
+      o.who.draw(c, x + 20, 99, 1, { alpha: o.left ? Math.min(1, o.left) : 1 });
+      // patience: a thin bar that drains and reddens
+      const p = Math.max(0, 1 - o.wait / PATIENCE);
+      if (!o.done && !o.left) { c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(x + 6, 47, w - 12, 3); c.fillStyle = p < 0.25 ? '#e44' : p < 0.5 ? '#eb4' : this.col(1); c.fillRect(x + 6, 47, (w - 12) * p, 3); }
       this.drawItem(c, o.chain, o.tier, x + w - 30, 66, 0.8);
       this.text(c, CHAINS[o.chain].names[o.tier], x + w / 2, 101, 8, this.pal.ink);
       if (this.cells.some((cl) => this.isItem(cl) && cl.chain === o.chain && cl.t === o.tier)) { c.strokeStyle = this.col(1); c.lineWidth = 2; roundRect(c, x, 44, w, 64, 8); c.stroke(); }
