@@ -1,7 +1,11 @@
 // Vampire Survivors-style horde game in a cellular-automata cave. Weapons fire on
 // their own; you only move. Shots, bombs and the aura chew through the rock, so the
 // cave opens up as you fight. Level up to pick upgrades.
+// The hero is a Crystal Sprite: runs in 8 directions, shoots the wand, swings the
+// whip, casts bombs, flinches when bitten, kneels when nearly dead, cheers on a
+// level-up and is knocked down when the horde wins.
 import { Game, W, H, drawFit, ready } from './engine.js';
+import { Actor, dirOf } from '../crystal/sprites.js';
 
 const C = 10, G = 72, WW = C * G;
 const WEAPONS = {
@@ -37,6 +41,9 @@ export class Survivors extends Game {
     this.painted = false;
     this.p = { x: WW / 2, y: WW / 2, hp: 100, max: 100, sp: 70, face: 1, inv: 0 };
     this.weapons = { wand: 1 }; this.passive = {}; this.cd = {};
+    // feet sit 9px below the hitbox centre, as the old 24px figure did
+    this.hero = new Actor(this.skin.crystal(0, 'Fantasy'), { runSpeed: 50, walkStride: 5, runStride: 7 });
+    this.pend = {}; this.dying = 0; this.pickIn = 0;
     this.lvl = 1; this.xp = 0; this.need = 5; this.kills = 0;
     this.foes = []; this.shots = []; this.gems = []; this.booms = []; this.slashes = [];
     this.spawnT = 0; this.flowT = 0; this.dist = new Int16Array(G * G);
@@ -101,7 +108,7 @@ export class Survivors extends Game {
   }
   move(x, y) { if (this.joy) { this.joy.x = x; this.joy.y = y; } }
   down(x, y) {
-    if (this.pick) { const k = Math.floor((y - 120) / 70); if (x > 30 && x < W - 30 && k >= 0 && k < this.pick.length) this.choose(this.pick[k]); return; }
+    if (this.pick) { if (this.pickIn > 0) return; const k = Math.floor((y - 120) / 70); if (x > 30 && x < W - 30 && k >= 0 && k < this.pick.length) this.choose(this.pick[k]); return; }
     this.joy = { ox: x, oy: y, x, y };
   }
   up() { this.joy = null; }
@@ -111,6 +118,8 @@ export class Survivors extends Game {
     const opts = [...Object.keys(WEAPONS).map((k) => ({ k, w: 1 })), ...Object.keys(PASSIVE).map((k) => ({ k, w: 0 }))].filter((o) => (o.w ? (this.weapons[o.k] || 0) < 6 : (this.passive[o.k] || 0) < 4));
     for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [opts[i], opts[j]] = [opts[j], opts[i]]; }
     this.pick = opts.slice(0, 3); this.pickT = this.r(0.8, 1.5);
+    // a short cheer before the upgrade menu comes up
+    this.pickIn = 0.9; this.hero.emote('cheer', 0.9);
   }
   choose(o) {
     if (o.w) this.weapons[o.k] = (this.weapons[o.k] || 0) + 1;
@@ -118,7 +127,7 @@ export class Survivors extends Game {
     this.pick = null;
   }
   autopilot(dt) {
-    if (this.pick) { this.pickT -= dt; if (this.pickT <= 0) this.choose(this.pick.find((o) => o.w && !this.weapons[o.k]) || this.pick[0]); return; }
+    if (this.pick) { if (this.pickIn > 0) return; this.pickT -= dt; if (this.pickT <= 0) this.choose(this.pick.find((o) => o.w && !this.weapons[o.k]) || this.pick[0]); return; }
     const p = this.p;
     let mx = 0, my = 0;
     for (const f of this.foes) { const dx = p.x - f.x, dy = p.y - f.y, d = Math.hypot(dx, dy) + 1; if (d < 110) { mx += dx / d * (110 - d) / 30; my += dy / d * (110 - d) / 30; } }
@@ -135,27 +144,42 @@ export class Survivors extends Game {
   hit(f, dmg) { f.hp -= dmg; f.flash = 0.08; if (f.hp <= 0 && !f.dead) { f.dead = true; this.kills++; this.score += f.big ? 50 : 5; this.gems.push({ x: f.x, y: f.y, v: f.big ? 8 : 1 }); } }
   step(dt) {
     if (!this.painted && (this.paintT = (this.paintT || 0) - dt) <= 0) { this.paintT = 0.5; this.paint(); }
-    if (this.pick) return;
+    if (this.pick || this.dying) {
+      this.runPending(this.hero.update(dt, { lowHealth: !this.dying && this.p.hp < this.p.max * 0.25 }));
+      if (this.pick && this.pickIn > 0) { this.pickIn -= dt; if (this.hero.a.action !== 'cheer' && this.pickIn > 0.2) this.hero.emote('cheer', this.pickIn); }
+      if (this.dying && (this.dying -= dt) <= 0) this.gameOver();
+      return;
+    }
     this.clock += dt;
     const p = this.p, haste = 1 + (this.passive.haste || 0) * 0.15;
     let mv = this.auto ? this.autoMove : null;
     if (!this.auto && this.joy) { const dx = this.joy.x - this.joy.ox, dy = this.joy.y - this.joy.oy, d = Math.hypot(dx, dy); if (d > 6) mv = { x: dx / d * Math.min(1, d / 30), y: dy / d * Math.min(1, d / 30) }; }
+    const ox = p.x, oy = p.y, act = this.hero.a.action;
     if (mv) {
-      const sp = p.sp * (1 + (this.passive.speed || 0) * 0.12) * dt, r = 5;
+      // a swing or a flinch slows you down; shooting and casting don't
+      const sp = p.sp * (1 + (this.passive.speed || 0) * 0.12) * dt * (act === 'attack' ? 0.45 : act === 'flinch' ? 0.6 : 1), r = 5;
       const nx = p.x + mv.x * sp; if (!this.solid(nx + Math.sign(mv.x) * r, p.y - r) && !this.solid(nx + Math.sign(mv.x) * r, p.y + r)) p.x = nx;
       const ny = p.y + mv.y * sp; if (!this.solid(p.x - r, ny + Math.sign(mv.y) * r) && !this.solid(p.x + r, ny + Math.sign(mv.y) * r)) p.y = ny;
       if (Math.abs(mv.x) > 0.2) p.face = Math.sign(mv.x);
       p.walk = (p.walk || 0) + dt;
     }
+    this.runPending(this.hero.update(dt, { vx: (p.x - ox) / dt, vy: (p.y - oy) / dt, lowHealth: p.hp < p.max * 0.25 }));
     p.inv -= dt; p.hp = Math.min(p.max, p.hp + dt * (1 + (this.passive.heart || 0)));
     // weapons
     const cd = (k, t) => { this.cd[k] = (this.cd[k] || 0) - dt * haste; if (this.cd[k] <= 0) { this.cd[k] = t; return true; } return false; };
     const L = this.weapons;
-    if (L.wand && cd('wand', 1.1 / (1 + L.wand * 0.25))) for (let k = 0; k < Math.ceil(L.wand / 2); k++) { const f = this.nearest(260); if (!f) break; const a = Math.atan2(f.y - p.y, f.x - p.x) + (k ? this.r(-0.3, 0.3) : 0); this.shots.push({ x: p.x, y: p.y, vx: Math.cos(a) * 240, vy: Math.sin(a) * 240, a, life: 1.2, dmg: 6 + L.wand * 2, pierce: Math.floor(L.wand / 3) }); }
-    if (L.whip && cd('whip', 1.4 / (1 + L.whip * 0.15))) for (const s of L.whip > 2 ? [1, -1] : [p.face]) { this.slashes.push({ s, t: 0.2 }); for (const f of this.foes) if (Math.sign(f.x - p.x) === s && Math.abs(f.x - p.x) < 60 + L.whip * 6 && Math.abs(f.y - p.y) < 18) this.hit(f, 10 + L.whip * 4); this.digCircle(p.x + s * 40, p.y, 12, 1); }
+    // wand = shoot (bolt leaves on 'fire'), whip = attack (lands on 'hit'), bombs = cast (thrown on 'cast')
+    if (L.wand && cd('wand', 1.1 / (1 + L.wand * 0.25)) && this.nearest(260)) {
+      const f0 = this.nearest(260); if (!mv) this.hero.face(dirOf(f0.x - p.x, f0.y - p.y));
+      this.queue('wand', 'shoot', () => { for (let k = 0; k < Math.ceil(L.wand / 2); k++) { const f = this.nearest(260); if (!f) break; const a = Math.atan2(f.y - p.y, f.x - p.x) + (k ? this.r(-0.3, 0.3) : 0); this.shots.push({ x: p.x, y: p.y - 8, vx: Math.cos(a) * 240, vy: Math.sin(a) * 240, a, life: 1.2, dmg: 6 + L.wand * 2, pierce: Math.floor(L.wand / 3) }); } });
+    }
+    if (L.whip && cd('whip', 1.4 / (1 + L.whip * 0.15))) {
+      this.hero.face(p.face < 0 ? 'W' : 'E');
+      this.queue('whip', 'attack', () => { for (const s of L.whip > 2 ? [1, -1] : [p.face]) { this.slashes.push({ s, t: 0.2 }); for (const f of this.foes) if (Math.sign(f.x - p.x) === s && Math.abs(f.x - p.x) < 60 + L.whip * 6 && Math.abs(f.y - p.y) < 18) this.hit(f, 10 + L.whip * 4); this.digCircle(p.x + s * 40, p.y, 12, 1); } });
+    }
     if (L.orbit) { const n = 1 + L.orbit, R2 = 34 + L.orbit * 3; for (let k = 0; k < n; k++) { const a = this.t * 3 + k * Math.PI * 2 / n, ox = p.x + Math.cos(a) * R2, oy = p.y + Math.sin(a) * R2; for (const f of this.foes) if (Math.hypot(f.x - ox, f.y - oy) < f.r + 7) this.hit(f, 30 * dt * (1 + L.orbit * 0.3)); if (this.rng() < dt * 6) this.dig(ox, oy, 1); } }
     if (L.aura) { const R2 = 30 + L.aura * 6; for (const f of this.foes) if (Math.hypot(f.x - p.x, f.y - p.y) < R2) this.hit(f, (6 + L.aura * 3) * dt); if (this.rng() < dt * 3 * L.aura) { const a = this.r(0, 7); this.dig(p.x + Math.cos(a) * R2, p.y + Math.sin(a) * R2, 1); } }
-    if (L.bomb && cd('bomb', 3.2 / (1 + L.bomb * 0.2))) { const f = this.nearest(200); const a = f ? Math.atan2(f.y - p.y, f.x - p.x) : this.r(0, 7), d = f ? Math.min(140, Math.hypot(f.x - p.x, f.y - p.y)) : 80; this.booms.push({ x: p.x, y: p.y, tx: p.x + Math.cos(a) * d, ty: p.y + Math.sin(a) * d, t: 0.6, r: 34 + L.bomb * 6 }); }
+    if (L.bomb && cd('bomb', 3.2 / (1 + L.bomb * 0.2))) this.queue('bomb', 'cast', () => { const f = this.nearest(200); const a = f ? Math.atan2(f.y - p.y, f.x - p.x) : this.r(0, 7), d = f ? Math.min(140, Math.hypot(f.x - p.x, f.y - p.y)) : 80; this.booms.push({ x: p.x, y: p.y - 14, tx: p.x + Math.cos(a) * d, ty: p.y + Math.sin(a) * d, t: 0.6, r: 34 + L.bomb * 6 }); });
     for (const b of this.shots) {
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
       if (this.solid(b.x, b.y)) { this.dig(b.x, b.y, 1); b.life = 0; }
@@ -180,7 +204,7 @@ export class Survivors extends Game {
       let nx = f.x + dx / d * f.sp * dt, ny = f.y + dy / d * f.sp * dt;
       if (this.solid(nx, ny)) { if (here < 0 && this.rng() < dt * 2) this.dig(nx, ny, 1); nx = f.x; ny = f.y; }
       f.x = nx; f.y = ny;
-      if (p.inv <= 0 && Math.hypot(f.x - p.x, f.y - p.y) < f.r + 5) { p.hp -= (f.big ? 10 : 5) * (this.mods.glass ? 2 : 1); p.inv = 0.4; if (p.hp <= 0) this.gameOver(); }
+      if (p.inv <= 0 && !this.dying && Math.hypot(f.x - p.x, f.y - p.y) < f.r + 5) { p.hp -= (f.big ? 10 : 5) * (this.mods.glass ? 2 : 1); p.inv = 0.4; if (p.hp <= 0) this.die(); else this.hero.hurt(); }
     }
     // keep the horde from stacking into one blob
     for (let i = 0; i < this.foes.length; i++) for (let j = i + 1; j < this.foes.length; j++) {
@@ -195,7 +219,21 @@ export class Survivors extends Game {
     this.shots = this.shots.filter((b) => b.life > 0); this.booms = this.booms.filter((b) => !b.done || b.flash > 0); this.slashes = this.slashes.filter((s) => s.t > 0);
     if (this.xp >= this.need) this.levelUp();
   }
-  gameOver() { this.burst(this.p.x - this.camX, this.p.y - this.camY, this.col(0), 40, 260); this.best = Math.max(this.best, this.score); const keep = this.score; this.setup(); this.msg = { s: `DEVOURED · ${keep}`, t: 2.5 }; }
+  // start a weapon's animation; its effect runs on the matching event, or at once if
+  // the animation can't play or gets cut off (a flinch interrupting a swing)
+  queue(k, anim, fn) {
+    if (this.pend[k]) this.pend[k].fn();
+    const ok = anim === 'shoot' ? this.hero.shoot() : anim === 'attack' ? this.hero.attack() : this.hero.cast();
+    if (ok) this.pend[k] = { anim, fn }; else { delete this.pend[k]; fn(); }
+  }
+  runPending(evs) {
+    for (const [k, q] of Object.entries(this.pend)) {
+      const ev = q.anim === 'shoot' ? 'fire' : q.anim === 'attack' ? 'hit' : 'cast';
+      if (evs.includes(ev) || this.hero.a.action !== q.anim) { delete this.pend[k]; q.fn(); if (q.anim === 'cast') this.hero.stopCast(); }
+    }
+  }
+  die() { const p = this.p; this.burst(p.x - this.camX, p.y - this.camY, this.col(0), 30, 200); this.pend = {}; this.hero.ko(); this.dying = 2.2; }
+  gameOver() { this.best = Math.max(this.best, this.score); const keep = this.score; this.setup(); this.msg = { s: `DEVOURED · ${keep}`, t: 2.5 }; }
   draw(c) {
     const p = this.p;
     this.camX = Math.max(0, Math.min(WW - W, p.x - W / 2)); this.camY = Math.max(0, Math.min(WW - H, p.y - H / 2));
@@ -203,16 +241,23 @@ export class Survivors extends Game {
     c.drawImage(this.world, this.camX, this.camY, W, H, 0, 0, W, H);
     c.save(); c.translate(-this.camX, -this.camY);
     for (const g of this.gems) { c.fillStyle = g.v > 1 ? this.col(0) : this.col(4); c.beginPath(); c.moveTo(g.x, g.y - 4); c.lineTo(g.x + 3, g.y); c.lineTo(g.x, g.y + 4); c.lineTo(g.x - 3, g.y); c.fill(); }
+    const L = this.weapons;
+    if (L.aura) { c.fillStyle = this.col(2); c.globalAlpha = 0.12 + Math.sin(this.t * 5) * 0.04; c.beginPath(); c.arc(p.x, p.y, 30 + L.aura * 6, 0, 7); c.fill(); c.globalAlpha = 1; }
     const enemyImgs = this.skin.list('foes', 3, 'enemy', 'monster', 'animal');
-    for (const f of this.foes) {
-      if (f.x < this.camX - 30 || f.x > this.camX + W + 30 || f.y < this.camY - 30 || f.y > this.camY + H + 30) continue;
+    // foes and hero drawn back to front by their feet
+    const ents = this.foes.filter((f) => !(f.x < this.camX - 30 || f.x > this.camX + W + 30 || f.y < this.camY - 30 || f.y > this.camY + H + 30)).map((f) => ({ f, y: f.y + f.r }));
+    ents.push({ y: p.y + 9 });
+    ents.sort((a, b) => a.y - b.y);
+    for (const { f } of ents) {
+      if (!f) {
+        if (this.dying || p.inv <= 0 || Math.floor(this.t * 15) % 2) this.hero.draw(c, p.x, p.y + 9, 1, { alpha: this.dying ? Math.min(1, this.dying / 0.8) : 1 });
+        continue;
+      }
       const cr = this.skin.creatures[f.kind % 6], im = f.kind >= 3 && enemyImgs[f.kind - 3] ? enemyImgs[f.kind - 3] : cr.frames[Math.floor(f.ph * 4) % 2], s = f.r * 2.6;
       if (f.flash) c.filter = 'brightness(2.5)';
       if (!drawFit(c, im, f.x, f.y + Math.sin(f.ph * 10) * 1, s, s, 0, f.x > p.x)) { c.fillStyle = this.col(f.kind); c.beginPath(); c.arc(f.x, f.y, f.r, 0, 7); c.fill(); }
       c.filter = 'none';
     }
-    const L = this.weapons;
-    if (L.aura) { c.fillStyle = this.col(2); c.globalAlpha = 0.12 + Math.sin(this.t * 5) * 0.04; c.beginPath(); c.arc(p.x, p.y, 30 + L.aura * 6, 0, 7); c.fill(); c.globalAlpha = 1; }
     if (L.orbit) { const n = 1 + L.orbit, R2 = 34 + L.orbit * 3, im = this.skin.pick('orbit', 'item', 'ball', 'prop'); for (let k = 0; k < n; k++) { const a = this.t * 3 + k * Math.PI * 2 / n; if (!drawFit(c, im, p.x + Math.cos(a) * R2, p.y + Math.sin(a) * R2, 14, 14, a)) { c.fillStyle = this.col(1); c.beginPath(); c.arc(p.x + Math.cos(a) * R2, p.y + Math.sin(a) * R2, 5, 0, 7); c.fill(); } } }
     const bim = this.skin.pick('bullet', 'item', 'fx', 'ball');
     for (const b of this.shots) if (!drawFit(c, bim, b.x, b.y, 10, 10, b.a)) { c.fillStyle = this.col(4); c.beginPath(); c.arc(b.x, b.y, 3, 0, 7); c.fill(); }
@@ -221,17 +266,13 @@ export class Survivors extends Game {
       else { c.fillStyle = this.col(0); c.globalAlpha = Math.max(0, b.flash * 3); c.beginPath(); c.arc(b.tx, b.ty, b.r, 0, 7); c.fill(); c.globalAlpha = 1; }
     }
     for (const s of this.slashes) { c.strokeStyle = this.pal.ink; c.globalAlpha = s.t * 4; c.lineWidth = 6; c.beginPath(); c.ellipse(p.x + s.s * 40, p.y, 40, 10, 0, 0, 7); c.stroke(); c.globalAlpha = 1; }
-    if (p.inv <= 0 || Math.floor(this.t * 15) % 2) {
-      const per = this.skin.people[0];
-      drawFit(c, per.walk[Math.floor((p.walk || 0) * 8) % 2], p.x, p.y - 4, 18, 24, 0, p.face < 0);
-    }
     c.restore();
     // HUD
     c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(0, H - 10, W, 10);
     c.fillStyle = this.col(4); c.fillRect(0, H - 10, W * Math.min(1, this.xp / this.need), 10);
     c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(W - 92, 42, 80, 7); c.fillStyle = this.col(0); c.fillRect(W - 92, 42, 80 * Math.max(0, p.hp / p.max), 7);
     this.text(c, `LV ${this.lvl}  ${Math.floor(this.clock / 60)}:${String(Math.floor(this.clock % 60)).padStart(2, '0')}`, W - 12, 30, 11, this.pal.ink, 'right');
-    if (this.pick) {
+    if (this.pick && this.pickIn <= 0) {
       c.fillStyle = 'rgba(0,0,0,.6)'; c.fillRect(0, 0, W, H);
       this.text(c, 'LEVEL UP', W / 2, 96, 18, this.pal.ink);
       this.pick.forEach((o, k) => {
