@@ -1,0 +1,158 @@
+{
+  "generatedAt": "2026-10-29T16:15:26.657Z",
+  "package": "2026-W43",
+  "mix": {
+    "game": 51,
+    "wiki": 23,
+    "video": 18,
+    "meme": 60,
+    "product": 58,
+    "psych": 57,
+    "selfcare": 5,
+    "web": 5,
+    "oracle": 3,
+    "power": 2,
+    "read": 4,
+    "studio": 2,
+    "news": 41
+  },
+  "subWeights": {},
+  "learned": {
+    "meme": {
+      "remix": 0.8695652173913044
+    }
+  },
+  "usage7d": {
+    "hours": 3.1,
+    "posts": 1502,
+    "sessions": 66,
+    "skips": 456,
+    "selfcareDone": 0,
+    "byHour": [
+      0,
+      2,
+      0,
+      0,
+      17,
+      0,
+      0,
+      17,
+      13,
+      10,
+      7,
+      9,
+      12,
+      24,
+      4,
+      18,
+      19,
+      1,
+      1,
+      4,
+      5,
+      1,
+      23,
+      0
+    ]
+  },
+  "perCategory": {
+    "game": {
+      "total": 1040,
+      "viewed": 410,
+      "avgDwellSec": 16.1
+    },
+    "wiki": {
+      "total": 1197,
+      "viewed": 315,
+      "avgDwellSec": 7.9
+    },
+    "video": {
+      "total": 750,
+      "viewed": 241,
+      "avgDwellSec": 7.1
+    },
+    "meme": {
+      "total": 520,
+      "viewed": 401,
+      "avgDwellSec": 5.4
+    },
+    "product": {
+      "total": 208,
+      "viewed": 208,
+      "avgDwellSec": 4.3
+    },
+    "psych": {
+      "total": 208,
+      "viewed": 208,
+      "avgDwellSec": 3.3
+    },
+    "selfcare": {
+      "total": 260,
+      "viewed": 75,
+      "avgDwellSec": 10.8
+    },
+    "web": {
+      "total": 260,
+      "viewed": 67,
+      "avgDwellSec": 7.7
+    },
+    "oracle": {
+      "total": 156,
+      "viewed": 42,
+      "avgDwellSec": 4.8
+    },
+    "power": {
+      "total": 104,
+      "viewed": 26,
+      "avgDwellSec": 5
+    },
+    "read": {
+      "total": 152,
+      "viewed": 54,
+      "avgDwellSec": 11
+    },
+    "studio": {
+      "total": 104,
+      "viewed": 26,
+      "avgDwellSec": 9.8
+    },
+    "news": {
+      "total": 91,
+      "viewed": 0,
+      "avgDwellSec": 0
+    }
+  },
+  "favorites": [
+    {
+      "id": "w26056",
+      "cat": "wiki",
+      "sub": "literature",
+      "label": "Robert Anton Wilson",
+      "url": "https://en.wikipedia.org/wiki/Robert_Anton_Wilson"
+    },
+    {
+      "id": "pxhdqdx",
+      "cat": "psych",
+      "sub": "mandel",
+      "label": "I love talking about nothing, father. It is the only thing I know anything about."
+    },
+    {
+      "id": "gcysv49",
+      "cat": "game",
+      "sub": "racer",
+      "label": "Sienna Road Racer"
+    }
+  ],
+  "saved": [],
+  "moreLikeThis": [],
+  "lessLikeThis": [
+    {
+      "id": "mc71ih8k",
+      "v": -1,
+      "cat": "meme",
+      "sub": "remix",
+      "label": "mc71ih8k"
+    }
+  ],
+  "promptEdited": false
+}
