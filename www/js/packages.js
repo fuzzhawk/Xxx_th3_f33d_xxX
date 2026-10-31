@@ -54,7 +54,9 @@ async function fetchPackage(base, id, onProgress) {
   if (manifest.oracle) { try { oracle = await getJSON(`${base}${id}/${manifest.oracle}`, 60000); } catch { /* optional */ } }
   let vocab = [];
   if (manifest.vocab) { try { vocab = await getJSON(`${base}${id}/${manifest.vocab}`, 60000); } catch { /* optional */ } }
-  return { manifest, posts, sprites, themes, textures, oracle, vocab };
+  let backgrounds = [];
+  if (manifest.backgrounds) { try { backgrounds = await getJSON(`${base}${id}/${manifest.backgrounds}`, 60000); } catch { /* optional */ } }
+  return { manifest, posts, sprites, themes, textures, oracle, vocab, backgrounds };
 }
 
 export async function downloadPackage(id, onProgress) {

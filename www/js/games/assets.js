@@ -23,6 +23,10 @@ let textures = [];
 // Weathered texture photos (rust, bark, concrete…) shipped in the package as small data URIs.
 export function setTextures(list) { textures = (list || []).map((t) => img(t.src)); }
 export const getTextures = () => textures;
+// Background groups from the package: coherent sets of clouds, landscapes and paintings.
+let bgGroups = [];
+export function setBackgrounds(list) { bgGroups = (list || []).filter((g) => g.imgs?.length); }
+export const getBackgrounds = () => bgGroups;
 export function setThemes(list) { themes.clear(); for (const t of list || []) themes.set(t.id, t); }
 export const hasAssets = () => !!kenney || props.length > 0;
 
@@ -110,6 +114,15 @@ export class Skin {
     if (!this.slots.enemy.length) this.slots.enemy = this.creatures.slice(1, 5).map((m) => m.frames[0]);
     if (!this.slots.item.length) this.slots.item = props.length ? props.slice((seed % 30), (seed % 30) + 6).map(img) : Array.from({ length: 4 }, (_, k) => procItem(ps + k * 13, this.hue + k * 30));
     if (!this.slots.tile.length) this.slots.tile = [texture(ps, this.hue)];
+    // half of all games take their backdrop from one coherent group of clouds, landscapes or paintings;
+    // `bgSet` holds a few more from the same group for games with layered (parallax) skies
+    const bgHash = ((seed >>> 0) * 2654435761 + v * 97) >>> 0;
+    if (bgGroups.length && bgHash % 2 === 0) {
+      const g = bgGroups[(bgHash >>> 3) % bgGroups.length], k = (bgHash >>> 9) % g.imgs.length;
+      this.bgGroup = g;
+      this.bgSet = Array.from({ length: Math.min(4, g.imgs.length) }, (_, i) => img(g.imgs[(k + i) % g.imgs.length].src));
+      this.bg = this.bgSet[0];
+    }
     // generated themes borrow a photo background from a kit, or a texture
     if (!this.bg) {
       const kits = [...themes.values()].filter((x) => x.bgs?.length);

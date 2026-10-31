@@ -421,3 +421,19 @@ details.subw[open] summary::after { transform: rotate(90deg); }
 .jump { display: inline-flex; align-items: center; gap: 6px; background: var(--card2); color: var(--text); border: 1px solid var(--line2); border-radius: 999px; padding: 6px 11px; font: 600 12.5px var(--sans); cursor: pointer; }
 .jump small { color: var(--muted); font-weight: 600; font-size: 10.5px; }
 .jump:active { transform: scale(0.97); }
+
+/* ------------------------------------------------ boot / loading animation */
+#boot { position: fixed; inset: 0; z-index: 100; background: radial-gradient(circle at 50% 38%, #221a14, var(--bg) 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; transition: opacity .5s ease, visibility .5s; }
+#boot.done { opacity: 0; visibility: hidden; pointer-events: none; }
+.boot-mark { font-family: var(--serif); font-style: italic; font-size: 38px; letter-spacing: -.5px; display: flex; align-items: center; gap: 11px; animation: bootrise 1.2s cubic-bezier(.2,.8,.2,1) both; }
+.boot-mark .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--ring); box-shadow: 0 0 18px rgba(255,122,26,.7); animation: bootpulse 1.6s ease-in-out infinite; }
+.boot-cards { position: relative; width: 150px; height: 104px; }
+.boot-cards i { position: absolute; left: 25px; top: 0; width: 100px; height: 104px; border-radius: 12px; background: linear-gradient(110deg, var(--card) 30%, #3a2c22 50%, var(--card) 70%) 0 0 / 300% 100%; border: 1px solid var(--line2); animation: bootdeal 2.4s cubic-bezier(.5,0,.2,1) infinite, bootshine 1.4s linear infinite; }
+.boot-cards i:nth-child(2) { animation-delay: .8s, .2s; }
+.boot-cards i:nth-child(3) { animation-delay: 1.6s, .4s; }
+.boot-line { color: var(--muted); font: 600 12px var(--mono); letter-spacing: .4px; min-height: 16px; animation: fadein 1s .3s both; }
+@keyframes bootrise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes bootpulse { 0%, 100% { transform: scale(.8); box-shadow: 0 0 8px rgba(255,122,26,.4); } 50% { transform: scale(1.25); box-shadow: 0 0 26px rgba(255,122,26,.9); } }
+@keyframes bootdeal { 0% { transform: translateY(30px) rotate(-8deg) scale(.9); opacity: 0; } 18% { opacity: 1; transform: translateY(0) rotate(0) scale(1); } 66% { opacity: 1; transform: translateY(0) rotate(0) scale(1); } 100% { opacity: 0; transform: translateY(-46px) rotate(6deg) scale(.96); } }
+@keyframes bootshine { to { background-position: -300% 0; } }
+@media (prefers-reduced-motion: reduce) { .boot-cards i, .boot-mark .dot { animation: none; } }

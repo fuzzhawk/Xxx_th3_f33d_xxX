@@ -2,7 +2,7 @@ import { $, $$, el, fmtDur, toast } from './util.js';
 import { settings, saveSettings, seenSet, flushSeen } from './state.js';
 import { initialPackage, loadPackage, checkForNew, downloadPackage } from './packages.js';
 import { loadFavs } from './favs.js';
-import { loadKenney, setProps, setThemes, setTextures } from './games/assets.js';
+import { loadKenney, setProps, setThemes, setTextures, setBackgrounds } from './games/assets.js';
 import { setOracle } from './oracle.js';
 import { setVocab } from './games/words.js';
 import * as stats from './stats.js';
@@ -18,9 +18,11 @@ const feed = new Feed($('#view-feed'), $('#feed'), $('#feed-spacer'), $('#feed-s
 export function applyImmersive() {
   try { window.Capacitor?.nativePromise?.('FeedNative', 'setImmersive', { on: !!settings.immersive })?.catch(() => {}); } catch { /* not native */ }
 }
+// the package's pictures and data that games and posts draw on
+function useArt(p) { setProps(p.sprites); setThemes(p.themes); setTextures(p.textures); setBackgrounds(p.backgrounds); setOracle(p.oracle); setVocab(p.vocab); }
 const app = {
   pkg: () => pkg,
-  async reload() { pkg = await loadPackage(settings.pkg); setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle); setVocab(pkg.vocab); feed.load(pkg); },
+  async reload() { pkg = await loadPackage(settings.pkg); useArt(pkg); feed.load(pkg); },
   // settings changed: keep what is on screen, new posts follow the new mix
   softReload() { /* the scheduler reads settings live */ },
   // Settings → Jump to: back to the feed, showing only that kind of post
@@ -79,6 +81,12 @@ timer.addEventListener('click', openStats);
 $('#stats').addEventListener('click', (e) => { if (e.target.id === 'stats' || e.target.closest('[data-close]')) history.back(); });
 
 // ---------------------------------------------------------------- boot
+// the loading animation stays until the first posts are in
+const BOOT_LINES = ['shuffling this week’s package…', 'waking the forest spirits…', 'sharpening the pixels…', 'dealing the cards…', 'tuning the oracle…', 'polishing the long reads…'];
+const bootEl = document.getElementById('boot');
+let bootLine = 0;
+const bootTimer = setInterval(() => { const l = bootEl?.querySelector('.boot-line'); if (l) l.textContent = BOOT_LINES[++bootLine % BOOT_LINES.length]; }, 1400);
+function bootDone() { clearInterval(bootTimer); bootEl?.classList.add('done'); setTimeout(() => bootEl?.remove(), 700); }
 async function boot() {
   stats.init();
   applyImmersive();
@@ -88,9 +96,11 @@ async function boot() {
   initSettings($('#view-settings'), app);
   try {
     pkg = await initialPackage();
-    setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle); setVocab(pkg.vocab);
+    useArt(pkg);
     feed.load(pkg);
+    bootDone();
   } catch (err) {
+    bootDone();
     console.error(err);
     $('#feed').append(notice('No package yet', `The app could not load a package (${err.message}). Connect to the internet and check Settings → Package.`,
       [el('button.btn.primary', { onclick: () => show('settings') }, 'Open settings')]));
@@ -102,7 +112,7 @@ async function boot() {
       // same package id rebuilt on GitHub: refresh it quietly
       const same = remote.packages.find((p) => p.id === pkg.manifest.id);
       if (same && same.created > pkg.manifest.created) {
-        try { pkg = await downloadPackage(same.id); setProps(pkg.sprites); setThemes(pkg.themes); setTextures(pkg.textures); setOracle(pkg.oracle); setVocab(pkg.vocab); toast(`Updated ${same.id} with the latest build`); feed.load(pkg); } catch { /* keep the old copy */ }
+        try { pkg = await downloadPackage(same.id); useArt(pkg); toast(`Updated ${same.id} with the latest build`); feed.load(pkg); } catch { /* keep the old copy */ }
       }
       const newest = fresh.at(-1);
       if (newest) document.querySelector('[data-tab=settings]').classList.add('notify');

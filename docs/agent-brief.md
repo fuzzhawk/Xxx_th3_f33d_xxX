@@ -27,7 +27,7 @@ owner's requests and decisions. Your prompt names your work package and the file
 - Mutators: `this.mods`, `this.G` (gravity ×), `this.T` (time ×), `this.S` (size ×); `static noMods = [...]` bans some.
 - Theme art: `this.skin` (www/js/games/assets.js): `skin.pal` palette, `skin.col(i)`, `skin.pick(key, ...roles)`,
   `skin.list(key, n, ...roles)` for PNGs/canvases by role (`hero`, `enemy`, `item`, `tile`, `bg`…), `skin.bg`,
-  `skin.texFor(k)` weathered photo textures, `skin.creatures` (6 generated creatures: `.frames[0..1]`, `.walk[4]`,
+  `skin.texFor(k)` weathered photo textures, `skin.bgSet` (when present: up to 4 images from one coherent group of clouds, landscapes or paintings — use them for layered/parallax backdrops; `skin.bg` is the first), `skin.creatures` (6 generated creatures: `.frames[0..1]`, `.walk[4]`,
   `.attack[3]`, `.hurt`, `.dead`), `skin.crystal(k, era, dirs)` Crystal Sprite sheets, `skin.vehicle(key)` random PNG.
   Helpers: `drawFit(c, img, x, y, w, h, rot, flip)`, `ready(img)`.
 - Characters: Crystal Sprite Engine — `www/js/crystal/README.md` and `www/js/crystal/sprites.js`

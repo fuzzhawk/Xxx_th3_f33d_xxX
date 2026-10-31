@@ -21,9 +21,9 @@ import { readBody } from './reads.js';
 
 const TOPIC_COLOR = {
   music: '#e8742a', literature: '#c9952b', science: '#8a9a52', history: '#c4623a', transgressive: '#d06a8c', mysteries: '#6d9bb0', occult: '#a283c4',
-  animals: '#d8a25a', retrogaming: '#5b9aa9', vintagescifi: '#a77bd0'
+  animals: '#d8a25a', retrogaming: '#5b9aa9', vintagescifi: '#a77bd0', theory: '#d9b26f', math: '#5b8fd0', biology: '#5fa86a', offbeat: '#c98a3a'
 };
-const TOPIC_GLYPH = { music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉' };
+const TOPIC_GLYPH = { music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉', theory: '𝄞', math: '∑', biology: '❦', offbeat: '⚘' };
 const CAT_FACE = { news: ['◉', '#8a2b2b'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], read: ['❧', '#6a5a3a'], studio: ['✎', '#3a6a5a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'] };
 let soundOn = false;
 

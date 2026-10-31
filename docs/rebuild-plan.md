@@ -104,9 +104,9 @@ Work happens on branch `claude/feed-rebuild` and ships in one push to `claude/re
 | Crystal Quest | `jrpg.js` |
 | Crypt Hack | `hack.js` |
 | Oracle + Rhymes | `oracle.js`, `oracle-data.js`, `chaos.js` (new), `rhymes.js` (new), `www/data/rhymes*` |
-| Feed content | `www/js/psych.js`, `www/js/productart.js`, `www/js/power.js`, `tools/power.mjs`, `tools/data/power.json`, `tools/products.mjs`, `tools/data/products-data.mjs`, loading animation (`www/index.html`) |
+| Feed content | `www/js/psych.js`, `www/js/productart.js`, `www/js/power.js`, `tools/power.mjs`, `tools/data/power.json`, `tools/products.mjs`, `tools/data/products-data.mjs` |
 | Monster Battle | `battle.js` (+ new overworld file) |
 | Grave Merge | `graves.js` |
 | Hell Maze | `hellmaze.js` (new), `doom.js` (delete) |
 | Haruspicy | `haruspex.js` |
-| Integration (lead) | `www/js/packages.js`, `games/all.js`, `games/assets.js`, `cards.js`, `feed.js`, `settingsview.js`, harness pages |
+| Integration (lead) | loading animation (`www/index.html`, `style.css`), `www/js/packages.js`, `www/js/main.js`, `games/all.js`, `games/assets.js`, `cards.js`, `feed.js`, `settingsview.js`, harness pages |
