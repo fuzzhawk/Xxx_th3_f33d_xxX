@@ -87,7 +87,9 @@ Work happens on branch `claude/feed-rebuild` and ships in one push to `claude/re
 | --- | --- |
 | Creatures | `www/js/spirits.js` (new), `monster()` in `www/js/games/creature.js` |
 | Characters | `www/js/marrow/*`, `www/js/crystal/sprites.js`, `www/js/hero.js`, `www/js/studio.js`, `www/js/dnd.js`, `www/js/games/brawl.js` |
-| Package builder | `tools/*`, `packages/` data, `tools/data/*` |
+| Package builder | `tools/build-package.mjs`, `tools/data/config.json`, `tools/data/topics.json`, `tools/data/content.mjs`, other `tools/data/*` not listed below |
+| Images | `tools/images.mjs`, new `tools/data/images.json` |
+| Memes | `tools/memes.mjs`, `tools/data/memes-data.mjs`, `www/js/memes.js` |
 | Plinko + Peg Shot | `plinko.js`, `peggle.js`, `materials.js` (new) |
 | Arcade five | `breakout.js`, `pong.js`, `juggle.js`, `dash.js`, `flap.js` |
 | Merge + Tetris | `merge.js`, `tetris.js` (new), `stacker.js` (delete) |
@@ -102,9 +104,9 @@ Work happens on branch `claude/feed-rebuild` and ships in one push to `claude/re
 | Crystal Quest | `jrpg.js` |
 | Crypt Hack | `hack.js` |
 | Oracle + Rhymes | `oracle.js`, `oracle-data.js`, `chaos.js` (new), `rhymes.js` (new), `www/data/rhymes*` |
-| Feed content | `psych.js`, `memes.js`, `productart.js`, `power.js`, loading animation (`index.html`, `www/index.html`, `css`) |
+| Feed content | `www/js/psych.js`, `www/js/productart.js`, `www/js/power.js`, `tools/power.mjs`, `tools/data/power.json`, `tools/products.mjs`, `tools/data/products-data.mjs`, loading animation (`www/index.html`) |
 | Monster Battle | `battle.js` (+ new overworld file) |
 | Grave Merge | `graves.js` |
 | Hell Maze | `hellmaze.js` (new), `doom.js` (delete) |
 | Haruspicy | `haruspex.js` |
-| Integration (lead) | `games/all.js`, `games/assets.js`, `cards.js`, `feed.js`, `settingsview.js`, harness pages |
+| Integration (lead) | `www/js/packages.js`, `games/all.js`, `games/assets.js`, `cards.js`, `feed.js`, `settingsview.js`, harness pages |

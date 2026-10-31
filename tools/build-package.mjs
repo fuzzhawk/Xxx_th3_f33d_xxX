@@ -15,8 +15,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hasTransparentEdges } from './png.mjs';
+import { memesBuilder } from './memes.mjs';
+import { powerBuilder } from './power.mjs';
+import { productsBuilder } from './products.mjs';
+import { imagesBuilder } from './images.mjs';
 import { DECK, QUESTIONS } from '../www/js/oracle-data.js';
-import { productClassics, productParts, selfCare, selfCareFlavors, fallbackQuotes, memeText, memeWeights, memeImageCount } from './data/content.mjs';
+import { selfCare, selfCareFlavors, fallbackQuotes } from './data/content.mjs';
+import { productClassics, productParts } from './data/products-data.mjs';
+import { memeText, memeWeights, memeImageCount } from './data/memes-data.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = parseArgs(process.argv.slice(2));
@@ -806,60 +812,6 @@ async function buildReads(wiki) {
   return shuffle(out).slice(0, n).map((x) => ({ id: `rd${hashStr(`${x.title}${x.paras?.[0] || x.lines?.[0] || ''}`).toString(36)}`, cat: 'read', sub: x.kind, ...x }));
 }
 
-// ------------------------------------------------------------------ absurd power scale
-async function buildPower() {
-  const P = readJSON(path.join(ROOT, 'tools/data/power.json'));
-  const all = Object.entries(P.entities).flatMap(([kind, ts]) => ts.map((t) => ({ t, kind })));
-  const ents = new Map();
-  if (OFFLINE) for (const e of all) ents.set(e.t, { t: e.t, k: e.kind, b: `${e.t} is a placeholder entry for offline testing.`, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(e.t.replace(/ /g, '_'))}`, views: 500 + (hashStr(e.t) % 90000), len: 3000 + (hashStr(e.t) % 60000) });
-  else {
-    for (let i = 0; i < all.length; i += 20) {
-      const batch = all.slice(i, i + 20);
-      try {
-        const j = await fetchJSON(wq({ action: 'query', prop: 'extracts|pageimages|info|pageviews', exintro: '1', explaintext: '1', exsentences: '2', exlimit: '20', piprop: 'thumbnail', pithumbsize: '320', pilimit: '20', pvipdays: '30', inprop: 'url', redirects: '1', titles: batch.map((e) => e.t).join('|') }));
-        const back = {};
-        for (const n of j.query?.normalized || []) back[n.to] = n.from;
-        for (const r of j.query?.redirects || []) back[r.to] = back[r.from] || r.from;
-        for (const pg of j.query?.pages || []) {
-          if (pg.missing || !pg.extract) continue;
-          const orig = back[pg.title] || pg.title, e = batch.find((x) => x.t === orig) || batch.find((x) => x.t === pg.title);
-          if (!e || ents.has(pg.title)) continue;
-          const views = Object.values(pg.pageviews || {}).reduce((a, v) => a + (v || 0), 0);
-          ents.set(pg.title, { t: pg.title, k: e.kind, b: clip(cleanExtract(pg.extract), 170), img: pg.thumbnail?.source, url: pg.fullurl || `https://en.wikipedia.org/wiki/${encodeURIComponent(pg.title.replace(/ /g, '_'))}`, views, len: pg.length || 0 });
-        }
-      } catch (e) { warn(`power batch ${i}: ${e.message}`); }
-      await sleep(80);
-    }
-  }
-  const list = [...ents.values()];
-  if (list.length < 8) { warn('power scale: too few entities'); return []; }
-  // stats: two from real numbers (pageviews, article length), the rest are fate
-  const statOf = (e) => {
-    const h = hashStr(e.t), s = {};
-    P.stats.forEach((name, k) => { s[name] = name === 'Lore' ? Math.min(10, Math.max(1, Math.round(Math.log10(e.len + 10) * 2.2 - 5))) : name === 'Cult following' ? Math.min(10, Math.max(1, Math.round(Math.log10(e.views + 10) * 1.9 - 2))) : 1 + ((h >>> (k * 3)) % 10); });
-    return s;
-  };
-  for (const e of list) { e.s = statOf(e); e.pw = Math.round(Math.sqrt(e.views + 50) * Math.sqrt(e.len + 500) / 40 * (1 + (hashStr(e.t) % 13) / 4)); delete e.views; delete e.len; }
-  const fill = (tpl, o) => tpl.replace(/\{(\w+)\}/g, (_, k) => o[k] ?? '');
-  const n = want.power || 0, posts = [];
-  const TIER_TITLES = ['Official power ranking', 'Who would win in a pub', 'Strongest when wet', 'Most dangerous at a dinner party', 'Best to have in a lifeboat', 'Tier list of the unknowable', 'Ranked by how hard they are to explain to a customs officer', 'Most likely to survive the heat death of the universe', 'Who you’d want on a pub quiz team', 'Ranked by sheer audacity'];
-  for (let i = 0; i < n; i++) {
-    const seed = Math.floor(rand() * 2 ** 31), unit = pick(P.units);
-    if (i % 10 < 7) {
-      let a = pick(list), b = pick(list), g = 0;
-      while ((b === a || (b.k === a.k && rand() < 0.7)) && g++ < 20) b = pick(list);
-      const w = a.pw === b.pw ? (rand() < 0.5 ? 0 : 1) : a.pw > b.pw ? 0 : 1, win = [a, b][w], lose = [a, b][1 - w];
-      const stat = Object.entries(win.s).sort((x, y) => (y[1] - lose.s[y[0]]) - (x[1] - lose.s[x[0]]))[0][0];
-      posts.push({ id: `pw${seed.toString(36)}`, cat: 'power', sub: 'versus', seed, unit, a, b, winner: w, how: `${win.t} wins ${fill(pick(P.wins), { stat: stat.toLowerCase(), loser: lose.t })}.`, verdict: pick(P.verdicts) });
-    } else {
-      const picks = new Set(); while (picks.size < 6) picks.add(pick(list));
-      const ranked = [...picks].sort((x, y) => y.pw - x.pw);
-      posts.push({ id: `pt${seed.toString(36)}`, cat: 'power', sub: 'tier', seed, unit, title: pick(TIER_TITLES), ents: ranked, tiers: ['S', 'A', 'B', 'C', 'D', 'F'] });
-    }
-  }
-  report.sources.power = list.length;
-  return posts;
-}
 
 // ------------------------------------------------------------------ game theme kits
 const themeDefs = readJSON(path.join(ROOT, 'tools/data/themes.json')).themes;
@@ -959,31 +911,6 @@ function buildPsych(quotes, wiki) {
   });
 }
 
-function buildProducts() {
-  const P = productParts;
-  const posts = [];
-  const names = new Set();
-  const STYLES = ['sunset', 'memphis', 'chrome', 'vhs', 'infomercial', 'blueprint'];
-  const art = () => ({ style: pick(STYLES), seed: Math.floor(rand() * 2 ** 31) });
-  for (const c of shuffle([...productClassics])) {
-    if (posts.length >= want.product) break;
-    if (seen.product.has(c.name)) continue;
-    names.add(c.name);
-    posts.push({ id: `pr${hashStr(c.name).toString(36)}`, cat: 'product', sub: 'classic', name: c.name, tagline: c.tagline, desc: c.desc, glyph: c.glyph,
-      features: shuffle([...P.feature]).slice(0, 3), price: pick(P.price), disclaimer: pick(P.disclaimer), art: art() });
-  }
-  let guard = 0;
-  while (posts.length < want.product && guard++ < 20000) {
-    const [obj, glyph] = pick(P.object);
-    const name = `The ${pick(P.prefix)}-${obj} ${pick(P.suffix)}`;
-    if (names.has(name) || seen.product.has(name)) continue;
-    names.add(name);
-    const purpose = pick(P.purpose);
-    posts.push({ id: `pr${hashStr(name).toString(36)}`, cat: 'product', sub: 'generated', name, tagline: pick(P.tagline), glyph,
-      desc: `The ${obj.toLowerCase()} ${purpose}.`, features: shuffle([...P.feature]).slice(0, 3), price: pick(P.price), disclaimer: pick(P.disclaimer), art: art() });
-  }
-  return posts;
-}
 
 function buildSelfCare() {
   const posts = [];
@@ -997,84 +924,7 @@ function buildSelfCare() {
   return shuffle(posts);
 }
 
-// ------------------------------------------------------------------ surreal comic strips: odd thinkers talk past each other in their own (Wikiquote) words
-async function buildStrips(quotes, commons, n) {
-  const S = config.strips || {}, byAuthor = {};
-  for (const q of quotes) if (q.text.length >= 25 && q.text.length <= 150) (byAuthor[q.author] ||= []).push(q.text.replace(/^"|"$/g, ''));
-  const cast = Object.keys(byAuthor).filter((a) => byAuthor[a].length >= 3);
-  if (cast.length < 2 || !n) return [];
-  const portraits = {};
-  if (!OFFLINE) for (let i = 0; i < cast.length; i += 20) {
-    try {
-      const j = await fetchJSON(wq({ action: 'query', prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '240', pilimit: '20', redirects: '1', titles: cast.slice(i, i + 20).join('|') }));
-      const back = {}; for (const r of [...(j.query?.normalized || []), ...(j.query?.redirects || [])]) back[r.to] = back[r.from] || r.from;
-      for (const pg of j.query?.pages || []) if (pg.thumbnail?.source) portraits[back[pg.title] || pg.title] = pg.thumbnail.source;
-    } catch (e) { warn(`strip portraits: ${e.message}`); }
-  }
-  const out = [];
-  for (let k = 0; k < n; k++) {
-    const a = pick(cast); let b = pick(cast), g = 0; while (b === a && g++ < 10) b = pick(cast);
-    const qa = shuffle([...byAuthor[a]]), qb = shuffle([...byAuthor[b]]);
-    const bgs = Array.from({ length: 4 }, () => pick(commons)?.img).filter(Boolean);
-    const panels = [{ who: 0, say: qa[0] }, { who: 1, say: qb[0] }, { event: pick(S.events || ['Something strange happens.']) }, rand() < 0.75 ? { who: rand() < 0.5 ? 0 : 1, say: rand() < 0.5 ? qa[1] : qb[1] } : { who: 1, say: pick(S.sfx || ['…']) }];
-    const theme = pick(S.themes || ['the void']);
-    out.push({ id: `ms${hashStr(a + b + qa[0] + qb[0]).toString(36)}`, cat: 'meme', sub: 'strip', style: 'strip', title: `${a} and ${b} on ${theme}`, cast: [{ name: a, img: portraits[a] }, { name: b, img: portraits[b] }], panels, imgs: bgs, wiki: `https://en.wikiquote.org/wiki/${encodeURIComponent(a.replace(/ /g, '_'))}`, ref: `${a} & ${b}`, credit: 'Words from Wikiquote · pictures from Wikimedia Commons' });
-  }
-  report.sources.strips = out.length;
-  return out;
-}
 
-function buildMemes(quotes, wiki, commons, kym) {
-  const posts = [];
-  const kymN = Math.min(kym.length, Math.round(want.meme * 0.25));
-  for (const k of kym.slice(0, kymN)) posts.push({ id: `mk${hashStr(k.link).toString(36)}`, cat: 'meme', sub: 'kym', style: 'kym', img: k.img, title: k.title, link: k.link, credit: 'via Know Your Meme' });
-  const shortQ = shuffle(quotes.filter((q) => q.text.length < 150));
-  const facts = shuffle(wiki.filter((w) => w.hook.length < 170));
-  const topicLabel = Object.fromEntries(Object.entries(topics.wiki).map(([k, t]) => [k, t.label]));
-  let qi = 0, fi = 0, ii = 0;
-  const nextQ = () => shortQ[qi++ % Math.max(1, shortQ.length)] || { text: 'Only the madman is absolutely sure.', author: 'Robert Anton Wilson' };
-  const nextF = () => facts[fi++ % Math.max(1, facts.length)];
-  const nextImg = () => commons[ii++ % Math.max(1, commons.length)];
-  const styles = Object.entries(memeWeights);
-  const total = styles.reduce((s2, [, w]) => s2 + w, 0);
-  const pickStyle = () => { let x = rand() * total; for (const [k, w] of styles) { x -= w; if (x <= 0) return k; } return 'caption'; };
-  const authorUrl = (a) => `https://en.wikipedia.org/wiki/${encodeURIComponent(a.replace(/ /g, '_'))}`;
-  const short = (t) => t.replace(/ \(.*\)$/, '');
-  while (posts.length < want.meme && commons.length) {
-    const style = pickStyle();
-    const f = nextF(), f2 = nextF(), f3 = nextF(), f4 = nextF(), q = nextQ();
-    const usesQuote = (s3) => /\{quote|\{author|quoteA/.test(s3);
-    const factLower = f ? f.hook.replace(/\.$/, '').replace(/^(\S)/, (c) => (/^[A-Z][a-z]+ [a-z]/.test(f.hook) ? c.toLowerCase() : c)) : 'nothing is true';
-    const words = q.text.split(' '), half = Math.ceil(words.length / 2);
-    const fill = (t) => String(t).replace(/\{TITLE\}/g, f ? short(f.title).toUpperCase() : 'THIS').replace(/\{title\}/g, f ? short(f.title) : 'this').replace(/\{title2\}/g, f2 ? short(f2.title) : 'that')
-      .replace(/\{title3\}/g, f3 ? short(f3.title) : 'the other thing').replace(/\{fact\}/g, factLower).replace(/\{quoteA\}/g, words.slice(0, half).join(' ')).replace(/\{quoteB\}/g, words.slice(half).join(' '))
-      .replace(/\{quote\}/g, q.text.replace(/^"|"$/g, '')).replace(/\{author\}/g, q.author).replace(/\{topic\}/g, f ? topicLabel[f.sub] || 'Wikipedia' : 'Wikipedia');
-    const imgs = Array.from({ length: memeImageCount[style] || 1 }, nextImg);
-    const p = { cat: 'meme', sub: 'remix', style, imgs: imgs.map((x) => x.img), img: imgs[0].img, credit: imgs[0].credit, link: imgs[0].link };
-    const T = memeText[style];
-    let src = '';
-    if (style === 'impact' || style === 'demotivator') { const [top, bottom] = pick(T); p.top = fill(top); p.bottom = fill(bottom); src = top + bottom; }
-    else if (style === 'caption' || style === 'pov' || style === 'isthis') { const t = pick(T); p.text = fill(t); src = t; if (style === 'pov') { p.top = p.text; } if (style === 'isthis') p.label = 'me'; }
-    else if (style === 'post' || style === 'quotecard') { p.text = q.text.replace(/^"|"$/g, ''); p.author = q.author; src = '{quote}'; }
-    else if (style === 'chyron') { p.text = factLower; p.ticker = [f2, f3].filter(Boolean).map((x) => short(x.title).toUpperCase()).join(' · '); src = '{fact}'; }
-    else if (style === 'twopanel') { p.a = pick(T.boring); p.b = fill(pick(T.weird)); src = p.b; }
-    else if (style === 'versus') { const [a, b] = pick(T); p.a = fill(a); p.b = fill(b); src = a + b; }
-    else if (style === 'brain') { p.steps = pick(T).map(fill); src = '{title}'; }
-    else if (style === 'starter') {
-      const same = facts.filter((x) => x.sub === f?.sub).slice(fi % 50, (fi % 50) + 4);
-      p.text = fill(pick(T)); p.labels = (same.length >= 4 ? same : [f, f2, f3, f4].filter(Boolean)).map((x) => short(x.title)); src = '{title}';
-    }
-    else if (style === 'labels') { p.labels = pick(T).map(fill); src = '{title}'; }
-    // the send button opens what the meme is about
-    if (usesQuote(src)) { p.wiki = authorUrl(q.author); p.ref = q.author; }
-    else if (f) { p.wiki = f.url; p.ref = short(f.title); }
-    p.id = `mc${hashStr(style + p.img + (p.text || p.top || p.a || p.ref || '')).toString(36)}`;
-    if (!posts.some((x) => x.id === p.id)) posts.push(p);
-  }
-  report.sources.memesBuilt = posts.length;
-  report.memeStyles = posts.reduce((m, p) => ((m[p.style] = (m[p.style] || 0) + 1), m), {});
-  return shuffle(posts);
-}
 
 // ------------------------------------------------------------------ offline fixtures (local testing only)
 function offlineFixtures() {
@@ -1094,7 +944,10 @@ function offlineFixtures() {
 
 // ------------------------------------------------------------------ main
 async function main() {
-  let wiki, video, web, quotes, commons, kym, sprites = [], themes = [], news = [], textures = [], oracleData = null;
+  // helpers and state for the builder modules (memes, power, products, images)
+  const K = { ABBR, ADJ, BROWSER_UA, DECK, GAME_NAMES, KENNEY_NAMES, OFFLINE, OUT, PROC_A, PROC_B, PSYCH_ALGOS, QUESTIONS, ROOT, TAROT_ALT, UA, WIKI_API, args, assignThemes, avgDwell, buildComics, buildGames, buildNews, buildOracle, buildPsych, buildQuotes, buildReads, buildSelfCare, buildSprites, buildStudio, buildTarot, buildTextures, buildThemes, buildVideos, buildVocab, buildWeb, buildWiki, categoryMembers, cats, cleanExtract, clip, commonsImages, commonsSearch, config, decodeEntities, durSec, extracts, fallbackQuotes, fetchJSON, fetchText, fileURLToPath, firstImg, fs, hasTransparentEdges, hashStr, history, historyPath, id, isoDate, isoWeekId, kymMemes, log, memeImageCount, memeText, memeWeights, moreLike, mulberry32, offlineFixtures, ogMeta, parseArgs, parseFeed, parseWikiquote, path, pick, playable, pool, productClassics, productParts, rand, readFeed, readJSON, report, scrapeBlog, seen, selfCare, selfCareFlavors, sentences, shuffle, sleep, stripParens, stripTags, themeDefs, topics, totalPosts, vetSprite, want, warn, wq, writeJSON, ytSearch };
+  const { buildMemes, buildStrips } = memesBuilder(K), { buildPower } = powerBuilder(K), { buildProducts } = productsBuilder(K), { buildBackgrounds, tagSprites } = imagesBuilder(K);
+  let wiki, video, web, quotes, commons, kym, sprites = [], themes = [], news = [], textures = [], backgrounds = [], oracleData = null;
   if (OFFLINE) ({ wiki, video, web, quotes, commons, kym } = offlineFixtures());
   else {
     quotes = await buildQuotes();
@@ -1103,7 +956,8 @@ async function main() {
     web = await buildWeb();
     commons = await commonsImages();
     kym = await kymMemes();
-    sprites = await buildSprites();
+    sprites = tagSprites(await buildSprites());
+    backgrounds = await buildBackgrounds();
     themes = await buildThemes();
     textures = await buildTextures();
     news = await buildNews();
@@ -1145,6 +999,7 @@ async function main() {
   if (sprites.length) writeJSON(path.join(dir, 'sprites.json'), sprites);
   if (themes.length) writeJSON(path.join(dir, 'themes.json'), themes);
   if (textures.length) writeJSON(path.join(dir, 'textures.json'), textures);
+  if (backgrounds.length) writeJSON(path.join(dir, 'backgrounds.json'), backgrounds);
   if (oracleData) writeJSON(path.join(dir, 'tarot.json'), oracleData);
   if (vocab.length) writeJSON(path.join(dir, 'vocab.json'), vocab);
   const prompt = fs.readFileSync(path.join(ROOT, 'packages/prompt.md'), 'utf8');
@@ -1159,7 +1014,7 @@ async function main() {
       web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' },
       news: Object.fromEntries(Object.entries(config.news.groups).map(([k, g]) => [k, g.label]))
     },
-    files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, textures: textures.length ? 'textures.json' : undefined, oracle: oracleData ? 'tarot.json' : undefined, vocab: vocab.length ? 'vocab.json' : undefined, prompt, report
+    files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, textures: textures.length ? 'textures.json' : undefined, backgrounds: backgrounds.length ? 'backgrounds.json' : undefined, oracle: oracleData ? 'tarot.json' : undefined, vocab: vocab.length ? 'vocab.json' : undefined, prompt, report
   };
   writeJSON(path.join(dir, 'manifest.json'), manifest, true);
 
