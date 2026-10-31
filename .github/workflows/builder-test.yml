@@ -1,0 +1,60 @@
+name: Builder test (no commit, no publish)
+
+# Runs the package builder against the real network on the rebuild branch, so new
+# builder code can be checked before the real package build. It never commits,
+# deploys or builds the APK. Extra builder flags come from tools/builder-test.args.
+on:
+  push:
+    branches: [claude/feed-rebuild]
+    paths:
+      - 'tools/**'
+      - '!tools/bundle-package.mjs'
+      - '!tools/fetch-assets.mjs'
+      - '!tools/data/assets.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: builder-test
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build into /tmp
+        run: |
+          ARGS=$(cat tools/builder-test.args 2>/dev/null || true)
+          node tools/build-package.mjs --id builder-test --out /tmp/pkg $ARGS 2>&1 | tee build.log
+      - name: Summarise
+        if: always()
+        run: |
+          node -e '
+            const fs = require("fs"), d = "/tmp/pkg/builder-test/";
+            if (!fs.existsSync(d + "manifest.json")) { console.log("no manifest"); process.exit(0); }
+            const m = JSON.parse(fs.readFileSync(d + "manifest.json"));
+            console.log("COUNTS", JSON.stringify(m.counts));
+            console.log("SOURCES", JSON.stringify(m.report?.sources));
+            console.log("WARNINGS", (m.report?.warnings || []).length);
+            for (const w of (m.report?.warnings || []).slice(0, 80)) console.log("  W", w);
+            for (const f of fs.readdirSync(d)) {
+              if (!f.endsWith(".json") || f === "manifest.json") continue;
+              const j = JSON.parse(fs.readFileSync(d + f)); const a = Array.isArray(j) ? j : j.posts || [];
+              const subs = {}; for (const p of a) subs[p.sub || p.kind || "-"] = (subs[p.sub || p.kind || "-"] || 0) + 1;
+              console.log("FILE", f, a.length, JSON.stringify(subs).slice(0, 400));
+              for (const p of a.slice(0, 2)) console.log("  SAMPLE", JSON.stringify(p).slice(0, 600));
+            }'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: builder-test
+          path: |
+            /tmp/pkg/builder-test
+            build.log
+          retention-days: 5
