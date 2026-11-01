@@ -51,10 +51,10 @@ export function loadRhymes() {
   return loading;
 }
 
-// the pronunciations of what was typed: the word itself, or failing that the longest ending that is a word (so
-// compounds and prefixed words still work). guess says which ending was used.
+// the pronunciations of what was typed (the last word of it): the word itself, or failing that the longest ending that is
+// a word, so compounds and prefixed words still work. guess says which ending was used.
 export function lookup(d, text) {
-  const w = text.toLowerCase().replace(/[^a-z']/g, '').replace(/^'+|'+$/g, '');
+  const w = text.toLowerCase().split(/[^a-z']+/).map((x) => x.replace(/^'+|'+$/g, '')).filter(Boolean).pop();
   if (!w) return null;
   const hit = (x) => d.words.get(x) || (x.endsWith("'s") ? d.words.get(x.slice(0, -2)) : null);
   let e = hit(w);
@@ -63,29 +63,32 @@ export function lookup(d, text) {
   return null;
 }
 
-// perfect: the same rhyming part after a different start. near: the same vowel with a similar ending, the same vowel
-// with another ending, or the same ending with another vowel (ranked in that order)
+// perfect: the same rhyming part after a different start. near, best first: the same vowel and a similar ending (3), the
+// same vowel and another ending (2), the same ending under another vowel (1.5), the same vowel with a longer or shorter
+// ending (1.2); +0.3 for the same number of syllables
 export function rhymes(d, q) {
-  const perfect = new Map(), near = new Map(), skip = new Set(q.p.map((a) => a.e.w).concat(q.w));
+  const perfect = new Map(), near = new Map(), own = new Set(q.p.map((a) => a.e.w)).add(q.w);
+  const kin = (w) => (w.startsWith(q.w) ? w.length - q.w.length <= 3 : q.w.startsWith(w) && q.w.length - w.length <= 3); // moon, moons
   for (const c of d.all) {
-    if (skip.has(c.e.w)) continue;
-    let best = 0, score = 0;
+    const w = c.e.w;
+    if (own.has(w) || kin(w)) continue;
+    let best = 0;
     for (const a of q.p) {
-      if (c.key === a.key) { if (c.on !== a.on) { best = 9; break; } continue; }
-      if (c.v === a.v) {
-        if (c.tail.length === a.tail.length && c.tail.length) score = [...c.tail].every((t, i) => cls(t) === cls(a.tail[i])) ? 3 : 2;
-        else if (!c.tail.length && !a.tail.length) score = 0;
-      } else if (a.tail && c.tail === a.tail) score = 1.5;
-      if (score) score += c.n === a.n ? 0.3 : 0;
-      best = Math.max(best, score);
+      let s = 0;
+      if (c.key === a.key) { if (c.on === a.on) continue; best = 9; break; }
+      const dl = Math.abs(c.tail.length - a.tail.length);
+      if (c.v === a.v) s = !dl ? ([...c.tail].every((t, i) => cls(t) === cls(a.tail[i])) ? 3 : 2) : dl === 1 ? 1.2 : 0;
+      else if (a.tail && c.tail === a.tail) s = 1.5;
+      if (s && c.n === a.n) s += 0.3;
+      if (s > best) best = s;
     }
     if (!best) continue;
-    const m = best === 9 ? perfect : near, k = Math.min(4, c.n), cur = m.get(c.e.w);
-    if (cur && cur.score >= best) continue;
-    m.set(c.e.w, { w: c.e.w, lv: c.e.lv, n: k, score: best });
+    const m = best === 9 ? perfect : near;
+    if ((m.get(w)?.score || 0) < best) m.set(w, { w, lv: c.e.lv, n: Math.min(4, c.n), score: best });
   }
-  // sorted by how common, within each number of syllables; the near ones by closeness first
-  const group = (m) => { const g = {}; for (const r of m.values()) (g[r.n] ||= []).push(r); for (const k in g) g[k].sort((a, b) => b.score - a.score || a.lv - b.lv || (a.w < b.w ? -1 : 1)); return g; };
+  for (const w of perfect.keys()) near.delete(w);
+  // common words first within each number of syllables; the near ones by closeness before that
+  const group = (m) => { const g = {}; for (const r of m.values()) (g[r.n] ||= []).push(r); for (const k in g) g[k].sort((x, y) => y.score - x.score || x.lv - y.lv || (x.w < y.w ? -1 : 1)); return g; };
   return { perfect: group(perfect), near: group(near) };
 }
 
@@ -101,7 +104,7 @@ const SYL = { 1: 'One syllable', 2: 'Two syllables', 3: 'Three syllables', 4: 'F
 const SHOWN = { 1: 48, 2: 36, 3: 24, 4: 16 };
 
 export function rhymeBody(p) {
-  const input = el('input.rhyme-input', { type: 'text', value: p.word || '', placeholder: 'Type a word', autocomplete: 'off', autocapitalize: 'off', spellcheck: false, enterKeyHint: 'search', 'aria-label': 'Word to find rhymes for' });
+  const input = el('input.rhyme-input', { type: 'text', value: p.word || '', placeholder: 'Type a word', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterKeyHint: 'search', 'aria-label': 'Word to find rhymes for' });
   const info = el('div.rhyme-info.muted', 'Loading the dictionary…');
   const out = el('div.rhyme-out');
   const ta = el('textarea.write-area.rhyme-pad', { placeholder: 'Write here. Tap a rhyme to drop it in.', rows: 6, spellcheck: true });
@@ -146,7 +149,7 @@ export function rhymeBody(p) {
   const search = () => {
     const text = input.value.trim();
     current = text;
-    if (!d) return;
+    if (!d) { activate(); return; }
     if (!text) { info.textContent = 'Type a word above.'; out.replaceChildren(); return; }
     const q = lookup(d, text);
     if (!q) { info.textContent = `“${text}” isn’t in the dictionary. Try another spelling.`; out.replaceChildren(); return; }
