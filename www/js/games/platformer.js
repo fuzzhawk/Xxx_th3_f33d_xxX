@@ -91,7 +91,7 @@ export class Platformer extends Game {
   foeY(f, t) { return f.y - f.hop * Math.abs(Math.sin(t * f.hf + f.ph)) + f.amp * Math.sin(t * f.vf + f.ph); }
   has(o, s) { return o.got || (s.got !== null && s.got.includes(o.id)); }
   isDead(f, s) { return !!f.dead || (s.kill !== null && s.kill.includes(f.id)); }
-  fallen(o, s) {
+  crumbled(o, s) {
     let tt = o.tt;
     if (tt == null && s.cr) for (let i = 0; i < s.cr.length; i += 2) if (s.cr[i] === o.id) { tt = s.cr[i + 1]; break; }
     return tt != null && s.t > tt + CRUMBLE;
@@ -148,7 +148,7 @@ export class Platformer extends Game {
       let sup = s.on;
       if (sup) {
         const sx = sup.k === 'm' ? this.mx(sup, s.t) : sup.x;
-        if (s.x + w <= sx + 2 || s.x >= sx + sup.w - 2 || (sup.k === 'c' && this.fallen(sup, s))) sup = null;
+        if (s.x + w <= sx + 2 || s.x >= sx + sup.w - 2 || (sup.k === 'c' && this.crumbled(sup, s))) sup = null;
       }
       if (sup) {
         if (sup.k === 'm') { s.x += this.mx(sup, s.t) - this.mx(sup, s.t - dt); s.y = this.my(sup, s.t) - h; } else s.y = sup.y - h;
@@ -162,7 +162,7 @@ export class Platformer extends Game {
           for (const o of os) {
             if (!SURF[o.k]) continue;
             let ox = o.x, oy = o.y, oy0 = o.y;
-            if (o.k === 'm') { ox = this.mx(o, s.t); oy = this.my(o, s.t); oy0 = this.my(o, s.t - dt); } else if (o.k === 'c' && this.fallen(o, s)) continue;
+            if (o.k === 'm') { ox = this.mx(o, s.t); oy = this.my(o, s.t); oy0 = this.my(o, s.t - dt); } else if (o.k === 'c' && this.crumbled(o, s)) continue;
             if (s.x + w <= ox + 2 || s.x >= ox + o.w - 2) continue;
             if (pb <= oy0 + 1 && nb >= oy && oy < top) { top = oy; best = o; }
           }
