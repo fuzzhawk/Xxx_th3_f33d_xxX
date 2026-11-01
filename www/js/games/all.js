@@ -34,7 +34,7 @@ export const GAMES = { plinko: Plinko, breakout: Breakout, merge: Merge, dash: D
   wordle: Wordle, bee: Bee, wordsearch: WordSearch, wheel: Wheel, hangman: Hangman, vocab: Vocab, ladder: Ladder, t2048: Twenty48, arrows: Arrows, jrpg: Jrpg, hack: Hack, outland: Outland };
 // display names (the package's own names win when it has them)
 export const GAME_NAMES = {
-  plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', tetris: 'Tetris', pong: 'Pong', peggle: 'Peg Shot', juggle: 'Juggle',
+  plinko: 'Plinko', breakout: 'Breakout', merge: 'drag to aim, release to drop · two alike merge (on the planet, aim around the core)', dash: 'Dash', flappy: 'Flap', tetris: 'tap beside the piece to move, tap the piece to turn, drag to slide, swipe down to drop, swipe up to hold · every full line is lifted out as a saying', pong: 'Pong', peggle: 'Peg Shot', juggle: 'Juggle',
   platformer: 'Platformer', racer: 'Road Racer', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot', outland: 'Outland',
   chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl',
   starfox: 'Sky Fox', expedition: 'Expeditions', ski: 'Downhill', graves: 'Grave Merge', survivors: 'Cave Horde', robotron: 'Robo Arena', crokinole: 'Crokinole',
