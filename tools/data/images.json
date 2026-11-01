@@ -9,7 +9,7 @@
     "max": 24,
     "cap": 6,
     "licence": "public domain|cc0|cc[- ]by|^pd|pdm|no restrictions",
-    "reject": "\\b(maps?|diagram|chart|graph|logo|poster|title page|book cover|letters?|manuscript|newspaper|catalog(ue)?|stamps?|coins?|banknote|postcard|signature|inscription|frames?|framed|exhibition|installation|visitors|gallery view|selfie|screenshot|collage|montage|wedding)\\b",
+    "reject": "\\b(portraits?|self-portrait|maps?|diagram|chart|graph|logo|poster|title page|book cover|letters?|manuscript|newspaper|catalog(ue)?|stamps?|coins?|banknote|postcard|signature|inscription|frames?|framed|exhibition|installation|visitors|gallery view|selfie|screenshot|collage|montage|wedding)\\b",
     "groups": [
       { "id": "storm", "name": "Storm Front", "kind": "cloud", "mood": "stormy", "hue": 215, "dark": true,
         "reject": "\\b(people|person|portrait|cars?|vehicles?|trucks?|aircraft|airplane|damage|flood(ing|ed)?|radar|satellite)\\b",
@@ -109,7 +109,7 @@
         "src": [
           { "commons": "intitle:\"Google Art Project\" (\"Caspar David Friedrich\" OR \"William Turner\" OR \"J. M. W. Turner\" OR \"John Martin\" OR \"Carl Blechen\" OR \"Johan Christian Dahl\" OR \"Philip James de Loutherbourg\")" },
           { "commons": "intitle:\"Caspar David Friedrich\"", "not": "portrait drawing" },
-          { "aic": ["Joseph Mallord William Turner", "John Martin", "Caspar David Friedrich", "Johan Christian Dahl", "Philip James de Loutherbourg", "Joseph Wright"], "type": 1 },
+          { "aic": ["Joseph Mallord William Turner", "John Martin", "Caspar David Friedrich", "Dahl", "Philip James de Loutherbourg", "Joseph Wright"], "type": 1 },
           { "cma": "Turner", "type": "Painting" }
         ] },
       { "id": "ukiyoe", "name": "Ukiyo-e Views", "kind": "painting", "mood": "woodblock", "hue": 200, "cap": 10,
@@ -124,7 +124,7 @@
       { "id": "impressionist", "name": "Impressionist Light", "kind": "painting", "mood": "airy", "hue": 190,
         "reject": "\\b(portrait|self-portrait|woman|women|girl|madame|mme|lady|child|children|boy|nude|bathers?|still life|flowers|vase|fruit|interior)\\b",
         "src": [
-          { "aic": ["Claude Monet", "Camille Pissarro", "Alfred Sisley", "Armand Guillaumin", "Eugène Boudin", "Gustave Caillebotte"], "type": 1 },
+          { "aic": ["Claude Monet", "Camille Pissarro", "Alfred Sisley", "Armand Guillaumin", "Boudin", "Gustave Caillebotte"], "type": 1 },
           { "commons": "intitle:\"Google Art Project\" (\"Claude Monet\" OR \"Alfred Sisley\" OR \"Camille Pissarro\" OR \"Eugène Boudin\" OR \"Armand Guillaumin\")" },
           { "cma": "Monet", "type": "Painting" },
           { "cma": "Sisley", "type": "Painting" },
@@ -145,7 +145,7 @@
           { "commons": "intitle:Čiurlionis", "not": "portrait photograph" },
           { "commons": "intitle:Roerich (Himalayas OR mountains OR Tibet OR Kanchenjunga OR mountain)", "not": "portrait photograph" },
           { "commons": "intitle:Sohlberg", "not": "portrait photograph" },
-          { "aic": ["Odilon Redon", "Arnold Böcklin", "Pierre Puvis de Chavannes", "Gustave Moreau"], "type": 1 }
+          { "aic": ["Odilon Redon", "Böcklin", "Bocklin", "Pierre Puvis de Chavannes", "Gustave Moreau"], "type": 1 }
         ] },
       { "id": "nocturne", "name": "Nocturnes", "kind": "painting", "mood": "moonlit", "hue": 222, "dark": true,
         "reject": "\\b(portrait|self-portrait|still life|interior|nude|photograph)\\b",
@@ -184,8 +184,8 @@
   "sprites": {
     "note": "Sprite tags come from the file title, the search that found it and any categories. 'groups' maps words (singular; phrases allowed) to a coarse group; ties go to the earlier group in 'order'. 'extra' adds one transparent PNG per made-up product object (and per extra query) so products can find pictures that suit their names.",
     "order": ["symbol", "creature", "body", "figure", "animal", "food", "plant", "vehicle", "music", "tech", "tool", "clothing", "building", "space", "mineral", "object"],
-    "stop": "png svg jpg jpeg gif tif tiff webp file image images picture pic photo photograph icon icons emoji transparent background cutout isolated clipart clip vector illustration drawing sketch art artwork color colour colored coloured version alt new edit edited crop cropped small large big high res resolution hd hq copy final the and with from for of an in on at by to de la le el les und der die das von du des van wikimedia commons public domain cc by sa pd nih bioart farm fresh map marker light dark stk psf",
-    "plural": { "mice": "mouse", "geese": "goose", "teeth": "tooth", "feet": "foot", "knives": "knife", "leaves": "leaf", "wolves": "wolf", "loaves": "loaf", "fungi": "fungus", "cacti": "cactus", "people": "person", "children": "child", "men": "man", "women": "woman", "shoes": "shoe", "canoes": "canoe", "toes": "toe", "oboes": "oboe", "cookies": "cookie", "zombies": "zombie", "movies": "movie", "pixies": "pixie", "brownies": "brownie", "pies": "pie", "ties": "tie", "dice": "dice", "octopuses": "octopus", "octopi": "octopus", "glasses": "glasses", "headphones": "headphones", "scissors": "scissors", "pliers": "pliers", "trousers": "trousers", "species": "species", "series": "series", "axes": "axe", "lenses": "lens", "buses": "bus", "fries": "fries" },
+    "stop": "png svg jpg jpeg gif tif tiff webp file image images picture pic photo photograph icon icons emoji transparent background cutout isolated clipart clip vector illustration drawing sketch art artwork color colour colored coloured version alt new edit edited crop cropped small large big high res resolution hd hq copy final the and with from for of an in on at by to de la le el les und der die das von du des van wikimedia commons public domain cc by sa pd nih bioart farm fresh map marker light dark stk psf offline",
+    "plural": { "mice": "mouse", "geese": "goose", "teeth": "tooth", "feet": "foot", "knives": "knife", "leaves": "leaf", "wolves": "wolf", "loaves": "loaf", "fungi": "fungus", "cacti": "cactus", "people": "person", "children": "child", "men": "man", "women": "woman", "shoes": "shoe", "canoes": "canoe", "toes": "toe", "oboes": "oboe", "cookies": "cookie", "zombies": "zombie", "movies": "movie", "pixies": "pixie", "brownies": "brownie", "pies": "pie", "ties": "tie", "dice": "dice", "octopuses": "octopus", "octopi": "octopus", "glasses": "glasses", "headphones": "headphones", "scissors": "scissors", "pliers": "pliers", "trousers": "trousers", "species": "species", "series": "series", "axes": "axe", "lenses": "lens", "buses": "bus", "fries": "fries", "thermos": "thermos", "christmas": "christmas", "canvas": "canvas", "atlas": "atlas", "texas": "texas" },
     "groups": {
       "symbol": "logo, emblem, coat of arms, heraldic, heraldry, flag, banner, badge, insignia, barnstar, medal, trophy, award, sign, symbol, sigil, rune, glyph, pentagram, ankh, cross, crescent, yin yang, letter, alphabet, number, digit, arrow, monogram, crest, escutcheon, headline, wordmark",
       "creature": "alien, monster, ghost, dragon, unicorn, griffin, gryphon, phoenix, mermaid, demon, devil, imp, goblin, troll, ogre, vampire, zombie, yeti, kraken, sphinx, centaur, gargoyle, fairy, angel, spirit, kaiju, cyclops, minotaur, chimera, basilisk, hydra, golem, jinn, genie",

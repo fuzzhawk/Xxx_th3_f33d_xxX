@@ -59,7 +59,7 @@ export class Juggle extends Game {
     if (this.wall) { c.globalAlpha = 0.18; for (const w of this.wall) drawFit(c, w.i, w.x, w.y, w.s, w.s, w.r); c.globalAlpha = 1; }
     for (const b of this.balls) {
       const rot = (this.ang || 0) * b.spin * 0.1 + b.x * 0.02;
-      c.fillStyle = 'rgba(0,0,0,.22)'; c.beginPath(); c.ellipse(b.x + 5, b.y + 7, b.r * 1.02, b.r * 0.98, 0, 0, 7); c.fill();
+      c.fillStyle = 'rgba(0,0,0,.16)'; c.beginPath(); c.ellipse(b.x + 4, b.y + 8, b.r * 0.85, b.r * 0.8, 0, 0, 7); c.fill();
       if (!drawFit(c, b.i, b.x, b.y, b.r * 2.2, b.r * 2.2, rot)) {
         c.save(); c.translate(b.x, b.y); c.rotate(rot);
         for (let i = 0; i < 6; i++) { c.fillStyle = i % 2 ? b.c1 : b.c2; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, b.r, (i * Math.PI) / 3, ((i + 1) * Math.PI) / 3); c.fill(); }

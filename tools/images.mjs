@@ -13,7 +13,7 @@ export function imagesBuilder(K) {
   const RE = new Map(B.groups.map((g) => [g.id, g.reject ? new RegExp(g.reject, 'i') : null]));
   const fits = (w, h) => w > 0 && h > 0 && w / h >= B.aspect[0] && w / h <= B.aspect[1];
   const rejected = (g, text, more = '') => junk.test(text) || !!RE.get(g.id)?.test(`${text} ${more}`);
-  const norm = (s) => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z]+/g, ' ').trim();
+  const norm = (s) => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const plain = (s, n) => clip(stripTags(String(s || '')), n);
   const title = (t, date) => clip(`${t || 'Untitled'}${date ? ` (${date})` : ''}`, 90);
 
@@ -111,7 +111,7 @@ export function imagesBuilder(K) {
     for (let r = 0; imgs.length < max && lists.some((l) => r < l.length); r++) for (const l of lists) {
       const x = l[r];
       if (!x || imgs.length >= max) continue;
-      const who = norm(x.by), key = `${norm(x.title)}|${who.split(' ').pop()}`;
+      const who = norm(x.by).replace(/[\d ]+$/, ''), key = `${norm(x.title)}|${who}`;
       if (taken.has(x.src) || taken.has(key) || (who && who !== 'unknown' && (per.get(who) || 0) >= cap)) continue;
       taken.add(x.src); taken.add(key); per.set(who, (per.get(who) || 0) + 1);
       imgs.push(x);

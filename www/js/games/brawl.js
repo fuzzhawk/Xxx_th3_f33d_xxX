@@ -121,11 +121,12 @@ export class Fighter extends Game {
     const x = (att.x + o.x) / 2, y = this.floor() - 70 + o.y;
     this.fx.push({ kind: 'num', x: o.x, y: y - 30, s: blocked ? 'BLOCK' : `${d}`, t: 0.8, big: d > 12 });
     if (blocked) { o.x += att.face * 6; this.spark(x, y, '#9ad', 6); return; }
-    att.landed = true; att.combo = att.comboT > 0 ? att.combo + 1 : 1; att.comboT = 0.9;
+    // a hit only extends the combo while the victim is still reeling from the last one
+    att.landed = true; att.combo = att.comboT > 0 && (o.stun > 0 || o.down > 0) ? att.combo + 1 : 1; att.comboT = 0.9;
     if (att.combo >= 2) this.comboShow = { f: att.i, n: att.combo, t: 1.2 };
     o.act = null; o.combo = 0;
     if (m.down || o.hp <= 0 || opts.launch) { o.down = o.hp <= 0 ? 99 : 1.4; o.downT = 0; o.stun = 0; o.vx = att.face * (opts.launch || 140); o.vy = -(opts.lift || 260); }
-    else { o.stun = m.ball ? 0.45 : 0.35; o.hurtT = 0; o.x += att.face * (m.push || 10); }
+    else { o.stun = m.ball ? 0.42 : m.dmg >= 9 ? 0.28 : 0.22; o.hurtT = 0; o.x += att.face * (m.push || 12); }
     this.freeze = Math.min(0.12, 0.04 + d * 0.004); this.shake = Math.min(0.4, 0.08 + d * 0.01);
     this.spark(x, y, this.col(att.i ? 0 : 3), 10 + d);
   }
@@ -138,7 +139,7 @@ export class Fighter extends Game {
     f.crouch = false;
     if (f.meter >= 100 && dist < 140 && this.rng() < 0.6) return this.ultra(f);
     // follow a hit with its chain
-    if (f.act && f.landed && MOVES[f.act].chain && this.rng() < 0.08) { this.doMove(f, MOVES[f.act].chain[this.ri(0, MOVES[f.act].chain.length - 1)]); return; }
+    if (f.act && f.landed && MOVES[f.act].chain && this.rng() < 0.03) { this.doMove(f, MOVES[f.act].chain[this.ri(0, MOVES[f.act].chain.length - 1)]); return; }
     if (f.ai > 0) return;
     f.ai = this.r(0.12, 0.3) / f.spd;
     if (dist > 170 && this.rng() < 0.3) return this.doMove(f, 'hadouken');

@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 // Builds one weekly package for The Feed.
 //
-//   node tools/build-package.mjs [--id 2026-W43] [--offline] [--out packages]
+//   node tools/build-package.mjs [--id 2026-W43] [--offline] [--out packages] [--only video,read] [--quick]
 //
 // Network sources (Wikipedia, Wikiquote, YouTube, Hacker News, Substack, Reddit,
-// Wikimedia Commons, Know Your Meme) are fetched here; each source fails soft so
-// a blocked site shrinks its category instead of failing the build. The app
-// rebalances the feed when a category is short.
+// Wikimedia Commons, Know Your Meme, Gutendex/Project Gutenberg) are fetched here;
+// each source fails soft so a blocked site shrinks its category instead of failing
+// the build. The app rebalances the feed when a category is short.
 //
 // --offline skips the network and fills network categories with placeholder
 // fixtures. It is only for testing the app locally; never commit its output.
+// --only builds just the listed categories (plus the sources they need) and
+// --quick builds small counts from fewer sources; both are for test builds, so
+// neither updates index.json or history.json.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,13 +23,20 @@ import { powerBuilder } from './power.mjs';
 import { productsBuilder } from './products.mjs';
 import { imagesBuilder } from './images.mjs';
 import { DECK, QUESTIONS } from '../www/js/oracle-data.js';
-import { selfCare, selfCareFlavors, fallbackQuotes } from './data/content.mjs';
+import { selfCare, selfCareFlavors, fallbackQuotes, videoAvoid } from './data/content.mjs';
+import { eroticaWorks, eroticaHardBan, eroticaSoftBan, eroticaSensual } from './data/erotica.mjs';
 import { productClassics, productParts } from './data/products-data.mjs';
 import { memeText, memeWeights, memeImageCount } from './data/memes-data.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = parseArgs(process.argv.slice(2));
 const OFFLINE = !!args.offline;
+const QUICK = !!args.quick;
+const ONLY = typeof args.only === 'string' ? new Set(args.only.split(',').map((s) => s.trim()).filter(Boolean)) : null;
+// is any of these categories being built?
+const need = (...c) => !ONLY || c.some((k) => ONLY.has(k));
+// in --quick builds, a short slice of a source list
+const few = (list, n) => (QUICK ? (list || []).slice(0, n) : list || []);
 const OUT = path.resolve(ROOT, args.out || 'packages');
 const config = readJSON(path.join(ROOT, 'tools/data/config.json'));
 const topics = readJSON(path.join(ROOT, 'tools/data/topics.json'));
@@ -157,9 +167,10 @@ const seen = Object.fromEntries(Object.entries(history).map(([k, v]) => [k, new 
 // ------------------------------------------------------------------ counts
 const cats = config.categories;
 const avgDwell = Object.values(cats).reduce((s, c) => s + (c.pct / 100) * c.dwellSec, 0);
-const totalPosts = Math.round((config.targetHoursPerDay * config.days * 3600) / avgDwell * config.buffer);
-const want = Object.fromEntries(Object.entries(cats).map(([k, c]) => [k, Math.round(totalPosts * c.pct / 100)]));
-log(`Package ${id}: target ${totalPosts} posts`, want);
+const totalPosts = Math.round((config.targetHoursPerDay * config.days * 3600) / avgDwell * config.buffer * (QUICK ? 0.05 : 1));
+const want = Object.fromEntries(Object.entries(cats).map(([k, c]) => [k, c.pct ? Math.max(QUICK ? 3 : 1, Math.round(totalPosts * c.pct / 100)) : 0]));
+if (ONLY) for (const k of Object.keys(want)) if (!ONLY.has(k)) want[k] = 0;
+log(`Package ${id}: target ${totalPosts} posts${QUICK ? ' (quick)' : ''}${ONLY ? ` (only ${[...ONLY].join(', ')})` : ''}`, want);
 
 // ------------------------------------------------------------------ Wikipedia
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
@@ -201,16 +212,18 @@ async function extracts(titles) {
 
 async function buildWiki() {
   const topicKeys = Object.keys(topics.wiki);
-  const perTopic = Math.ceil(want.wiki / topicKeys.length);
+  // memes and long reads draw on the week's Wikipedia picks, so a build of only those still needs some
+  const wantN = want.wiki || (need('meme', 'read') ? (QUICK ? 22 : 330) : 0);
+  const perTopic = Math.ceil(wantN / topicKeys.length);
   const claimed = new Set();
   const posts = [];
   for (const key of topicKeys) {
     const t = topics.wiki[key];
     log(`wiki: ${key}`);
     const cand = new Set(t.seeds);
-    const catLists = await pool(t.categories, 2, (c) => categoryMembers(c));
+    const catLists = await pool(few(shuffle([...t.categories]), 2), 2, (c) => categoryMembers(c, QUICK ? 0 : 1));
     catLists.forEach((l) => (l || []).forEach((x) => cand.add(x)));
-    const likeLists = await pool(shuffle([...t.seeds]).slice(0, 30), 2, moreLike);
+    const likeLists = await pool(shuffle([...t.seeds]).slice(0, QUICK ? 3 : 30), 2, moreLike);
     likeLists.forEach((l) => (l || []).forEach((x) => cand.add(x)));
     const seeds = new Set(t.seeds);
     const relevant = t.keywords ? new RegExp(t.keywords, 'i') : null;
@@ -247,7 +260,7 @@ async function buildWiki() {
 // ------------------------------------------------------------------ Wikiquote
 async function buildQuotes() {
   const quotes = [];
-  await pool(config.quoteAuthors, 4, async (author) => {
+  await pool(few(config.quoteAuthors, 8), 4, async (author) => {
     try {
       const j = await fetchJSON(`https://en.wikiquote.org/w/api.php?${new URLSearchParams({ action: 'parse', page: author, prop: 'text', redirects: '1', format: 'json', formatversion: '2' })}`);
       const got = parseWikiquote(j.parse?.text || '');

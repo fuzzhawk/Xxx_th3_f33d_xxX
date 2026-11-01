@@ -126,3 +126,14 @@ export const fallbackQuotes = [
 
 // ---------------------------------------------------------------- meme formats (v2)
 // {title}/{title2}/{title3}/{fact}: Wikipedia items · {quote}/{author}: Wikiquote · {topic}: wiki topic label
+
+// ---------------------------------------------------------------- videos
+// A video is skipped when its title, channel, description or tags match any of these:
+// AI tools and labels, synthetic voices, AI upscales/colourisations, narrated listicle farms.
+export const videoAvoid = [
+  /\bA\.?I\.?\b(?!\s*wei)/i, /artificial intelligence|machine[- ]generated|(?:ai|computer|digitally)[- ]generated|(?<!procedurally |randomly )\bgenerated\b|generative ai/i,
+  /midjourney|stable ?diffusion|dall[- ·]?e\b|\bsora\b|runway ?(?:ml|gen)|\bgen-?[234]\b|\bpika ?(?:labs)?\b|\bkling\b|\bveo ?\d\b|hailuo|luma (?:ai|dream)|leonardo\.ai|invideo|synthesia|heygen|eleven ?labs|chat ?gpt|\bgpt-?\d|openai/i,
+  /deep ?fakes?|face ?swap|voice ?clon|cloned voice|text[- ]to[- ](?:speech|video)|image[- ]to[- ]video|\btts\b|synthetic (?:voice|media|content)|altered or synthetic|narrated by (?:an )?(?:ai|robot)/i,
+  /upscal|remaster(?:ed)? (?:with|by|using) ai|colou?ri[sz](?:ed|ation)|\b(?:4k|8k)\b.{0,40}\b(?:60|120) ?fps\b|\b(?:60|120) ?fps\b.{0,40}\b(?:4k|8k)\b/i,
+  /^top \d+\b|\b(?:top|the) \d+ (?:most|creepiest|scariest|strangest|weirdest|craziest|mysterious|terrifying|disturbing)\b|you won'?t believe|facts you (?:didn'?t|never)|mind[- ]?blowing facts|#facts\b|#ai\w*|#midjourney|#sora/i
+];

@@ -252,9 +252,9 @@ export class Tetris extends Game {
   autopilot(dt) {
     if (!this.p || this.clearing || this.dead) return;
     const rowT = this.rowTime();
-    if (!this.plan) { this.plan = this.think(); this.wait = Math.min(this.r(0.15, 0.32), rowT * 2); this.tries = 0; if (!this.plan) { this.hardDrop(); return; } }
+    if (!this.plan) { this.plan = this.think(); this.wait = Math.min(this.r(0.22, 0.45), rowT * 1.5); this.tries = 0; if (!this.plan) { this.hardDrop(); return; } }
     if ((this.wait -= dt) > 0) return;
-    this.wait = Math.min(0.075, rowT / 3);
+    this.wait = Math.min(0.085, rowT / 3);
     const p = this.p, t = this.plan;
     if (t.hold) { this.hold(); this.plan = null; return; }
     if (p.r !== t.r) { if (!this.rotate(((t.r - p.r + 4) % 4) === 3 ? -1 : 1) && this.tries++ > 2) this.plan = { ...t, r: p.r }; return; }
@@ -490,30 +490,30 @@ function place(m, k, r, x) {
   const n = b.filter((row) => row !== FULL);
   while (n.length < ROWS) n.unshift(0);
   const landH = ROWS - (y + cs.reduce((s, q) => s + q[1], 0) / 4);
-  let rowT = 0, colT = 0, holes = 0, wells = 0, top = ROWS, wellCells = 0;
+  // while the stack is low, judge only the left nine columns and keep the right one open as a well for tetrises
+  const top = n.findIndex(Boolean), height = top < 0 ? 0 : ROWS - top, build = height < 11, C = build ? COLS - 1 : COLS;
+  let rowT = 0, colT = 0, holes = 0, wells = 0, wellCells = 0;
   for (let i = 0; i < ROWS; i++) {
     const row = n[i];
     if (!row) continue;
-    if (top === ROWS) top = i;
     let prev = 1;
-    for (let X = 0; X < COLS; X++) { const f = (row >> X) & 1; if (f !== prev) rowT++; prev = f; }
+    for (let X = 0; X < C; X++) { const f = (row >> X) & 1; if (f !== prev) rowT++; prev = f; }
     if (!prev) rowT++;
+    if (build && (row >> (COLS - 1)) & 1) wellCells++;
   }
-  const height = ROWS - top;
-  for (let X = 0; X < COLS; X++) {
+  for (let X = 0; X < C; X++) {
     let prev = 0, seen = false, depth = 0;
     for (let i = 0; i < ROWS; i++) {
       const f = (n[i] >> X) & 1;
       if (f !== prev) colT++;
       prev = f;
-      if (f) { seen = true; if (X === COLS - 1) wellCells++; } else if (seen) holes++;
-      const l = X === 0 || ((n[i] >> (X - 1)) & 1), rr = X === COLS - 1 || ((n[i] >> (X + 1)) & 1);
-      if (!f && l && rr) { depth++; if (!(X === COLS - 1 && height < 10)) wells += depth; } else depth = 0;
+      if (f) seen = true; else if (seen) holes++;
+      const l = X === 0 || ((n[i] >> (X - 1)) & 1), rr = X === C - 1 || ((n[i] >> (X + 1)) & 1);
+      if (!f && l && rr) { depth++; wells += depth; } else depth = 0;
     }
     if (!prev) colT++;
   }
   let v = -4.5 * landH + 3.42 * eroded - 3.22 * rowT - 9.35 * colT - 7.9 * holes - 3.39 * wells;
-  // while the stack is low, keep the right column open and save lines up for a tetris
-  if (height < 10) { v -= 6 * wellCells; if (cleared.length === 4) v += 40; else if (cleared.length) v -= 12; }
+  if (build) v += -14 * wellCells + (cleared.length === 4 ? 60 : -10 * cleared.length);
   return v;
 }

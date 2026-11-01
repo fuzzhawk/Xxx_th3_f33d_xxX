@@ -170,8 +170,8 @@ export class Backdrop {
       const dark = lum(this.zen) < 0.2;
       if (dark) { c.fillStyle = '#fff'; for (const [x, y, s] of this.stars) { c.globalAlpha = 0.25 + s * 0.4; c.fillRect(x - m, y, s, s); } c.globalAlpha = 1; }
       const { x, y, r: sr } = this.sun, sc = mix(this.hz, '#fff', dark ? 0.75 : 0.55);
-      const gl = c.createRadialGradient(x, y, sr * 0.5, x, y, sr * 6); gl.addColorStop(0, rgba(sc, 0.45)); gl.addColorStop(1, rgba(sc, 0));
-      c.fillStyle = gl; c.fillRect(x - sr * 6, y - sr * 6, sr * 12, sr * 12);
+      const gl = c.createRadialGradient(x, y, sr * 0.6, x, y, sr * 4); gl.addColorStop(0, rgba(sc, dark ? 0.25 : 0.45)); gl.addColorStop(1, rgba(sc, 0));
+      c.fillStyle = gl; c.fillRect(x - sr * 4, y - sr * 4, sr * 8, sr * 8);
       c.fillStyle = sc; c.beginPath(); c.arc(x, y, sr, 0, 7); c.fill();
       if (dark) { c.fillStyle = rgba(this.mid, 0.9); c.beginPath(); c.arc(x + sr * 0.45, y - sr * 0.2, sr * 0.92, 0, 7); c.fill(); }
     }
@@ -189,15 +189,16 @@ export class Backdrop {
     const textured = L.img && ready(L.img);
     if (textured) {
       mirrorTile(c, L.img, L.base - L.amp - 10, this.floor + 74 - (L.base - L.amp - 10), L.kind === 'bank' ? 0.4 : 0.85);
-      c.globalAlpha = 0.28 + 0.3 * (1 - L.q); c.fillStyle = L.fill; c.fillRect(0, L.top, P, h); c.globalAlpha = 1;
+      c.globalAlpha = 0.22 + 0.28 * (1 - L.q); c.fillStyle = L.fill; c.fillRect(0, L.top, P, h); c.globalAlpha = 1;
       L.done = true;
     }
     if (L.kind !== 'clouds') {
-      const fog = L.front ? 0 : 0.62 * Math.pow(1 - L.q, 1.25), g = c.createLinearGradient(0, L.base - L.amp, 0, this.floor + 60);
-      g.addColorStop(0, rgba(this.hz, fog)); g.addColorStop(0.55, rgba(this.hz, fog * 0.45)); g.addColorStop(1, `rgba(0,0,0,${L.kind === 'bank' ? 0.12 : 0.18 + 0.2 * L.q})`);
+      const fog = L.front ? 0 : 0.55 * Math.pow(1 - L.q, 1.5), g = c.createLinearGradient(0, L.base - L.amp, 0, this.floor + 60);
+      if (L.kind === 'bank') { g.addColorStop(0, 'rgba(255,255,255,.4)'); g.addColorStop(0.35, rgba(this.hz, fog * 0.5)); g.addColorStop(1, 'rgba(0,0,0,.16)'); }
+      else { g.addColorStop(0, rgba(this.hz, fog)); g.addColorStop(0.55, rgba(this.hz, fog * 0.4)); g.addColorStop(1, `rgba(0,0,0,${0.16 + 0.22 * L.q})`); }
       c.fillStyle = g; c.fillRect(0, L.top, P, h);
-      if (L.edge && !L.front) {
-        c.strokeStyle = rgba(mix(this.hz, '#fff', 0.5), L.kind === 'bank' ? 0.55 : 0.3); c.lineWidth = L.kind === 'bank' ? 3 : 1.6;
+      if (L.edge && !L.front && L.kind !== 'bank') {
+        c.strokeStyle = rgba(mix(this.hz, '#fff', 0.5), 0.3); c.lineWidth = 1.6;
         c.beginPath(); for (let x = 0; x <= P; x += 4) c.lineTo(x, L.edge(x) + 1); c.stroke();
       }
     }
