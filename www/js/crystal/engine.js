@@ -173,7 +173,7 @@ function buildRaw(frameKey){
   if(st==='bun'){const bx=view==='front'||view==='back'?cx:hx1+1,by=OY+(view==='front'?-1:2);
     for(const[dx,dy]of[[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[0,1]]){const x=bx+dx,y=by+dy;if(inb(x,y)&&!(mat[I(x,y)]||'').startsWith('eye'))hair.add(I(x,y));}}
   if(st==='pigtails'){for(const sx of(view==='front'||view==='back'?[hx0-1,hx1+1]:[hx1+1])){const o=sx<cx?-1:1;
-    for(let k=0;k<7;k++){const y=OY+4+k;if(inb(sx,y)&&!(mat[I(sx,y)]||'').startsWith('eye'))hair.add(I(sx,y));if(k>0&&k<5&&inb(sx+o,y))hair.add(I(sx+o,y));}}}
+    for(let k=0;k<7;k++){const y=OY+6+k,x=sx+(k>2?o:0);if(inb(x,y)&&!(mat[I(x,y)]||'').startsWith('eye'))hair.add(I(x,y));if(k>1&&k<5&&inb(x+o,y))hair.add(I(x+o,y));}}}
   const bd=cfg.beard;
   if(bd&&bd!=='none'&&!back){ // beards on the lower face (stubble just shades it); a long one hangs over the chest
     for(const i of headIdx){if(mat[i]!=='skin'||reg[i]!=='e')continue;const y=fy(i);
@@ -577,7 +577,7 @@ function composeP(dir,P){
     // a cape from the shoulders to the knees: behind the body, over it from the back, streaming with the motion
     const backV=base==='N'||base==='NW',side=base!=='S'&&base!=='N';
     const sy=oy+11+torsoShift[1],ky=Math.max(...Object.values(legs).map(l=>S(l.kn)[1]))+1-Math.max(0,lift)*1.5;
-    const bx=PX+torsoShift[0]+(side?(base==='W'?2:1):0),w0=base==='W'?1.5:3.5,w1=base==='W'?2.5:5,tr=trailX*2.6+(side?1.5:0),cc=new Map();
+    const bx=PX+torsoShift[0]+(side?(base==='W'?4:base==='SW'?3:1):0),w0=base==='W'?1.5:3.5,w1=base==='W'?2.5:5,tr=trailX*2.6+(side?1.5:0),cc=new Map();
     for(let y=Math.floor(sy);y<=Math.ceil(ky);y++){const u=(y-sy)/Math.max(1,ky-sy);if(u<0||u>1)continue;
       const c0=bx+tr*u*u,w=w0+(w1-w0)*u,xl=c0-w,xr=c0+w;
       for(let x=Math.floor(xl);x<=Math.ceil(xr);x++){if(!inb(x,y)||x+.5<xl||x+.5>xr)continue;

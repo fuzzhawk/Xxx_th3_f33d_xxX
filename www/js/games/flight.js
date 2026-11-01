@@ -286,8 +286,8 @@ export class Flight extends Game {
     if (i < 1 || z0 + CH > this.len - 20) return; // a clear runway at the start and an arena for the boss
     const roll = R();
     if (i === 1) this.ringRow(R, z0 + 34);
-    else if (roll < 0.64) this.obstacle(R, c, z0 + 12 + R() * 36);
-    else if (roll < 0.9) this.ringRow(R, z0 + 8 + R() * 24);
+    else if (roll < 0.68) this.obstacle(R, c, z0 + 12 + R() * 36);
+    else if (roll < 0.86) this.ringRow(R, z0 + 8 + R() * 24);
     const waves = [];
     if (i === 1) waves.push({ z: z0 - 32, k: 'v' });
     else if (R() < 0.8) waves.push({ z: z0 - 40 + R() * 50, k: pick(['v', 'v', 'cross', 'chase', 'swoop', 'pair']) });
@@ -393,7 +393,7 @@ export class Flight extends Game {
         for (const s of [-1, 1]) { const x = ax + s * (ow / 2 + pw / 2); st.push({ s: 'cyl', n: 6, x, y: oh / 2, z, w: pw, h: oh, c: ca }); this.addCol({ t: 'box', x, y: oh / 2, z, w: pw, h: oh, d: pw }); }
         st.push({ s: 'cyl', n: 6, x: ax, y: oh + 1.6, z, w: 3.2, h: ow + pw * 2 + 2, rz: Math.PI / 2, c: cb }); this.addCol({ t: 'box', x: ax, y: oh + 1.6, z, w: ow + pw * 2 + 2, h: 3.2, d: 3.2 });
       } else { B(ax - ow / 2 - pw / 2, oh / 2, z, pw, oh, 4, ca); B(ax + ow / 2 + pw / 2, oh / 2, z, pw, oh, 4, ca); B(ax, oh + 1.8, z, ow + pw * 2 + 1.5, 3.6, 4.6, cb); }
-      if (R() < 0.65) this.rings.push({ x: ax, y: oh / 2 + 1, z, r: 4, gold: R() < 0.4 });
+      if (R() < 0.4) this.rings.push({ x: ax, y: oh / 2 + 1, z, r: 4, gold: R() < 0.4 });
     } else if (p === 'gate') {
       const hx = (R() - 0.5) * 20, hy = 8.5 + R() * 10, hw = 14, hh = 11, d = 3, col = E.wall, X0 = -36, X1 = 36, top = 36, b = E.space ? -14 : 0;
       B((X0 + hx - hw / 2) / 2, (b + top) / 2, z, hx - hw / 2 - X0, top - b, d, col);
@@ -401,7 +401,7 @@ export class Flight extends Game {
       B(hx, (b + hy - hh / 2) / 2, z, hw, hy - hh / 2 - b, d, col);
       B(hx, (hy + hh / 2 + top) / 2, z, hw, top - hy - hh / 2, d, col);
       for (const [x, y, w, h] of [[hx, hy - hh / 2 - 0.3, hw + 1.2, 0.6], [hx, hy + hh / 2 + 0.3, hw + 1.2, 0.6], [hx - hw / 2 - 0.3, hy, 0.6, hh], [hx + hw / 2 + 0.3, hy, 0.6, hh]]) st.push({ s: 'box', x, y, z: z - 1.6, w, h, d: 0.4, c: E.arch[1], g: 1 });
-      this.rings.push({ x: hx, y: hy, z: z - 5, r: 4, gold: true });
+      if (R() < 0.5) this.rings.push({ x: hx, y: hy, z: z - 5, r: 4, gold: true });
     } else if (['towers', 'obelisks', 'stacks', 'spires', 'spikes', 'bigtrees'].includes(p)) {
       const n = p === 'bigtrees' ? 2 : 2 + (R() < 0.5 ? 1 : 0);
       for (let i = 0; i < n; i++) {
@@ -445,7 +445,7 @@ export class Flight extends Game {
       const b = 16 + R() * 8, h = b * 0.62, x = (R() - 0.5) * 22;
       st.push({ s: 'cyl', n: 4, k: 0, x, y: h / 2, z, w: b * 1.41, h, ry: (R() - 0.5) * 0.3, c: E.stone });
       this.addCol({ t: 'cone', x, z, r: b * 0.6, y0: 0, y1: h });
-      if (R() < 0.6) this.rings.push({ x, y: Math.min(22, h + 5.5), z, r: 4, gold: false });
+      if (R() < 0.35) this.rings.push({ x, y: Math.min(22, h + 5.5), z, r: 4, gold: false });
     } else if (p === 'mesa') {
       const w = 14 + R() * 5, h = 30 + R() * 10, x = (R() - 0.5) * 20;
       st.push({ s: 'cyl', n: 7, k: 0.88, x, y: h / 2, z, w, h, ry: R() * 3, j: 0.06, sd: sd(), c: E.rock, t: E.rock2 }, { s: 'cyl', n: 7, k: 0.9, x, y: h * 0.4, z, w: w * 1.04, h: h * 0.14, c: E.rock2 });
@@ -454,7 +454,7 @@ export class Flight extends Game {
       const w = 26 + R() * 10, h = 10 + R() * 5, x = (R() - 0.5) * 16;
       st.push({ s: 'cyl', n: 7, k: 0.3, x, y: h / 2, z, w, h, ry: R() * 3, j: 0.12, sd: sd(), c: E.ground[4], t: E.ground[2] });
       this.addCol({ t: 'cone', x, z, r: w * 0.5, y0: 0, y1: h * 1.15 });
-      this.rings.push({ x, y: Math.min(22, h * 1.15 + 5.5), z, r: 4, gold: R() < 0.3 });
+      if (R() < 0.4) this.rings.push({ x, y: Math.min(22, h * 1.15 + 5.5), z, r: 4, gold: R() < 0.3 });
     } else if (p === 'rig') {
       const x = (R() - 0.5) * 12, dy = 11 + R() * 4, [c1, c2, c3] = E.rig;
       B(x, dy, z, 24, 2.2, 14, c1);
@@ -619,12 +619,12 @@ export class Flight extends Game {
     if (type === 'carrier') {
       P({ id: 'podL', ox: -12.5, oy: -0.5, oz: -1, r: 2.9, hp: 24, gun: 'burst' }); P({ id: 'podR', ox: 12.5, oy: -0.5, oz: -1, r: 2.9, hp: 24, gun: 'burst' });
       P({ id: 'core', ox: 0, oy: 3.2, oz: -1.5, r: 2.9, hp: 45, gun: 'fan', core: true });
-      P({ id: 'hull', ox: 0, oy: 0, oz: 0, r: 8, hull: true });
+      P({ id: 'hull', ox: 0, oy: 0, oz: 0, r: 8, hull: true, hw: 13.5, hh: 2.3, hd: 8.5 });
     } else if (type === 'walker') {
       P({ id: 'armL', ox: -8.2, oy: 18.5, oz: -3, r: 2.5, hp: 20, gun: 'burst' }); P({ id: 'armR', ox: 8.2, oy: 18.5, oz: -3, r: 2.5, hp: 20, gun: 'burst' });
       P({ id: 'head', ox: 0, oy: 24.4, oz: -1.4, r: 2.4, hp: 16, gun: 'aim' });
       P({ id: 'core', ox: 0, oy: 20, oz: -4.6, r: 2.5, hp: 45, gun: 'fan', core: true });
-      P({ id: 'hull', ox: 0, oy: 20, oz: 0, r: 5.8, hull: true });
+      P({ id: 'hull', ox: 0, oy: 20, oz: 0, r: 5.8, hull: true, hw: 6.4, hh: 3.3, hd: 4.2 });
     } else {
       for (let i = 0; i < 4; i++) P({ id: 'pan' + i, a: (i * Math.PI) / 2, ox: 0, oy: 0, oz: -1, r: 3.2, hp: 12, gun: 'aim', panel: true });
       P({ id: 'core', ox: 0, oy: 0, oz: 0, r: 4.6, hp: 60, gun: 'ring', core: true });
@@ -636,7 +636,7 @@ export class Flight extends Game {
   stepBoss(dt) {
     const B = this.boss, z = this.z;
     B.t += dt;
-    const want = B.type === 'walker' ? 82 : 74, rel = B.z - z;
+    const want = B.type === 'walker' ? 70 : 62, rel = B.z - z;
     B.z += (SPEED + clamp((want - rel) * 1.2, -60, 20)) * dt;
     B.x = Math.sin(B.t * 0.42) * (B.type === 'walker' ? 6 : 10);
     if (B.type !== 'walker') B.y = 13 + Math.sin(B.t * 0.63) * 4;
@@ -709,7 +709,9 @@ export class Flight extends Game {
       if (b.life <= 0) continue;
       for (const e of this.foes) { if (e.dead || e.z + e.r < z0 || e.z - e.r > b.z) continue; if ((b.x - e.x) ** 2 + (b.y - e.y) ** 2 < (e.r + 0.4) ** 2) { b.life = 0; this.damage(e, b.dmg); break; } }
       if (b.life <= 0) continue;
-      for (const p of parts) { if (p.z + p.r < z0 || p.z - p.r > b.z) continue; if ((b.x - p.x) ** 2 + (b.y - p.y) ** 2 < (p.r + 0.4) ** 2) { b.life = 0; if (p.armored) this.spark(b.x, b.y, p.z - p.r, 2); this.hitPart(p, b.dmg); break; } }
+      for (const p of parts) {
+        if (p.hull) { if (Math.abs(b.x - p.x) < p.hw && Math.abs(b.y - p.y) < p.hh && b.z > p.z - p.hd && z0 < p.z + p.hd) { b.life = 0; this.spark(b.x, b.y, p.z - p.hd, 2); break; } continue; }
+        if (p.z + p.r < z0 || p.z - p.r > b.z) continue; if ((b.x - p.x) ** 2 + (b.y - p.y) ** 2 < (p.r + 0.4) ** 2) { b.life = 0; if (p.armored) this.spark(b.x, b.y, p.z - p.r, 2); this.hitPart(p, b.dmg); break; } }
     }
     this.shots = this.shots.filter((b) => b.life > 0);
     const s = this.ship, rad = 1.15 * this.S + 0.55;
@@ -735,7 +737,7 @@ export class Flight extends Game {
   }
   blast(x, y, z) {
     const R2 = 26;
-    this.flashes.push({ x, y, z, r: R2, life: 0.7, max: 0.7, c: [1, 0.5, 0.85] });
+    this.flashes.push({ x, y, z, r: R2 * 0.8, life: 0.7, max: 0.7, c: [0.75, 0.35, 0.65] });
     for (const e of this.foes) if (!e.dead && (e.x - x) ** 2 + (e.y - y) ** 2 + (e.z - z) ** 2 < R2 * R2) this.damage(e, 6);
     for (const p of this.bossParts()) if (!p.armored && (p.x - x) ** 2 + (p.y - y) ** 2 + (p.z - z) ** 2 < (R2 + p.r) ** 2) this.hitPart(p, 8);
     this.eshots = this.eshots.filter((b) => (b.x - x) ** 2 + (b.y - y) ** 2 + (b.z - z) ** 2 > (R2 + 6) ** 2);
@@ -764,7 +766,7 @@ export class Flight extends Game {
   boom(x, y, z, size = 1, cols) {
     const n = Math.round((8 + size * 6) * (this.mods.party ? 1.8 : 1));
     for (let i = 0; i < n; i++) this.debris.push({ x, y, z, vx: this.r(-14, 14) * size, vy: this.r(-6, 18) * size, vz: SPEED * 0.6 + this.r(-12, 12) * size, rx: this.r(0, TAU), ry: this.r(0, TAU), sx: this.r(-9, 9), sy: this.r(-9, 9), s: this.r(0.3, 0.8) * Math.sqrt(size), life: this.r(0.7, 1.4), c: this.mods.party ? [this.rng(), this.rng(), this.rng()] : cols[i % cols.length] });
-    this.flashes.push({ x, y, z, r: 2.4 * size, life: 0.42, max: 0.42, c: [1, 0.72, 0.3] });
+    this.flashes.push({ x, y, z, r: 1.5 * size, life: 0.36, max: 0.36, c: [0.95, 0.6, 0.25] });
     if (this.debris.length > 300) this.debris.splice(0, this.debris.length - 300);
     this.shake = Math.max(this.shake, Math.min(0.35, 0.08 * size));
   }
@@ -881,10 +883,9 @@ export class Flight extends Game {
     if (this.boss) { this.boss.m = null; for (const p of this.boss.parts) p.m = null; }
     for (const c of this.chunks.values()) for (const m of c.mv) m.m = null;
     if (!gl || lost) return;
-    const seen = new Set(), free = (o) => { if (o && !seen.has(o)) { seen.add(o); o.dispose(); } };
+    const seen = new Set(), free = (o) => { if (!o || seen.has(o)) return; seen.add(o); if (o.dispose) o.dispose(); else if (typeof o === 'object') for (const v of Object.values(o)) free(v); };
     gl.scene.traverse((o) => free(o.geometry));
-    for (const g of Object.values(gl.geo)) for (const x of [].concat(g)) free(x);
-    for (const m of gl.mats) free(m);
+    free(gl.geo); free(gl.mats);
   }
   buildGpu() {
     if (!live.includes(this)) live.push(this);
@@ -1002,12 +1003,12 @@ export class Flight extends Game {
       S.solid(BOXS, xf(0, 0.38, -0.95, 0.3, 0.14, 0.9), acc);
       for (const sd of [-1, 1]) {
         prism3(S, [sd * 0.35, 0.07, 0.55], [sd * 0.5, 0.07, -1.15], [sd * 2.55, -0.25, -1.1], [0, -0.12, 0], wing);
-        prism3(S, [sd * 2.4, -0.28, -0.45], [sd * 2.5, -0.33, -1.3], [sd * 2.75, 0.85, -1.5], [sd * 0.12, 0, 0], acc);
+        prism3(S, [sd * 2.4, -0.28, -0.5], [sd * 2.5, -0.33, -1.25], [sd * 2.68, 0.6, -1.4], [sd * 0.1, 0, 0], acc);
       }
-      S.solid(BOXS, xf(0, 0.12, -1.72, 0.66, 0.38, 0.24), dark);
-      Sg.solid(BOXS, xf(0, 0.12, -1.86, 0.44, 0.24, 0.06), lin('#9af0ff'));
+      S.solid(BOXS, xf(0, 0.12, -1.72, 0.5, 0.3, 0.24), dark);
+      Sg.solid(BOXS, xf(0, 0.12, -1.85, 0.3, 0.16, 0.04), lin('#c8f8ff'));
       geo.ship = this.geoPair(S, Sg);
-      const F = new Poly(); F.solid(cylS(5, 0), xf(0, 0, -0.6, 0.42, 1.2, 0.3, 0, -Math.PI / 2), lin('#7ae8ff')); geo.flame = F.geo();
+      const F = new Poly(); F.solid(cylS(5, 0), xf(0, 0, -0.45, 0.26, 0.9, 0.18, 0, -Math.PI / 2), lin('#a8f0ff')); geo.flame = F.geo();
       const Sh = new Poly(); Sh.face([[0, 0, 2.2], [2.6, 0, -1.1], [0, 0, -1.6], [-2.6, 0, -1.1]], WHITE, [0, 1, 0]); geo.shadow = Sh.geo();
       const g = new T.Group(); g.rotation.order = 'YXZ';
       g.add(mesh(geo.ship[0], gl.lit), mesh(geo.ship[1], gl.glow));
@@ -1070,7 +1071,7 @@ export class Flight extends Game {
     B.solid(cylS(8, 1), xf(0, 0, 0, 2.3, 0.25, 2.3), c2);
     geo.mine = this.geoPair(A, B);
     // rings and power-ups
-    for (const gold of [0, 1]) geo['ring' + gold] = ringPoly(P(), 4.6, 0.8, 0.7, lin(gold ? '#ffd23a' : '#dfe4ee')).geo();
+    for (const gold of [0, 1]) geo['ring' + gold] = ringPoly(P(), 4.6, 0.8, 0.7, lin(gold ? '#ffd23a' : '#f4f7fc')).geo();
     for (const k of Object.keys(ITEMS)) { const c = lin(ITEMS[k][0]); A = P(); B = P(); A.solid(OCTS, xf(0, 0, 0, 2.0, 2.8, 2.0), (ny) => (ny > 0 ? c : mul(c, 0.7))); B.solid(cylS(8, 1), xf(0, 0, 0, 2.7, 0.3, 2.7), mix(c, WHITE, 0.5)); geo['item' + k] = this.geoPair(A, B); }
   }
   bossGeo(type) {
@@ -1135,7 +1136,7 @@ export class Flight extends Game {
     for (const m of c.mv) {
       const Q = new Poly();
       prim(Q, Q, { ...m.vis, x: 0, y: 0, z: 0, g: 0 });
-      m.m = mesh(Q.geo(), m.vis.g ? gl.glow : gl.lit); m.m.rotation.order = 'YXZ'; g.add(m.m);
+      m.m = mesh(Q.geo(), m.vis.g ? gl.hot : gl.lit); m.m.rotation.order = 'YXZ'; g.add(m.m);
     }
     g.userData.mv = c.mv;
     gl.root.add(g);
@@ -1189,7 +1190,6 @@ export class Flight extends Game {
         m.position.set(e.x, e.base, e.z);
         const dx = s.x - e.x, dz = this.z - e.z, dy = s.y - (e.base + 1.9);
         e.barrel.rotation.set(-Math.atan2(dy, Math.hypot(dx, dz)), Math.atan2(dx, dz), 0);
-        e.barrel.position.z = e.flare > 0 ? -0.3 : 0;
       } else if (e.kind === 'walker') {
         m.position.set(e.x, Math.abs(Math.sin(e.t * 5)) * 0.25, e.z); m.rotation.set(0, Math.PI + clamp(e.dir * 0.4, -0.4, 0.4), 0);
         e.legs[0].rotation.x = Math.sin(e.t * 5) * 0.5; e.legs[1].rotation.x = -Math.sin(e.t * 5) * 0.5;
@@ -1204,11 +1204,10 @@ export class Flight extends Game {
       }
     }
     for (const g of this.rings) {
-      if (g.z - this.z > VIEW || (g.ok && g.tt > 0.35)) continue;
+      if (g.z - this.z > VIEW || g.z < this.z - 2 || (g.ok && g.tt > 0.08)) continue;
       if (!g.m) { g.m = mesh(gl.geo['ring' + (g.gold ? 1 : 0)], gl.lit); gl.root.add(g.m); }
       seen.add(g.m);
       g.m.position.set(g.x, g.y, g.z); g.m.rotation.z = t * 0.8;
-      g.m.scale.setScalar(g.ok ? 1 + g.tt * 2 : 1);
       flashG(g.m, g.ok, white);
     }
     for (const it of this.items) {
@@ -1260,7 +1259,7 @@ export class Flight extends Game {
     for (const d of this.debris) { if (n >= 320) break; const age = 1.5 - d.life; V.set(d.x, d.y, d.z); E.set(d.rx + d.sx * age, d.ry + d.sy * age, 0); Q.setFromEuler(E); S.setScalar(d.s * Math.min(1, d.life * 3)); M.compose(V, Q, S); gl.debrisM.setMatrixAt(n, M); gl.debrisM.setColorAt(n, C.setRGB(d.c[0], d.c[1], d.c[2])); n++; }
     gl.debrisM.count = n; markI(gl.debrisM);
     n = 0;
-    for (const f of this.flashes) { if (n >= 40) break; const k = f.life / f.max; V.set(f.x, f.y, f.z); Q.identity(); S.setScalar(f.r * 2 * (0.45 + (1 - k) * 0.7)); M.compose(V, Q, S); gl.flashM.setMatrixAt(n, M); gl.flashM.setColorAt(n, C.setRGB(f.c[0] * k, f.c[1] * k * k, f.c[2] * k * k)); n++; }
+    for (const f of this.flashes) { if (n >= 40) break; const k = f.life / f.max; V.set(f.x, f.y, f.z); Q.identity(); S.setScalar(f.r * 2 * (0.5 + (1 - k) * 0.5)); M.compose(V, Q, S); gl.flashM.setMatrixAt(n, M); gl.flashM.setColorAt(n, C.setRGB(f.c[0] * k, f.c[1] * k * k, f.c[2] * k * k)); n++; }
     gl.flashM.count = n; markI(gl.flashM);
     n = 0;
     for (const b of this.bombsF) { if (n >= 8 || b.life < 0) continue; V.set(b.x, b.y, b.z); E.set(t * 9, t * 6, 0); Q.setFromEuler(E); S.setScalar(1 + Math.sin(t * 40) * 0.2); M.compose(V, Q, S); gl.bombM.setMatrixAt(n++, M); }

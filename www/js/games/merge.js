@@ -35,6 +35,7 @@ function segHit(x, y, r, s) {
 }
 
 export class Merge extends Game {
+  static noMods = ['glass'];
   setup() {
     const keys = Object.keys(MODES);
     this.mode = keys[this.ri(0, keys.length - 1)];

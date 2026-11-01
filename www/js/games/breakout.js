@@ -122,8 +122,8 @@ export class Breakout extends Game {
     let target = null;
     if (ball) {
       const bx = this.fold(ball.x + ball.vx * Math.max(0, bt), ball.r);
-      if (this.aimFor !== ball || this.aimAt !== this.balls.length) { this.aimFor = ball; this.aimAt = this.balls.length; this.aimOff = this.chooseOff(bx); }
-      target = bx - this.aimOff * p.w / 2;
+      if (ball.aim == null) { ball.aim = this.chooseOff(bx); ball.err = this.rng() < 0.015 + this.level * 0.004 ? this.r(0.8, 1.1) * p.w * (this.rng() < 0.5 ? -1 : 1) : 0; }
+      target = bx - ball.aim * p.w / 2 + ball.err;
       // dodge a bad capsule that would land on the paddle, if the ball still gets hit
       for (const q of this.caps) if (!POW[q.k][3] && q.y < p.y && (p.y - q.y) / q.vy < 0.7 && Math.abs(q.x - target) < p.w / 2 + 10) {
         const alt = bx + Math.sign(bx - q.x || 1) * p.w * 0.4;
@@ -203,7 +203,8 @@ export class Breakout extends Game {
         this.speed = Math.min(540, this.speed + 3);
         p.sq = 1; this.fx.sparks(b.x, p.y, 5, this.col(0), 150, -Math.PI / 2, 1.6, 0.25);
         if (this.pw.catch > 0) { b.stuck = 0.6; b.off = off; this.fx.ring(b.x, p.y, 14, '#ffe14f', 0.3, 2); }
-        else { b.off = off; const a = -Math.PI / 2 + off * 1.05, s = this.spd(); b.vx = Math.cos(a) * s; b.vy = Math.sin(a) * s; b.y = p.y - b.r; }
+        else { b.off = off; const a = -Math.PI / 2 + off * 1.05 + this.r(-0.04, 0.04), s = this.spd(); b.vx = Math.cos(a) * s; b.vy = Math.sin(a) * s; b.y = p.y - b.r; }
+        b.aim = null;
       }
       // bricks
       if (b.y - b.r < this.fieldB) for (const k of this.bricks) {

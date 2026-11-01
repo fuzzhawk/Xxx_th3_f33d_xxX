@@ -40,53 +40,76 @@ function physics(ds, dt) {
 }
 const ringScore = (d) => { const r = Math.hypot(d.x - CX, d.y - CY); return r < RINGS[1] - DR ? 15 : r < RINGS[2] - DR ? 10 : r < RINGS[3] - DR ? 5 : 0; };
 
+const gauss = (R) => (R() + R() + R() - 1.5) * 2;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
 export class Crokinole extends Game {
   static noAuto = true;
   static noMods = ['mirror', 'lowg', 'heavy', 'giant', 'tiny', 'wobble'];
-  setup() { this.stats = { foul: [0, 0], shots: [0, 0], pts: [0, 0] }; this.totals = [0, 0]; this.round = 0; this.newRound(); }
+  setup() {
+    this.stats = { foul: [0, 0], shots: [0, 0], pts: [0, 0], tw: [0, 0], try20: [0, 0] }; this.totals = [0, 0]; this.round = 0;
+    // each post gives each side its own hands: steadiness, odds of a real slip, nerve on the hole, taste for knock-outs
+    const base = this.r(0.2, 0.65);
+    this.skill = [0, 1].map(() => { const s = clamp(base + this.r(-0.15, 0.15), 0.05, 0.75); return { aim: 0.05 - 0.025 * s, pow: 0.1 - 0.05 * s, slip: 0.1 - 0.07 * s, temp: 6.5 - 4.5 * s, aggr: this.r(0.7, 1.4), nerve: this.r(1.5, 2.2) }; });
+    this.form = [0, 0]; // hot or cold hand, -1..1
+    this.newRound();
+  }
   newRound() {
-    this.round++; this.discs = []; this.twenties = [0, 0]; this.shot = 0; this.turn = this.round % 2; this.phase = 'aim'; this.think = 1; this.aim = null; this.msg = null;
+    this.round++; this.discs = []; this.twenties = [0, 0]; this.shot = 0; this.turn = this.round % 2; this.phase = 'aim'; this.think = 1; this.aim = null; this.msg = null; this.pending = this.brain = null;
     this.left = [SHOTS, SHOTS];
   }
   // side 0 shoots from the bottom quarter, side 1 from the top
   spot(side, u) { const a = (side ? -Math.PI / 2 : Math.PI / 2) + (u - 0.5) * (Math.PI / 2.2); return { x: CX + Math.cos(a) * RINGS[3], y: CY + Math.sin(a) * RINGS[3] }; }
-  shoot(side, u, ang, pow) {
+  shoot(side, u, ang, pow, try20) {
     const s = this.spot(side, u);
-    const d = { x: s.x, y: s.y, vx: Math.cos(ang) * pow, vy: Math.sin(ang) * pow, side, shot: true, i: side ? this.skin.pick('them', 'enemy', 'monster') : this.skin.pick('us', 'hero', 'item') };
+    const d = { x: s.x, y: s.y, vx: Math.cos(ang) * pow, vy: Math.sin(ang) * pow, side, shot: true, try20, i: side ? this.skin.pick('them', 'enemy', 'monster') : this.skin.pick('us', 'hero', 'item') };
     for (const o of this.discs) o.hit = false;
     this.stats.shots[side]++;
-    this.discs.push(d); this.left[side]--; this.phase = 'roll'; this.rollT = 0; this.needHit = this.discs.some((o) => !o.out && o.side !== side);
+    this.discs.push(d); this.left[side]--; this.phase = 'roll'; this.rollT = 0; this.pending = this.brain = this.aim = null; this.needHit = this.discs.some((o) => !o.out && o.side !== side);
     return d;
   }
-  // try a spread of shots in a copy of the board, keep the best
-  plan(side) {
-    let best = null;
-    const opp = this.discs.filter((d) => !d.out && d.side !== side);
-    for (let k = 0; k < 48; k++) {
-      const u = this.rng(), s = this.spot(side, u);
-      let tx = CX, ty = CY;
-      if (opp.length && this.rng() < 0.8) { const o = opp[Math.floor(this.rng() * opp.length)]; tx = o.x; ty = o.y; }
-      const ang = Math.atan2(ty - s.y, tx - s.x) + this.r(-0.06, 0.06), dist = Math.hypot(tx - s.x, ty - s.y);
-      const pow = Math.sqrt(2 * 150 * dist) * this.r(opp.length ? 1.05 : 0.92, opp.length ? 1.5 : 1.08);
+  // a shot as it leaves the fingers: aim and power wobble; hard flicks and the hole are harder to keep steady
+  wobble(side, c, z = [gauss(this.rng), gauss(this.rng), this.rng()]) {
+    const sk = this.skill[side], k = 1 - 0.25 * this.form[side], hard = (c.kind === 'hole' ? sk.nerve : 1) * (0.75 + c.pow / 800), slip = z[2] < sk.slip;
+    return { ang: c.ang + z[0] * sk.aim * k * hard * (slip ? 2.4 : 1), pow: clamp(c.pow * (1 + z[1] * sk.pow * k * hard * (slip ? 1.8 : 1)), 40, 520) };
+  }
+  // the shooter thinks a few simulations per step: sketch shots (the hole, a soft draw, hits on their best discs), rank them
+  // on a perfect board, re-test the best of each kind with its own wobble, then pick among them (careless players stray)
+  *thinker(side) {
+    const sk = this.skill[side], opp = this.discs.filter((d) => !d.out && d.side !== side), needHit = opp.length > 0;
+    const at = (u, tx, ty, f, kind, off = 0) => { const s = this.spot(side, u), dist = Math.hypot(tx - s.x, ty - s.y); return { u, kind, ang: Math.atan2(ty - s.y, tx - s.x) + off / dist, pow: Math.min(520, Math.sqrt(300 * dist) * f) }; };
+    const run = (c, z) => {
+      const { ang, pow } = z ? this.wobble(side, c, z) : c, s = this.spot(side, c.u);
       const ds = this.discs.map((d) => ({ ...d, shot: false, hit: false })), me = { x: s.x, y: s.y, vx: Math.cos(ang) * pow, vy: Math.sin(ang) * pow, side, shot: true };
       ds.push(me);
       for (let t = 0; t < 5; t += 1 / 60) { physics(ds, 1 / 60); if (ds.every((d) => d.out || Math.hypot(d.vx, d.vy) < 1)) break; }
-      if (opp.length && !ds.some((d) => d.side !== side && d.hit)) me.out = 'foul';
-      if (!opp.length && !me.out && ringScore(me) < 15) me.out = 'foul';
-      let v = 0;
-      for (const d of ds) { const sc = d.out === 'twenty' ? 20 : d.out ? 0 : ringScore(d); v += d.side === side ? sc : -sc; }
-      v += this.r(0, 3);
-      if (!best || v > best.v) best = { v, u, ang, pow };
-    }
-    return best;
+      if (!me.out && (needHit ? !ds.some((d) => d.side !== side && d.hit) : ringScore(me) < 15)) me.out = 'foul';
+      let v = me.out === 'foul' ? -6 : 0; // a lost disc is a lost chance
+      for (const d of ds) { const sc = d.out === 'twenty' ? 20 : d.out ? 0 : ringScore(d); v += d.side === side ? sc : -sk.aggr * sc; }
+      return v;
+    };
+    const cands = [];
+    for (let k = 0; k < 10; k++) cands.push(at(k < 5 ? 0.5 + this.r(-0.03, 0.03) : k < 7 ? this.r(0, 0.06) : k < 9 ? this.r(0.94, 1) : this.rng(), CX, CY, this.r(0.92, 1.3), 'hole'));
+    if (!needHit) for (let k = 0; k < 6; k++) cands.push(at(0.5 + this.r(-0.04, 0.04), CX, CY, this.r(0.9, 1), 'soft'));
+    for (const { d } of opp.map((d) => ({ d, w: ringScore(d) + this.r(0, 6) })).sort((a, b) => b.w - a.w).slice(0, 4))
+      for (let k = 0; k < 6; k++) cands.push(at(this.rng(), d.x, d.y, this.r(1.15, 2.3), 'hit', this.r(-1, 1) * DR * 1.5));
+    for (const c of cands) { c.v = run(c); yield; }
+    cands.sort((a, b) => b.v - a.v);
+    const top = ['hole', 'soft', 'hit'].flatMap((k) => cands.filter((c) => c.kind === k).slice(0, 2)), zs = Array.from({ length: 5 }, () => [gauss(this.rng), gauss(this.rng), this.rng()]);
+    for (const c of top) { let e = 0; for (const z of zs) { e += run(c, z); yield; } c.ev = e / zs.length; }
+    const best = Math.max(...top.map((c) => c.ev)), ws = top.map((c) => Math.exp((c.ev - best) / sk.temp));
+    let x = this.rng() * ws.reduce((a, b) => a + b, 0), pick = top[0];
+    for (let i = 0; i < top.length; i++) { x -= ws[i]; if (x <= 0) { pick = top[i]; break; } }
+    return { u: pick.u, kind: pick.kind, ...this.wobble(side, pick) };
   }
   ai(dt) {
-    if (this.phase !== 'aim') return;
-    this.think -= dt;
-    if (this.think > 0) return;
-    if (!this.pending) { this.pending = this.plan(this.turn); this.think = 0.5; this.aim = { u: this.pending.u, ang: this.pending.ang, pow: this.pending.pow }; return; }
-    const p = this.pending; this.pending = null; this.aim = null;
-    this.shoot(this.turn, p.u, p.ang + this.r(-0.02, 0.02), p.pow * this.r(0.97, 1.03));
+    if (this.phase !== 'aim' || (this.think -= dt) > 0) return;
+    if (this.pending) { const p = this.pending; this.shoot(this.turn, p.u, p.ang, p.pow, p.kind === 'hole'); return; }
+    this.brain ||= this.thinker(this.turn);
+    for (let i = 0; i < 3; i++) {
+      const r = this.brain.next();
+      if (r.done) { this.pending = r.value; this.aim = { u: r.value.u, ang: r.value.ang, pow: r.value.pow }; this.brain = null; this.think = this.r(0.35, 0.8); return; }
+    }
   }
   down(x, y) {
     if (this.phase !== 'aim' || this.turn !== 0) return;
@@ -105,13 +128,18 @@ export class Crokinole extends Game {
     if (this.phase === 'aim' && (this.turn === 1 || (this.auto && this.autoOK))) this.ai(dt);
     if (this.phase === 'roll') {
       physics(this.discs, dt); this.rollT += dt;
-      for (const d of this.discs) if (d.out === 'twenty' && !d.counted) { d.counted = true; this.twenties[d.side]++; this.burst(CX, CY, this.col(1), 18, 160); this.msg = { s: '20!', t: 1 }; }
+      for (const d of this.discs) if (d.out === 'twenty' && !d.counted) { d.counted = true; this.twenties[d.side]++; this.stats.tw[d.side]++; this.burst(CX, CY, this.col(1), 18, 160); this.msg = { s: '20!', t: 1 }; }
       if (this.discs.every((d) => d.out || Math.hypot(d.vx, d.vy) < 1) || this.rollT > 8) {
         const s = this.discs.find((d) => d.shot);
         if (s) {
           s.shot = false;
           const foul = !s.out && ((this.needHit && !this.discs.some((o) => o.side !== s.side && o.hit)) || (!this.needHit && ringScore(s) < 15));
-          if (foul) { this.stats.foul[s.side]++; s.out = 'foul'; this.msg = { s: this.needHit ? 'MISSED — DISC OFF' : 'SHORT — DISC OFF', t: 1 }; }
+          const knocked = this.discs.filter((o) => o.side !== s.side && o.out === 'ditch').length;
+          if (s.try20) this.stats.try20[s.side]++;
+          if (foul) { this.stats.foul[s.side]++; s.out = 'foul'; this.msg = { s: s.try20 ? 'MISSED THE 20 — DISC OFF' : this.needHit ? 'MISSED — DISC OFF' : 'SHORT — DISC OFF', t: 1 }; }
+          else if (s.try20 && s.out !== 'twenty') this.msg = { s: 'SO CLOSE', t: 1 };
+          else if (knocked) this.msg = { s: knocked > 1 ? 'DOUBLE KNOCK-OUT!' : 'KNOCKED OFF!', t: 1 };
+          this.form[s.side] = clamp(this.form[s.side] + (foul ? -0.5 : s.out === 'twenty' || knocked ? 0.4 : 0.1), -1, 1);
         }
         this.discs = this.discs.filter((d) => !d.out);
         this.shot++;
@@ -151,7 +179,7 @@ export class Crokinole extends Game {
       const s = this.spot(this.turn, this.aim.u);
       this.disc(c, s.x, s.y, this.turn, this.turn ? this.skin.pick('them', 'enemy', 'monster') : this.skin.pick('us', 'hero', 'item'), 0.7);
       c.strokeStyle = this.pal.ink; c.globalAlpha = 0.5; c.setLineDash([4, 4]); c.lineWidth = 1.5;
-      const L = 30 + this.aim.pow * 0.2; c.beginPath(); c.moveTo(s.x, s.y); c.lineTo(s.x + Math.cos(this.aim.ang) * L, s.y + Math.sin(this.aim.ang) * L); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+      const L = 30 + this.aim.pow * 0.2, an = this.aim.ang + (this.pending ? Math.sin(this.t * 9) * 0.014 : 0); c.beginPath(); c.moveTo(s.x, s.y); c.lineTo(s.x + Math.cos(an) * L, s.y + Math.sin(an) * L); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
     }
     // discs left
     for (let s = 0; s < 2; s++) for (let k = 0; k < this.left[s]; k++) this.disc(c, 16 + k * 14, s ? 44 : H - 14, s, null, 0.8, 5);

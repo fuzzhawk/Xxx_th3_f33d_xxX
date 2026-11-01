@@ -8,7 +8,8 @@
 // them get ordered dithering and grit. `big` is a smooth 160 px portrait.
 import { mulberry32 } from './util.js';
 
-const TAU = Math.PI * 2, F = 4;
+const TAU = Math.PI * 2;
+const ssFor = (size) => (size <= 26 ? 4 : size <= 44 ? 3 : 2);
 export const SPIRIT_PLANS = ['critter', 'guardian', 'kodama', 'puff', 'mochi', 'wisp', 'birdy', 'moth', 'noodle', 'pup', 'shell', 'lantern'];
 // the old BEASTS plan names (and the older legacy ones) map onto archetypes
 const ALIAS = { quad: 'critter', brute: 'guardian', biped: 'guardian', insect: 'moth', spider: 'puff', serpent: 'noodle', bird: 'birdy', floater: 'wisp', slime: 'mochi', blob: 'mochi', crab: 'shell', centipede: 'pup', totem: 'kodama' };
@@ -82,20 +83,20 @@ export function genome(seed, hue = 0, tier = 0, opts = {}) {
   g.loco = { critter: 'walk', guardian: 'waddle', kodama: 'waddle', puff: 'hop', mochi: 'hop', wisp: 'float', birdy: 'hop', moth: 'float', noodle: 'float', pup: 'inch', shell: 'walk', lantern: 'float' }[plan];
   g.atk = { critter: 'pounce', guardian: 'lunge', kodama: 'flare', puff: 'pounce', mochi: 'spit', wisp: 'flare', birdy: 'peck', moth: 'flare', noodle: 'lunge', pup: 'lunge', shell: 'lunge', lantern: 'flare' }[plan];
   g.die = { critter: 'flop', guardian: 'flop', kodama: 'fade', puff: 'squish', mochi: 'squish', wisp: 'fade', birdy: 'flop', moth: 'fade', noodle: 'fade', pup: 'flop', shell: 'flop', lantern: 'fade' }[plan];
-  g.len = r(0.9, 1.1); g.fat = r(0.9, 1.15); g.hr = r(0.92, 1.12); g.leg = r(0, 1); g.legW = r(0.85, 1.2); g.fluff = r(0, 1); g.turn = r(0.12, 0.3);
-  g.eye = 'bean'; g.eyeS = r(1.05, 1.45); g.blush = ch(0.75); g.one = false;
+  g.len = r(0.9, 1.1); g.fat = r(0.9, 1.15); g.hr = r(0.92, 1.18); g.sit = plan === 'critter' && ch(0.35); g.leg = r(0, 1); g.legW = r(0.85, 1.2); g.fluff = r(0, 1); g.turn = r(0.12, 0.3);
+  g.eye = 'bean'; g.eyeS = r(1.05, 1.45); g.blushOn = ch(0.75); g.one = false;
   const tone = opts.tone || wp(TONES[plan]); g.tone = tone;
   if (plan === 'puff') { g.legs = opts.plan === 'spider' ? 6 + 2 * Math.floor(R() * 2) : ch(0.55) ? pick([2, 4, 6]) : 0; if (g.legs) g.loco = 'walk'; g.fluff = r(0.6, 1); g.turn = r(0.04, 0.14); g.spiky = tone === 'dark' || ch(0.3); g.mouth = pick(['none', 'smile', 'cat', 'none']); g.hold = ch(0.3) ? 'star' : ''; }
   if (plan === 'mochi') { g.sub = pick(['dome', 'dome', 'drop', 'jelly']); g.turn = r(0.05, 0.15); g.mouth = pick(['cat', 'smile', 'open', 'cat']); g.crown = g.A === 'rabbit' ? 'none' : pick(['leaf', 'sprout', 'none', 'flower', 'cherry']); }
-  if (plan === 'wisp') { g.sub = pick(['flame', 'flame', 'ghost', 'jelly', 'mask']); g.turn = r(0.04, 0.14); g.mouth = pick(['smile', 'cat', 'none', 'open']); if (g.sub === 'mask') { g.mask = 'face'; g.tone = tone === 'white' ? 'dark' : tone; } }
-  if (plan === 'kodama') { g.eye = 'hollow'; g.mouth = 'o'; g.turn = r(-0.05, 0.12); g.eyeS = r(1.1, 1.5); g.blush = ch(0.3); g.crown = pick(['sprout', 'sprout', 'leaf', 'flower', 'mushroom', 'acorn', 'none']); g.sub = pick(['round', 'tall', 'wide']); g.fluff = 0; g.headShape = 'round'; }
+  if (plan === 'wisp') { g.sub = pick(['flame', 'flame', 'ghost', 'jelly', 'mask']); g.turn = r(0.04, 0.14); g.mouth = pick(['smile', 'cat', 'none', 'open']); if (g.sub === 'mask') { g.mask = 'face'; g.tone = tone === 'white' || ch(0.6) ? 'dark' : tone; } }
+  if (plan === 'kodama') { g.eye = 'hollow'; g.mouth = 'o'; g.turn = r(-0.05, 0.12); g.eyeS = r(1.1, 1.5); g.blushOn = ch(0.3); g.crown = pick(['sprout', 'sprout', 'leaf', 'flower', 'mushroom', 'acorn', 'none']); g.sub = pick(['round', 'tall', 'wide']); g.fluff = 0; g.headShape = 'round'; }
   if (plan === 'lantern') { g.sub = pick(['chochin', 'chochin', 'kasa', 'kettle']); g.one = g.sub === 'kasa' || ch(0.45); g.mouth = 'tongue'; g.turn = r(0.02, 0.12); if (g.sub === 'kasa') g.loco = 'hop'; if (g.sub === 'kettle') { g.loco = 'walk'; g.A = 'tanuki'; Object.assign(g, { ears: 'round', tail: 'ringed', nose: true, mouth: 'cat', band: ch(0.5), one: false }); g.atk = 'spit'; g.die = 'flop'; } }
   if (plan === 'guardian') { g.turn = r(0.06, 0.18); g.belly = 1; g.chev = ch(0.6); g.hold = ch(0.35) ? pick(['leaf', 'leaf', 'acorn', 'lantern']) : ''; if (g.A === 'spirit') g.ears = pick(['cat', 'round', 'rabbit', 'tufts']); }
   if (plan === 'birdy') { g.belly = 1; g.turn = r(0.12, 0.26); g.wings = 'feather'; if (g.B === 'turtle') g.shellBack = 1; if (g.A === 'cat' || g.A === 'fox') { g.mouth = 'beak'; g.tail = 'feather'; } }
   if (plan === 'moth') { g.wings = 'moth'; g.turn = r(0.03, 0.12); g.ears = g.A === 'moth' ? 'antennae' : AN[g.A].ears; g.tail = 'none'; g.collar = 1; g.eye = ch(0.4) ? 'soot' : 'bean'; }
   if (plan === 'noodle') { g.turn = r(0.15, 0.3); g.tail = pick(['tuft', 'fish', 'tuft', 'wisp']); g.fin = ch(0.5); g.paws = ch(0.6); if (g.A === 'dragon') g.crown = pick(['horns', 'antlers', 'horns', 'none']); g.whisk = g.A === 'dragon' || ch(0.3) ? 2 : g.whisk; }
   if (plan === 'pup') { g.segs = 3 + Math.floor(R() * 3) + (opts.plan === 'centipede' ? 1 : 0); g.turn = r(0.15, 0.3); if (g.A === 'moth') { g.ears = 'antennae'; g.A = 'caterpillar'; } g.tail = 'none'; g.crown = ch(0.35) ? pick(['leaf', 'flower', 'sprout']) : 'none'; }
-  if (plan === 'shell') { g.sub = g.A === 'snail' ? 'snail' : 'turtle'; g.turn = r(0.15, 0.3); g.garden = pick(['moss', 'flower', 'mushroom', 'tree', 'shrine', 'sprout']); g.tail = 'none'; if (g.A === 'turtle') g.mouth = pick(['smile', 'cat', 'beak']); g.crown = 'none'; }
+  if (plan === 'shell') { g.sub = g.A === 'snail' ? 'snail' : 'turtle'; g.turn = r(0.15, 0.3); g.garden = pick(['moss', 'flower', 'mushroom', 'tree', 'shrine', 'sprout']); g.tail = 'none'; if (g.A === 'turtle') g.mouth = pick(['smile', 'cat', 'beak']); g.crown = 'none'; if (g.sub === 'turtle') g.die = 'flip'; }
   // chimera extras
   const B = g.B;
   if (B === 'fish') { g.tail = 'fish'; if (plan === 'critter') g.fin = 1; }
@@ -159,11 +160,21 @@ export function genome(seed, hue = 0, tier = 0, opts = {}) {
   return g;
 }
 function species(g) {
-  const P = { puff: g.tone === 'dark' ? 'soot sprite' : 'fuzzball', mochi: g.sub === 'jelly' ? 'jelly spirit' : 'mochi spirit', wisp: { flame: "will-o'-wisp", ghost: 'little ghost', jelly: 'sky jelly', mask: 'masked spirit' }[g.sub], kodama: 'kodama', lantern: { chochin: 'lantern yokai', kasa: 'umbrella yokai', kettle: 'teakettle tanuki' }[g.sub], guardian: 'forest guardian', moth: 'moth', noodle: 'sky dragon', pup: 'caterpillar pup', shell: g.sub === 'snail' ? 'garden snail' : 'garden turtle', birdy: 'bird', critter: '' }[g.plan];
-  const A = g.A === 'spirit' ? '' : g.A;
-  if (g.plan === 'critter') return g.B ? `${A}-${g.B}` : A;
-  if (['moth', 'birdy', 'noodle', 'pup', 'guardian'].includes(g.plan) && A && !['moth', 'bird', 'dragon'].includes(A)) return `${P.split(' ').pop()}-${A}`.replace('pup-', 'caterpillar-');
-  return g.plan === 'kodama' || g.plan === 'lantern' || !A || A === 'tanuki' && g.plan === 'lantern' ? P : `${A} ${P}`;
+  const A = g.A === 'spirit' ? '' : g.A, B = g.B, pre = A ? A + ' ' : '';
+  switch (g.plan) {
+    case 'critter': return B ? `${A}-${B}` : `${A} spirit`;
+    case 'guardian': return A ? `${A} guardian` : 'forest guardian';
+    case 'birdy': return g.shellBack ? `turtle-${A}` : A === 'bird' ? 'songbird spirit' : A === 'owl' ? 'owl spirit' : `${A}-bird`;
+    case 'moth': return A === 'moth' ? 'moth spirit' : `moth-${A}`;
+    case 'noodle': return A === 'dragon' ? (B ? `dragon-${B}` : 'sky dragon') : `${A}-dragon`;
+    case 'pup': return A === 'dog' ? 'caterpillar pup' : A === 'caterpillar' ? 'fuzzy caterpillar' : `caterpillar-${A}`;
+    case 'shell': return g.sub === 'snail' ? 'garden snail' : A === 'turtle' ? 'garden turtle' : `turtle-${A}`;
+    case 'puff': return g.tone === 'dark' ? pre + 'soot sprite' : pre + 'fuzzball';
+    case 'mochi': return pre + (g.sub === 'jelly' ? 'jelly spirit' : 'mochi spirit');
+    case 'wisp': return g.sub === 'mask' ? 'masked spirit' : pre + { flame: "will-o'-wisp", ghost: 'little ghost', jelly: 'sky jelly' }[g.sub];
+    case 'kodama': return 'kodama';
+    default: return { chochin: 'lantern yokai', kasa: 'umbrella yokai', kettle: 'teakettle tanuki' }[g.sub];
+  }
 }
 const FRAG = { fox: ['Fox', 'Kit', 'Vix'], cat: ['Mew', 'Purr', 'Tabby'], owl: ['Hoot', 'Owl'], frog: ['Rib', 'Frog', 'Croak'], deer: ['Fawn', 'Doe'], rabbit: ['Bun', 'Hop', 'Lop'], bear: ['Bear', 'Bru'], tanuki: ['Nuki', 'Tanu'], axolotl: ['Axo', 'Lotl'], lion: ['Leo', 'Mane'], mouse: ['Pip', 'Squeak'], dog: ['Pup', 'Woof'], seal: ['Seal', 'Pinn'], bird: ['Wren', 'Chirp'], fish: ['Fin', 'Koi', 'Gill'], moth: ['Moth', 'Dust'], turtle: ['Shell', 'Turt'], dragon: ['Ryu', 'Drake'], snail: ['Swirl', 'Snail'], caterpillar: ['Wiggle', 'Grub'] };
 const SPIRIT = { puff: ['Soot', 'Fuzz', 'Smudge'], mochi: ['Mochi', 'Dango', 'Jelly'], wisp: ['Wisp', 'Flick', 'Boo'], kodama: ['Koda', 'Twig', 'Kono'], lantern: ['Chochi', 'Kasa', 'Glim'], guardian: ['Toto', 'Moss', 'Bumble'], moth: ['Moth'], noodle: ['Ryu'], pup: ['Wiggle'], shell: ['Shell'], birdy: ['Wren'], critter: ['Kit'] };
@@ -228,6 +239,7 @@ function ink(p, w = 2) { if (!Q.ink) return; X.strokeStyle = G.inkC; X.lineWidth
 // base tone, a shadow crescent away from the light (top-left), a soft light, optional gloss and rim light
 function solid(p, Rm, cx, cy, rx, ry, o = {}) {
   const x = X; x.fillStyle = Rm[2]; x.fill(p);
+  if (Q.probe) return;
   x.save(); x.clip(p);
   if (o.sh !== 0) {
     const k = o.sh || 1, q = new Path2D(); q.rect(cx - rx * 3, cy - ry * 3, rx * 6, ry * 6); E(cx - rx * 0.2 * k, cy - ry * 0.3 * k, rx * 1.04, ry * 1.02, 0, q); x.fillStyle = Rm[1]; x.fill(q, 'evenodd');
@@ -268,7 +280,7 @@ function eye(cx, cy, w, h, far, skin) {
       const a = far ? 1 : 0; pix(x0 + a, my - 1, 1, 1, D); pix(x0 + 1 - a, my, 1, 1, D); pix(x0 + a, my + 1, 1, 1, D); return;
     }
     const rd = tw >= 4 && th >= 4, body = (c) => { pix(L, T + (rd ? 1 : 0), tw, th - (rd ? 2 : 0), c); if (rd) { pix(L + 1, T, tw - 2, 1, c); pix(L + 1, T + th - 1, tw - 2, 1, c); } };
-    if (k === 'soot') { body(Wc); const pw = Math.max(1, Math.round(tw * 0.5)), ph = Math.max(1, Math.round(th * 0.55)); pix(L + tw - pw - (tw >= 4 ? 1 : 0), T + ((th - ph + 1) >> 1), pw, ph, D); }
+    if (k === 'soot') { body(Wc); const pw = Math.max(1, Math.round(tw * 0.45)), ph = Math.max(1, Math.round(th * 0.5)); pix(L + ((tw - pw + 1) >> 1), T + ((th - ph + 1) >> 1), pw, ph, D); }
     else if (k === 'glow') { body(g.glow[2]); if (th >= 3) pix(L + Math.max(0, (tw >> 1) - (tw >= 4 ? 1 : 0)), T + 1, tw >= 4 ? 2 : 1, th - 2, g.glow[4]); }
     else {
       body(D); if (k === 'sparkle' && th >= 4) pix(L + (rd ? 1 : 0), T + th - 2, tw - (rd ? 2 : 0), 1, g.irisC);
@@ -323,7 +335,7 @@ function mouthAt(mx, my, r, skin) {
   }
 }
 function noseAt(nx, ny, r) { if (Q.F) { const hp = hpx(r); if (hp >= 7) stamp(nx, ny, hp >= 13 ? ['xx'] : ['x'], { x: G.noseC }); return; } const s = r * 0.09; fill(curve([[nx - s, ny - s * 0.5], [nx + s, ny - s * 0.5], [nx, ny + s * 0.6]]), G.noseC); }
-function blushAt(bx, by, r) { if (!G.blush) return; if (Q.F) { const hp = hpx(r); if (hp >= 6) stamp(bx, by, hp >= 11 ? ['xx'] : ['x'], { x: G.blushC }); return; } X.globalAlpha = Q.big ? 0.7 : 1; fill(E(bx, by, r * 0.15, r * 0.085), G.blushC); X.globalAlpha = 1; }
+function blushAt(bx, by, r) { if (!G.blushOn) return; if (Q.F) { const hp = hpx(r); if (hp >= 6) stamp(bx, by, hp >= 11 ? ['xx'] : ['x'], { x: G.blushC }); return; } X.globalAlpha = Q.big ? 0.7 : 1; fill(E(bx, by, r * 0.15, r * 0.085), G.blushC); X.globalAlpha = 1; }
 function fmark(cx, cy, r) {
   const g = G, c = g.glowy ? g.glow[3] : g.acc[2], k = g.fmark, s = r * 0.1;
   if (Q.F && hpx(r) < 9) return stamp(cx, cy, k === 'diamond' || k === 'flame' ? ['x', 'x'] : ['x'], { x: c });
@@ -369,7 +381,7 @@ function head(hx, hy, r, o = {}) {
     if (g.cheeks && g.fluff > 0.3 && !o.noShape) for (const s of [-1, 1]) fill(furE(s * rx * 0.62 + r * g.turn * 0.3, ry * 0.4, r * 0.34, r * 0.24, 3, 0.45, 63 + s), s < 0 ? Rm[2] : Rm[1]);
     if (!o.noShape) { const p = o.fur ? furE(0, 0, rx, ry, o.fur[0], o.fur[1], 62, o.fur[2]) : g.fluff > 0.55 ? furE(0, 0, rx, ry, 8, 0.05 + g.fluff * 0.04, 62) : E(0, 0, rx, ry); solid(p, Rm, 0, 0, rx, ry, { deep: o.deep, gloss: o.gloss }); }
   }
-  if (o.part !== 'back') { face(r, rx, ry, o); ears(r, rx, ry, 'front'); if (!o.noCrown) crown(r, rx, ry); }
+  if (o.part !== 'back') { if (!Q.probe) face(r, rx, ry, o); ears(r, rx, ry, 'front'); if (!o.noCrown) crown(r, rx, ry); }
   x.restore();
 }
 function ears(r, rx, ry, layer) {
@@ -520,12 +532,33 @@ function garden(cx, ty, w) {
 function spitFx(x0, y0) { if (!Q.A.spit) return; const Rm = G.glowy ? G.glow : G.acc; solid(E(x0 + 0.1, y0, 0.075, 0.062), Rm, x0 + 0.1, y0, 0.075, 0.062, { gloss: 1, rim: '' }); fill(E(x0 + 0.015, y0 + 0.01, 0.035, 0.028), Rm[3]); }
 const egg = (cx, cy, rx, ry, k = 0.12) => { const pts = []; for (let i = 0; i < 16; i++) { const a = (i / 16) * TAU; pts.push([cx + Math.cos(a) * rx * (1 + k * Math.sin(a)), cy + Math.sin(a) * ry]); } return curve(pts); };
 
+// a critter sitting up: haunch on the ground, front legs straight, tail curled round its feet
+function sitting(g, A) {
+  const x = X, ry = 0.17 * g.fat, rx = 0.25 * g.len, hr = 0.27 * g.hr, bx = -0.06, by = -0.3 - 0.06 * g.leg, lr = 0.058 * g.legW;
+  const fl = (lx, near) => { const col = near ? g.body[2] : g.body[1], p = new Path2D(); p.moveTo(lx, by + 0.02); p.lineTo(lx + 0.01, -lr * 0.7 - A.bobS); if (near && Q.ink) { x.strokeStyle = g.inkC; x.lineWidth = lr * 2 + px(2); x.stroke(p); } x.strokeStyle = col; x.lineWidth = lr * 2; x.lineCap = 'round'; x.stroke(p); const paw = E(lx + lr * 0.4, -lr * 0.78 - A.bobS, lr * 1.22, lr * 0.78); if (near) ink(paw); fill(paw, g.bodyMark === 'socks' ? g.belly[near ? 3 : 1] : col); };
+  fl(bx + rx * 0.62, false);
+  if (g.wings === 'moth') mothWings(bx - rx * 0.2, by - ry * 0.9, 0.5, false); else if (g.wings) wing(bx - rx * 0.2, by - ry * 0.8, 0.36, false);
+  const tl = g.tail; if (tl === 'fluffy' || tl === 'ringed' || tl === 'cat' || tl === 'wisp' || tl === 'tuft' || tl === 'thin') { x.save(); x.translate(bx - rx * 0.7, -0.08); x.scale(1, -0.55); tail(0, 0, 0.95); x.restore(); } else tail(bx - rx * 0.8, -0.12);
+  const body = g.fluff > 0.45 ? furE(bx, by, rx, ry * 1.35, 10, 0.07 * g.fluff, 1) : E(bx, by, rx, ry * 1.35, -0.5);
+  solid(body, g.body, bx, by, rx, ry * 1.35, { deep: 1 }); marks(body, bx, by, rx, ry);
+  const hp = E(bx - rx * 0.45, -ry * 0.75, rx * 0.55, ry * 0.75); solid(hp, g.body, bx - rx * 0.45, -ry * 0.75, rx * 0.55, ry * 0.75, { deep: 1 });
+  const rp = E(bx - rx * 0.05, -lr * 0.78 - A.bobS, lr * 1.4, lr * 0.8); ink(rp); fill(rp, g.bodyMark === 'socks' ? g.belly[3] : g.body[2]);
+  if (g.shellBack) shellDome(bx - rx * 0.25, by - ry * 0.6, rx * 0.8, ry * 1.2);
+  fill(furE(bx + rx * 0.62, by - ry * 0.35, rx * 0.32, ry * 0.95, 4, 0.3, 3), g.belly[3]);
+  fl(bx + rx * 0.82, true);
+  const hx = bx + rx * 0.62, hy = by - ry * 1.15 - hr * 0.55;
+  trinket(hx - hr * 0.2, hy + hr * 0.82, hr * 0.95);
+  head(hx, hy, hr);
+  if (g.wings === 'feather') wing(bx - rx * 0.1, by - ry * 0.9, 0.36, true);
+}
+
 // ---------------------------------------------------------------- archetypes
 const BODY = {
   critter(g, A) {
+    if (g.sit && !A.mv && !A.atk && !A.dead) return sitting(g, A);
     const rx = 0.27 * g.len, ry = 0.18 * g.fat, legH = 0.11 + 0.1 * g.leg, by = -(legH + ry), bx = -0.09, hr = 0.27 * g.hr, ph = A.t * TAU, lr = 0.058 * g.legW, hip = by + ry * 0.45, pj = A.pounce || 0;
     leg(bx + rx * 0.64, hip, lr, ph + Math.PI, false, pj); leg(bx - rx * 0.52, hip, lr, ph, false, -pj * 0.4);
-    if (g.wings === 'moth') mothWings(bx - rx * 0.05, by - ry * 0.75, 0.4, false); else if (g.wings) wing(bx - rx * 0.1, by - ry * 0.7, 0.36, false);
+    if (g.wings === 'moth') mothWings(bx - rx * 0.05, by - ry * 0.75, 0.5, false); else if (g.wings) wing(bx - rx * 0.1, by - ry * 0.7, 0.36, false);
     tail(bx - rx * 0.86, by - ry * 0.3);
     const body = g.fluff > 0.45 ? furE(bx, by, rx, ry, 10, 0.07 * g.fluff, 1) : E(bx, by, rx, ry);
     solid(body, g.body, bx, by, rx, ry, { deep: 1 }); marks(body, bx, by, rx, ry);
@@ -624,21 +657,22 @@ const BODY = {
     fill(furE(0.01, cy + r * 0.84, r * 0.9, r * 0.28, 7, 0.3, 11), g.belly[3]);
   },
   noodle(g, A) {
-    const ph = A.ph, N = 14, pts = [], rad = [];
-    for (let i = 0; i <= N; i++) { const u = i / N; pts.push([-0.62 + u * 0.78, -0.42 - u * 0.1 + Math.sin(u * TAU * 1.05 - ph) * 0.085 * (0.35 + 0.65 * (1 - u))]); rad.push(0.022 + 0.088 * Math.pow(Math.sin(Math.PI * (0.08 + 0.84 * u)), 0.6)); }
+    const ph = A.ph, N = 16, pts = [], rad = [];
+    for (let i = 0; i <= N; i++) { const u = i / N; pts.push([-0.06 + 0.25 * Math.sin(TAU * 0.85 * u + 0.5 - ph * 0.6) * (0.55 + 0.45 * u), -0.1 - u * 0.58]); rad.push(0.02 + 0.078 * Math.pow(Math.sin(Math.PI * (0.06 + 0.88 * u)), 0.6)); }
+    const nrm = (i) => { const a = pts[Math.max(0, i - 1)], c = pts[Math.min(N, i + 1)], dx = c[0] - a[0], dy = c[1] - a[1], d = Math.hypot(dx, dy) || 1; return [dy / d, -dx / d]; };
     const e = pts[0], k = g.tail;
-    if (k === 'fish') for (const s of [-1, 1]) solid(leafP(e[0], e[1], Math.PI + s * 0.6, 0.2, 0.06), s > 0 ? dk(g.acc) : g.acc, e[0] - 0.1, e[1], 0.1, 0.08, { rim: '' });
-    else if (k === 'wisp') flame(e[0] - 0.02, e[1] + 0.06, 0.16, ph);
-    else { const q = furE(e[0] - 0.04, e[1], 0.1, 0.08, 6, 0.35, 45); solid(q, g.acc, e[0] - 0.04, e[1], 0.1, 0.08, { rim: '' }); }
-    const paw = (i, near) => { const [a, b] = pts[i], fy = b + rad[i] + 0.06; line([[a, b], [a + 0.03, fy]], 0.04, near ? g.body[2] : g.body[1]); fill(E(a + 0.045, fy, 0.04, 0.025), near ? g.body[2] : g.body[1]); };
-    if (g.paws) { paw(4, false); paw(10, false); }
+    if (k === 'fish') for (const s of [-1, 1]) solid(leafP(e[0], e[1], Math.PI * 0.5 + s * 0.7, 0.2, 0.06), s > 0 ? dk(g.acc) : g.acc, e[0], e[1] + 0.08, 0.1, 0.08, { rim: '' });
+    else if (k === 'wisp') flame(e[0] - 0.05, e[1] + 0.04, 0.15, ph);
+    else { const q = furE(e[0] - 0.05, e[1] + 0.02, 0.1, 0.08, 6, 0.35, 45); solid(q, g.acc, e[0] - 0.05, e[1] + 0.02, 0.1, 0.08, { rim: '' }); }
+    const paw = (i, near) => { const [a, b] = pts[i], c = near ? g.body[2] : g.body[1], fx = a + 0.07 + rad[i] * 0.4, fy = b + rad[i] + 0.04; line([[a + rad[i] * 0.3, b], [fx, fy]], 0.038, c); fill(E(fx + 0.02, fy, 0.04, 0.026), c); };
+    if (g.paws) { paw(5, false); paw(11, false); }
+    if (g.fin) fill(tube(pts.map(([a, b], i) => { const [nx, ny] = nrm(i); return [a + nx * rad[i] * 0.7, b + ny * rad[i] * 0.7]; }), rad.map((v) => v * 0.75 + 0.02)), g.acc[3]);
     const p = tube(pts, rad, 0, 3);
-    if (g.fin) fill(tube(pts.map(([a, b], i) => [a, b - rad[i] * 0.7]), rad.map((v) => v * 0.75 + 0.02)), g.acc[3]);
     solid(p, g.body, ...bbox(pts, 0.1), {});
-    X.save(); X.clip(p); fill(tube(pts.map(([a, b], i) => [a, b + rad[i] * 0.62]), rad.map((v) => v * 0.55)), g.belly[2]); X.restore();
-    if (!g.fin) for (let i = 2; i < N - 1; i += 2) { const [a, b] = pts[i]; fill(leafP(a, b - rad[i] * 0.8, -Math.PI / 2 - 0.7, rad[i] * 0.9 + 0.03, 0.022), g.acc[2]); }
-    if (g.paws) { paw(5, true); paw(11, true); }
-    head(pts[N][0] + 0.1, pts[N][1] - 0.1, 0.2);
+    X.save(); X.clip(p); fill(tube(pts.map(([a, b], i) => { const [nx, ny] = nrm(i); return [a - nx * rad[i] * 0.62, b - ny * rad[i] * 0.62]; }), rad.map((v) => v * 0.55)), g.belly[2]); X.restore();
+    if (!g.fin) for (let i = 2; i < N - 1; i += 2) { const [a, b] = pts[i], [nx, ny] = nrm(i); fill(leafP(a + nx * rad[i] * 0.8, b + ny * rad[i] * 0.8, Math.atan2(ny, nx) - 0.6, rad[i] * 0.9 + 0.03, 0.022), g.acc[2]); }
+    if (g.paws) { paw(4, true); paw(10, true); }
+    head(pts[N][0] + 0.1, pts[N][1] - 0.07, 0.2);
     spitFx(pts[N][0] + 0.3, pts[N][1] - 0.02);
   },
   pup(g, A) {
@@ -681,19 +715,23 @@ const BODY = {
       tail(-0.34, -0.3);
       const p = E(0, -0.3, 0.36, 0.24); ink(p); solid(p, g.shellR, 0, -0.3, 0.36, 0.24, { gloss: 1 });
       line([[-0.35, -0.32], [0, -0.28], [0.35, -0.32]], 0.03, g.shellR[3], true);
-      solid(E(-0.04, -0.53, 0.2, 0.06), g.shellR, -0.04, -0.53, 0.2, 0.06, { rim: '' }); solid(E(-0.04, -0.6, 0.05, 0.04), g.horn, -0.04, -0.6, 0.05, 0.04, { rim: '' });
+      solid(E(-0.04, -0.53, 0.2, 0.06), g.shellR, -0.04, -0.53, 0.2, 0.06, { rim: '' }); solid(E(-0.04, -0.6, 0.05, 0.04), g.horn, -0.04, -0.6, 0.05, 0.04, { rim: '' }); line([[-0.24, -0.5], [-0.12, -0.72], [0.06, -0.72], [0.16, -0.5]], 0.026, g.horn[0], true);
       leg(0.12, -0.18, lr, ph2, true); leg(-0.27, -0.18, lr, ph2 + Math.PI, true);
       head(0.3, -0.52, 0.2); spitFx(0.48, -0.48);
       return;
     }
     if (sub === 'kasa') {
-      const fy = -0.012 - (A.air ? 0 : A.bobS); line([[0, -0.36], [0.01, fy - 0.04]], 0.04, g.body[1]);
-      fill(poly([[-0.09, fy - 0.045], [0.11, fy - 0.045], [0.11, fy - 0.02], [-0.09, fy - 0.02]]), g.horn[1]); line([[-0.05, fy - 0.02], [-0.05, fy]], 0.025, g.horn[0]); line([[0.07, fy - 0.02], [0.07, fy]], 0.025, g.horn[0]);
-      const p = curve([[0, -1.02], [0.2, -0.66], [0.34, -0.38], [0.22, -0.32], [0, -0.35], [-0.22, -0.32], [-0.34, -0.38], [-0.2, -0.66]]);
-      solid(p, g.body, 0, -0.62, 0.3, 0.36, { deep: 1 });
-      x.save(); x.clip(p); for (const s of [-0.18, 0, 0.18]) line([[0, -1.0], [s, -0.34]], 0.012, g.body[1]); x.restore();
-      fill(E(0, -1.03, 0.035, 0.035), g.horn[1]);
-      head(0, -0.58, 0.24, { noShape: 1, fy: 0, eyeK: 1.1 });
+      const fy = -0.012 - (A.air ? 0 : A.bobS); line([[0.02, -0.42], [0.02, fy - 0.04]], 0.042, g.horn[1]);
+      fill(poly([[-0.08, fy - 0.045], [0.13, fy - 0.045], [0.13, fy - 0.018], [-0.08, fy - 0.018]]), g.horn[1]); line([[-0.04, fy - 0.02], [-0.04, fy]], 0.025, g.horn[0]); line([[0.09, fy - 0.02], [0.09, fy]], 0.025, g.horn[0]);
+      x.save(); x.translate(0, -0.42); x.rotate(0.08 + (A.tilt || 0)); x.translate(0, 0.42);
+      const hem = [], pts = [[0, -1.02], [0.22, -0.88], [0.4, -0.64], [0.47, -0.44]];
+      for (let i = 0; i <= 8; i++) hem.push([0.47 - i * 0.1175, -0.42 + (i & 1 ? -0.07 : 0)]);
+      const p = curve([...pts, ...hem.slice(1, 8), [-0.47, -0.44], [-0.4, -0.64], [-0.22, -0.88]]);
+      solid(p, g.body, 0, -0.7, 0.45, 0.32, { deep: 1 });
+      x.save(); x.clip(p); for (let i = 0; i <= 8; i += 2) line([[0, -1.0], [hem[i][0] * 0.98, -0.42]], 0.014, g.body[1]); x.restore();
+      fill(E(0, -1.04, 0.035, 0.035), g.horn[1]);
+      head(0.04, -0.66, 0.26, { noShape: 1, fy: 0, eyeK: 1.25 });
+      x.restore();
       return;
     }
     const sw = A.mv ? Math.sin(A.t * TAU) * 0.06 : 0;
@@ -701,7 +739,7 @@ const BODY = {
     line([[-0.1, -0.95], [-0.08, -1.04], [0.08, -1.04], [0.1, -0.95]], 0.02, g.inkC, true);
     const p = E(0, -0.56, 0.3, 0.36);
     solid(p, g.body, 0, -0.56, 0.3, 0.36, { rim: g.glow[3] });
-    x.save(); x.clip(p); x.globalAlpha = 0.6; fill(E(0.02, -0.52, 0.2, 0.24), g.glow[3]); x.globalAlpha = 1; for (const k of [-0.24, -0.12, 0.12, 0.24]) line([[-0.32, -0.56 + k], [0, -0.56 + k * 1.08], [0.32, -0.56 + k]], 0.012, g.body[1], true); x.restore();
+    x.save(); x.clip(p); x.globalAlpha = 0.6; fill(E(0.02, -0.52, 0.2, 0.24), g.glow[3]); x.globalAlpha = 1; if (hpx(0.3) > 10) for (const k of [-0.22, 0.22]) line([[-0.32, -0.56 + k], [0, -0.56 + k * 1.08], [0.32, -0.56 + k]], 0.012, g.body[1], true); x.restore();
     fill(E(0, -0.92, 0.17, 0.05), g.inkC); fill(E(0, -0.2, 0.15, 0.045), g.inkC);
     head(0, -0.58, 0.3, { noShape: 1, fy: 0.0 });
     x.restore();
@@ -731,7 +769,7 @@ function anim(g, pose) {
     if (K === 'flare') { A.dx *= 0.4; A.sq = [1, 0.94, 1.08, 1][k]; A.bob = L === 'float' ? [0, 0.01, -0.04, -0.01][k] : 0; A.wing = [0, 1, -1, 0][k]; }
   }
   if (pose.hurt) Object.assign(A, { dx: -0.06, sq: 0.86, lean: -0.14, eyes: 'shut', mouth: 0.6, ear: -0.4, tail: -0.3, tilt: -0.08, wing: 0.8 });
-  if (pose.dead) Object.assign(A, { dead: 1, eyes: g.die === 'fade' ? 'calm' : 'x', mouth: g.die === 'fade' ? 0 : 0.6, ear: -0.45, tail: -0.4, wing: -0.7, sq: g.die === 'squish' ? 0.55 : g.die === 'fade' ? 0.95 : 1, bob: 0 });
+  if (pose.dead) Object.assign(A, { dead: 1, mv: g.die === 'flip' ? 1 : 0, t: 0.3, eyes: g.die === 'fade' ? 'calm' : 'x', mouth: g.die === 'fade' ? 0 : 0.6, ear: -0.45, tail: -0.4, wing: -0.7, sq: g.die === 'squish' ? 0.55 : g.die === 'fade' ? 0.95 : 1, bob: 0 });
   return A;
 }
 function paint(x, g, pose, q) {
@@ -741,6 +779,7 @@ function paint(x, g, pose, q) {
   x.save();
   // flopped over: a quarter turn onto its back, resting on the ground, kept inside the frame
   if (A.dead && g.die === 'flop' && q.box) { const b = q.box, cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, w = b.x1 - b.x0, h = b.y1 - b.y0, rm = q.room || { cx, w: h, h: w }, k = Math.min(1, rm.w / h, rm.h / w); x.translate(rm.cx, b.y1 - (w * k) / 2); x.scale(k, k); x.rotate(-Math.PI / 2); x.translate(-cx, -cy); }
+  if (A.dead && g.die === 'flip' && q.box) { const b = q.box, cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2; x.translate(cx, cy); x.rotate(Math.PI); x.translate(-cx, -cy); }
   x.translate(snap(A.dx), A.bobS);
   const pv = g.loco === 'float' ? -0.5 : 0; x.translate(0, pv); x.scale(1 / Math.sqrt(A.sq), A.sq); x.translate(0, -pv);
   BODY[g.plan](g, A);
@@ -748,13 +787,13 @@ function paint(x, g, pose, q) {
 }
 
 // ---------------------------------------------------------------- framing and the pixel pipeline
-let WK = null, WX = null;
+let WK = null, WX = null, BUF = null;
 function work(w, h) { if (!WK) { WK = document.createElement('canvas'); WK.width = w; WK.height = h; WX = WK.getContext('2d', { willReadFrequently: true }); } else if (WK.width < w || WK.height < h) { WK.width = Math.max(WK.width, w); WK.height = Math.max(WK.height, h); } return WX; }
-const PROBES = [{}, { breath: 1 }, { walk: 1, t: 0.25 }, { walk: 1, t: 0.5 }, { walk: 1, t: 0.75 }, { atk: 2 }];
+const PROBES = [{}, { walk: 1, t: 0.25 }, { walk: 1, t: 0.5 }, { walk: 1, t: 0.75 }, { atk: 2 }];
 // the union of the main poses' silhouettes, in units (measured once per genome at low resolution)
 function measure(g) {
   if (g.box) return g.box;
-  const S = 40, PW = 136, PH = 128, ox = 68, oy = 96, x = work(PW, PH); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  const S = 34, PW = 116, PH = 110, ox = 58, oy = 82, x = work(PW, PH); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
   for (const pose of PROBES) {
     x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, PW, PH); x.setTransform(S, 0, 0, S, ox, oy);
     paint(x, g, pose, { F: 0, u: 1 / 30, probe: 1 });
@@ -782,22 +821,24 @@ function palFor(g) {
 }
 // draw a pose at 4× into the work canvas, box-filter it down, quantise to the palette, outline, effects
 function pixelFrame(g, pose, fit, fx = {}) {
-  const { w, h, s } = fit, W = w * F, H = h * F, x = work(W, H);
+  const { w, h, s } = fit, F = ssFor(h), W = w * F, H = h * F, x = work(W, H);
   x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, W, H); x.setTransform(s * F, 0, 0, s * F, fit.ox * F, fit.oy * F);
   paint(x, g, pose, { F, u: 1 / s, detail: s >= 34, ink: s >= 20, box: fit.box, room: fit.room });
-  const src = x.getImageData(0, 0, W, H).data, n = w * h, acc = new Float32Array(n * 4);
+  const src = x.getImageData(0, 0, W, H).data, n = w * h;
+  if (!BUF || BUF.n < n) BUF = { n, acc: new Float32Array(n * 4), id: new Int16Array(n), out: new Uint8ClampedArray(n * 4) };
+  const acc = BUF.acc.fill(0, 0, n * 4), id = BUF.id.fill(-1, 0, n), out = BUF.out.fill(0, 0, n * 4), memo = new Map();
   for (let yy = 0; yy < H; yy++) { const row = ((yy / F) | 0) * w; for (let xx = 0; xx < W; xx++) { const i = (yy * W + xx) * 4, a = src[i + 3]; if (!a) continue; const t = (row + ((xx / F) | 0)) * 4; acc[t] += src[i] * a; acc[t + 1] += src[i + 1] * a; acc[t + 2] += src[i + 2] * a; acc[t + 3] += a; } }
-  const P = palFor(g), C = P.rgb, id = new Int16Array(n).fill(-1), full = 255 * F * F, dz = g.dither ? 30 : 0, gz = g.grit * 18;
+  const P = palFor(g), C = P.rgb, full = 255 * F * F, dz = g.dither ? 30 : 0, gz = g.grit * 18;
   for (let t = 0; t < n; t++) {
     const a = acc[t * 4 + 3]; if (a < full * 0.5) continue;
     const tx = t % w, ty = (t / w) | 0, o = (dz ? (BAYER[(ty & 3) * 4 + (tx & 3)] / 16 - 0.47) * dz : 0) + (gz ? (hash(tx, ty, g.seed) - 0.5) * gz : 0);
-    const r = acc[t * 4] / a + o, gg = acc[t * 4 + 1] / a + o, b = acc[t * 4 + 2] / a + o;
-    let best = 0, bd = 1e12;
-    for (let k = 0; k < C.length; k++) { const c = C[k], dr = r - c[0], dg = gg - c[1], db = b - c[2], d = 2 * dr * dr + 4 * dg * dg + 3 * db * db; if (d < bd) { bd = d; best = k; } }
+    const r = acc[t * 4] / a + o, gg = acc[t * 4 + 1] / a + o, b = acc[t * 4 + 2] / a + o, key = ((r + 64) >> 1) * 262144 + ((gg + 64) >> 1) * 512 + ((b + 64) >> 1);
+    let best = memo.get(key);
+    if (best === undefined) { let bd = 1e12; best = 0; for (let k = 0; k < C.length; k++) { const c = C[k], dr = r - c[0], dg = gg - c[1], db = b - c[2], d = 2 * dr * dr + 4 * dg * dg + 3 * db * db; if (d < bd) { bd = d; best = k; } } memo.set(key, best); }
     id[t] = best;
   }
   if (g.grit) for (let t = 0; t < n; t++) { const k = id[t]; if (k < 0) continue; const q = hash(t, 7, g.seed); if (q < 0.045 * g.grit) id[t] = P.dn[k]; else if (q > 1 - 0.02 * g.grit) id[t] = P.up[k]; }
-  const out = new Uint8ClampedArray(n * 4), put = (t, c) => { out[t * 4] = c[0]; out[t * 4 + 1] = c[1]; out[t * 4 + 2] = c[2]; out[t * 4 + 3] = 255; };
+  const put = (t, c) => { out[t * 4] = c[0]; out[t * 4 + 1] = c[1]; out[t * 4 + 2] = c[2]; out[t * 4 + 3] = 255; };
   for (let t = 0; t < n; t++) if (id[t] >= 0) put(t, C[id[t]]);
   if (g.line) for (let t = 0; t < n; t++) {
     if (id[t] >= 0) continue;
@@ -809,7 +850,7 @@ function pixelFrame(g, pose, fit, fx = {}) {
     const dist = new Uint8Array(n).fill(255); let front = [];
     for (let t = 0; t < n; t++) if (out[t * 4 + 3]) { dist[t] = 0; front.push(t); }
     for (let d = 1; d <= fx.aura; d++) { const nx = []; for (const t of front) { const tx = t % w, ty = (t / w) | 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const a = tx + dx, b = ty + dy; if (a < 0 || b < 0 || a >= w || b >= h) continue; const u = b * w + a; if (dist[u] === 255) { dist[u] = d; nx.push(u); } } } front = nx; }
-    for (let t = 0; t < n; t++) { const d = dist[t]; if (!d || d === 255) continue; const tx = t % w, ty = (t / w) | 0; if (BAYER[((ty + ph) & 3) * 4 + ((tx + ph * 2) & 3)] / 16 < (fx.flare ? 0.8 : 0.55) - (d - 1) * 0.3) put(t, d === 1 ? g.glow.rgb[3] : g.glow.rgb[2]); }
+    for (let t = 0; t < n; t++) { const d = dist[t]; if (!d || d === 255) continue; const tx = t % w, ty = (t / w) | 0; if (BAYER[((ty + ph) & 3) * 4 + ((tx + ph * 2) & 3)] / 16 < (fx.flare ? 0.62 : 0.38) - (d - 1) * 0.24) put(t, d === 1 ? g.glow.rgb[3] : g.glow.rgb[2]); }
   }
   if (fx.dissolve) { // the lower body crumbles into sparks
     let top = h, bot = -1; for (let t = 0; t < n; t++) if (out[t * 4 + 3]) { const ty = (t / w) | 0; if (ty < top) top = ty; if (ty > bot) bot = ty; }
@@ -818,16 +859,16 @@ function pixelFrame(g, pose, fit, fx = {}) {
   }
   if (fx.motes) { const R = mulberry32((g.seed ^ (ph * 977 + 13)) >>> 0); for (let i = 0; i < fx.motes; i++) { const mx = Math.floor(R() * w), my = Math.floor(R() * h * 0.85), t = my * w + mx; if (out[t * 4 + 3]) continue; put(t, g.glow.rgb[4]); if (w >= 40) for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X2 = mx + a, Y2 = my + b, u = Y2 * w + X2; if (X2 >= 0 && X2 < w && Y2 >= 0 && Y2 < h && !out[u * 4 + 3]) put(u, g.glow.rgb[3]); } } }
   const c = document.createElement('canvas'); c.width = w; c.height = h; c.pixel = true;
-  c.getContext('2d').putImageData(new ImageData(out, w, h), 0, 0);
+  c.getContext('2d').putImageData(new ImageData(out.slice(0, n * 4), w, h), 0, 0);
   return c;
 }
 // a smooth 160 px portrait with a soft outline (and a halo of light for old spirits)
 function bigRender(g) {
   const S = 160, b = measure(g), bw = b.x1 - b.x0, bh = b.y1 - b.y0, s = (S - 22) / Math.max(bw, bh), ox = S / 2 - ((b.x0 + b.x1) / 2) * s, oy = S / 2 - ((b.y0 + b.y1) / 2) * s;
   const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; return c; };
-  const art = mk(), x = art.getContext('2d'); x.setTransform(s, 0, 0, s, ox, oy);
+  const art = mk(), x = art.getContext('2d', { willReadFrequently: true }); x.setTransform(s, 0, 0, s, ox, oy);
   paint(x, g, {}, { F: 0, u: 1.2 / s, detail: 1, ink: 1, big: 1 });
-  const sil = mk(), sx = sil.getContext('2d'); sx.drawImage(art, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = css(g.outRGB); sx.fillRect(0, 0, S, S);
+  const sil = mk(), sx = sil.getContext('2d', { willReadFrequently: true }); sx.drawImage(art, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = css(g.outRGB); sx.fillRect(0, 0, S, S);
   const c = mk(), o = c.getContext('2d');
   if (g.tier >= 2 || g.plan === 'wisp' || g.plan === 'lantern') { const gr = o.createRadialGradient(S / 2, S / 2, 10, S / 2, S / 2, S / 2); gr.addColorStop(0, `rgba(${g.glow.rgb[3].map((v) => v | 0)},${0.25 + g.tier * 0.08})`); gr.addColorStop(1, 'rgba(0,0,0,0)'); o.fillStyle = gr; o.fillRect(0, 0, S, S); }
   for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; o.drawImage(sil, Math.cos(a) * 2.4, Math.sin(a) * 2.4); }
@@ -861,15 +902,14 @@ export function spirit(seed, hue = 0, size = 24, tier = 0, opts = {}) {
   const S = Math.max(12, Math.round(size)), pad = g.tier >= 3 ? (S >= 32 ? 2 : 1) : 0, fit = fitFor(g, S, S, pad);
   const base = g.tier >= 3 ? { aura: pad, motes: g.tier - 1 } : g.tier === 2 ? { motes: 1 } : {}, fr = (pose, fx) => pixelFrame(g, pose, fit, fx);
   const flare = g.atk === 'flare';
-  const out = {
-    frames: [fr({}, { ...base, phase: 0 }), fr({ breath: 1 }, { ...base, phase: 1 })],
-    walk: [0, 0.25, 0.5, 0.75].map((t, i) => fr({ walk: 1, t }, { ...base, phase: i })),
-    attack: [1, 2, 3].map((k) => fr({ atk: k }, flare ? { flare: k === 2 ? 1 : 0.5, aura: Math.max(pad, k === 2 ? 2 : 1), motes: k === 2 ? 3 : 1, phase: k } : { ...base, phase: k })),
-    hurt: fr({ hurt: 1 }, {}), dead: fr({ dead: 1 }, { dissolve: g.die === 'fade', phase: 2 }),
-    plan: g.plan, hue: g.hue, genome: g, name: g.name, species: g.species, element: g.element, floats: g.loco === 'float', tier: g.tier, size: S, palette: palette(g)
-  };
-  let big = null, ana = null;
-  Object.defineProperty(out, 'big', { get: () => big || (big = bigRender(g)), enumerable: true });
-  Object.defineProperty(out, 'anatomy', { get: () => ana || (ana = anatomy(g)), enumerable: true });
+  const out = { frames: [fr({}, { ...base, phase: 0 }), fr({ breath: 1 }, { ...base, phase: 1 })], plan: g.plan, hue: g.hue, genome: g, name: g.name, species: g.species, element: g.element, floats: g.loco === 'float', tier: g.tier, size: S, palette: palette(g) };
+  // the other cycles, the portrait and the anatomy are built on first use (most games only show the idle pair)
+  const lazy = (k, fn) => { let v; Object.defineProperty(out, k, { get: () => v || (v = fn()), enumerable: true }); };
+  lazy('walk', () => [0, 0.25, 0.5, 0.75].map((t, i) => fr({ walk: 1, t }, { ...base, phase: i })));
+  lazy('attack', () => [1, 2, 3].map((k) => fr({ atk: k }, flare ? { flare: k === 2 ? 1 : 0.5, aura: Math.max(pad, k === 2 ? 2 : 1), motes: k === 2 ? 3 : 1, phase: k } : { ...base, phase: k })));
+  lazy('hurt', () => fr({ hurt: 1 }, {}));
+  lazy('dead', () => fr({ dead: 1 }, { dissolve: g.die === 'fade', phase: 2 }));
+  lazy('big', () => bigRender(g));
+  lazy('anatomy', () => anatomy(g));
   return out;
 }

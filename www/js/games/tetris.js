@@ -1,4 +1,4 @@
-import { Game, W, H, roundRect } from './engine.js';
+import { Game, roundRect } from './engine.js';
 
 // ================================================================ Tetris with words
 // Every row of the well is a line of a saying, printed faintly like a page; blocks ink the letters they cover,
@@ -116,7 +116,7 @@ export class Tetris extends Game {
   static noMods = ['mirror', 'trails', 'giant', 'tiny', 'swarm', 'glass'];
   setup() {
     this.colors = [...KINDS].map((_, i) => `hsl(${Math.round(this.skin.hue + i * 51.4) % 360},55%,${i % 2 ? 66 : 61}%)`);
-    this.deck = []; this.above = []; this.best = 0;
+    this.deck = []; this.above = [];
     this.reset();
   }
   reset() {
