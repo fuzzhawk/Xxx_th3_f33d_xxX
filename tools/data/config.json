@@ -539,6 +539,13 @@
         "max": 10
       },
       {
+        "name": "Achewood",
+        "urls": [],
+        "home": "https://achewood.com/",
+        "scrape": true,
+        "max": 8
+      },
+      {
         "name": "Moonbeard",
         "urls": [
           "https://moonbeard.com/feed/"
@@ -586,6 +593,13 @@
           "https://www.mrlovenstein.com/rss.xml"
         ],
         "home": "https://www.mrlovenstein.com/",
+        "max": 8,
+        "nsfw": true
+      },
+      {
+        "name": "Extra Fabulous Comics",
+        "urls": [],
+        "home": "https://extrafabulouscomics.com/",
         "max": 8,
         "nsfw": true
       },

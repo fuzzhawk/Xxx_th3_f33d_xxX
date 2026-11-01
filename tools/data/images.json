@@ -11,173 +11,177 @@
     "licence": "public domain|cc0|cc[- ]by|^pd|pdm|no restrictions",
     "reject": "\\b(portraits?|self-portrait|maps?|diagram|chart|graph|logo|poster|title page|book cover|letters?|manuscript|newspaper|catalog(ue)?|stamps?|coins?|banknote|postcard|signature|inscription|frames?|framed|exhibition|installation|visitors|gallery view|selfie|screenshot|collage|montage|wedding)\\b",
     "groups": [
-      { "id": "storm", "name": "Storm Front", "kind": "cloud", "mood": "stormy", "hue": 215, "dark": true,
+      {"id": "storm", "name": "Storm Front", "kind": "cloud", "mood": "stormy", "hue": 215, "dark": true,
         "reject": "\\b(people|person|portrait|cars?|vehicles?|trucks?|aircraft|airplane|damage|flood(ing|ed)?|radar|satellite)\\b",
         "src": [
-          { "commons": "(cumulonimbus OR supercell OR mammatus OR \"shelf cloud\" OR \"wall cloud\" OR thunderstorm OR \"storm clouds\")", "in": "fp|qi" },
-          { "commons": "incategory:Cumulonimbus_clouds|Mammatus_clouds|Shelf_clouds|Arcus_clouds|Supercells|Storm_clouds" }
+          {"commons": "thunderstorm OR cumulonimbus OR supercell OR mammatus OR \"shelf cloud\" OR \"storm clouds\"", "in": "fp|qi"},
+          {"commons": "incategory:Cumulonimbus_clouds|Mammatus_clouds|Shelf_clouds|Arcus_clouds|Supercells|Storm_clouds"}
         ] },
-      { "id": "golden", "name": "Golden Hour", "kind": "cloud", "mood": "warm", "hue": 28,
+      {"id": "golden", "name": "Golden Hour", "kind": "cloud", "mood": "warm", "hue": 28,
         "reject": "\\b(people|person|portrait|silhouettes? of|city|skyline|street|boats?|ships?|birds?|aircraft)\\b",
         "src": [
-          { "commons": "clouds (sunset OR sunrise OR afterglow OR dusk OR \"golden hour\" OR \"crepuscular rays\")", "in": "fp|qi" },
-          { "commons": "incategory:Clouds_at_sunset|Clouds_at_sunrise|Crepuscular_rays|Sunset_clouds" }
+          {"commons": "\"sunset clouds\" OR \"sunrise clouds\" OR afterglow OR \"crepuscular rays\" OR \"evening sky\" OR \"red sky\"", "in": "fp|qi"},
+          {"commons": "incategory:Clouds_at_sunset|Clouds_at_sunrise|Crepuscular_rays|Sunset_clouds"},
+          {"commons": "sunset clouds sky", "in": "qi"}
         ] },
-      { "id": "fair", "name": "Fair Weather", "kind": "cloud", "mood": "bright", "hue": 205,
+      {"id": "fair", "name": "Fair Weather", "kind": "cloud", "mood": "bright", "hue": 205,
         "reject": "\\b(people|person|portrait|sunset|sunrise|storm|buildings?|city|aircraft|airplane|contrails?|birds?)\\b",
         "src": [
-          { "commons": "clouds (cumulus OR altocumulus OR cirrus OR cirrocumulus OR \"fair weather\" OR \"blue sky\")", "in": "fp|qi" },
-          { "commons": "incategory:Cumulus_clouds|Cumulus_humilis_clouds|Cumulus_mediocris_clouds|Altocumulus_clouds|Cirrus_clouds|Cirrocumulus_clouds" }
+          {"commons": "cumulus OR altocumulus OR cirrus OR cirrocumulus OR \"blue sky\"", "in": "fp|qi"},
+          {"commons": "incategory:Cumulus_clouds|Cumulus_humilis_clouds|Cumulus_mediocris_clouds|Altocumulus_clouds|Cirrus_clouds|Cirrocumulus_clouds"}
         ] },
-      { "id": "night", "name": "Night Sky", "kind": "cloud", "mood": "night", "hue": 235, "dark": true,
+      {"id": "night", "name": "Night Sky", "kind": "cloud", "mood": "night", "hue": 235, "dark": true,
         "reject": "\\b(nebula|galaxy|galaxies|telescope|hubble|webb|eso|diagram|people|person|city|street)\\b",
         "src": [
-          { "commons": "(\"Milky Way\" OR \"star trails\" OR \"night sky\" OR \"starry sky\" OR astrophotography)", "in": "fp|qi", "not": "nebula galaxy telescope Hubble" },
-          { "commons": "incategory:Milky_Way_in_the_night_sky|Star_trails|Night_skies|Starry_skies" }
+          {"commons": "\"Milky Way\" OR \"star trails\" OR \"night sky\" OR \"starry sky\" OR astrophotography", "in": "fp|qi", "not": "nebula galaxy telescope Hubble"},
+          {"commons": "incategory:Milky_Way_in_the_night_sky|Star_trails|Night_skies|Starry_skies"}
         ] },
-      { "id": "aurora", "name": "Northern Lights", "kind": "cloud", "mood": "night", "hue": 150, "dark": true,
+      {"id": "aurora", "name": "Northern Lights", "kind": "cloud", "mood": "night", "hue": 150, "dark": true,
         "reject": "\\b(satellite|iss|space station|diagram|map|people|person)\\b",
         "src": [
-          { "commons": "aurora (borealis OR australis OR \"northern lights\" OR \"polar lights\")", "in": "fp|qi" },
-          { "commons": "incategory:Aurora_borealis|Aurora_australis|Auroras|Aurorae" }
+          {"commons": "aurora OR \"northern lights\" OR \"polar lights\"", "in": "fp|qi"},
+          {"commons": "incategory:Aurora_borealis|Aurora_australis|Auroras|Aurorae|Polar_lights"}
         ] },
-      { "id": "mist", "name": "Fog and Mist", "kind": "cloud", "mood": "misty", "hue": 200,
+      {"id": "mist", "name": "Fog and Mist", "kind": "cloud", "mood": "misty", "hue": 200,
         "reject": "\\b(people|person|portrait|city|street|cars?|road|bridge|buildings?|interior)\\b",
         "src": [
-          { "commons": "(fog OR mist OR \"sea of clouds\" OR \"cloud inversion\" OR \"morning mist\") (valley OR mountains OR hills OR forest OR landscape OR lake)", "in": "fp|qi" },
-          { "commons": "incategory:Fog_in_mountains|Sea_of_clouds|Fog_in_forests|Morning_mist|Valley_fog" }
+          {"commons": "fog OR mist OR \"sea of clouds\" OR \"cloud inversion\" OR \"morning mist\"", "in": "fp|qi"},
+          {"commons": "incategory:Fog_in_mountains|Sea_of_clouds|Fog_in_forests|Morning_mist|Valley_fog|Fog"}
         ] },
-      { "id": "alpine", "name": "Alpine Peaks", "kind": "landscape", "mood": "crisp", "hue": 210,
+      {"id": "alpine", "name": "Alpine Peaks", "kind": "landscape", "mood": "crisp", "hue": 210,
         "reject": "\\b(flowers?|insects?|birds?|animals?|ibex|marmot|cows?|sheep|people|person|portrait|church|chapel|interior|hut|ski|skiing|skiers?|cable car|hotel)\\b",
         "src": [
-          { "commons": "(Alps OR alpine OR Dolomites OR Matterhorn OR Himalayas OR Patagonia OR \"mountain range\" OR glacier) (landscape OR view OR peak OR summit OR valley)", "in": "fp|qi" },
-          { "commons": "(Rockies OR \"Rocky Mountains\" OR Andes OR Karakoram OR \"Mont Blanc\" OR Eiger OR Tatra) (landscape OR view OR peak)", "in": "fp|qi" }
+          {"commons": "Alps OR Dolomites OR Matterhorn OR Himalayas OR Patagonia OR \"mountain range\" OR \"mountain landscape\"", "in": "fp|qi"},
+          {"commons": "Rockies OR Andes OR Karakoram OR \"Mont Blanc\" OR Eiger OR Tatras OR \"alpine lake\"", "in": "fp|qi"}
         ] },
-      { "id": "coast", "name": "Sea Cliffs", "kind": "landscape", "mood": "fresh", "hue": 195,
+      {"id": "coast", "name": "Sea Cliffs", "kind": "landscape", "mood": "fresh", "hue": 195,
         "reject": "\\b(birds?|gulls?|ships?|boats?|ferry|harbou?r|port|people|person|portrait|city|beach umbrellas?|hotel|resort)\\b",
         "src": [
-          { "commons": "(cliffs OR \"sea stack\" OR coastline OR \"rocky coast\" OR headland OR seascape) sea", "in": "fp|qi" },
-          { "commons": "(\"sea cliffs\" OR \"sea stacks\" OR \"wave-cut\" OR \"coastal cliffs\" OR fjord OR \"rocky shore\")", "in": "fp|qi" }
+          {"commons": "cliffs OR \"sea stack\" OR coastline OR \"rocky coast\" OR headland OR seascape", "in": "fp|qi"},
+          {"commons": "\"sea cliffs\" OR \"sea stacks\" OR \"coastal cliffs\" OR \"rocky shore\" OR \"steep coast\"", "in": "fp|qi"}
         ] },
-      { "id": "forest", "name": "Deep Forest", "kind": "landscape", "mood": "deep", "hue": 120,
+      {"id": "forest", "name": "Deep Forest", "kind": "landscape", "mood": "deep", "hue": 120,
         "reject": "\\b(mushrooms?|fung(us|i)|insects?|beetles?|spiders?|birds?|flowers?|animals?|deer|people|person|portrait|leaf|leaves|cabin|house)\\b",
         "src": [
-          { "commons": "(forest OR woodland OR \"old-growth\" OR rainforest OR woods) (trees OR path OR fog OR light)", "in": "fp|qi" },
-          { "commons": "(\"beech forest\" OR \"pine forest\" OR \"misty forest\" OR \"forest path\" OR \"cloud forest\" OR \"redwood forest\")", "in": "fp|qi" }
+          {"commons": "forest OR woodland OR \"old-growth\" OR rainforest OR woods", "in": "fp|qi"},
+          {"commons": "\"beech forest\" OR \"pine forest\" OR \"misty forest\" OR \"forest path\" OR \"cloud forest\" OR \"redwood forest\"", "in": "fp|qi"}
         ] },
-      { "id": "desert", "name": "Desert and Dunes", "kind": "landscape", "mood": "sunbaked", "hue": 32,
+      {"id": "desert", "name": "Desert and Dunes", "kind": "landscape", "mood": "sunbaked", "hue": 32,
         "reject": "\\b(animals?|lizards?|camels?|snakes?|insects?|flowers?|people|person|portrait|cars?|vehicles?|road|town|city)\\b",
         "src": [
-          { "commons": "(desert OR dunes OR canyon OR mesa OR badlands OR \"Monument Valley\" OR Sahara OR Namib) landscape", "in": "fp|qi" },
-          { "commons": "(\"sand dunes\" OR \"Death Valley\" OR \"Grand Canyon\" OR \"Wadi Rum\" OR Atacama OR \"Bryce Canyon\")", "in": "fp|qi" }
+          {"commons": "desert OR dunes OR canyon OR mesa OR badlands OR \"Monument Valley\" OR Sahara OR Namib", "in": "fp|qi"},
+          {"commons": "\"sand dunes\" OR \"Death Valley\" OR \"Grand Canyon\" OR \"Wadi Rum\" OR Atacama OR \"Bryce Canyon\"", "in": "fp|qi"}
         ] },
-      { "id": "north", "name": "Moors and Fjords", "kind": "landscape", "mood": "brooding", "hue": 160,
+      {"id": "north", "name": "Moors and Fjords", "kind": "landscape", "mood": "brooding", "hue": 160,
         "reject": "\\b(sheep|birds?|puffins?|horses?|animals?|flowers?|people|person|portrait|church|house|village|town|harbou?r|boats?)\\b",
         "src": [
-          { "commons": "(moor OR moorland OR heath OR highlands OR fjord OR tundra OR Iceland OR \"Faroe Islands\" OR Lofoten) landscape", "in": "fp|qi" },
-          { "commons": "(\"Scottish Highlands\" OR Glencoe OR \"Isle of Skye\" OR Dartmoor OR Connemara OR Hebrides OR Greenland) (landscape OR view)", "in": "fp|qi" }
+          {"commons": "moorland OR moor OR heath OR highlands OR fjord OR tundra OR Iceland OR \"Faroe Islands\" OR Lofoten", "in": "fp|qi"},
+          {"commons": "\"Scottish Highlands\" OR Glencoe OR \"Isle of Skye\" OR Dartmoor OR Connemara OR Hebrides OR Greenland", "in": "fp|qi"}
         ] },
-      { "id": "autumn", "name": "Autumn Colours", "kind": "landscape", "mood": "amber", "hue": 24,
+      {"id": "autumn", "name": "Autumn Colours", "kind": "landscape", "mood": "amber", "hue": 24,
         "reject": "\\b(leaf|leaves close|mushrooms?|fung(us|i)|insects?|birds?|people|person|portrait|city|street|park bench|cars?)\\b",
         "src": [
-          { "commons": "(autumn OR fall) (foliage OR forest OR trees OR colours OR colors) landscape", "in": "fp|qi" },
-          { "commons": "(\"autumn forest\" OR \"fall foliage\" OR \"autumn colours\" OR \"autumn landscape\" OR \"Indian summer\")", "in": "fp|qi" }
+          {"commons": "\"autumn forest\" OR \"autumn colours\" OR \"autumn colors\" OR \"fall foliage\" OR \"autumn landscape\" OR \"autumn leaves\"", "in": "fp|qi"},
+          {"commons": "autumn landscape", "in": "fp|qi"}
         ] },
-      { "id": "photochrom", "name": "Photochrom Travels", "kind": "landscape", "mood": "vintage", "hue": 165,
+      {"id": "photochrom", "name": "Photochrom Travels", "kind": "landscape", "mood": "vintage", "hue": 165,
         "reject": "\\b(street|hotel|church|cathedral|market|people|portrait|costume|interior|square|station|harbou?r)\\b",
         "src": [
-          { "commons": "photochrom (Switzerland OR Norway OR Alps OR mountains OR lake OR glacier OR fjord OR valley OR falls OR gorge)" },
-          { "commons": "photochrom (Tyrol OR Scotland OR Ireland OR \"Bernese Oberland\" OR Yellowstone OR Yosemite OR coast)" }
+          {"commons": "photochrom Switzerland"},
+          {"commons": "photochrom Norway"},
+          {"commons": "photochrom mountains"}
         ] },
-      { "id": "silver", "name": "Silver Wilderness", "kind": "landscape", "mood": "mono", "hue": 0,
+      {"id": "silver", "name": "Silver Wilderness", "kind": "landscape", "mood": "mono", "hue": 0,
         "reject": "\\b(portrait|people|person|camp|wagon|town|street|building|house|indians?|tribe)\\b",
         "src": [
-          { "commons": "\"Ansel Adams\" (\"National Archives\" OR \"National Park\" OR Yosemite OR Glacier OR Tetons OR canyon)" },
-          { "commons": "(\"Carleton Watkins\" OR \"Carleton E. Watkins\") (Yosemite OR valley OR falls OR mountains)" },
-          { "commons": "\"William Henry Jackson\" (canyon OR mountains OR Yellowstone OR Colorado OR falls)" }
+          {"commons": "\"Ansel Adams\" National Archives"},
+          {"commons": "\"Carleton Watkins\" Yosemite"},
+          {"commons": "\"William Henry Jackson\" canyon"}
         ] },
-      { "id": "hudson", "name": "Hudson River School", "kind": "painting", "mood": "luminous", "hue": 40,
+      {"id": "hudson", "name": "Hudson River School", "kind": "painting", "mood": "luminous", "hue": 40,
         "reject": "\\b(portrait|self-portrait|still life|flowers|hummingbirds?|nude|interior|sketchbook|photograph)\\b",
         "src": [
-          { "aic": ["Thomas Cole", "Frederic Edwin Church", "Albert Bierstadt", "Sanford Robinson Gifford", "Jasper Francis Cropsey", "John Frederick Kensett", "Asher Brown Durand", "Thomas Moran", "George Inness", "Worthington Whittredge"], "type": 1 },
-          { "commons": "intitle:\"Google Art Project\" (\"Thomas Cole\" OR \"Frederic Edwin Church\" OR Bierstadt OR Cropsey OR Kensett OR \"Sanford Robinson Gifford\" OR \"Asher Brown Durand\" OR \"Thomas Moran\" OR Whittredge)" },
-          { "met": "Hudson River School", "medium": "Paintings", "n": 12 },
-          { "cma": "Hudson River School", "type": "Painting" }
+          {"aic": ["Thomas Cole", "Frederic Edwin Church", "Albert Bierstadt", "Sanford Robinson Gifford", "Jasper Francis Cropsey", "John Frederick Kensett", "Asher Brown Durand", "Thomas Moran", "George Inness", "Worthington Whittredge"], "type": 1},
+          {"commons": "intitle:Bierstadt", "not": "portrait photograph"},
+          {"commons": "Cropsey OR Kensett OR \"Sanford Robinson Gifford\" OR \"Asher Brown Durand\" OR \"Thomas Moran\" OR \"Thomas Cole\" OR \"Frederic Edwin Church\" intitle:\"Google Art Project\""},
+          {"met": "Hudson River School", "medium": "Paintings", "n": 12},
+          {"cma": "Bierstadt", "type": "Painting"},
+          {"cma": "Thomas Cole", "type": "Painting"}
         ] },
-      { "id": "sublime", "name": "Romantic Sublime", "kind": "painting", "mood": "dramatic", "hue": 28, "dark": true,
+      {"id": "sublime", "name": "Romantic Sublime", "kind": "painting", "mood": "dramatic", "hue": 28, "dark": true,
         "reject": "\\b(portrait|self-portrait|still life|nude|interior|drawing of a|letter|grave|photograph)\\b",
         "src": [
-          { "commons": "intitle:\"Google Art Project\" (\"Caspar David Friedrich\" OR \"William Turner\" OR \"J. M. W. Turner\" OR \"John Martin\" OR \"Carl Blechen\" OR \"Johan Christian Dahl\" OR \"Philip James de Loutherbourg\")" },
-          { "commons": "intitle:\"Caspar David Friedrich\"", "not": "portrait drawing" },
-          { "aic": ["Joseph Mallord William Turner", "John Martin", "Caspar David Friedrich", "Dahl", "Philip James de Loutherbourg", "Joseph Wright"], "type": 1 },
-          { "cma": "Turner", "type": "Painting" }
+          {"commons": "intitle:\"Caspar David Friedrich\"", "not": "portrait drawing"},
+          {"commons": "\"Caspar David Friedrich\" OR Turner OR \"John Martin\" OR Blechen OR Dahl OR Loutherbourg intitle:\"Google Art Project\""},
+          {"aic": ["Joseph Mallord William Turner", "John Martin", "Caspar David Friedrich", "Dahl", "Philip James de Loutherbourg", "Joseph Wright"], "type": 1},
+          {"cma": "Turner", "type": "Painting"}
         ] },
-      { "id": "ukiyoe", "name": "Ukiyo-e Views", "kind": "painting", "mood": "woodblock", "hue": 200, "cap": 10,
+      {"id": "ukiyoe", "name": "Ukiyo-e Views", "kind": "painting", "mood": "woodblock", "hue": 200, "cap": 10,
         "reject": "\\b(actors?|courtesans?|beauty|beauties|woman|women|warriors?|portrait|surimono|book|album cover)\\b",
         "src": [
-          { "aic": ["Utagawa Hiroshige", "Katsushika Hokusai", "Kawase Hasui", "Yoshida Hiroshi"], "types": ["Print"] },
-          { "cma": "Hiroshige", "type": "Print" },
-          { "cma": "Hokusai", "type": "Print" },
-          { "met": "Hiroshige", "artist": true, "dept": 6, "n": 12 },
-          { "commons": "(\"One Hundred Famous Views of Edo\" OR \"Thirty-six Views of Mount Fuji\" OR \"Fifty-three Stations of the Tokaido\" OR \"Sixty-nine Stations of the Kisokaido\")" }
+          {"aic": ["Utagawa Hiroshige", "Katsushika Hokusai", "Kawase Hasui", "Yoshida Hiroshi"], "types": ["Print"]},
+          {"cma": "Hiroshige", "type": "Print"},
+          {"cma": "Hokusai", "type": "Print"},
+          {"met": "Hiroshige", "artist": true, "dept": 6, "n": 12},
+          {"commons": "\"One Hundred Famous Views of Edo\" OR \"Thirty-six Views of Mount Fuji\" OR \"Fifty-three Stations of the Tokaido\""}
         ] },
-      { "id": "impressionist", "name": "Impressionist Light", "kind": "painting", "mood": "airy", "hue": 190,
+      {"id": "impressionist", "name": "Impressionist Light", "kind": "painting", "mood": "airy", "hue": 190,
         "reject": "\\b(portrait|self-portrait|woman|women|girl|madame|mme|lady|child|children|boy|nude|bathers?|still life|flowers|vase|fruit|interior)\\b",
         "src": [
-          { "aic": ["Claude Monet", "Camille Pissarro", "Alfred Sisley", "Armand Guillaumin", "Boudin", "Gustave Caillebotte"], "type": 1 },
-          { "commons": "intitle:\"Google Art Project\" (\"Claude Monet\" OR \"Alfred Sisley\" OR \"Camille Pissarro\" OR \"Eugène Boudin\" OR \"Armand Guillaumin\")" },
-          { "cma": "Monet", "type": "Painting" },
-          { "cma": "Sisley", "type": "Painting" },
-          { "met": "Claude Monet", "artist": true, "dept": 11, "medium": "Paintings", "n": 12 }
+          {"aic": ["Claude Monet", "Camille Pissarro", "Alfred Sisley", "Armand Guillaumin", "Boudin", "Gustave Caillebotte"], "type": 1},
+          {"commons": "Monet OR Sisley OR Pissarro OR Boudin OR Guillaumin intitle:\"Google Art Project\""},
+          {"cma": "Monet", "type": "Painting"},
+          {"cma": "Sisley", "type": "Painting"},
+          {"met": "Claude Monet", "artist": true, "dept": 11, "medium": "Paintings", "n": 12}
         ] },
-      { "id": "dutch", "name": "Dutch Skies", "kind": "painting", "mood": "overcast", "hue": 45,
+      {"id": "dutch", "name": "Dutch Skies", "kind": "painting", "mood": "overcast", "hue": 45,
         "reject": "\\b(portrait|self-portrait|still life|flowers|interior|tavern|merry company|kitchen|church interior|banquet)\\b",
         "src": [
-          { "aic": ["Ruisdael", "Ruysdael", "Hobbema", "van Goyen", "Cuyp", "Koninck", "van der Neer", "van de Velde"], "type": 1 },
-          { "commons": "intitle:\"Google Art Project\" (Ruisdael OR Ruysdael OR Hobbema OR \"van Goyen\" OR Cuyp OR Koninck OR \"van der Neer\" OR \"Esaias van de Velde\")" },
-          { "commons": "intitle:Ruisdael", "not": "portrait" },
-          { "cma": "Ruisdael", "type": "Painting" }
+          {"aic": ["Ruisdael", "Ruysdael", "Hobbema", "van Goyen", "Cuyp", "Koninck", "van der Neer", "van de Velde"], "type": 1},
+          {"commons": "intitle:Ruisdael", "not": "portrait"},
+          {"commons": "Ruysdael OR Hobbema OR \"van Goyen\" OR Cuyp OR Koninck OR \"van der Neer\" intitle:\"Google Art Project\""},
+          {"cma": "Ruisdael", "type": "Painting"}
         ] },
-      { "id": "visionary", "name": "Visionary Lands", "kind": "painting", "mood": "dreamlike", "hue": 265,
-        "reject": "\\b(portrait|self-portrait|photo|photograph|letter|grave|house|museum|stamp|sculpture|bust)\\b",
+      {"id": "visionary", "name": "Visionary Lands", "kind": "painting", "mood": "dreamlike", "hue": 265,
+        "reject": "\\b(portrait|self-portrait|photograph|letter|grave|stamp|sculpture|bust)\\b",
         "src": [
-          { "commons": "intitle:Böcklin", "not": "portrait photograph" },
-          { "commons": "intitle:Čiurlionis", "not": "portrait photograph" },
-          { "commons": "intitle:Roerich (Himalayas OR mountains OR Tibet OR Kanchenjunga OR mountain)", "not": "portrait photograph" },
-          { "commons": "intitle:Sohlberg", "not": "portrait photograph" },
-          { "aic": ["Odilon Redon", "Böcklin", "Bocklin", "Pierre Puvis de Chavannes", "Gustave Moreau"], "type": 1 }
+          {"commons": "intitle:Böcklin", "not": "portrait photograph"},
+          {"commons": "intitle:Čiurlionis", "not": "portrait photograph"},
+          {"commons": "intitle:Roerich", "not": "portrait photograph"},
+          {"commons": "intitle:Sohlberg", "not": "portrait photograph"},
+          {"aic": ["Odilon Redon", "Böcklin", "Bocklin", "Pierre Puvis de Chavannes", "Gustave Moreau"], "type": 1}
         ] },
-      { "id": "nocturne", "name": "Nocturnes", "kind": "painting", "mood": "moonlit", "hue": 222, "dark": true,
+      {"id": "nocturne", "name": "Nocturnes", "kind": "painting", "mood": "moonlit", "hue": 222, "dark": true,
         "reject": "\\b(portrait|self-portrait|still life|interior|nude|photograph)\\b",
         "src": [
-          { "commons": "intitle:Grimshaw", "not": "portrait photograph" },
-          { "commons": "intitle:\"Google Art Project\" (nocturne OR moonlight OR moonlit OR \"by moonlight\")" },
-          { "aic": [], "words": "nocturne moonlight moonlit moonrise night", "type": 1 },
-          { "commons": "intitle:Kuindzhi (moon OR night OR moonlit OR moonlight)" }
+          {"commons": "intitle:Grimshaw", "not": "portrait photograph"},
+          {"commons": "nocturne OR moonlight OR moonlit OR \"by moonlight\" intitle:\"Google Art Project\""},
+          {"aic": [], "words": "nocturne moonlight moonlit moonrise night", "type": 1},
+          {"commons": "intitle:Kuindzhi night"}
         ] },
-      { "id": "russian", "name": "Russian Plains", "kind": "painting", "mood": "quiet", "hue": 95,
-        "reject": "\\b(portrait|self-portrait|photo|photograph|museum|grave|house|stamp|monument|still life)\\b",
+      {"id": "russian", "name": "Russian Plains", "kind": "painting", "mood": "quiet", "hue": 95,
+        "reject": "\\b(portrait|self-portrait|photograph|grave|stamp|monument|still life)\\b",
         "src": [
-          { "commons": "intitle:Shishkin", "not": "portrait photograph" },
-          { "commons": "intitle:Levitan", "not": "portrait photograph" },
-          { "commons": "intitle:Savrasov", "not": "portrait photograph" },
-          { "commons": "intitle:Kuindzhi", "not": "portrait photograph" }
+          {"commons": "intitle:Shishkin", "not": "portrait photograph"},
+          {"commons": "intitle:Levitan", "not": "portrait photograph"},
+          {"commons": "intitle:Savrasov", "not": "portrait photograph"},
+          {"commons": "intitle:Kuindzhi", "not": "portrait photograph"}
         ] },
-      { "id": "cloudstudy", "name": "Cloud Studies", "kind": "painting", "mood": "airy", "hue": 210,
+      {"id": "cloudstudy", "name": "Cloud Studies", "kind": "painting", "mood": "airy", "hue": 210,
         "reject": "\\b(photo|photograph|portrait|diagram|chart)\\b",
         "src": [
-          { "commons": "(\"cloud study\" OR \"study of clouds\" OR \"sky study\" OR Wolkenstudie OR \"cloud studies\" OR \"study of sky\")", "not": "photograph" },
-          { "commons": "intitle:Constable (sky OR clouds OR cloud)" },
-          { "aic": [], "words": "clouds sky skies", "type": 1 },
-          { "cma": "clouds", "type": "Painting" }
+          {"commons": "\"cloud study\" OR \"study of clouds\" OR \"sky study\" OR Wolkenstudie OR \"cloud studies\"", "not": "photograph"},
+          {"commons": "intitle:Constable sky OR clouds"},
+          {"aic": [], "words": "clouds sky skies", "type": 1},
+          {"cma": "clouds", "type": "Painting"}
         ] },
-      { "id": "marine", "name": "Wild Seas", "kind": "painting", "mood": "wild", "hue": 192,
+      {"id": "marine", "name": "Wild Seas", "kind": "painting", "mood": "wild", "hue": 192,
         "reject": "\\b(portrait|self-portrait|still life|interior|nude|photograph|regatta|naval battle|battle)\\b",
         "src": [
-          { "commons": "intitle:Aivazovsky (sea OR wave OR storm OR shipwreck OR moonlit OR coast OR bay)", "not": "portrait photograph" },
-          { "aic": ["Winslow Homer", "Ivan Aivazovsky", "Willem van de Velde", "Gustave Courbet"], "type": 1 },
-          { "cma": "Winslow Homer", "type": "Painting" },
-          { "met": "Winslow Homer", "artist": true, "medium": "Paintings", "n": 12 }
+          {"commons": "intitle:Aivazovsky", "not": "portrait photograph"},
+          {"aic": ["Winslow Homer", "Aivazovsky", "Willem van de Velde", "Gustave Courbet"], "type": 1},
+          {"cma": "Winslow Homer", "type": "Painting"},
+          {"met": "Winslow Homer", "artist": true, "medium": "Paintings", "n": 12}
         ] }
     ]
   },
@@ -204,6 +208,6 @@
       "mineral": "crystal, gem, gemstone, diamond, ruby, emerald, sapphire, amethyst, quartz, opal, pearl, geode, rock, stone, pebble, boulder, fossil, amber, gold, silver, ore, mineral, obsidian, jade",
       "object": "teapot, cup, mug, teacup, glass, bottle, jar, vase, bowl, plate, chair, table, sofa, bed, pillow, cushion, candle, lantern, hourglass, mirror, box, chest, treasure chest, basket, book, dice, die, domino, card, playing card, ball, balloon, kite, toy, teddy bear, rubber duck, yo-yo, spinning top, marble, button, coin, banknote, money, piggy bank, gift, present, envelope, thermos, lunchbox, snow globe, bell, bubble wand, bubble, crystal ball, hammock, doorknob, potion, cauldron, chess piece, trophy cup, umbrella stand, urn, amphora, barrel, crate, suitcase"
     },
-    "extra": { "products": true, "queries": [], "width": 120, "maxBytes": 20000, "perQuery": 1, "tries": 3 }
+    "extra": { "products": true, "queries": [], "width": 120, "maxBytes": 20000, "perQuery": 1, "tries": 4, "fallback": "icon" }
   }
 }

@@ -212,7 +212,8 @@ export function imagesBuilder(K) {
     await pool(qs, 3, async (q) => {
       try {
         let got = 0;
-        for (const c of (await commonsSearch(q, 'filemime:image/png', 8, X.width || 120)).slice(0, X.tries || 3)) {
+        // the plain word first, then e.g. "sock icon" (icons are more often clean cut-outs)
+        for (const term of [q, ...(X.fallback ? [`${q} ${X.fallback}`] : [])]) for (const c of got >= (X.perQuery || 1) ? [] : (await commonsSearch(term, 'filemime:image/png', 10, X.width || 120)).slice(0, X.tries || 3)) {
           if (got >= (X.perQuery || 1)) break;
           const r = await fetch(c.ii.thumburl, { headers: { 'User-Agent': UA } });
           if (!r.ok) continue;

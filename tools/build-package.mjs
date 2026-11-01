@@ -487,17 +487,19 @@ function parseFeed(xml) {
 }
 const isoDate = (d) => { const t = new Date(d || ''); return isNaN(t) ? '' : t.toISOString().slice(0, 10); };
 async function readFeed(f) {
+  // failures are reported once, and only when no URL, fallback or discovered feed worked
+  const errs = [], fail = (more) => { if (more) errs.push(more); if (errs.length) warn(`feed ${f.name}: ${errs.join('; ')}`); return null; };
   const tryUrl = async (url) => {
-    try { const xml = await fetchText(url, { ua: BROWSER_UA, retries: 1 }); const parsed = parseFeed(xml); if (parsed.items.length) return parsed; }
-    catch (e) { warn(`feed ${f.name} ${url}: ${e.message}`); }
+    try { const xml = await fetchText(url, { ua: BROWSER_UA, retries: 1 }); const parsed = parseFeed(xml); if (parsed.items.length) return parsed; errs.push(`${url}: no items`); }
+    catch (e) { errs.push(`${url}: ${e.message}`); }
     return null;
   };
   for (const url of f.urls) { const r = await tryUrl(url); if (r) return r; }
   // RSS autodiscovery from the home page, then (for webcomics) walk the "previous" links
   const home = f.home || (f.urls[0] && new URL(f.urls[0]).origin + '/');
-  if (!home) return null;
+  if (!home) return fail();
   let html;
-  try { html = await fetchText(home, { ua: BROWSER_UA, retries: 1 }); } catch (e) { warn(`feed ${f.name} home: ${e.message}`); return null; }
+  try { html = await fetchText(home, { ua: BROWSER_UA, retries: 1 }); } catch (e) { return fail(`home: ${e.message}`); }
   for (const m of html.matchAll(/<link[^>]+>/gi)) {
     const tag = m[0];
     if (!/rel=["']?alternate/i.test(tag) || !/application\/(rss|atom)\+xml/i.test(tag)) continue;
@@ -506,7 +508,7 @@ async function readFeed(f) {
     const r = await tryUrl(new URL(decodeEntities(href), home).href);
     if (r) { log(`feed ${f.name}: discovered ${href}`); return r; }
   }
-  if (!f.scrape) return null;
+  if (!f.scrape) return fail('no feed found on the home page');
   if (f.scrape === 'blog') return scrapeBlog(f, home, html);
   const items = [];
   let url = home, page = html;
@@ -670,18 +672,24 @@ async function buildWeb() {
   });
   report.sources.sites = perSite;
   const comics = await buildComics(w);
-  // Reddit (occasional; usually blocked from CI)
-  const rd = [];
+  // Reddit (often blocked from CI): the JSON listing, else the subreddit's RSS feed; one warning if both fail
+  const rd = [], blocked = [];
   await pool(few(w.subreddits, 2), 2, async (s) => {
     try {
-      const j = await fetchJSON(`https://www.reddit.com/r/${s}/top.json?t=month&limit=25&raw_json=1`, { retries: 0 });
+      const j = await fetchJSON(`https://www.reddit.com/r/${s}/top.json?t=month&limit=25&raw_json=1`, { retries: 0, ua: BROWSER_UA });
       for (const c of j.data?.children || []) {
         const d = c.data;
         if (!d || d.over_18 || d.stickied || d.score < 100) continue;
         rd.push({ source: `r/${s}`, sub: 'reddit', title: d.title, url: `https://www.reddit.com${d.permalink}`, excerpt: clip((d.selftext || '').replace(/\s+/g, ' '), 320), meta: `${d.score} upvotes · ${d.num_comments} comments`, date: new Date(d.created_utc * 1000).toISOString().slice(0, 10) });
       }
-    } catch (e) { warn(`reddit ${s}: ${e.message}`); }
+      return;
+    } catch { /* try the feed */ }
+    try {
+      const feed = parseFeed(await fetchText(`https://www.reddit.com/r/${s}/top/.rss?t=month&limit=25`, { retries: 0, ua: BROWSER_UA }));
+      for (const it of feed.items) if (it.title && it.link && !/\bnsfw\b/i.test(it.title)) rd.push({ source: `r/${s}`, sub: 'reddit', title: it.title, url: it.link, excerpt: clip(stripTags(it.html).replace(/\s*submitted by[\s\S]*$/i, ''), 320), date: isoDate(it.date) });
+    } catch (e) { blocked.push(`${s} (${e.message})`); }
   });
+  if (blocked.length) warn(`reddit: ${blocked.length}/${few(w.subreddits, 2).length} subreddits unreachable, e.g. ${blocked.slice(0, 3).join(', ')}`);
   report.sources.reddit = rd.length;
 
   const fresh = (l) => shuffle(l.filter((x) => !seen.web.has(x.url)));
@@ -701,16 +709,18 @@ async function buildWeb() {
 async function buildNews() {
   const out = [];
   const per = {};
-  const jobs = Object.entries(config.news.groups).flatMap(([g, grp]) => few(grp.feeds, 1).map(([name, url]) => ({ g, name, url })));
+  // a feed is [name, url, ...fallback urls] (e.g. a Google News search for sites that refuse CI)
+  const jobs = Object.entries(config.news.groups).flatMap(([g, grp]) => few(grp.feeds, 1).map(([name, ...urls]) => ({ g, name, urls })));
   await pool(jobs, 4, async (j) => {
-    const feed = await readFeed({ name: j.name, urls: [j.url] });
+    const feed = await readFeed({ name: j.name, urls: j.urls, home: j.urls[0] && new URL(j.urls[0]).origin + '/' });
     if (!feed) return;
     for (const it of feed.items.slice(0, config.news.maxPerFeed)) {
       if (!it.title || !it.link || seen.news?.has(it.link)) continue;
-      // Google News titles end with " - Source"
-      const title = j.url.includes('news.google.com') ? it.title.replace(/\s+-\s+[^-]+$/, '') : it.title;
+      // Google News titles end with " - Source" and carry no excerpt
+      const gn = it.link.includes('news.google.com');
+      const title = gn ? it.title.replace(/\s+-\s+[^-]+$/, '') : it.title;
       const thumb = firstImg(it.html, it.link);
-      out.push({ id: `n${hashStr(it.link).toString(36)}`, cat: 'news', sub: j.g, source: j.name, title, url: it.link, excerpt: j.url.includes('news.google.com') ? '' : clip(stripTags(it.html), 320), date: isoDate(it.date), thumb: thumb && !/feedburner|gravatar|pixel|emoji|share/i.test(thumb) ? thumb : undefined });
+      out.push({ id: `n${hashStr(it.link).toString(36)}`, cat: 'news', sub: j.g, source: j.name, title, url: it.link, excerpt: gn ? '' : clip(stripTags(it.html), 320), date: isoDate(it.date), thumb: thumb && !/feedburner|gravatar|pixel|emoji|share/i.test(thumb) ? thumb : undefined });
       per[j.name] = (per[j.name] || 0) + 1;
     }
   });
@@ -984,16 +994,28 @@ function eroVerses(text, w, pk) {
 }
 // random excerpts inside `span`: verse runs of 8–28 lines, or 2–5 paragraphs of prose
 function eroAuto(body, w, a) {
-  const out = [], [f0, f1] = a.span || [0, 1], tries = 80;
+  const out = [], [f0, f1] = a.span || [0, 1], tries = 300;
   if (a.prose || w.kind === 'novel') {
     const paras = body.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').trim()).filter((p) => p && !isNote(p));
     const i0 = Math.floor(paras.length * f0), i1 = Math.floor(paras.length * f1);
+    const isHead = (p) => p.length <= 70 && !/[.!?,;:]["”’)]*$/.test(p) && /^[^a-z]*[A-Z]/.test(p) && (p === p.toUpperCase() || !/[.!?]/.test(p));
+    // a collection of short titled pieces (songs, epigrams): whole pieces; otherwise runs of 2–5 paragraphs
+    const secs = [];
+    for (let i = i0; i < i1; i++) if (isHead(paras[i])) { const txt = []; for (let j = i + 1; j < i1 && !isHead(paras[j]); j++) txt.push(paras[j]); if (txt.length) secs.push({ title: paras[i], paras: txt.slice(0, 6), i }); }
+    const pieces = secs.length >= 8 ? secs : null;
     for (let t = 0; t < tries && out.length < a.count; t++) {
-      const i = i0 + Math.floor(rand() * Math.max(1, i1 - i0 - 2)), k = 2 + Math.floor(rand() * 4);
-      const run = paras.slice(i, i + k), txt = run.join(' ');
-      if (txt.length < 500 || txt.length > 3600 || run.some((p) => p.length < 40 || p === p.toUpperCase())) continue;
-      if (!eroOk(txt, a, true) || !eroOk(`${paras[i - 1] || ''} ${paras[i + k] || ''}`) || eroSensual(txt) < 4) continue;
-      if (!out.some((o) => o.paras[0] === run[0])) out.push({ paras: run });
+      let run, title, i, k;
+      if (pieces) ({ paras: run, title, i } = pieces[Math.floor(rand() * pieces.length)]), (k = run.length + 1);
+      else {
+        i = i0 + Math.floor(rand() * Math.max(1, i1 - i0 - 2)); k = 2 + Math.floor(rand() * 4);
+        run = paras.slice(i, i + k);
+        if (run.some((p) => p.length < 40 || isHead(p))) continue;
+      }
+      const txt = run.join(' ');
+      if (txt.length < (pieces ? 250 : 500) || txt.length > 3600) continue;
+      if (!eroOk(`${title || ''} ${txt}`, a, true) || !eroOk(`${paras[i - 1] || ''} ${paras[i + k] || ''}`) || eroSensual(txt) < (pieces ? 3 : 4)) continue;
+      const nice = title && title.toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, p, c) => p + c.toUpperCase()).replace(/(?!^)\b(Of|The|And|To|In|On|A|An|At|For|By|With)\b/g, (x) => x.toLowerCase());
+      if (!out.some((o) => o.paras[0] === run[0])) out.push({ paras: run, title: nice || undefined });
     }
     return out;
   }
@@ -1042,7 +1064,7 @@ async function buildErotica() {
       if (w.auto) {
         const auto = eroAuto(body, w, w.auto);
         if (!auto.length) miss.push(`no excerpt in #${c.id} passed the content filters`);
-        for (const x of auto) out.push({ kind: x.lines ? 'poem' : 'novel', title: x.lines ? `from ${base.book}` : base.book, ...base, ...x });
+        for (const x of auto) out.push({ kind: x.lines ? 'poem' : 'novel', ...base, ...x, title: x.title || (x.lines ? `from ${base.book}` : base.book) });
       }
       misses = miss;
       if (!out.length) return false;
