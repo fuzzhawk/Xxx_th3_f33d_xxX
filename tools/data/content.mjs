@@ -128,12 +128,19 @@ export const fallbackQuotes = [
 // {title}/{title2}/{title3}/{fact}: Wikipedia items · {quote}/{author}: Wikiquote · {topic}: wiki topic label
 
 // ---------------------------------------------------------------- videos
-// A video is skipped when its title, channel, description or tags match any of these:
-// AI tools and labels, synthetic voices, AI upscales/colourisations, narrated listicle farms.
+// A video is skipped when its title, channel, description or tags hold one of these phrases
+// (AI tools and labels, synthetic voices); videoAvoidTitle is checked on titles and channels
+// only (a bare "AI", AI upscales and colourisations, narrated listicle farms).
 export const videoAvoid = [
-  /\bA\.?I\.?\b(?!\s*wei)/i, /artificial intelligence|machine[- ]generated|(?:ai|computer|digitally)[- ]generated|(?<!procedurally |randomly )\bgenerated\b|generative ai/i,
-  /midjourney|stable ?diffusion|dall[- ·]?e\b|\bsora\b|runway ?(?:ml|gen)|\bgen-?[234]\b|\bpika ?(?:labs)?\b|\bkling\b|\bveo ?\d\b|hailuo|luma (?:ai|dream)|leonardo\.ai|invideo|synthesia|heygen|eleven ?labs|chat ?gpt|\bgpt-?\d|openai/i,
-  /deep ?fakes?|face ?swap|voice ?clon|cloned voice|text[- ]to[- ](?:speech|video)|image[- ]to[- ]video|\btts\b|synthetic (?:voice|media|content)|altered or synthetic|narrated by (?:an )?(?:ai|robot)/i,
-  /upscal|remaster(?:ed)? (?:with|by|using) ai|colou?ri[sz](?:ed|ation)|\b(?:4k|8k)\b.{0,40}\b(?:60|120) ?fps\b|\b(?:60|120) ?fps\b.{0,40}\b(?:4k|8k)\b/i,
-  /^top \d+\b|\b(?:top|the) \d+ (?:most|creepiest|scariest|strangest|weirdest|craziest|mysterious|terrifying|disturbing)\b|you won'?t believe|facts you (?:didn'?t|never)|mind[- ]?blowing facts|#facts\b|#ai\w*|#midjourney|#sora/i
+  /\b(?:ai|a\.i\.)[- ](?:generated|created|made|animated|animation|art|artwork|video|film|movie|voice|voiceover|narrat\w*|music|song|cover|remaster\w*|upscal\w*|enhanced|restored|colou?ri[sz]\w*|story|stories|influencer|model|images?|imagery)\b/i,
+  /\b(?:generated|created|made|animated|narrated|voiced|produced|enhanced|upscaled|restored|colou?ri[sz]ed) (?:with|by|using|in) (?:ai|a\.i\.|artificial intelligence|midjourney|sora|runway|kling|veo|pika|luma|hailuo|chat ?gpt|eleven ?labs)\b/i,
+  /\b(?:digitally|machine)[- ]generated\b|\bgenerative ai\b|\bai slop\b/i,
+  /\bmidjourney\b|\bstable ?diffusion\b|\bdall[- ·]e\b|\bopenai\b|\bchat ?gpt\b|\bgpt-?[345]\b|\bsora (?:ai|2|video|generated)\b|#sora\b|\brunway ?(?:ml|gen-?\d)\b|\bpika (?:labs|art|ai)\b|\bkling (?:ai|\d)\b|\bgoogle veo\b|\bveo ?[23]\b|\bluma (?:ai|dream machine)\b|\bhailuo\b|\bleonardo\.ai\b|\binvideo ai\b|\bsynthesia\b|\bheygen\b|\beleven ?labs\b/i,
+  /\bdeep ?fakes?\b|\bface ?swap\w*|\bvoice ?clon\w*|\bcloned voice\b|\btext[- ]to[- ](?:speech|video)\b|\bimage[- ]to[- ]video\b|\bsynthetic (?:voice|media|video)\b/i,
+  /#ai(?:art|generated|video|videos|animation|music|cover|shorts|story|film)?\b|#midjourney\b/i
+];
+export const videoAvoidTitle = [
+  /\bA\.I\.|\bAI\b(?![- ]?Wei)/,
+  /\bupscal(?:ed|ing|e)\b|\b(?:4k|8k)\b.{0,40}\b(?:60|120) ?fps\b|\b(?:60|120) ?fps\b.{0,40}\b(?:4k|8k)\b|\bcolou?ri[sz]ed\b/i,
+  /^top \d+\b|\b(?:top|the) \d+ (?:most|creepiest|scariest|strangest|weirdest|craziest|terrifying|disturbing)\b|\byou won'?t believe\b|\bfacts you (?:didn'?t|never)\b|\bmind[- ]?blowing facts\b/i
 ];

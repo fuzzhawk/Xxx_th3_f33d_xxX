@@ -131,7 +131,8 @@ export class Dash extends Game {
     const j = this.doJump(p);
     if (j === 1) { p.sq = -0.6; this.fx.puff(p.x + S / 2, G, 0, -10, 6, this.edgeC, 0.4, 20, 0.5); }
     if (j === 2) { p.sq = -0.4; this.fx.ring(p.x + S / 2, p.y + S, 22, this.pal.ink, 0.3, 2); this.fx.sparks(p.x + S / 2, p.y + S, 8, this.col(1), 150, Math.PI / 2, 1.8, 0.3); }
-    if (j) this.lag = this.r(0.05, 0.13);
+    // now and then the autopilot hesitates on the next one, like a person would
+    if (j) this.lag = this.rng() < 0.012 + 0.02 * clamp(this.dist / 8000, 0, 1) ? this.r(0.2, 0.32) : this.r(0.05, 0.13);
   }
   // ---------------------------------------------------------- autopilot: try jumps against the same physics a second ahead
   roll(j1, j2, hor = 1.15) {
@@ -206,7 +207,7 @@ export class Dash extends Game {
     if (p.on && (this.dustT -= dt) <= 0) { this.dustT = 0.07; this.fx.puff(p.x + 3, G - 2, -this.speed * 0.25, this.r(-25, -5), this.r(2, 4), this.edgeC, 0.4, 14, 0.45); }
     if ((this.trT = (this.trT || 0) - dt) <= 0) { this.trT = 0.03; p.trail.push([p.x, p.y, p.rot]); if (p.trail.length > 6) p.trail.shift(); }
     for (const t of p.trail) t[0] -= dx;
-    if (this.speed > 360 && Math.random() < (this.speed - 360) / 300) this.fx.spark(W + 10, this.r(30, G - 10), -this.speed * 2.6, 0, 'rgba(255,255,255,.5)', 0.25);
+    if (this.speed > 360 && Math.random() < (this.speed - 360) / 500) this.fx.spark(W + 10, this.r(30, G - 10), -this.speed * 2.6, 0, 'rgba(255,255,255,.5)', 0.25);
   }
   land(q) {
     const v = q.vy;

@@ -617,9 +617,9 @@ export class Flight extends Game {
     const B = { type, x: 0, y: type === 'walker' ? 0 : 13, z: this.z + 240, t: 0, parts: [], launch: 6, spin: 0, openK: 0 };
     const P = (o) => { o.max = o.hp = Math.round((o.hp || 0) * k); o.flash = 0; o.cool = this.r(1.5, 3); o.x = 0; o.y = 0; o.z = 0; B.parts.push(o); };
     if (type === 'carrier') {
-      P({ id: 'podL', ox: -12.5, oy: -0.5, oz: -1, r: 2.9, hp: 24, gun: 'burst' }); P({ id: 'podR', ox: 12.5, oy: -0.5, oz: -1, r: 2.9, hp: 24, gun: 'burst' });
+      P({ id: 'podL', ox: -14.5, oy: -0.5, oz: -2, r: 2.9, hp: 24, gun: 'burst' }); P({ id: 'podR', ox: 14.5, oy: -0.5, oz: -2, r: 2.9, hp: 24, gun: 'burst' });
       P({ id: 'core', ox: 0, oy: 3.2, oz: -1.5, r: 2.9, hp: 45, gun: 'fan', core: true });
-      P({ id: 'hull', ox: 0, oy: 0, oz: 0, r: 8, hull: true, hw: 13.5, hh: 2.3, hd: 8.5 });
+      P({ id: 'hull', ox: 0, oy: 0, oz: 0, r: 8, hull: true, hw: 11, hh: 2.3, hd: 8 });
     } else if (type === 'walker') {
       P({ id: 'armL', ox: -8.2, oy: 18.5, oz: -3, r: 2.5, hp: 20, gun: 'burst' }); P({ id: 'armR', ox: 8.2, oy: 18.5, oz: -3, r: 2.5, hp: 20, gun: 'burst' });
       P({ id: 'head', ox: 0, oy: 24.4, oz: -1.4, r: 2.4, hp: 16, gun: 'aim' });
@@ -638,7 +638,7 @@ export class Flight extends Game {
     B.t += dt;
     const want = B.type === 'walker' ? 70 : 62, rel = B.z - z;
     B.z += (SPEED + clamp((want - rel) * 1.2, -60, 20)) * dt;
-    B.x = Math.sin(B.t * 0.42) * (B.type === 'walker' ? 6 : 10);
+    B.x = Math.sin(B.t * 0.42) * (B.type === 'core' ? 10 : 6);
     if (B.type !== 'walker') B.y = 13 + Math.sin(B.t * 0.63) * 4;
     B.spin += dt * 0.8; B.openK += ((B.type === 'core' && Math.sin(B.t * 0.7) > 0.45 ? 1 : 0) - B.openK) * Math.min(1, dt * 3);
     const guards = B.parts.filter((p) => !p.dead && !p.hull && !p.core).length;
@@ -656,7 +656,7 @@ export class Flight extends Game {
         this.flashes.push({ x: B.x, y: B.y + (B.type === 'walker' ? 18 : 0), z: B.z, r: 30, life: 0.8, max: 0.8, c: [1, 0.85, 0.6] });
         const bonus = this.sHits * 10 + Math.round(this.shield) * 10;
         this.score += bonus; this.boss = null; this.clear = 0.001; this.whiteT = 0.35;
-        this.msg = { a: 'STAGE CLEAR', b: `${this.sHits} HITS · BONUS ${bonus}`, c: this.E.label, t: 4.6 };
+        this.msg = { a: 'STAGE CLEAR', b: `HITS ${this.sHits} · BONUS ${bonus}`, c: this.E.label, t: 4.6 };
       }
       return;
     }
@@ -679,8 +679,8 @@ export class Flight extends Game {
   hitPart(p, n) {
     const B = this.boss;
     if (!B || p.dead || B.dying) return;
-    p.flash = 0.06;
     if (p.armored) return;
+    p.flash = 0.06;
     p.hp -= n * (this.mods.glass ? 2 : 1);
     if (p.hp > 0) return;
     p.dead = true; this.score += 300; this.pop(p.x, p.y + 3, p.z, '300'); this.boom(p.x, p.y, p.z, 2, this.foeCols);

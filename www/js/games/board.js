@@ -159,87 +159,190 @@ const CATS = [['1s', (d) => sum(d.filter((x) => x === 1))], ['2s', (d) => sum(d.
 const sum = (a) => a.reduce((s, x) => s + x, 0);
 const counts = (d) => [0, 1, 2, 3, 4, 5, 6].map((v) => d.filter((x) => x === v).length);
 const maxCount = (d) => Math.max(...counts(d));
+// The cup sits upside down at the left, hiding the dice. Rolling slides the loose dice under it, flips it upright,
+// shakes it (rattle), tips it over to spill the dice, and it rolls back over onto its mouth. Held dice stay put.
+const SLOT = (i) => 122 + i * 50, SY = 112, HX = 52, HY = 112, CL = 76, CM = 29, CB = 21, A_TIP = 2.35, ZH = 34;
+const easeIO = (k) => k * k * (3 - 2 * k), easeOut = (k) => 1 - (1 - k) * (1 - k);
 export class Dice extends Game {
   static noAuto = true;
   static noMods = ['mirror', 'wobble', 'swarm', 'glass', 'trails'];
-  setup() { this.best = 0; this.newGame(); }
-  newGame() { this.card = CATS.map(() => null); this.round = 0; this.newTurn(); this.total = 0; this.score = 0; }
-  newTurn() { this.dice = Array.from({ length: 5 }, (_, i) => ({ v: 1 + this.ri(0, 5), held: false, x: 50 + i * 65, y: 110, vx: 0, vy: 0, rot: 0, vr: 0, rolling: 0 })); this.rolls = 0; this.wait = 0.6; this.msg = ''; }
+  setup() { this.best = 0; this.cup = { ph: 'idle', k: 0, x: HX, y: HY, a: Math.PI, T: 0.6 }; this.dice = null; this.sweep = []; this.newGame(); }
+  newGame() { this.card = CATS.map(() => null); this.round = 0; this.msg = ''; this.newTurn(); this.total = 0; this.score = 0; }
+  newTurn() {
+    // last turn's dice are scooped back under the cup; the new ones wait there, unseen
+    this.sweep = (this.dice || []).filter((d) => !d.hid).map((d) => ({ x: d.x, y: d.y, v: d.v, k: 0, sx: d.x, sy: d.y, z: 0, sc: 1, rot: 0 }));
+    this.dice = Array.from({ length: 5 }, () => ({ v: 1 + this.ri(0, 5), held: false, x: HX, y: HY, z: 0, rot: 0, rolling: 0, hid: true, sc: 1 }));
+    this.rolls = 0; this.wait = 0.6; this.picked = false; this.msg = this.msg || '';
+  }
+  busy() { return this.cup.ph !== 'idle' || this.dice.some((d) => d.rolling > 0); }
   roll() {
-    if (this.rolls >= 3 || this.dice.some((d) => d.rolling > 0)) return;
-    this.rolls++;
-    for (const d of this.dice) if (!d.held) { d.rolling = this.r(0.6, 1.1); d.vx = this.r(-300, 300); d.vy = this.r(-420, -200); d.vr = this.r(-14, 14); }
+    if (this.rolls >= 3 || this.busy() || this.dice.every((d) => d.held)) return;
+    this.rolls++; this.picked = false; this.msg = '';
+    const c = this.cup, loose = this.dice.filter((d) => !d.held && !d.hid);
+    loose.forEach((d, j) => { d.into = true; d.sx = d.x; d.sy = d.y; d.lag = j * 0.07; });
+    c.ph = loose.length ? 'gather' : 'flip'; c.k = 0; c.T = this.r(0.5, 0.75);
+  }
+  spill() {
+    const c = this.cup, mx = c.x + CL / 2 * Math.sin(c.a), my = c.y - CL / 2 * Math.cos(c.a), zs = Math.min(2, 1 / Math.sqrt(this.G));
+    this.dice.map((d, i) => [d, i]).filter(([d]) => d.hid).sort((a, b) => b[1] - a[1]).forEach(([d, i], j) => {
+      Object.assign(d, { sx: mx, sy: my + ZH * zs, tx: SLOT(i), ty: SY, age: -j * 0.07, T: this.r(0.55, 0.75) + (SLOT(i) - mx) / 900, zs, rolling: 1, rot0: (this.rng() < 0.5 ? -1 : 1) * this.r(5, 11), fv: 1 + this.ri(0, 5) });
+    });
+    this.burst(mx, my, this.col(4), 6, 60);
   }
   scoreCat(i) {
-    if (this.card[i] !== null || this.rolls === 0 || this.dice.some((d) => d.rolling > 0)) return;
+    if (this.card[i] !== null || this.rolls === 0 || this.busy()) return;
     const v = CATS[i][1](this.dice.map((d) => d.v));
-    this.card[i] = v; this.msg = `${CATS[i][0]}: +${v}`;
+    this.card[i] = v;
     this.total = sum(this.card.map((x) => x || 0)) + (sum(this.card.slice(0, 6).map((x) => x || 0)) >= 63 ? 35 : 0);
     this.score = this.total;
     this.round++;
-    if (this.round >= CATS.length) { this.best = Math.max(this.best, this.total); this.over = 3; } else this.newTurn();
+    if (this.round >= CATS.length) { this.best = Math.max(this.best, this.total); this.over = 3; this.msg = `${CATS[i][0]}: +${v}`; } else { this.msg = ''; this.newTurn(); this.msg = `${CATS[i][0]}: +${v}`; }
   }
   // simple strategy: chase the most common face, or a straight when four are in a row
   autopilot(dt) {
-    if (this.over || this.dice.some((d) => d.rolling > 0)) return;
-    this.wait -= dt; if (this.wait > 0) return; this.wait = this.r(0.5, 0.9);
+    if (this.over || this.busy()) return;
+    this.wait -= dt; if (this.wait > 0) return;
     const d = this.dice.map((x) => x.v);
-    if (this.rolls === 0) return this.roll();
+    if (this.rolls === 0) { this.wait = this.r(0.4, 0.8); return this.roll(); }
     const options = CATS.map((c, i) => [i, this.card[i] === null ? c[1](d) : -1]).filter(([, v]) => v >= 0);
     const bestNow = options.sort((a, b) => b[1] - a[1])[0];
-    if (this.rolls === 3 || (bestNow && bestNow[1] >= 30)) {
-      const pick = bestNow[1] > 0 ? bestNow : options.sort((a, b) => [12, 0, 1, 11].indexOf(b[0]) - [12, 0, 1, 11].indexOf(a[0]))[0] || bestNow;
-      return this.scoreCat(pick[0]);
+    const score = () => { const pick = bestNow[1] > 0 ? bestNow : options.sort((a, b) => [12, 0, 1, 11].indexOf(b[0]) - [12, 0, 1, 11].indexOf(a[0]))[0] || bestNow; this.wait = this.r(0.6, 1); return this.scoreCat(pick[0]); };
+    if (this.rolls === 3 || (bestNow && bestNow[1] >= 30)) return score();
+    if (!this.picked) {
+      const cs = counts(d), face = cs.lastIndexOf(Math.max(...cs));
+      const uniq = [...new Set(d)].sort();
+      const straightish = uniq.length >= 4 && uniq[3] - uniq[0] === 3 && (this.card[9] === null || this.card[10] === null);
+      this.dice.forEach((x, i) => (x.held = straightish ? uniq.includes(x.v) && d.indexOf(x.v) === i : x.v === face));
+      if (this.dice.every((x) => x.held)) return score();
+      this.picked = true; this.wait = this.r(0.45, 0.8); return;
     }
-    const cs = counts(d), face = cs.lastIndexOf(Math.max(...cs));
-    const uniq = [...new Set(d)].sort();
-    const straightish = uniq.length >= 4 && uniq[3] - uniq[0] === 3 && (this.card[9] === null || this.card[10] === null);
-    this.dice.forEach((x, i) => (x.held = straightish ? uniq.includes(x.v) && d.indexOf(x.v) === i : x.v === face));
-    this.roll();
+    this.wait = this.r(0.3, 0.6); this.roll();
   }
   down(x, y) {
     if (this.auto || this.over) return;
-    if (y < 175) { const d = this.dice.find((d) => Math.abs(d.x - x) < 30 && Math.abs(d.y - y) < 30); if (d && this.rolls) d.held = !d.held; return; }
+    if (y < 175) {
+      const d = this.rolls && !this.busy() && this.dice.find((d) => !d.hid && Math.abs(d.x - x) < 26 && Math.abs(d.y - y) < 30);
+      if (d) d.held = !d.held; else if (Math.abs(x - HX) < 40 && Math.abs(y - HY) < 46) this.roll();
+      return;
+    }
     if (y < 210) { this.roll(); return; }
     const col = x < W / 2 ? 0 : 1, row = Math.floor((y - 214) / 28), i = col * 7 + row;
     if (row >= 0 && i < CATS.length) this.scoreCat(i);
   }
   tap(x, y) { this.down(x, y); }
+  stepCup(dt) {
+    const c = this.cup, P = Math.PI;
+    if (c.ph === 'idle') return;
+    c.k += dt;
+    if (c.ph === 'gather') {
+      const k = Math.min(1, c.k / 0.32);
+      for (const d of this.dice) if (d.into) {
+        const q = easeIO(Math.max(0, Math.min(1, (k - d.lag) / (1 - d.lag))));
+        d.x = d.sx + (HX - d.sx) * q; d.y = d.sy + (HY + 14 - d.sy) * q; d.z = 18 * Math.sin(q * P); d.sc = 1 - 0.3 * q;
+        if (q >= 1) { d.hid = true; d.into = false; d.sc = 1; d.z = 0; d.held = false; }
+      }
+      if (k >= 1 && !this.dice.some((d) => d.into)) { c.ph = 'flip'; c.k = 0; }
+    } else if (c.ph === 'flip') {
+      const k = Math.min(1, c.k / 0.26);
+      c.a = P + P * easeIO(k); c.x = HX; c.y = HY - 22 * Math.sin(k * P);
+      if (k >= 1) { c.ph = 'shake'; c.k = 0; }
+    } else if (c.ph === 'shake') {
+      const t = c.k;
+      c.a = 2 * P + Math.sin(t * 72) * 0.17; c.x = HX + Math.sin(t * 97) * 5 + Math.sin(t * 41) * 2; c.y = HY - 12 + Math.sin(t * 83) * 4;
+      if (this.rng() < dt * 14) this.burst(c.x + this.r(-10, 10), c.y - CL / 2, '#fff', 1, 45);
+      if (t >= c.T) { c.ph = 'tip'; c.k = 0; c.spilled = false; }
+    } else if (c.ph === 'tip') {
+      const k = Math.min(1, c.k / 0.5), e = easeIO(k);
+      c.a = 2 * P + A_TIP * e; c.x = HX + 14 * e; c.y = HY - 12 + 8 * e;
+      if (!c.spilled && k >= 0.58) { c.spilled = true; this.spill(); }
+      if (k >= 1) { c.ph = 'settle'; c.k = 0; }
+    } else if (c.ph === 'settle') {
+      const k = Math.min(1, c.k / 0.36), e = easeOut(k);
+      c.a = 2 * P + A_TIP + (P - A_TIP) * e; c.x = HX + 14 * (1 - e); c.y = HY - 4 * (1 - e);
+      if (k >= 1) { c.ph = 'idle'; c.a = P; c.x = HX; c.y = HY; }
+    }
+  }
   step(dt) {
     if (this.over) { this.over -= dt; if (this.over <= 0) this.newGame(); return; }
+    this.stepCup(dt);
+    for (const s of this.sweep) { s.k += dt / 0.4; const q = easeIO(Math.min(1, s.k)); s.x = s.sx + (HX - s.sx) * q; s.y = s.sy + (HY + 14 - s.sy) * q; s.z = 16 * Math.sin(q * Math.PI); s.sc = 1 - 0.3 * q; }
+    this.sweep = this.sweep.filter((s) => s.k < 1);
     for (const d of this.dice) {
+      if (d.pop > 0) { d.pop -= dt; d.sc = 1 + 0.16 * Math.sin(Math.max(0, d.pop) / 0.18 * Math.PI); }
       if (d.rolling <= 0) continue;
-      d.rolling -= dt; d.vy += 1400 * this.G * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.rot += d.vr * dt;
-      if (d.y > 140) { d.y = 140; d.vy *= -0.45; d.vx *= 0.8; d.vr *= 0.7; }
-      if (d.x < 34 || d.x > W - 34) { d.vx *= -0.8; d.x = Math.max(34, Math.min(W - 34, d.x)); }
-      if (this.rng() < dt * 18) d.v = 1 + this.ri(0, 5);
-      if (d.rolling <= 0) { d.rot = 0; d.v = 1 + this.ri(0, 5); }
+      d.age += dt;
+      if (d.age < 0) continue;
+      d.hid = false;
+      const k = Math.min(1, d.age / d.T), e = 1 - (1 - k) ** 2.2;
+      d.x = d.sx + (d.tx - d.sx) * e; d.y = d.sy + (d.ty - d.sy) * e;
+      d.z = ZH * d.zs * (1 - k) ** 2 * Math.abs(Math.cos(2 * Math.PI * (0.85 * k + 0.7 * k * k)));
+      d.rot = d.rot0 * (1 - k) ** 2;
+      if (k < 0.8 && this.rng() < dt * 22) d.v = 1 + this.ri(0, 5);
+      if (k >= 1) { d.rolling = 0; d.v = d.fv; d.z = 0; d.rot = 0; d.x = d.tx; d.y = d.ty; d.pop = 0.18; this.burst(d.x, d.y + 16, 'rgba(255,255,255,.6)', 3, 40); }
     }
-    // settle dice back into their slots
-    this.dice.forEach((d, i) => { if (d.rolling <= 0) { d.x += (50 + i * 65 - d.x) * Math.min(1, dt * 8); d.y += (110 - d.y) * Math.min(1, dt * 8); } });
   }
   drawDie(c, d) {
-    const s = 46;
-    c.save(); c.translate(d.x, d.y); c.rotate(d.rot);
-    c.fillStyle = d.held ? this.col(0) : '#f6efe4'; roundRect(c, -s / 2, -s / 2, s, s, 9); c.fill();
+    const s = 42 * (d.sc || 1), held = d.held && !d.into, lift = held ? 5 : 0;
+    c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(d.x + 3, d.y + 5 + 14, s * 0.46 * (1 - d.z / 120), s * 0.16, 0, 0, 7); c.fill();
+    c.save(); c.translate(d.x, d.y - d.z - lift); c.rotate(d.rot);
+    c.fillStyle = held ? this.col(0) : '#f6efe4'; roundRect(c, -s / 2, -s / 2, s, s, 9); c.fill();
     c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 2; c.stroke();
-    c.fillStyle = d.held ? '#fff' : '#1a1410';
+    c.fillStyle = held ? '#fff' : '#1a1410';
     const P = { 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]] }[d.v];
-    for (const [a, b] of P) { c.beginPath(); c.arc(a * 12, b * 12, 4.5, 0, 7); c.fill(); }
+    for (const [a, b] of P) { c.beginPath(); c.arc(a * s * 0.26, b * s * 0.26, s * 0.1, 0, 7); c.fill(); }
     c.restore();
+    if (held) this.text(c, 'HOLD', d.x, d.y + 32, 9, this.col(0));
+  }
+  drawCup(c) {
+    const { x, y, a, ph } = this.cup, h = CL / 2, lift = Math.max(0, HY - y), up = Math.cos(a) > -0.3;
+    // the shadow stays on the table while the cup lifts
+    c.fillStyle = `rgba(0,0,0,${0.3 * (1 - Math.min(1, lift / 40))})`; c.beginPath(); c.ellipse(HX + 4, HY + h + 3, CM + 5, 7, 0, 0, 7); c.fill();
+    c.save(); c.translate(x, y); c.rotate(a);
+    const leather = '#7b4a2c', trace = () => { c.beginPath(); c.moveTo(-CM, -h); c.quadraticCurveTo(-(CB + CM) / 2 - 2, 0, -CB, h); c.lineTo(CB, h); c.quadraticCurveTo((CB + CM) / 2 + 2, 0, CM, -h); c.closePath(); };
+    c.fillStyle = leather; trace(); c.fill();
+    c.beginPath(); c.ellipse(0, h, CB, 5, 0, 0, 7); c.ellipse(0, -h, CM, 6, 0, 0, 7); c.fill();
+    c.save(); trace(); c.clip();
+    const g = c.createLinearGradient(-CM, 0, CM, 0);
+    g.addColorStop(0, 'rgba(0,0,0,.5)'); g.addColorStop(0.22, 'rgba(255,255,255,.26)'); g.addColorStop(0.5, 'rgba(255,255,255,0)'); g.addColorStop(0.82, 'rgba(0,0,0,.14)'); g.addColorStop(1, 'rgba(0,0,0,.55)');
+    c.fillStyle = g; c.fillRect(-CM - 2, -h - 8, CM * 2 + 4, CL + 16);
+    c.fillStyle = 'rgba(0,0,0,.22)'; c.fillRect(-CM - 2, -h, CM * 2 + 4, 10);
+    c.restore();
+    c.strokeStyle = this.col(1); c.lineWidth = 2; c.globalAlpha = 0.9;
+    c.beginPath(); c.moveTo(-CM + 0.5, -h + 10); c.lineTo(CM - 0.5, -h + 10); c.moveTo(-CB - 1.5, h - 9); c.lineTo(CB + 1.5, h - 9); c.stroke();
+    c.globalAlpha = 1; c.strokeStyle = 'rgba(255,235,200,.4)'; c.lineWidth = 1.2; c.setLineDash([3, 3]);
+    c.beginPath(); c.moveTo(-CM * 0.42, -h + 16); c.lineTo(-CB * 0.42, h - 14); c.stroke(); c.setLineDash([]);
+    // the face that points up: the dark mouth when the cup is upright, the leather base when it is upside down
+    c.beginPath(); c.ellipse(0, up ? -h : h, up ? CM : CB, up ? 6 : 5, 0, 0, 7);
+    c.fillStyle = up ? 'rgba(18,10,6,.92)' : '#8a5834'; c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.3)'; c.lineWidth = 1.2; c.stroke();
+    c.restore();
+    if (ph === 'shake') {
+      // rattle marks either side of the cup
+      c.strokeStyle = this.pal.ink; c.lineWidth = 2; c.lineCap = 'round';
+      const f = Math.floor(this.t * 26) % 2;
+      for (const s of [-1, 1]) for (let r = 0; r < 2; r++) { c.globalAlpha = 0.6 - r * 0.2; c.beginPath(); c.arc(x, y, 50 + r * 9 + f * 4, s > 0 ? -0.5 : Math.PI - 0.5 + 0.0, s > 0 ? 0.5 : Math.PI + 0.5); c.stroke(); }
+      c.globalAlpha = 1;
+    }
   }
   draw(c) {
     this.clear(c);
     c.fillStyle = 'rgba(0,0,0,.3)'; roundRect(c, 14, 50, W - 28, 125, 16); c.fill();
-    for (const d of this.dice) this.drawDie(c, d);
-    c.fillStyle = this.rolls >= 3 ? '#4a403a' : this.col(1); roundRect(c, W / 2 - 70, 180, 140, 26, 13); c.fill();
-    this.text(c, this.rolls >= 3 ? 'pick a score' : `ROLL (${3 - this.rolls} left)`, W / 2, 193, 12, '#1a1410');
-    const d = this.dice.map((x) => x.v);
+    c.strokeStyle = 'rgba(255,255,255,.07)'; c.lineWidth = 1.5; roundRect(c, 17, 53, W - 34, 119, 13); c.stroke();
+    // dice going under the cup are drawn first so the cup hides them; dice on the table and tumbling out come after it
+    for (const s of this.sweep) this.drawDie(c, s);
+    for (const d of this.dice) if (d.into) this.drawDie(c, d);
+    this.drawCup(c);
+    for (const d of this.dice) if (!d.hid && !d.into) this.drawDie(c, d);
+    if (!this.rolls && this.cup.ph === 'idle' && !this.over && !(this.auto && this.autoOK)) this.text(c, 'tap to shake', HX, HY + 52, 10, 'rgba(255,255,255,.55)');
+    const idle = !this.busy() && this.rolls < 3;
+    c.fillStyle = idle ? this.col(1) : '#4a403a'; roundRect(c, W / 2 - 70, 180, 140, 26, 13); c.fill();
+    this.text(c, this.rolls >= 3 && !this.busy() ? 'pick a score' : this.busy() ? 'rolling…' : `ROLL (${3 - this.rolls} left)`, W / 2, 193, 12, idle ? '#1a1410' : '#cfc6b8');
+    const d = this.dice.map((x) => x.v), shown = this.rolls && !this.busy();
     CATS.forEach(([name, f], i) => {
       const col = i < 7 ? 0 : 1, row = i < 7 ? i : i - 7, x = 16 + col * (W / 2), y = 214 + row * 28;
       c.fillStyle = this.card[i] !== null ? 'rgba(255,255,255,.05)' : 'rgba(255,255,255,.12)'; roundRect(c, x, y, W / 2 - 24, 24, 6); c.fill();
       this.text(c, name, x + 8, y + 12, 11, this.pal.ink, 'left');
-      const v = this.card[i] !== null ? this.card[i] : this.rolls ? f(d) : '';
+      const v = this.card[i] !== null ? this.card[i] : shown ? f(d) : '';
       this.text(c, String(v), x + W / 2 - 34, y + 12, 12, this.card[i] !== null ? this.col(4) : this.col(0), 'right');
     });
     this.text(c, this.over ? `Final ${this.total} · best ${this.best}` : this.msg || `Round ${this.round + 1}/13`, W / 2, 30, 13);

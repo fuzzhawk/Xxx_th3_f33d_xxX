@@ -17,6 +17,7 @@ const KITS = [
 const POWERS = ['multi', 'fire', 'bomb', 'storm'];
 const COL = { blue: '#3d8bff', orange: '#ff8a2a', purple: '#b45cff', green: '#4cd964', bomb: '#e8333a' };
 const VAL = { blue: 10, orange: 100, purple: 500, green: 10, bomb: 50 };
+const PA = { x: 0, y: 0, ux: 0, uy: 0 }, NONE = [];
 
 // ball against a disc moving at (ux, uy); returns the impact speed (0 when apart)
 function bounce(b, x, y, r, e, ux = 0, uy = 0) {
@@ -143,12 +144,16 @@ export class PegShot extends Game {
       const hw = (p.brick ? p.w / 2 : p.r) + 8, hh = (p.brick ? p.h / 2 : p.r) + 8;
       for (let y = Math.max(0, Math.floor((p.y - hh) / GC)); y <= Math.floor((p.y + hh) / GC); y++) for (let x = Math.max(0, Math.floor((p.x - hw) / GC)); x <= Math.min(this.gx - 1, Math.floor((p.x + hw) / GC)); x++) this.grid[y * this.gx + x]?.push(p);
     }
-    this.moving = this.pegs.filter((p) => !p.gone && (p.R || p.amp));
+    // moving pegs grouped by wheel or slider row, so a look-ahead skips whole groups far from the ball
+    const groups = new Map();
+    for (const p of this.pegs) if (!p.gone && (p.R || p.amp)) { const k = p.R ? `w${p.cx},${p.cy}` : `s${p.y}`; if (!groups.has(k)) groups.set(k, { p0: p, ps: [] }); groups.get(k).ps.push(p); }
+    this.groups = [...groups.values()];
   }
   // where a moving peg is at level time t, and how fast it goes
   pegAt(p, t) {
-    if (p.R) { const a = p.a0 + p.w * t; return [p.cx + Math.cos(a) * p.R, p.cy + Math.sin(a) * p.R, -Math.sin(a) * p.R * p.w, Math.cos(a) * p.R * p.w]; }
-    const a = p.ph + p.f * t; return [p.sx + Math.sin(a) * p.amp, p.y, Math.cos(a) * p.amp * p.f, 0];
+    if (p.R) { const a = p.a0 + p.w * t, c = Math.cos(a), s = Math.sin(a); PA.x = p.cx + c * p.R; PA.y = p.cy + s * p.R; PA.ux = -s * p.R * p.w; PA.uy = c * p.R * p.w; }
+    else { const a = p.ph + p.f * t; PA.x = p.sx + Math.sin(a) * p.amp; PA.y = p.y; PA.ux = Math.cos(a) * p.amp * p.f; PA.uy = 0; }
+    return PA;
   }
   mult() { const f = this.litOrange / this.oranges; return f < 0.4 ? 1 : f < 0.6 ? 2 : f < 0.76 ? 3 : f < 0.9 ? 5 : 10; }
 
@@ -193,11 +198,13 @@ export class PegShot extends Game {
       b.vy += g * dt; b.x += b.vx * dt; b.y += b.vy * dt; t += dt;
       if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.9; } else if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx) * 0.9; }
       if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy) * 0.9; }
-      const cell = this.grid[Math.floor(b.y / GC) * this.gx + Math.floor(b.x / GC)] || [];
+      const cell = this.grid[Math.floor(b.y / GC) * this.gx + Math.floor(b.x / GC)] || NONE;
       for (const p of cell) if (p.brick ? hitBrick(b, p, 0.6) : bounce(b, p.x, p.y, p.r, 0.78)) if (!seen.has(p)) { seen.add(p); v += p.k === 'orange' ? (left === 1 ? 40 : 10) : p.purple ? 12 : p.k === 'green' ? 7 : p.k === 'bomb' ? 7 + this.pegs.filter((q) => q.k === 'orange' && !q.gone && Math.hypot(q.x - p.x, q.y - p.y) < 46).length * 6 : 1; }
-      for (const p of this.moving) {
-        if (p.R ? Math.abs(b.x - p.cx) > p.R + 16 || Math.abs(b.y - p.cy) > p.R + 16 : Math.abs(b.y - p.y) > 16 || Math.abs(b.x - p.sx) > p.amp + 16) continue;
-        const [x, y, ux, uy] = this.pegAt(p, t); if (bounce(b, x, y, p.r, 0.78, ux, uy) && !seen.has(p)) { seen.add(p); v += p.k === 'orange' ? (left === 1 ? 40 : 10) : p.k === 'bomb' ? 8 : 1; } }
+      for (const gr of this.groups) {
+        const q = gr.p0;
+        if (q.R ? Math.abs(Math.hypot(b.x - q.cx, b.y - q.cy) - q.R) > PR + b.r + 3 : Math.abs(b.y - q.y) > PR + b.r + 3) continue;
+        for (const p of gr.ps) { if (p.gone) continue; this.pegAt(p, t); if (bounce(b, PA.x, PA.y, p.r, 0.78, PA.ux, PA.uy) && !seen.has(p)) { seen.add(p); v += p.k === 'orange' ? (left === 1 ? 40 : 10) : p.k === 'bomb' ? 8 : 1; } }
+      }
       bx += bd * 90 * dt; if (bx > W - BK_W / 2 - 6) bd = -1; if (bx < BK_W / 2 + 6) bd = 1;
       if (b.y > BK_Y && Math.abs(b.x - bx) < BK_W / 2 - 6) { v += 6; break; }
       if (b.y > H + 10) break;
@@ -292,7 +299,7 @@ export class PegShot extends Game {
       p.flash = Math.max(0, p.flash - sdt);
       if (p.gone) continue;
       if (p.R || p.amp) {
-        [p.x, p.y] = this.pegAt(p, this.lt);
+        this.pegAt(p, this.lt); p.x = PA.x; p.y = PA.y;
         const sc = Math.floor(p.x / 3) * 1000 + Math.floor(p.y / 3);
         if (sc !== p.sc) { m.solid(p.ox ?? p.x, p.oy ?? p.y, p.r, false); m.solid(p.x, p.y, p.r, true); p.sc = sc; p.ox = p.x; p.oy = p.y; }
       }
@@ -334,7 +341,7 @@ export class PegShot extends Game {
       if (b.fireT > 0 && !p.brick) { if (Math.hypot(p.x - b.x, p.y - b.y) < b.r + p.r) { this.light(p, b); b.vx *= 0.97; b.vy *= 0.97; } continue; }
       let hit;
       if (p.brick) hit = hitBrick(b, p, 0.6);
-      else if (p.R || p.amp) { const [, , ux, uy] = this.pegAt(p, this.lt); hit = bounce(b, p.x, p.y, p.r, 0.78, ux, uy); }
+      else if (p.R || p.amp) { this.pegAt(p, this.lt); hit = bounce(b, p.x, p.y, p.r, 0.78, PA.ux, PA.uy); }
       else hit = bounce(b, p.x, p.y, p.r, 0.78);
       if (hit) this.light(p, b);
     }

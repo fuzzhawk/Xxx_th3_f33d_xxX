@@ -23,7 +23,7 @@ import { powerBuilder } from './power.mjs';
 import { productsBuilder } from './products.mjs';
 import { imagesBuilder } from './images.mjs';
 import { DECK, QUESTIONS } from '../www/js/oracle-data.js';
-import { selfCare, selfCareFlavors, fallbackQuotes, videoAvoid } from './data/content.mjs';
+import { selfCare, selfCareFlavors, fallbackQuotes, videoAvoid, videoAvoidTitle } from './data/content.mjs';
 import { eroticaWorks, eroticaHardBan, eroticaSoftBan, eroticaSensual } from './data/erotica.mjs';
 import { productClassics, productParts } from './data/products-data.mjs';
 import { memeText, memeWeights, memeImageCount } from './data/memes-data.mjs';
@@ -355,34 +355,50 @@ function ytAge(t) {
   return u === 'year' ? n : u === 'month' ? n / 12 : u === 'week' ? n / 52 : 0;
 }
 const yearsSince = (d) => { const t = Date.parse(d || ''); return isNaN(t) ? null : (Date.now() - t) / (365.25 * 86400000); };
-// AI-made or AI-processed videos and narrated listicle farms (patterns in tools/data/content.mjs)
-const aiMarked = (...texts) => { const s = texts.filter(Boolean).join(' \n '); return videoAvoid.some((re) => re.test(s)); };
+// AI-made or AI-processed videos and narrated listicle farms (patterns in tools/data/content.mjs):
+// the matched words, or null
+function aiMarked(title, channel, ...rest) {
+  const head = [title, channel].filter(Boolean).join(' \n '), all = [head, ...rest].filter(Boolean).join(' \n ');
+  for (const re of videoAvoidTitle) { const m = head.match(re); if (m) return m[0]; }
+  for (const re of videoAvoid) { const m = all.match(re); if (m) return m[0]; }
+  return null;
+}
+// YouTube's own disclosure ("How this content was made: Altered or synthetic content"), not any page text
+const syntheticLabel = (html) => { const i = html.indexOf('howThisWasMadeSectionViewModel'); return i >= 0 && /altered or synthetic/i.test(html.slice(i, i + 4000)); };
 // Checks that a video plays embedded and is not blocked in config.videoRegion
 // (YouTube's own watch-page data); falls back to oEmbed when the page can't be read.
 // The watch page also gives the upload date, the full description and tags, and
 // YouTube's own "altered or synthetic content" label.
 async function playable(vid) {
-  const region = config.videoRegion;
+  const region = config.videoRegion, vc = (report.sources.videoChecks ||= {});
+  const tally = (k) => { vc[k] = (vc[k] || 0) + 1; };
   try {
     const html = await fetchText(`https://www.youtube.com/watch?v=${vid}&hl=en`, { ua: BROWSER_UA, headers: { Cookie: 'CONSENT=YES+cb; SOCS=CAI' }, retries: 1, timeout: 15000 });
     const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]+?\})\s*;\s*(?:var\s|<\/script>)/);
-    if (m) {
+    if (!m) tally('watch page without player data');
+    else {
       const pr = JSON.parse(m[1]);
       const ps = pr.playabilityStatus || {};
-      if (ps.status && ps.status !== 'OK') return null;
-      if (ps.playableInEmbed === false) return null;
-      const mf = pr.microformat?.playerMicroformatRenderer || {};
-      const countries = mf.availableCountries;
-      if (region && Array.isArray(countries) && countries.length && !countries.includes(region)) { report.regionBlocked = (report.regionBlocked || 0) + 1; return null; }
-      const vd = pr.videoDetails || {};
-      return { title: vd.title, author_name: vd.author, date: (mf.publishDate || mf.uploadDate || '').slice(0, 10), desc: vd.shortDescription || '', tags: (vd.keywords || []).join(' '),
-        synthetic: /altered or synthetic content|"isSynthetic(?:Media|Content)?":true/i.test(html) };
+      const why = `${ps.reason || ''} ${JSON.stringify(ps.errorScreen || '').slice(0, 600)}`;
+      // a bot check or sign-in wall says nothing about the video itself: ask oEmbed instead
+      if (ps.status && ps.status !== 'OK' && /not a bot|unusual traffic|sign in to confirm(?! your age)/i.test(why)) tally('watch page bot check');
+      else if (ps.status && ps.status !== 'OK') { tally(`status ${ps.status}`); return null; }
+      else if (ps.playableInEmbed === false) { tally('embedding off'); return null; }
+      else {
+        const mf = pr.microformat?.playerMicroformatRenderer || {};
+        const countries = mf.availableCountries;
+        if (region && Array.isArray(countries) && countries.length && !countries.includes(region)) { report.regionBlocked = (report.regionBlocked || 0) + 1; tally('region blocked'); return null; }
+        const vd = pr.videoDetails || {};
+        tally('watch page ok');
+        return { title: vd.title, author_name: vd.author, date: (mf.publishDate || mf.uploadDate || '').slice(0, 10), desc: vd.shortDescription || '', tags: (vd.keywords || []).join(' '), synthetic: syntheticLabel(html) };
+      }
     }
-  } catch { /* fall through */ }
+  } catch { tally('watch page failed'); }
   try {
     const j = await fetchJSON(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${vid}`)}&format=json`, { retries: 1, timeout: 10000 });
+    tally(j?.title ? 'oembed ok' : 'oembed empty');
     return j && j.title ? j : null;
-  } catch { return null; }
+  } catch { tally('oembed failed'); return null; }
 }
 // The owner wants older, human-made videos: uploads 5–20 years old come first (config.videoAge),
 // then other dated uploads, then undated ones; Shorts and very recent uploads only fill gaps.
@@ -393,7 +409,8 @@ async function buildVideos() {
   const totalW = Object.values(groups).reduce((s, g) => s + g.weight, 0);
   const week = +(id.match(/W(\d+)/) || [0, 0])[1];
   const tier = (age, short) => (age == null ? (short ? 4 : 2) : age >= AGE.min && age <= AGE.max + 1 ? 0 : age >= AGE.min - 2 ? 1 : 3);
-  const posts = [], taken = new Set(), stat = { aiDropped: 0, inRange: 0, older: 0, newer: 0, undated: 0 };
+  const posts = [], taken = new Set(), stat = { aiDropped: 0, inRange: 0, older: 0, newer: 0, undated: 0, searchDated: 0, searchInRange: 0 }, dropped = [];
+  const drop = (v, why) => { stat.aiDropped++; if (dropped.length < 25) dropped.push({ title: clip(v.title || '', 90), channel: v.channel || '', why }); return false; };
   for (const [key, g] of Object.entries(groups)) {
     const quota = Math.round(want.video * g.weight / totalW);
     if (!quota) continue;
@@ -409,7 +426,8 @@ async function buildVideos() {
     const fresh = cand.filter((v) => !taken.has(v.vid) && !seen.video.has(v.vid) && (!v.dur || durSec(v.dur) <= 600));
     const kw = g.keywords ? new RegExp(g.keywords, 'i') : null;
     const dedup = [...new Map(fresh.map((v) => [v.vid, v])).values()];
-    const clean = dedup.filter((v) => !aiMarked(v.title, v.channel, v.desc) || (stat.aiDropped++, false));
+    const clean = dedup.filter((v) => { const why = aiMarked(v.title, v.channel, v.desc); return why ? drop(v, why) : true; });
+    for (const v of clean) { const a = ytAge(v.published); if (a != null) { stat.searchDated++; if (tier(a) === 0) stat.searchInRange++; } }
     const ranked = clean.map((v, i) => ({ v, i, t: tier(ytAge(v.published), v.short), k: kw && kw.test(v.title) ? 0 : 1 }))
       .sort((a, b) => a.t - b.t || a.k - b.k || a.i - b.i).map((x) => x.v);
     const uniq = ranked.slice(0, Math.ceil(quota * 1.8));
@@ -419,7 +437,8 @@ async function buildVideos() {
     uniq.forEach((v, i) => {
       const c = checks[i];
       if (!c) return;
-      if (c.synthetic || aiMarked(c.desc, c.tags, c.title)) { stat.aiDropped++; return; }
+      const why = c.synthetic ? 'YouTube label: altered or synthetic content' : aiMarked(c.title, '', c.desc, c.tags);
+      if (why) { drop(v, why); return; }
       const age = c.date ? yearsSince(c.date) : ytAge(v.published);
       ok.push({ v, c, age, t: tier(age, v.short), i });
     });
@@ -436,6 +455,7 @@ async function buildVideos() {
   }
   report.sources.youtube = posts.length;
   report.sources.videoAges = stat;
+  report.sources.videoDropped = dropped;
   return posts;
 }
 

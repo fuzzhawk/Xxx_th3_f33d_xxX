@@ -81,7 +81,7 @@ function waves(R, n = 4, rough = 0.5, f0 = 1) {
 }
 function ridges(R, n = 4, f0 = 2) {
   const t = []; let s = 0;
-  for (let i = 0; i < n; i++) { const a = Math.pow(0.55, i); s += a; t.push([f0 * (i + 1) + Math.floor(R() * 3), a, R() * TAU]); }
+  for (let i = 0; i < n; i++) { const a = Math.pow(0.42, i); s += a; t.push([f0 * (i + 1) + Math.floor(R() * 3), a, R() * TAU]); }
   return (x) => { let v = 0; for (const [f, a, p] of t) v += a * (1 - Math.abs(Math.sin((x / P) * Math.PI * f + p))); return v / s; };
 }
 // draw a picture across [0,P) × [y, y+h): pairs of tiles, the second mirrored, cropped to the tile's aspect
@@ -222,7 +222,7 @@ export class Backdrop {
         }
         c.globalAlpha = 1; break;
       }
-      case 'peaks': { const f = ridges(R, 4, 2); edge((x) => base - amp * Math.pow(f(x), 1.25)); break; }
+      case 'peaks': { const f = ridges(R, 3, 2); edge((x) => base - amp * Math.pow(f(x), 1.7)); break; }
       case 'hills': case 'isles': case 'dunes': {
         const f = waves(R, L.kind === 'dunes' ? 2 : 3, 0.45, L.kind === 'isles' ? 3 : 1);
         edge(L.kind === 'isles' ? (x) => base - amp * Math.max(0, f(x) * 1.8 - 0.35) : L.kind === 'dunes' ? (x) => base - amp * (0.5 + 0.5 * f(x)) * (0.75 + 0.25 * Math.sin((x / P) * TAU * 9)) : (x) => base - amp * (0.5 + 0.5 * f(x)));
