@@ -47,7 +47,7 @@ export const GAME_HINT = {
   rocks: 'tap to shoot, hold to thrust toward your finger', sling: 'drag down and release to fire upward',
   chess: 'tap a white piece, then its destination', dice: 'roll, tap dice to hold, tap a row to score',
   cards: 'tap up to five cards, then play or discard', monsters: 'tap a move', fighter: '◀ ▶ walk (hold away to block) · ▲ jump · ▼ crouch for sweeps and uppercuts · P K S attack · land hits to chain combos, fill the meter for an ULTRA · on autopilot, bet on the fight',
-  starfox: 'hold and drag to steer, lasers fire while you hold · fly through rings',
+  starfox: 'drag anywhere to steer, lasers fire while you hold · double-tap to barrel roll, ✸ drops a bomb · fly through rings, beat the boss',
   ski: 'tap to jump, hold in the air to backflip, land along the slope',
   robotron: 'left thumb moves, right thumb shoots (one thumb auto-aims) · rescue the humans',
   crokinole: 'touch near the bottom arc to place, drag back and release to flick · hit their discs or lose yours',

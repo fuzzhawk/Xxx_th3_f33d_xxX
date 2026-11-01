@@ -319,7 +319,7 @@ export class Plinko extends Game {
     if (pts >= 100) { this.fx.confetti(x, SLOT_Y, 26, this.pal.c, 260, 160); this.fx.shake(3); }
     if (b.kind !== 'ball' && b.kind !== 'gold') this.burst(b, true);
     if (s.sp) this.trigger(s.sp, x);
-    else if (b.combo >= 24) this.trigger('MULTIBALL', b.x, 'SUPER COMBO!');
+    else if (b.combo >= 30 && this.t > (this.comboCD || 0)) { this.comboCD = this.t + 10; this.trigger('MULTIBALL', b.x, 'SUPER COMBO!'); }
     this.learn(b, pts);
   }
   learn(b, pts) { const k = Math.max(0, Math.min(9, Math.floor(((b.dx - 20) / (W - 40)) * 10))); this.bins[k] += (pts - this.bins[k]) * 0.2; }
@@ -382,11 +382,13 @@ export class Plinko extends Game {
     for (const k of this.bumpers) k.flash = Math.max(0, k.flash - dt);
     for (const k of this.kickers) k.flash = Math.max(0, k.flash - dt);
     for (const s of this.slots) s.flash = Math.max(0, s.flash - dt);
+    const full = this.mat.count > 1600;
+    this.mat.floor = this.mat.count > 2400 ? 0.35 : full ? 0.12 : 0.04; // slots drain faster as the board fills
     for (const h of this.hoppers) {
-      if (h.on > 0) { h.on -= dt; if (this.rng() < 0.6) this.mat.emit(h.x + this.r(-5, 5) * (h.m === WATER ? 4 : 1), 12, this.r(-12, 12), this.r(30, 70), h.m, this.mat.paint(h.m, h.m === SAND ? this.mat.rgb(SAND, this.col(this.ri(0, 5))) : null)); }
+      if (h.on > 0 && !full) { h.on -= dt; if (this.rng() < 0.6) this.mat.emit(h.x + this.r(-5, 5) * (h.m === WATER ? 4 : 1), 12, this.r(-12, 12), this.r(30, 70), h.m, this.mat.paint(h.m, h.m === SAND ? this.mat.rgb(SAND, this.col(this.ri(0, 5))) : null)); }
       else if ((h.off -= dt) <= 0) { h.on = this.r(1.2, 2.6); h.off = this.r(5, 12); }
     }
-    if (this.storm > 0) { this.storm -= dt; for (let k = 0; k < 2; k++) this.mat.emit(this.r(0, W), 2, this.r(-20, 20), this.r(20, 80), this.stormM, this.mat.paint(this.stormM, this.stormM === SAND ? this.mat.rgb(SAND, this.col(this.ri(0, 5))) : null)); }
+    if (this.storm > 0) { this.storm -= dt; if (!full) for (let k = 0; k < 2; k++) this.mat.emit(this.r(0, W), 2, this.r(-20, 20), this.r(20, 80), this.stormM, this.mat.paint(this.stormM, this.stormM === SAND ? this.mat.rgb(SAND, this.col(this.ri(0, 5))) : null)); }
     for (const b of this.balls) if (!b.done) this.stepBall(b, dt);
     const bs = this.balls;
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {

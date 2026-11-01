@@ -13,7 +13,7 @@ const segDist = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, 
 export class Flap extends Game {
   setup() {
     this.fx = new Fx();
-    this.grav = 1250 * this.G;
+    this.grav = 1250 * this.G; this.kick = 360 * Math.sqrt(this.G); // a flap always lifts about 52px
     const set = this.skin.bgSet, R = () => this.rng();
     this.order = set?.length && sceneFor(this.skin.bgGroup, R) === 'sky' ? ['sky', 'hills', 'coast', 'sky', 'alien', 'desert'] : [...SCENE_KEYS];
     for (let i = this.order.length - 1; i > 0; i--) { const j = this.ri(0, i); [this.order[i], this.order[j]] = [this.order[j], this.order[i]]; }
@@ -38,7 +38,7 @@ export class Flap extends Game {
     if (this.bd && !now) { this.old = this.bd; this.fade = 1; }
     this.bd = new Backdrop(this, scene, { imgs: this.skin.bgSet, floor: GY + 2, seed: (this.post.seed || 1) + lv * 7919 });
     this.groundC = mix(this.col(lv + 1), this.pal.bg, 0.35); this.pipeC = this.col(lv + 2); this.rockC = mix(this.col(lv + 4), this.pal.bg, 0.55);
-    this.speed = Math.min(186, 140 + lv * 8);
+    this.speed = Math.min(186, 140 + lv * 8) * Math.sqrt(this.G); // with the flap scaled too, paths keep their shape under LOW-G/HEAVY
   }
   mark(lv, x) { this.obs.push({ type: 'mark', x, w: 4, lv }); }
   // ---------------------------------------------------------- generation (screen coordinates, scrolled with the world)
@@ -69,9 +69,9 @@ export class Flap extends Game {
       }
       case 'gates': for (let i = 0; i < 4; i++) { const g2 = gh * 1.12; this.obs.push({ type: 'pipe', x, w: PW, gh: g2, gy: this.r(top, bot - g2), br: this.r(0.22, 0.3), bs: this.r(1.5, 2.2), ph: this.r(0, 6) }); x += this.r(175, 200); } break;
       case 'tunnel': {
-        const len = this.r(700, 980), mid = (GY) / 2, a1 = this.r(45, 70), a2 = this.r(10, 20), p1 = this.r(0, 6), p2 = this.r(0, 6), tops = [], bots = [], step = 12;
+        const len = this.r(700, 980), mid = GY / 2, a1 = this.r(45, 68), a2 = this.r(5, 11), p1 = this.r(0, 6), p2 = this.r(0, 6), tops = [], bots = [], step = 12;
         for (let u = 0; u <= len; u += step) {
-          const t = u / len, g = 168 - (66 + 8 * d) * Math.min(1, t * 1.25) + (t < 0.08 ? (0.08 - t) * 500 : 0) + (t > 0.94 ? (t - 0.94) * 600 : 0);
+          const t = u / len, g = 172 - (56 + 6 * d) * Math.min(1, t * 1.25) + (t < 0.08 ? (0.08 - t) * 500 : 0) + (t > 0.94 ? (t - 0.94) * 600 : 0);
           let c = mid + a1 * Math.sin(u / 170 + p1) + a2 * Math.sin(u / 63 + p2);
           c = clamp(c, 24 + g / 2, GY - 24 - g / 2);
           tops.push(c - g / 2); bots.push(c + g / 2);
@@ -105,7 +105,7 @@ export class Flap extends Game {
         x += len; break;
       }
       case 'wind': for (let i = 0; i < 4; i++) {
-        const gy = this.r(top, bot - gh), f = this.rng() < 0.5 ? -this.r(650, 850) : this.r(450, 650), ww = this.r(70, 96);
+        const gy = this.r(top, bot - gh), f = this.rng() < 0.5 ? -this.r(380, 520) : this.r(300, 450), ww = this.r(70, 96);
         this.obs.push({ type: 'wind', x: x - ww - 18, w: ww, f }); pipe({ gy }); coin(x + PW / 2, gy + gh / 2); x += this.r(185, 210);
       } break;
       case 'fork': {
@@ -132,7 +132,7 @@ export class Flap extends Game {
     const T = this.t + tau, sh = this.speed * tau, bx = this.b.x, r = this.b.r + (real ? -1 : 1.5);
     let f = 0;
     for (const o of this.obs) if (o.type === 'wind') { const ox = o.x - sh; if (bx > ox && bx < ox + o.w) f += o.f; }
-    q.vy += (this.grav + f) * dt; q.y += q.vy * dt;
+    q.g = this.grav + f; q.vy += q.g * dt; q.y += q.vy * dt;
     if (q.y - r < 0 || q.y + r > GY) return true;
     for (const o of this.obs) {
       const ox = o.x - sh;
@@ -153,22 +153,24 @@ export class Flap extends Game {
     let best = null, bd = Infinity;
     for (const o of this.obs) { if (o.type !== 'pipe') continue; const ox = o.x - sh; if (ox + o.w + 12 < bx) continue; if (ox - bx < bd) { bd = ox - bx; best = o; } }
     if (best && bd < 150) { const [t, g] = this.gap(best, T + Math.max(0, (best.x - sh + best.w / 2 - bx) / this.speed)); return t + g / 2; }
-    for (const o of this.guides) { const u = bx + 26 - (o.x - sh); if (u >= 0 && u <= o.w) return o.ys[Math.min(o.ys.length - 1, Math.round(u / 10))]; }
+    for (const o of this.guides) { const u = bx + 34 - (o.x - sh); if (u >= 0 && u <= o.w) return o.ys[Math.min(o.ys.length - 1, Math.round(u / 10))]; }
     if (best) { const [t, g] = this.gap(best, T + (best.x - sh + best.w / 2 - bx) / this.speed); return t + g / 2; }
     return GY / 2;
   }
+  // flap when this far below the target, so the ~52px hop is centred on it (wind changes the hop)
+  th(g) { return (this.kick * this.kick) / (4 * Math.max(300, g)) - 2 + this.jit; }
   roll(first, hor = 0.85) {
-    const q = { y: this.b.y, vy: first ? -360 : this.b.vy }, dt = 1 / 60;
+    const q = { y: this.b.y, vy: first ? -this.kick : this.b.vy, g: this.grav }, dt = 1 / 60;
     for (let tau = 0; tau < hor; tau += dt) {
       if (this.phys(q, dt, tau, false)) return { dead: true, t: tau };
-      if (q.vy >= 0 && q.y > this.target(tau + dt) + 24 + this.jit) q.vy = -360;
+      if (q.vy >= 0 && q.y > this.target(tau + dt) + this.th(q.g)) q.vy = -this.kick;
     }
     return { dead: false, t: hor };
   }
   autopilot(dt) {
     if (this.dead || (this.planT -= dt) > 0) return;
     this.planT = 1 / 60;
-    const b = this.b, want = b.vy >= 0 && b.y > this.target(0) + 24 + this.jit;
+    const b = this.b, want = b.vy >= 0 && b.y > this.target(0) + this.th(b.g || this.grav);
     const a = this.roll(want);
     if (!a.dead) { if (want) this.flap(); return; }
     const o = this.roll(!want);
@@ -176,7 +178,7 @@ export class Flap extends Game {
   }
   flap() {
     if (this.dead) return;
-    const b = this.b; b.vy = -360; b.flapT = 0.18; this.jit = this.r(-5, 7);
+    const b = this.b; b.vy = -this.kick; b.flapT = 0.18; this.jit = this.r(-5, 6);
     this.fx.puff(b.x - 8, b.y + 4, -60, 30, 4, 'rgba(255,255,255,1)', 0.35, 18, 0.35);
   }
   down() { this.flap(); }

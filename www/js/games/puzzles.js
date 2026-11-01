@@ -163,39 +163,115 @@ export class Twenty48 extends Game {
 }
 
 // ================================================================ Arrows escape
+// Arrows are snakes on a grid: a body of cells (tail first) whose head points straight ahead along its last step. Tapping
+// one slides it out head first along its own body, then straight off the board; it is blocked if any cell ahead of the
+// head, out to the edge, is taken. Boards are built by placing arrows in reverse removal order, so they can always be cleared.
 const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+const bends = (cells) => cells.some((c, i) => i > 1 && (c[0] - cells[i - 1][0] !== cells[i - 1][0] - cells[i - 2][0] || c[1] - cells[i - 1][1] !== cells[i - 1][1] - cells[i - 2][1]));
+// the track an arrow slides along (cell units): a short tail, the body with its bends rounded, then straight out past the board
+function railOf(a, N) {
+  const n = a.cells.length, [hx, hy] = a.cells[n - 1], [ux, uy] = n > 1 ? [a.cells[1][0] - a.cells[0][0], a.cells[1][1] - a.cells[0][1]] : [DX[a.d], DY[a.d]], far = N + n + 3;
+  const raw = [[a.cells[0][0] - ux * 0.3, a.cells[0][1] - uy * 0.3], ...a.cells, [hx + DX[a.d] * far, hy + DY[a.d] * far]], p = [raw[0]], s = [0];
+  const push = (x, y) => { const q = p[p.length - 1]; p.push([x, y]); s.push(s[s.length - 1] + Math.hypot(x - q[0], y - q[1])); };
+  let head = 0;
+  for (let i = 1; i < raw.length - 1; i++) {
+    const [x, y] = raw[i], ix = Math.sign(x - raw[i - 1][0]), iy = Math.sign(y - raw[i - 1][1]), ox = Math.sign(raw[i + 1][0] - x), oy = Math.sign(raw[i + 1][1] - y);
+    if (ix === ox && iy === oy) push(x, y);
+    else for (let t = 0; t <= 6; t++) { const k = t / 6, m = (1 - k) * (1 - k), q = 2 * k * (1 - k), e = k * k; push(m * (x - ix * 0.34) + q * x + e * (x + ox * 0.34), m * (y - iy * 0.34) + q * y + e * (y + oy * 0.34)); }
+    if (i === n) head = s[s.length - 1];
+  }
+  push(raw[raw.length - 1][0], raw[raw.length - 1][1]);
+  return { p, s, head };
+}
+// the part of a track between two arc lengths, as points
+function railSlice(R, s0, s1) {
+  const { p, s } = R, at = (j, v) => { const t = (v - s[j]) / (s[j + 1] - s[j] || 1); return [p[j][0] + (p[j + 1][0] - p[j][0]) * t, p[j][1] + (p[j + 1][1] - p[j][1]) * t]; };
+  let i = 0; while (i < s.length - 2 && s[i + 1] <= s0) i++;
+  const out = [at(i, s0)];
+  let j = i + 1; for (; j < s.length - 1 && s[j] < s1; j++) out.push(p[j]);
+  out.push(at(j - 1, Math.min(s1, s[s.length - 1])));
+  return out;
+}
 export class Arrows extends Game {
   static noMods = NO_MODS;
   setup() { this.level = 1; this.cleared = 0; this.newLevel(); }
   newLevel() {
-    const N = this.N = Math.min(9, 4 + this.level);
+    const N = this.N = Math.min(9, 4 + Math.ceil((this.level + 1) / 2));
     this.cs = Math.min(46, 316 / N); this.x0 = (W - this.cs * N) / 2; this.y0 = 76 + (316 - this.cs * N) / 2;
-    this.hearts = 3; this.fly = []; this.bump = null; this.doneT = 0; this.failT = 0; this.thinkT = 1.2; this.shake = 0;
-    for (let tries = 0; tries < 6; tries++) { this.gen(); if (this.arrows.length >= N * N * 0.25) break; }
+    this.hearts = 3; this.fly = []; this.bump = null; this.doneT = 0; this.failT = 0; this.thinkT = 1.2; this.shake = 0; this.lastPick = null;
+    this.gen();
   }
+  // a few boards, keep the one that takes the most rounds of peeling to clear (the deepest chains of blockers)
   gen() {
-    const N = this.N, occ = new Int16Array(N * N).fill(-1), list = [];
-    const order = [...Array(N * N).keys()];
-    for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    const N = this.N;
+    let best = null;
+    for (let k = 0; k < 6 + Math.min(6, this.level); k++) {
+      const b = this.build(N, this.level);
+      if (!b.list.length || !this.solvable(b.list, b.occ)) continue;
+      const score = this.rounds(b.list, b.occ) + (b.occ.reduce((s, v) => s + (v >= 0), 0) / (N * N)) * 8;
+      if (!best || score > best.score) best = { ...b, score };
+    }
+    if (!best) { const occ = new Int16Array(N * N).fill(-1), c = (N >> 1) * N + (N >> 1); occ[c] = 0; best = { list: [{ cells: [[N >> 1, N >> 1]], d: 0, col: 0, id: 0 }], occ }; }
+    this.arrows = best.list; this.occ = best.occ; this.total = best.list.length;
+    for (const a of this.arrows) a.R = railOf(a, N);
+  }
+  // reverse placement: a new arrow only needs a clear run from its head to the edge among the arrows already down, so
+  // lifting them off in the opposite order always works. Later arrows may lie across earlier ones' runs: those are the blockers.
+  build(N, lv) {
+    const occ = new Int16Array(N * N).fill(-1), lane = new Uint8Array(N * N), list = [], inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
+    const runFree = (x, y, d) => { for (x += DX[d], y += DY[d]; inb(x, y); x += DX[d], y += DY[d]) if (occ[y * N + x] >= 0) return false; return true; };
+    const pBend = Math.min(0.92, 0.35 + 0.08 * lv), maxLen = Math.min(7, 4 + (lv >> 1)), wb = Math.min(2.5, 0.6 + 0.25 * lv);
+    const snake = (hx, hy, crook, cap) => {
+      let fb = null;
+      for (const d of [0, 1, 2, 3].filter((o) => runFree(hx, hy, o)).sort(() => this.rng() - 0.5)) {
+        const len = crook ? 3 + Math.floor(this.rng() ** 1.5 * (Math.max(3, Math.min(maxLen, cap)) - 2)) : this.ri(1, Math.min(cap, 3 + (lv > 4 ? 1 : 0))), ahead = new Set(), seen = new Set([hy * N + hx]), body = [[hx, hy]];
+        for (let x = hx + DX[d], y = hy + DY[d]; inb(x, y); x += DX[d], y += DY[d]) ahead.add(y * N + x);
+        let dir = (d + 2) % 4;
+        for (let k = 1; k < len; k++) {
+          const [x, y] = body[body.length - 1], l = (dir + 3) % 4, r = (dir + 1) % 4;
+          const opts = !crook || k === 1 ? [dir] : this.rng() < 0.55 ? (this.rng() < 0.5 ? [l, r, dir] : [r, l, dir]) : [dir, l, r];
+          const nd = opts.find((o) => { const nx = x + DX[o], ny = y + DY[o], i = ny * N + nx; return inb(nx, ny) && occ[i] < 0 && !seen.has(i) && !ahead.has(i); });
+          if (nd === undefined) break;
+          dir = nd; body.push([x + DX[nd], y + DY[nd]]); seen.add((y + DY[nd]) * N + x + DX[nd]);
+        }
+        const a = { cells: body.reverse(), d };
+        if (!crook || bends(a.cells)) return a;
+        fb ||= a;
+      }
+      return fb;
+    };
+    const put = (a) => {
+      a.id = list.length; a.col = this.ri(0, 5); list.push(a);
+      for (const [x, y] of a.cells) occ[y * N + x] = a.id;
+      const [hx, hy] = a.cells[a.cells.length - 1];
+      for (let x = hx + DX[a.d], y = hy + DY[a.d]; inb(x, y); x += DX[a.d], y += DY[a.d]) lane[y * N + x]++;
+    };
+    // heads are tried from the middle outward (more jumbled on later levels)
+    const order = [...Array(N * N).keys()].map((i) => { const x = i % N, y = (i / N) | 0; return [i, Math.min(x, y, N - 1 - x, N - 1 - y) + this.rng() * N * (0.3 + 0.04 * lv)]; }).sort((a, b) => b[1] - a[1]).map((o) => o[0]);
     for (const h of order) {
       if (occ[h] >= 0) continue;
-      const hx = h % N, hy = Math.floor(h / N), dirs = [0, 1, 2, 3].sort(() => this.rng() - 0.5);
-      const lens = this.rng() < 0.35 ? [3, 2, 1] : this.rng() < 0.6 ? [2, 1] : [1, 2];
-      let ok = false;
-      for (const len of lens) {
-        for (const d of dirs) {
-          const cells = [];
-          for (let k = len - 1; k >= 0; k--) { const x = hx - DX[d] * k, y = hy - DY[d] * k; if (x < 0 || y < 0 || x >= N || y >= N || occ[y * N + x] >= 0) { cells.length = 0; break; } cells.push([x, y]); }
-          if (!cells.length) continue;
-          const a = { cells, d, col: this.ri(0, 5), id: list.length };
-          list.push(a); for (const [x, y] of cells) occ[y * N + x] = a.id;
-          if (this.solvable(list, occ)) { ok = true; break; }
-          list.pop(); for (const [x, y] of cells) occ[y * N + x] = -1;
-        }
-        if (ok) break;
+      let best = null;
+      for (let k = 0; k < (lv > 3 ? 6 : 4); k++) {
+        const a = snake(h % N, (h / N) | 0, this.rng() < pBend, maxLen);
+        if (!a) continue;
+        a.sc = a.cells.reduce((s, [x, y]) => s + lane[y * N + x], 0) * wb + a.cells.length * 0.4 + this.rng() * 0.6;
+        if (!best || a.sc > best.sc) best = a;
       }
+      if (best) put(best);
     }
-    this.arrows = list; this.occ = occ; this.total = list.length;
+    for (const h of order) if (occ[h] < 0) { const a = snake(h % N, (h / N) | 0, lv > 1 && this.rng() < 0.4, 3); if (a) put(a); }
+    return { list, occ };
+  }
+  // rounds of "take off everything that is free" needed to clear the board
+  rounds(list, occ0) {
+    const occ = occ0.slice(); let left = list.slice(), r = 0;
+    while (left.length) {
+      const free = left.filter((a) => !this.clearPath(a, occ));
+      if (!free.length) return 99;
+      for (const a of free) for (const [x, y] of a.cells) occ[y * this.N + x] = -1;
+      left = left.filter((a) => !free.includes(a)); r++;
+    }
+    return r;
   }
   clearPath(a, occ) {
     const N = this.N, [hx, hy] = a.cells[a.cells.length - 1];
@@ -216,7 +292,7 @@ export class Arrows extends Game {
     const blk = this.clearPath(a, this.occ);
     if (!blk) {
       a.gone = true; for (const [x, y] of a.cells) this.occ[y * this.N + x] = -1;
-      this.fly.push({ a, k: 0, v: 0 }); this.score += 10 * a.cells.length;
+      this.fly.push({ a, k: 0, v: 0, end: this.N + a.cells.length + 2.5 }); this.score += 10 * a.cells.length;
       if (!this.live().length) { this.doneT = 2.2; this.cleared++; this.score += 100 * this.level; }
     } else {
       const [hx, hy] = a.cells[a.cells.length - 1], dist = Math.abs(blk[0] - hx) + Math.abs(blk[1] - hy) - 1;
@@ -227,7 +303,7 @@ export class Arrows extends Game {
   step(dt) {
     this.shake = Math.max(0, this.shake - dt);
     for (const f of this.fly) { f.v += dt * 30; f.k += f.v * dt; }
-    this.fly = this.fly.filter((f) => f.k < this.N + 4);
+    this.fly = this.fly.filter((f) => f.k < f.end);
     if (this.bump) {
       const b = this.bump; b.k += dt * 3.2;
       if (b.k >= 0.5 && !b.hit) { b.hit = true; const [hx, hy] = b.a.cells[b.a.cells.length - 1], [x, y] = this.cxy(hx + DX[b.a.d] * (b.dist + 0.5), hy + DY[b.a.d] * (b.dist + 0.5)); this.burst(x, y, '#ff5a4a', 10, 120); }
@@ -241,9 +317,14 @@ export class Arrows extends Game {
     if ((this.thinkT -= dt) > 0) return;
     const live = this.live(), free = live.filter((a) => !this.clearPath(a, this.occ));
     const oops = this.hearts > 1 && this.rng() < 0.04 ? live.filter((a) => this.clearPath(a, this.occ)) : [];
-    const pool = oops.length ? oops : free;
-    this.pick(pool[Math.floor(this.rng() * pool.length)]);
-    this.thinkT = this.rng() < 0.08 ? this.r(1.4, 2.6) : this.r(0.35, 0.9);
+    const pool = oops.length ? oops : free, ref = this.lastPick, head = (a) => a.cells[a.cells.length - 1];
+    let a = pool[Math.floor(this.rng() * pool.length)];
+    if (ref && this.rng() < 0.6) { // people tend to carry on near where they just tapped
+      const near = (o) => Math.hypot(head(o)[0] - head(ref)[0], head(o)[1] - head(ref)[1]);
+      for (let k = 0; k < 2; k++) { const o = pool[Math.floor(this.rng() * pool.length)]; if (near(o) < near(a)) a = o; }
+    }
+    this.pick(a); this.lastPick = a;
+    this.thinkT = (this.rng() < 0.08 ? this.r(1.4, 2.6) : this.r(0.35, 0.9)) * Math.max(0.55, Math.min(1, 14 / live.length));
   }
   cxy(x, y) { return [this.x0 + (x + 0.5) * this.cs, this.y0 + (y + 0.5) * this.cs]; }
   down(x, y) {
@@ -252,16 +333,16 @@ export class Arrows extends Game {
     const id = this.occ[cy * this.N + cx];
     if (id >= 0) this.pick(this.arrows[id]);
   }
+  // off = how far the arrow has slid along its track (in cells)
   drawArrow(c, a, off, alpha = 1, hot = false) {
-    const cs = this.cs, w = cs * 0.26, [tx, ty] = a.cells[0], [hx, hy] = a.cells[a.cells.length - 1];
-    const ox = DX[a.d] * off * cs, oy = DY[a.d] * off * cs;
-    const [x1, y1] = this.cxy(tx, ty), [x2, y2] = this.cxy(hx, hy);
-    const ax = x1 + ox - DX[a.d] * cs * 0.3, ay = y1 + oy - DY[a.d] * cs * 0.3, bx = x2 + ox + DX[a.d] * cs * 0.05, by = y2 + oy + DY[a.d] * cs * 0.05;
-    const col = hot ? '#ff5a4a' : this.col(a.col);
-    c.globalAlpha = alpha; c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round';
-    c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
-    const px = -DY[a.d], py = DX[a.d], tipx = bx + DX[a.d] * cs * 0.3, tipy = by + DY[a.d] * cs * 0.3, hw = cs * 0.3;
-    c.fillStyle = col; c.beginPath(); c.moveTo(tipx, tipy); c.lineTo(bx + px * hw, by + py * hw); c.lineTo(bx - px * hw, by - py * hw); c.closePath(); c.fill();
+    const cs = this.cs, w = cs * (a.cells.length > 1 ? 0.24 : 0.27), pts = railSlice(a.R, off, off + a.R.head + 0.05).map(([x, y]) => this.cxy(x, y));
+    const col = hot ? '#ff5a4a' : this.col(a.col), [bx, by] = pts[pts.length - 1], dx = DX[a.d], dy = DY[a.d], hw = cs * 0.3;
+    c.globalAlpha = alpha; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+    c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = w + 3; c.stroke();
+    c.strokeStyle = col; c.lineWidth = w; c.stroke();
+    c.beginPath(); c.moveTo(bx + dx * cs * 0.3, by + dy * cs * 0.3); c.lineTo(bx - dy * hw, by + dx * hw); c.lineTo(bx + dy * hw, by - dx * hw); c.closePath();
+    c.fillStyle = col; c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = 3; c.stroke(); c.fill();
     c.globalAlpha = 1;
   }
   draw(c) {
@@ -280,7 +361,7 @@ export class Arrows extends Game {
       const off = b && b.a === a ? Math.sin(Math.min(1, b.k) * Math.PI) * (b.dist + 0.25) : 0;
       this.drawArrow(c, a, off, 1, (b && b.a === a) || (b && b.hit && b.blk === a.id && b.k < 0.9));
     }
-    for (const f of this.fly) this.drawArrow(c, f.a, f.k, Math.max(0, 1 - f.k / (N + 3)));
+    for (const f of this.fly) this.drawArrow(c, f.a, f.k, Math.max(0, 1 - f.k / f.end));
     c.restore();
     const msg = this.doneT ? 'CLEARED!' : this.failT ? 'OUT OF HEARTS' : null;
     if (msg) { c.fillStyle = 'rgba(0,0,0,.7)'; roundRect(c, W / 2 - 120, 210, 240, 50, 12); c.fill(); this.text(c, msg, W / 2, 235, 20, this.doneT ? p.c[1] : '#ff7a6a'); }

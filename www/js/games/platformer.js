@@ -672,14 +672,15 @@ export class Platformer extends Game {
   }
   sky(c) {
     if (!this.strips) this.mkStrips();
-    this.skyG ||= (() => { const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, this.pal.bg2); g.addColorStop(1, this.pal.bg); return g; })();
-    c.fillStyle = this.skyG; c.fillRect(0, 0, W, H);
-    const bg = this.skin.bg, cx = this.camX, cy = this.camY;
-    if (ready(bg)) {
-      const iw = bg.naturalWidth || bg.width, ih = bg.naturalHeight || bg.height, s = Math.max((W + 80) / iw, (H + 60) / ih);
-      c.globalAlpha = 0.55; c.drawImage(bg, -40 + 40 * Math.sin(cx / 2600), -30 + Math.max(-30, Math.min(30, -cy * 0.05)), iw * s, ih * s);
-      c.globalAlpha = 0.3; c.fillStyle = this.pal.bg; c.fillRect(0, 0, W, H); c.globalAlpha = 1;
+    const bg = this.skin.bg, ok = ready(bg), cx = this.camX, cy = this.camY;
+    if (!this.skyC || this.skyC.ok !== ok) { // gradient, photo and wash baked once
+      const cv = this.skyC = document.createElement('canvas'), w = (cv.width = W + 80), h = (cv.height = H + 60), x = cv.getContext('2d'), g = x.createLinearGradient(0, 0, 0, h);
+      cv.ok = ok; g.addColorStop(0, this.pal.bg2); g.addColorStop(1, this.pal.bg); x.fillStyle = g; x.fillRect(0, 0, w, h);
+      if (ok) { const iw = bg.naturalWidth || bg.width, ih = bg.naturalHeight || bg.height, k = Math.max(w / iw, h / ih); x.globalAlpha = 0.55; x.drawImage(bg, (w - iw * k) / 2, (h - ih * k) / 2, iw * k, ih * k); x.globalAlpha = 0.3; x.fillStyle = this.pal.bg; x.fillRect(0, 0, w, h); }
     }
+    c.globalAlpha = this.mods.trails && this.t > 0.5 ? 0.25 : 1;
+    c.drawImage(this.skyC, Math.round(-40 + 40 * Math.sin(cx / 2600)), Math.round(-30 + Math.max(-30, Math.min(30, -cy * 0.05))));
+    c.globalAlpha = 1;
     const band = (cv, par, y0, a) => {
       if (a <= 0) return;
       const y = Math.round(y0 - cy * par * 0.6), ox = -(((cx * par) % 720) + 720) % 720;
@@ -706,7 +707,6 @@ export class Platformer extends Game {
     for (const s of this.segs) if (s.clr && s.x1 > x0 && s.x0 < x1) {
       let lo = -1e9, hi = 1e9; for (const o of s.solids) if (o.h === DEEP) { lo = Math.max(lo, o.y); hi = Math.min(hi, o.y); }
       const L = this.look[s.area]; c.fillStyle = L.dark; c.fillRect(s.x0, hi - s.clr - 4, s.x1 - s.x0, lo - hi + s.clr + 8);
-      const pt = this.pat(c, L.tex); if (pt) { c.globalAlpha = 0.18; c.fillStyle = pt; c.fillRect(s.x0, hi - s.clr - 4, s.x1 - s.x0, lo - hi + s.clr + 8); c.globalAlpha = 1; }
     }
     for (const d of this.deco) if (d.x > x0 - 40 && d.x < x1 + 40) this.drawDeco(c, d, t);
     for (const o of vs) if (o.k === 'l') this.drawLadder(c, o);
@@ -739,7 +739,7 @@ export class Platformer extends Game {
     if (st === 'ceil') {
       const yb = y + o.h, top = Math.max(y, this.camY - 20);
       c.fillStyle = L.fill; c.fillRect(o.x, top, o.w, yb - top);
-      const pt = this.pat(c, L.tex); if (pt) { c.globalAlpha = 0.35; c.fillStyle = pt; c.fillRect(o.x, top, o.w, yb - top); c.globalAlpha = 1; }
+      const pt = this.pat(c, L.tex); if (pt) { c.globalAlpha = 0.35; c.fillStyle = pt; c.fillRect(o.x, Math.max(top, yb - 60), o.w, yb - Math.max(top, yb - 60)); c.globalAlpha = 1; }
       c.fillStyle = L.edge; c.fillRect(o.x, yb - 4, o.w, 4);
       for (let x = o.x + 6; x < o.x + o.w - 6; x += 16) { const k = hash(x); if (k < 0.45) continue; c.beginPath(); c.moveTo(x - 5, yb); c.lineTo(x, yb + 6 + k * 12); c.lineTo(x + 5, yb); c.fill(); }
       return;
@@ -747,7 +747,7 @@ export class Platformer extends Game {
     const sky = L.id === 'sky' && deep;
     if (sky) hh = Math.min(hh, 40);
     c.fillStyle = st === 'tower' ? L.edge : L.fill; c.fillRect(o.x, y, o.w, hh);
-    const pt = this.pat(c, L.tex); if (pt) { c.globalAlpha = st === 'tower' ? 0.3 : 0.42; c.fillStyle = pt; c.fillRect(o.x, y, o.w, hh); c.globalAlpha = 1; }
+    const pt = this.pat(c, L.tex); if (pt) { c.globalAlpha = st === 'tower' ? 0.3 : 0.42; c.fillStyle = pt; c.fillRect(o.x, y, o.w, Math.min(hh, 90)); c.globalAlpha = 1; }
     if (st === 'tower') {
       c.strokeStyle = 'rgba(0,0,0,0.28)'; c.lineWidth = 1; c.beginPath();
       for (let r = 0, yy = y + 8; yy < Math.min(y + hh, bot); yy += 12, r++) { c.moveTo(o.x, yy); c.lineTo(o.x + o.w, yy); for (let x = o.x + (r % 2 ? 10 : 22); x < o.x + o.w; x += 24) { c.moveTo(x, yy); c.lineTo(x, yy + 12); } }
@@ -864,7 +864,7 @@ export class Platformer extends Game {
     const x = this.foeX(f, wt), y = this.foeY(f, wt), dir = f.span ? (((wt * f.f + f.ph) % 2) < 1 ? 1 : -1) : -1;
     const fr = m?.walk?.length ? m.walk[Math.floor(t * 8 + f.id) % m.walk.length] : m?.frames?.[Math.floor(t * 5 + f.id) % 2];
     if (f.kind === 'fly') { c.fillStyle = 'rgba(255,255,255,0.5)'; const k = Math.sin(t * 22) * 5; c.beginPath(); c.ellipse(x + f.w / 2 - 7, y + 2 - k * 0.3, 7, 3 + k * 0.4, -0.5, 0, TAU); c.ellipse(x + f.w / 2 + 7, y + 2 - k * 0.3, 7, 3 + k * 0.4, 0.5, 0, TAU); c.fill(); }
-    if (!drawFit(c, fr, x + f.w / 2, y + f.h - z / 2 + 3, z, z, 0, dir > 0)) { c.fillStyle = this.col(3); roundRect(c, x, y, f.w, f.h, 6); c.fill(); }
+    if (!drawFit(c, fr, x + f.w / 2, y + f.h - z / 2 + 3, z, z, 0, dir < 0)) { c.fillStyle = this.col(3); roundRect(c, x, y, f.w, f.h, 6); c.fill(); }
   }
   drawHero(c, t) {
     const p = this.p, P = this.ph, hero = this.hero, sc = 1.4 * this.S, hx = p.x + P.w / 2;

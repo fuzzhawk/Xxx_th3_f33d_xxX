@@ -618,7 +618,7 @@ export class Flight extends Game {
     const P = (o) => { o.max = o.hp = Math.round((o.hp || 0) * k); o.flash = 0; o.cool = this.r(1.5, 3); o.x = 0; o.y = 0; o.z = 0; B.parts.push(o); };
     if (type === 'carrier') {
       P({ id: 'podL', ox: -14.5, oy: -0.5, oz: -2, r: 2.9, hp: 24, gun: 'burst' }); P({ id: 'podR', ox: 14.5, oy: -0.5, oz: -2, r: 2.9, hp: 24, gun: 'burst' });
-      P({ id: 'core', ox: 0, oy: 3.2, oz: -1.5, r: 2.9, hp: 45, gun: 'fan', core: true });
+      P({ id: 'core', ox: 0, oy: 4, oz: -1.5, r: 2.9, hp: 36, gun: 'fan', core: true });
       P({ id: 'hull', ox: 0, oy: 0, oz: 0, r: 8, hull: true, hw: 11, hh: 2.3, hd: 8 });
     } else if (type === 'walker') {
       P({ id: 'armL', ox: -8.2, oy: 18.5, oz: -3, r: 2.5, hp: 20, gun: 'burst' }); P({ id: 'armR', ox: 8.2, oy: 18.5, oz: -3, r: 2.5, hp: 20, gun: 'burst' });
