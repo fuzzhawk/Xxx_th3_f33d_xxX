@@ -389,10 +389,17 @@ export class Materials {
     for (let yy = y0; yy <= y1; yy++) for (let xx = x0, i = yy * this.w + x0; xx <= x1; xx++, i++) { const u = this.T[i]; if (t ? u === t : u >= 2 && KIND[u] < 4) n++; }
     return n;
   }
+  // a solid rect (px) turns into material: a brick crumbling
+  crumbleRect(x, y, wd, ht, t, col) {
+    const cs = this.cs, rgb = this.rgb(t, col), x0 = Math.max(0, Math.floor(x / cs)), x1 = Math.min(this.w - 1, Math.floor((x + wd - 0.01) / cs)), y0 = Math.max(0, Math.floor(y / cs)), y1 = Math.min(this.h - 1, Math.floor((y + ht - 0.01) / cs));
+    for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) { const i = yy * this.w + xx; if (this.T[i] <= WALL) this.put(i, t, rgb); }
+    this.wakeCells(x0 - 1, y0 - 1, x1 + 1, y1 + 1, true);
+  }
   settle(n = 60) { for (let k = 0; k < n; k++) this.tick(); }
-  clear() {
+  // remove all material (and with `all` the solid stamps too)
+  clear(all = false) {
     const T = this.T;
-    for (let i = 0; i < T.length; i++) if (T[i] >= 2) { T[i] = 0; this.C[i] = 0; this.L[i] = 0; }
+    for (let i = 0; i < T.length; i++) if (all || T[i] >= 2) { T[i] = 0; this.C[i] = 0; this.L[i] = 0; }
     this.count = 0; this.np = 0; this.events.length = 0; this.drain.fill(0); this.hot = 0;
   }
 

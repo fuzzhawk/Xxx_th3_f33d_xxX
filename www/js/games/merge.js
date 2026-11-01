@@ -21,7 +21,7 @@ const MODES = {
     return { wall: [p(-142, -118), p(-142, 118), p(142, 118), p(142, -118)], k: 0.9 };
   },
   twin: () => ({ wall: [[22, 84], [22, 402], [338, 402], [338, 84]], extra: [[[171, 402], [180, 250], [189, 402]]] }),
-  planet: () => ({ core: [180, 238, 26], ring: 146, orbit: 166, k: 0.9 })
+  planet: () => ({ core: [180, 238, 26], ring: 142, orbit: 160, k: 0.9 })
 };
 // circle against a capsule segment [ax, ay, bx, by, radius]: [nx, ny, depth] pointing at the disc, or null
 function segHit(x, y, r, s) {
@@ -249,7 +249,11 @@ export class Merge extends Game {
     c.stroke();
     c.globalAlpha = this.cool > 0 ? 0.35 : 1; this.drawBall(c, x, y, R, this.cur); c.globalAlpha = 1;
     this.drawBall(c, W - 24, 62, 10, this.nxt);
-    this.text(c, this.mode.toUpperCase(), W - 24, 82, 8, 'rgba(255,255,255,.45)');
+    // labels stay readable under the MIRROR mutator
+    if (this.mods.mirror) { c.save(); c.translate(W, 0); c.scale(-1, 1); }
+    const lx = this.mods.mirror ? 24 : W - 24;
+    this.text(c, this.mode.toUpperCase(), lx, 82, 8, 'rgba(255,255,255,.45)');
     if (this.flash) { c.globalAlpha = Math.min(1, this.flash); this.text(c, 'OVERFLOW', W / 2, H / 2, 26, this.col(3)); c.globalAlpha = 1; }
+    if (this.mods.mirror) c.restore();
   }
 }

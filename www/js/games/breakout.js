@@ -36,7 +36,7 @@ export class Breakout extends Game {
     this.build();
   }
   build() {
-    const lv = this.level, cols = 8, cw = (W - 20) / cols, ch = 20, y0 = 50;
+    const lv = this.level, cols = 8, cw = (W - 20) / cols, ch = 20, y0 = 64;
     const rows = this.ri(5, 7) + (lv > 2 ? 1 : 0);
     const mode = lv === 0 ? this.ri(0, 2) : this.ri(0, 5), mask = MASKS[lv === 0 ? this.ri(0, 5) : this.ri(0, MASKS.length - 1)];
     const hue = this.ri(0, 4), ca = this.ri(0, 5), cb = this.ri(0, 5), sub = [];
@@ -58,7 +58,7 @@ export class Breakout extends Game {
         const c = hue === 4 ? mix(this.col(ca), this.col(cb === ca ? ca + 1 : cb), v) : this.col(ci + ca);
         const hp = big ? 1 + (this.rng() < 0.14 + lv * 0.03 ? 1 : 0) + (this.rng() < 0.04 + lv * 0.02 ? 1 : 0) : 1;
         this.bricks.push({ x: x + gap / 2, y: y + gap / 2, w: w - gap, h: h - gap, hp, max: hp, c, big, pts: big ? 10 : Math.round(12 / Math.sqrt(nx * ny)) + 1, t: r % 3,
-          tnt: this.rng() < (big ? 0.04 : 0.012), gift: this.rng() < 0.06, steel: false, flash: 0 });
+          tnt: this.rng() < (big ? 0.04 : 0.012), gift: this.rng() < 0.08, steel: false, flash: 0 });
       }
     }
     if (!this.bricks.length) return this.build();
@@ -105,7 +105,7 @@ export class Breakout extends Game {
   serve() {
     const p = this.paddle;
     this.balls = [this.mkBall(p.x, p.y - 8, 0, 0, 0.7)];
-    this.speed = Math.min(420, 290 + this.level * 14);
+    this.speed = Math.min(430, 305 + this.level * 14);
   }
   mkBall(x, y, vx, vy, stuck = 0) { return { x, y, vx, vy, r: 6 * this.S, stuck, off: this.r(-0.3, 0.3), trail: [], i: this.skin.pick('bb', 'ball', 'item') }; }
   spd() { return this.speed * (this.pw.slow > 0 ? 0.72 : 1) * (this.pw.fast > 0 ? 1.3 : 1); }
@@ -253,7 +253,7 @@ export class Breakout extends Game {
     for (let i = 0; i < n; i++) this.fx.chip(cx + this.r(-k.w / 3, k.w / 3), cy, this.r(-90, 90) + (b ? b.vx * 0.15 : 0), this.r(-160, 20), k.big ? this.r(3, 6) : this.r(2, 3.5), k.steel ? '#aab4bd' : k.tnt ? '#e8452c' : k.c, 0.9);
     this.fx.glow(cx, cy, k.big ? 22 : 12, k.c, 0.18);
     if (k.tnt) this.boom(cx, cy, 52);
-    if ((k.gift || this.rng() < (k.big ? 0.09 : 0.035) * (this.mods.swarm ? 1.6 : 1)) && this.caps.length < 4) this.drop(cx, cy);
+    if ((k.gift || this.rng() < (k.big ? 0.13 : 0.05) * (this.mods.swarm ? 1.6 : 1)) && this.caps.length < 4) this.drop(cx, cy);
   }
   boom(x, y, rad, mega = false) {
     this.fx.glow(x, y, rad * 1.5, mega ? '#ffd27a' : '#ff9a3c', 0.45); this.fx.ring(x, y, rad, '#fff3d6', 0.4, 4); this.fx.ring(x, y, rad * 0.6, '#ff7a2a', 0.3, 3);

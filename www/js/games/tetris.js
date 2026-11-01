@@ -266,11 +266,12 @@ export class Tetris extends Game {
   // ---------------------------------------------------------------- touch: tap beside the piece to move, on it to rotate, drag to slide, swipe down to drop, up to hold
   tap() { this.hint = 1.6; }
   setAuto(a) { super.setAuto(a); this.plan = null; this.ges = null; }
-  down(x, y) { this.ges = { x0: x, y0: y, ax: x, ay: y, t: performance.now(), drag: '', rep: 0, last: 0 }; }
+  down(x, y) { const now = performance.now(); this.ges = { x0: x, y0: y, ax: x, ay: y, t: now, drag: '', rep: 0, last: 0, py: y, pt: now, vy: 0 }; }
   move(x, y) {
     const g = this.ges;
     if (!g) return;
-    const dx = x - g.x0, dy = y - g.y0;
+    const dx = x - g.x0, dy = y - g.y0, now = performance.now();
+    if (now - g.pt > 4) { g.vy = 0.5 * g.vy + (0.5 * (y - g.py)) / (now - g.pt); g.py = y; g.pt = now; }
     if (!g.drag && Math.hypot(dx, dy) > 12) g.drag = Math.abs(dx) > Math.abs(dy) ? 'h' : dy > 0 ? 'v' : 'u';
     if (g.drag === 'h') { while (x - g.ax > CELL * 0.9) { this.shift(1); g.ax += CELL * 0.9; } while (g.ax - x > CELL * 0.9) { this.shift(-1); g.ax -= CELL * 0.9; } }
     if (g.drag === 'v') while (y - g.ay > CELL * 0.8) { this.softStep(); g.ay += CELL * 0.8; }
@@ -281,7 +282,7 @@ export class Tetris extends Game {
     if (!g || this.dead) return;
     const ms = performance.now() - g.t, dy = y - g.y0;
     if (!g.drag) { if (!g.rep) this.tapAt(x, y); return; }
-    if (g.drag === 'v' && dy > 46 && ms < 380) this.hardDrop();
+    if (g.drag === 'v' && dy > 40 && (ms < 400 || g.vy > 0.4)) this.hardDrop();
     if (g.drag === 'u' && dy < -36) this.hold();
   }
   pieceBox() {
@@ -430,9 +431,9 @@ export class Tetris extends Game {
     c.font = `italic 600 16px ${SERIF}`;
     s.lines ||= s.qs.slice(0, 2).map((q) => [wrapPx(c, `“${SAY[q][0]}”`, w), SAY[q][1]]);
     const hgt = s.lines.reduce((h, [l]) => h + l.length * 19 + 18, 0) + 14;
-    const y0 = BY + 22 + Math.max(0, 1 - s.t * 3) * 30;
+    const y0 = BY + 3 * CELL + Math.max(0, 1 - s.t * 3) * 30;
     c.globalAlpha = a;
-    c.fillStyle = 'rgba(14,11,8,.82)'; roundRect(c, BX + 6, y0, COLS * CELL - 12, hgt + (s.n === 4 ? 16 : 0), 8); c.fill();
+    c.fillStyle = this.auto ? 'rgba(14,11,8,.82)' : 'rgba(14,11,8,.62)'; roundRect(c, BX + 6, y0, COLS * CELL - 12, hgt + (s.n === 4 ? 16 : 0), 8); c.fill();
     c.strokeStyle = this.ink('T'); c.lineWidth = 1; c.stroke();
     let y = y0 + 16;
     if (s.n === 4) { this.label(c, 'TETRIS', cx, y, this.ink('I'), 10, 'center'); y += 16; }

@@ -5,11 +5,12 @@
 // emote…), read the events it returns, and draw it by its feet.
 import './engine.js';
 import { idbGet, idbSet } from '../store.js';
+import { personaFor, personaToCrystal } from '../persona.js';
 
 export const S = globalThis.FF5Sprites;
 export const FW = 40, FH = 40, AX = 20, AY = 37;
 export const ERAS = ['Fantasy', 'Present day', 'Sci-fi'];
-const VER = 'c1';
+const VER = 'c2';
 const ANIM_NAMES = Object.keys(S.animations);
 const ALL_DIRS = S.directions.slice();
 
@@ -39,7 +40,7 @@ function layout(dirs) {
 
 const mem = new Map();
 // A sheet: { cv, meta, char, ready, ok }. `char` is a full character object, or
-// omitted for a random one from `era`. Seeds are folded into a pool so that the
+// omitted for a random person (persona.js personaFor) from `era`. Seeds are folded into a pool so that the
 // cache fills up and later games start instantly.
 export function crystalSheet(seed, opts = {}) {
   const dirs = opts.dirs || ALL_DIRS, era = opts.char ? '' : (opts.era || '');
@@ -49,7 +50,7 @@ export function crystalSheet(seed, opts = {}) {
   const sheet = { cv, meta: layout(dirs), char: opts.char || null, ok: false, seed };
   sheet.ready = (async () => {
     if (opts.cache !== false) try { const rec = await idbGet('kv', key); if (rec?.blob) { const bm = await createImageBitmap(rec.blob); cv.width = bm.width; cv.height = bm.height; cv.getContext('2d').drawImage(bm, 0, 0); sheet.char = rec.char; sheet.ok = true; return sheet; } } catch { /* no cache */ }
-    const r = await bake({ seed, era, char: opts.char, dirs });
+    const r = await bake({ seed, era, char: opts.char || personaToCrystal(personaFor(seed, era || undefined)), dirs });
     if (r.error) { console.warn('crystal:', r.error); return sheet; }
     cv.width = r.w; cv.height = r.h; cv.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(r.data.buffer), r.w, r.h), 0, 0);
     sheet.meta = r.meta; sheet.char = r.char; sheet.ok = true;

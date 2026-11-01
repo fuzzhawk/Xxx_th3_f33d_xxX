@@ -1,6 +1,8 @@
 // Crokinole: flick discs across a round board ringed with pegs. Sink the centre hole
 // for 20, otherwise score by ring. If the other side has discs on the board, your
-// shot must hit one or it comes off.
+// shot must hit one or it comes off. Both sides (and the autopilot) shoot like people:
+// each post gives them a steadiness, a nerve and a taste for knock-outs, their aim and
+// power wobble, and they weigh safe points against hitting the other side's discs.
 import { Game, W, H, drawFit, ready } from './engine.js';
 
 const CX = W / 2, CY = H / 2 + 14, RB = 160, RINGS = [8, 48, 96, 140], DR = 9, PEGR = 3.2, SHOTS = 6;
@@ -11,7 +13,8 @@ function physics(ds, dt) {
   for (const d of ds) {
     if (d.out) continue;
     const v = Math.hypot(d.vx, d.vy);
-    if (v > 0) { const nv = Math.max(0, v - 150 * dt); d.vx *= nv / v; d.vy *= nv / v; }
+    if (!v) continue; // at rest: nothing moves it until something hits it
+    const nv = Math.max(0, v - 150 * dt); d.vx *= nv / v; d.vy *= nv / v;
     d.x += d.vx * dt; d.y += d.vy * dt;
     for (const p of PEGS) {
       const dx = d.x - p.x, dy = d.y - p.y, dd = Math.hypot(dx, dy), m = DR + PEGR;
@@ -20,7 +23,7 @@ function physics(ds, dt) {
   }
   for (let i = 0; i < ds.length; i++) for (let j = i + 1; j < ds.length; j++) {
     const a = ds[i], b = ds[j];
-    if (a.out || b.out) continue;
+    if (a.out || b.out || !(a.vx || a.vy || b.vx || b.vy)) continue;
     const dx = b.x - a.x, dy = b.y - a.y, dd = Math.hypot(dx, dy);
     if (dd >= DR * 2 || dd === 0) continue;
     const nx = dx / dd, ny = dy / dd, ov = (DR * 2 - dd) / 2;

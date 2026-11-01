@@ -304,8 +304,11 @@ function parseWikiquote(html) {
 }
 
 // ------------------------------------------------------------------ YouTube
-async function ytSearch(query) {
-  const url = `https://www.youtube.com/results?${new URLSearchParams({ search_query: query, sp: 'EgIYAQ==' })}`;
+// search filters: short (< 4 min) by relevance, and short by view count (older uploads rank higher)
+const YT_SORT = { relevance: 'EgIYAQ==', views: 'CAMSAhgB' };
+const ytText = (x) => (x?.runs || []).map((r) => r.text).join('') || x?.simpleText || x?.content || '';
+async function ytSearch(query, sort = 'relevance') {
+  const url = `https://www.youtube.com/results?${new URLSearchParams({ search_query: query, sp: YT_SORT[sort] || YT_SORT.relevance, hl: 'en' })}`;
   const html = await fetchText(url, { ua: BROWSER_UA, headers: { Cookie: 'CONSENT=YES+cb; SOCS=CAI' } });
   const m = html.match(/var ytInitialData\s*=\s*(\{[\s\S]*?\});\s*<\/script>/) || html.match(/ytInitialData"\]\s*=\s*(\{[\s\S]*?\});/);
   if (!m) throw new Error('no ytInitialData');
@@ -316,7 +319,17 @@ async function ytSearch(query) {
     if (Array.isArray(o)) { o.forEach(walk); return; }
     if (o.videoRenderer?.videoId) {
       const v = o.videoRenderer;
-      found.push({ vid: v.videoId, title: v.title?.runs?.map((r) => r.text).join('') || '', channel: v.ownerText?.runs?.[0]?.text || '', dur: v.lengthText?.simpleText || '' });
+      found.push({ vid: v.videoId, title: ytText(v.title), channel: ytText(v.ownerText) || ytText(v.longBylineText), dur: v.lengthText?.simpleText || '', published: ytText(v.publishedTimeText),
+        desc: (v.detailedMetadataSnippets || []).map((s) => ytText(s.snippetText)).join(' ') || ytText(v.descriptionSnippet) });
+      return;
+    }
+    // newer result layout
+    const lv = o.lockupViewModel;
+    if (lv?.contentId && /VIDEO/.test(lv.contentType || '')) {
+      const md = lv.metadata?.lockupMetadataViewModel;
+      const parts = (md?.metadata?.contentMetadataViewModel?.metadataRows || []).flatMap((r) => (r.metadataParts || []).map((p) => ytText(p.text))).filter(Boolean);
+      const dur = (JSON.stringify(lv.contentImage || {}).match(/"(?:text|content)":"(\d{1,2}(?::\d\d){1,2})"/) || [])[1] || '';
+      found.push({ vid: lv.contentId, title: ytText(md?.title), channel: parts[0] || '', dur, published: parts.find((p) => /\bago\b/.test(p)) || '' });
       return;
     }
     if (o.reelItemRenderer?.videoId) {
@@ -334,8 +347,20 @@ async function ytSearch(query) {
   return found;
 }
 function durSec(d) { if (!d) return 0; return d.split(':').reduce((s, x) => s * 60 + (+x || 0), 0); }
+// "12 years ago", "Streamed 3 years ago", "8 months ago" -> years (null when unknown)
+function ytAge(t) {
+  const m = /(\d+)\s+(year|month|week|day|hour|minute|second)s?\s+ago/i.exec(t || '');
+  if (!m) return null;
+  const n = +m[1], u = m[2].toLowerCase();
+  return u === 'year' ? n : u === 'month' ? n / 12 : u === 'week' ? n / 52 : 0;
+}
+const yearsSince = (d) => { const t = Date.parse(d || ''); return isNaN(t) ? null : (Date.now() - t) / (365.25 * 86400000); };
+// AI-made or AI-processed videos and narrated listicle farms (patterns in tools/data/content.mjs)
+const aiMarked = (...texts) => { const s = texts.filter(Boolean).join(' \n '); return videoAvoid.some((re) => re.test(s)); };
 // Checks that a video plays embedded and is not blocked in config.videoRegion
 // (YouTube's own watch-page data); falls back to oEmbed when the page can't be read.
+// The watch page also gives the upload date, the full description and tags, and
+// YouTube's own "altered or synthetic content" label.
 async function playable(vid) {
   const region = config.videoRegion;
   try {
@@ -346,9 +371,12 @@ async function playable(vid) {
       const ps = pr.playabilityStatus || {};
       if (ps.status && ps.status !== 'OK') return null;
       if (ps.playableInEmbed === false) return null;
-      const countries = pr.microformat?.playerMicroformatRenderer?.availableCountries;
+      const mf = pr.microformat?.playerMicroformatRenderer || {};
+      const countries = mf.availableCountries;
       if (region && Array.isArray(countries) && countries.length && !countries.includes(region)) { report.regionBlocked = (report.regionBlocked || 0) + 1; return null; }
-      return { title: pr.videoDetails?.title, author_name: pr.videoDetails?.author };
+      const vd = pr.videoDetails || {};
+      return { title: vd.title, author_name: vd.author, date: (mf.publishDate || mf.uploadDate || '').slice(0, 10), desc: vd.shortDescription || '', tags: (vd.keywords || []).join(' '),
+        synthetic: /altered or synthetic content|"isSynthetic(?:Media|Content)?":true/i.test(html) };
     }
   } catch { /* fall through */ }
   try {
@@ -356,16 +384,24 @@ async function playable(vid) {
     return j && j.title ? j : null;
   } catch { return null; }
 }
+// The owner wants older, human-made videos: uploads 5–20 years old come first (config.videoAge),
+// then other dated uploads, then undated ones; Shorts and very recent uploads only fill gaps.
+// Anything with AI markers is dropped outright.
 async function buildVideos() {
   const groups = topics.video;
+  const AGE = { min: 5, max: 20, ...(config.videoAge || {}) };
   const totalW = Object.values(groups).reduce((s, g) => s + g.weight, 0);
-  const posts = [];
-  const taken = new Set();
+  const week = +(id.match(/W(\d+)/) || [0, 0])[1];
+  const tier = (age, short) => (age == null ? (short ? 4 : 2) : age >= AGE.min && age <= AGE.max + 1 ? 0 : age >= AGE.min - 2 ? 1 : 3);
+  const posts = [], taken = new Set(), stat = { aiDropped: 0, inRange: 0, older: 0, newer: 0, undated: 0 };
   for (const [key, g] of Object.entries(groups)) {
     const quota = Math.round(want.video * g.weight / totalW);
-    const lists = await pool(g.queries, 2, async (q) => { await sleep(700); return ytSearch(q); });
+    if (!quota) continue;
+    const queries = few(g.queries, 2);
+    // alternate relevance and view-count sorting per query, and swap them each week
+    const lists = await pool(queries, 2, async (q, i) => { await sleep(700); return ytSearch(q, g.sort || ((i + week) % 2 ? 'views' : 'relevance')); });
     const failures = lists.filter((l) => !l).length;
-    if (failures) warn(`youtube ${key}: ${failures}/${g.queries.length} searches failed`);
+    if (failures) warn(`youtube ${key}: ${failures}/${queries.length} searches failed`);
     // interleave query results so one query cannot dominate
     const cand = [];
     const maxLen = Math.max(0, ...lists.map((l) => (l || []).length));
@@ -373,19 +409,33 @@ async function buildVideos() {
     const fresh = cand.filter((v) => !taken.has(v.vid) && !seen.video.has(v.vid) && (!v.dur || durSec(v.dur) <= 600));
     const kw = g.keywords ? new RegExp(g.keywords, 'i') : null;
     const dedup = [...new Map(fresh.map((v) => [v.vid, v])).values()];
-    const ranked = kw ? [...dedup.filter((v) => kw.test(v.title)), ...dedup.filter((v) => !kw.test(v.title))] : dedup;
-    const uniq = ranked.slice(0, Math.ceil(quota * 1.4));
+    const clean = dedup.filter((v) => !aiMarked(v.title, v.channel, v.desc) || (stat.aiDropped++, false));
+    const ranked = clean.map((v, i) => ({ v, i, t: tier(ytAge(v.published), v.short), k: kw && kw.test(v.title) ? 0 : 1 }))
+      .sort((a, b) => a.t - b.t || a.k - b.k || a.i - b.i).map((x) => x.v);
+    const uniq = ranked.slice(0, Math.ceil(quota * 1.8));
     const checks = await pool(uniq, 5, (v) => playable(v.vid));
-    let n = 0;
+    // re-rank with the exact upload date from the watch page, and drop what its description, tags or label give away
+    const ok = [];
     uniq.forEach((v, i) => {
-      if (n >= quota || !checks[i]) return;
-      taken.add(v.vid);
-      posts.push({ id: `v${v.vid}`, cat: 'video', sub: key, vid: v.vid, title: v.title || checks[i].title, channel: v.channel || checks[i].author_name || '', dur: v.dur || '', short: !!v.short || durSec(v.dur) <= 75 });
-      n++;
+      const c = checks[i];
+      if (!c) return;
+      if (c.synthetic || aiMarked(c.desc, c.tags, c.title)) { stat.aiDropped++; return; }
+      const age = c.date ? yearsSince(c.date) : ytAge(v.published);
+      ok.push({ v, c, age, t: tier(age, v.short), i });
     });
-    log(`video: ${key} -> ${n}/${quota} (${cand.length} found)`);
+    ok.sort((a, b) => a.t - b.t || a.i - b.i);
+    let n = 0;
+    for (const { v, c, age, t } of ok) {
+      if (n >= quota) break;
+      taken.add(v.vid);
+      stat[age == null ? 'undated' : t === 0 ? 'inRange' : age > AGE.max ? 'older' : 'newer']++;
+      posts.push({ id: `v${v.vid}`, cat: 'video', sub: key, vid: v.vid, title: v.title || c.title, channel: v.channel || c.author_name || '', dur: v.dur || '', short: !!v.short || durSec(v.dur) <= 75, date: c.date || undefined });
+      n++;
+    }
+    log(`video: ${key} -> ${n}/${quota} (${cand.length} found, ${ok.filter((x) => x.t === 0).length} aged ${AGE.min}–${AGE.max} years)`);
   }
   report.sources.youtube = posts.length;
+  report.sources.videoAges = stat;
   return posts;
 }
 
@@ -493,9 +543,52 @@ function firstImg(html, base) {
   if (!m) return null;
   try { return new URL(decodeEntities(m[1]), base).href; } catch { return null; }
 }
+// Public-domain newspaper strips (Little Nemo, Krazy Kat…) from Wikimedia Commons categories
+// (config.web.classicComics): page scans only, public domain only, published before `before`.
+async function classicStrips(c) {
+  if (!c?.strips?.length) return [];
+  const api = (p) => `https://commons.wikimedia.org/w/api.php?${new URLSearchParams({ format: 'json', formatversion: '2', ...p })}`;
+  const files = async (cat) => {
+    const j = await fetchJSON(api({ action: 'query', generator: 'categorymembers', gcmtitle: `Category:${cat}`, gcmtype: 'file', gcmlimit: '200', prop: 'imageinfo', iiprop: 'url|extmetadata|size|mime', iiurlwidth: String(c.width || 1280) }));
+    return j.query?.pages || [];
+  };
+  const out = [];
+  for (const s of few(c.strips, 4)) {
+    let pages = [];
+    for (const cat of s.categories) {
+      try {
+        pages.push(...await files(cat));
+        // one level of subcategories (by year, by volume…)
+        const sub = await fetchJSON(api({ action: 'query', list: 'categorymembers', cmtitle: `Category:${cat}`, cmtype: 'subcat', cmlimit: '50' }));
+        for (const sc of shuffle((sub.query?.categorymembers || []).map((m) => m.title.replace(/^Category:/, ''))).slice(0, QUICK ? 1 : 4)) { pages.push(...await files(sc)); await sleep(150); }
+      } catch (e) { warn(`classic comics ${cat}: ${e.message}`); }
+      await sleep(200);
+    }
+    const got = [];
+    for (const p of shuffle([...new Map(pages.map((p) => [p.title, p])).values()])) {
+      if (got.length >= (QUICK ? 2 : c.perStrip || 6)) break;
+      const ii = p.imageinfo?.[0], md = ii?.extmetadata || {};
+      if (!ii?.thumburl || !/jpeg|png|tiff|gif/.test(ii.mime || '') || ii.width < 700) continue;
+      if (!/public domain|^pd|cc0/i.test(md.LicenseShortName?.value || '')) continue;
+      const name = p.title.replace(/^File:/, '').replace(/\.\w+$/, '').replace(/_/g, ' ');
+      if (/portrait|photo|signature|grave|statue|logo|poster|book cover|advert/i.test(name)) continue;
+      const when = stripTags(md.DateTimeOriginal?.value || '');
+      const year = +((when.match(/\b(1[89]\d\d)\b/) || name.match(/\b(1[89]\d\d)\b/) || [])[1] || 0);
+      if (s.before && (!year || year >= s.before)) continue;
+      const desc = stripTags(md.ImageDescription?.value || '');
+      got.push({ source: s.name, sub: 'comic', classic: true, title: clip(stripTags(md.ObjectName?.value || '') || name, 90), url: ii.descriptionurl, img: ii.thumburl,
+        excerpt: clip([s.artist, when || year || ''].filter(Boolean).join(' · ') + (desc && desc.length < 400 ? ` — ${desc}` : ''), 200), date: isoDate(/^\d{4}-\d\d-\d\d/.test(when) ? when.slice(0, 10) : '') || (year ? String(year) : '') });
+    }
+    out.push(...got);
+    log(`comics: ${s.name} -> ${got.length} (${pages.length} files)`);
+  }
+  return out.slice(0, c.max || 30);
+}
 async function buildComics(w) {
   const out = [];
-  await pool(w.comics, 3, async (f) => {
+  // in quick builds every comic source is still tried (to test them), just for a couple of strips each
+  const comicFeeds = (w.comics || []).map((f) => (QUICK ? { ...f, max: Math.min(2, f.max || 10) } : f));
+  await pool(comicFeeds, 3, async (f) => {
     const feed = await readFeed(f);
     if (!feed) return;
     let n = 0;
@@ -519,19 +612,22 @@ async function buildComics(w) {
     try {
       const latest = (await fetchJSON('https://xkcd.com/info.0.json')).num;
       const nums = new Set();
-      while (nums.size < w.xkcdRandom) nums.add(1 + Math.floor(rand() * latest));
+      while (nums.size < (QUICK ? 3 : w.xkcdRandom)) nums.add(1 + Math.floor(rand() * latest));
       const got = await pool([...nums].filter((n) => n !== 404), 4, (n) => fetchJSON(`https://xkcd.com/${n}/info.0.json`));
       for (const x of got) if (x?.img) out.push({ source: 'xkcd', sub: 'comic', title: `${x.safe_title} (#${x.num})`, url: `https://xkcd.com/${x.num}/`, img: x.img, excerpt: x.alt, date: `${x.year}-${String(x.month).padStart(2, '0')}-${String(x.day).padStart(2, '0')}` });
       log(`comics: xkcd -> ${got.filter(Boolean).length}`);
     } catch (e) { warn(`xkcd: ${e.message}`); }
   }
+  const classic = await classicStrips(w.classicComics);
+  out.push(...classic);
   report.sources.comics = out.length;
+  report.sources.comicSources = Object.fromEntries([...new Set(out.map((x) => x.source))].map((s) => [s, out.filter((x) => x.source === s).length]));
   return out;
 }
 async function buildWeb() {
   const w = config.web;
   // Hacker News via Algolia
-  const hnLists = await pool(w.hnQueries, 4, (q) => fetchJSON(`https://hn.algolia.com/api/v1/search?${new URLSearchParams({ query: q, tags: 'story', numericFilters: `points>${w.hnMinPoints}`, hitsPerPage: '20' })}`).then((j) => j.hits.map((h) => ({ q, h }))));
+  const hnLists = await pool(few(w.hnQueries, 4), 4, (q) => fetchJSON(`https://hn.algolia.com/api/v1/search?${new URLSearchParams({ query: q, tags: 'story', numericFilters: `points>${w.hnMinPoints}`, hitsPerPage: '20' })}`).then((j) => j.hits.map((h) => ({ q, h }))));
   const hn = [];
   hnLists.forEach((l) => (l || []).forEach(({ q, h }) => {
     if (!h.title) return;
@@ -542,7 +638,7 @@ async function buildWeb() {
   // Sites (RSS/Atom)
   const sites = [];
   const perSite = {};
-  await pool(w.feeds, 4, async (f) => {
+  await pool(few(w.feeds, 6), 4, async (f) => {
     const feed = await readFeed(f);
     if (!feed) return;
     for (const it of feed.items.slice(0, f.max)) {
@@ -556,7 +652,7 @@ async function buildWeb() {
   const comics = await buildComics(w);
   // Reddit (occasional; usually blocked from CI)
   const rd = [];
-  await pool(w.subreddits, 2, async (s) => {
+  await pool(few(w.subreddits, 2), 2, async (s) => {
     try {
       const j = await fetchJSON(`https://www.reddit.com/r/${s}/top.json?t=month&limit=25&raw_json=1`, { retries: 0 });
       for (const c of j.data?.children || []) {
@@ -585,7 +681,7 @@ async function buildWeb() {
 async function buildNews() {
   const out = [];
   const per = {};
-  const jobs = Object.entries(config.news.groups).flatMap(([g, grp]) => grp.feeds.map(([name, url]) => ({ g, name, url })));
+  const jobs = Object.entries(config.news.groups).flatMap(([g, grp]) => few(grp.feeds, 1).map(([name, url]) => ({ g, name, url })));
   await pool(jobs, 4, async (j) => {
     const feed = await readFeed({ name: j.name, urls: [j.url] });
     if (!feed) return;
@@ -606,7 +702,7 @@ async function buildNews() {
 // ------------------------------------------------------------------ game sprites (transparent PNGs from Commons)
 async function buildSprites() {
   const out = [];
-  const lists = await pool(config.spriteQueries, 3, async (q) => {
+  const lists = await pool(few(config.spriteQueries, 6), 3, async (q) => {
     try {
       const j = await fetchJSON(`https://commons.wikimedia.org/w/api.php?${new URLSearchParams({ action: 'query', generator: 'search', gsrsearch: `${q} filemime:image/png`, gsrnamespace: '6', gsrlimit: '12', prop: 'imageinfo', iiprop: 'url|extmetadata|size', iiurlwidth: '160', format: 'json', formatversion: '2' })}`);
       return (j.query?.pages || []).map((p) => ({ q, ii: p.imageinfo?.[0], title: p.title })).filter((x) => x.ii?.thumburl);
@@ -615,7 +711,7 @@ async function buildSprites() {
   const cand = shuffle(lists.flat().filter((x) => /public domain|cc0|cc[- ]by|pd/i.test(x.ii.extmetadata?.LicenseShortName?.value || '')));
   const perQuery = {};
   await pool(cand, 4, async (x) => {
-    if (out.length >= config.spriteCount || (perQuery[x.q] || 0) >= 6) return;
+    if (out.length >= (QUICK ? 12 : config.spriteCount) || (perQuery[x.q] || 0) >= 6) return;
     try {
       const r = await fetch(x.ii.thumburl, { headers: { 'User-Agent': UA } });
       if (!r.ok) return;
@@ -623,7 +719,7 @@ async function buildSprites() {
       if (buf.length > 60000 || buf.readUInt32BE(0) !== 0x89504e47) return;
       if (!hasTransparentEdges(buf)) return;
       perQuery[x.q] = (perQuery[x.q] || 0) + 1;
-      out.push({ src: `data:image/png;base64,${buf.toString('base64')}`, name: x.title.replace(/^File:/, ''), credit: `${clip(stripTags(x.ii.extmetadata?.Artist?.value || 'Unknown'), 40)} · ${x.ii.extmetadata?.LicenseShortName?.value} · Wikimedia Commons` });
+      out.push({ src: `data:image/png;base64,${buf.toString('base64')}`, name: x.title.replace(/^File:/, ''), q: x.q, credit: `${clip(stripTags(x.ii.extmetadata?.Artist?.value || 'Unknown'), 40)} · ${x.ii.extmetadata?.LicenseShortName?.value} · Wikimedia Commons` });
     } catch { /* skip */ }
   });
   report.sources.sprites = out.length;
@@ -633,7 +729,7 @@ async function buildSprites() {
 // ------------------------------------------------------------------ meme images
 async function commonsImages() {
   const imgs = [];
-  await pool(config.memeImageQueries, 4, async (q) => {
+  await pool(few(config.memeImageQueries, 6), 4, async (q) => {
     try {
       const j = await fetchJSON(`https://commons.wikimedia.org/w/api.php?${new URLSearchParams({ action: 'query', generator: 'search', gsrsearch: `${q} filetype:bitmap`, gsrnamespace: '6', gsrlimit: '30', prop: 'imageinfo', iiprop: 'url|extmetadata|size|mime', iiurlwidth: '480', format: 'json', formatversion: '2' })}`);
       for (const p of j.query?.pages || []) {
@@ -650,7 +746,7 @@ async function commonsImages() {
 }
 async function kymMemes() {
   const out = [];
-  for (const url of config.knowYourMemeUrls) {
+  for (const url of few(config.knowYourMemeUrls, 1)) {
     try {
       const html = await fetchText(url, { ua: BROWSER_UA, retries: 1 });
       const re = /<img[^>]*?(?:data-src|src)="(https:\/\/i\.kym-cdn\.com\/(?:entries\/icons|photos\/images)\/[^"]+)"[^>]*?alt="([^"]*)"/g;
@@ -672,8 +768,8 @@ async function kymMemes() {
 // ------------------------------------------------------------------ weathered texture photos (small, embedded)
 async function buildTextures() {
   const out = [];
-  await pool(config.textureQueries, 3, async (q) => {
-    if (out.length >= config.textureCount) return;
+  await pool(few(config.textureQueries, 6), 3, async (q) => {
+    if (out.length >= (QUICK ? 6 : config.textureCount)) return;
     try {
       const cands = (await commonsSearch(q, 'filetype:bitmap', 6, 96)).filter((c) => /jpeg/.test(c.ii.mime || ''));
       for (const c of cands.slice(0, 2)) {
@@ -713,7 +809,7 @@ async function buildTarot() {
   }
   // older decks for the major arcana (Marseille, Visconti-Sforza, Sola Busca…)
   const best = (t) => { let bi = -1, bl = 0; TAROT_ALT.forEach((names, i) => { for (const n of names) if (t.includes(n) && n.length > bl) { bl = n.length; bi = i; } }); return bi; };
-  await pool(TAROT_ALT.map((n, i) => [n, i]), 3, async ([names, i]) => {
+  await pool(few(TAROT_ALT.map((n, i) => [n, i]), 2), 3, async ([names, i]) => {
     for (const q of new Set([`tarot ${names[0]}`, `tarot ${names[1]}`, `tarocchi ${names[names.length - 1]}`])) {
       try {
         for (const c of await commonsSearch(q, 'filetype:bitmap', 15, 320)) {
@@ -731,7 +827,8 @@ async function buildTarot() {
   return { tarot: out };
 }
 function buildOracle() {
-  const subs = ['tarot', 'iching', 'augury', 'dnd', 'tarot', 'haruspicy', 'dice', 'die'];
+  // sigil, paradigm and ritual are the chaos-magic oracles
+  const subs = ['tarot', 'iching', 'sigil', 'augury', 'dnd', 'paradigm', 'tarot', 'haruspicy', 'ritual', 'dice', 'die'];
   return shuffle(Array.from({ length: want.oracle || 0 }, (_, i) => {
     const seed = Math.floor(rand() * 2 ** 31), sub = subs[i % subs.length];
     return { id: `o${seed.toString(36)}`, cat: 'oracle', sub, seed, question: pick(QUESTIONS), spread: sub === 'tarot' && rand() < 0.5 ? 3 : 1 };
@@ -740,7 +837,7 @@ function buildOracle() {
 
 // ------------------------------------------------------------------ vocabulary (definitions from Wiktionary)
 async function buildVocab() {
-  const list = readJSON(path.join(ROOT, 'tools/data/vocab.json')).words.filter((w) => /^[a-z]+$/.test(w));
+  const list = few(readJSON(path.join(ROOT, 'tools/data/vocab.json')).words.filter((w) => /^[a-z]+$/.test(w)), 12);
   if (OFFLINE) return list.map((w) => ({ w, pos: 'noun', d: `placeholder definition of ${w} for offline testing` }));
   const out = [];
   await pool(list, 4, async (w) => {
@@ -760,28 +857,194 @@ async function buildVocab() {
 // ------------------------------------------------------------------ studio: writing pages and the character creator
 function buildStudio() {
   const P = readJSON(path.join(ROOT, 'tools/data/prompts.json'));
-  const prompts = shuffle([...P.prompts]);
+  const prompts = shuffle([...P.prompts]), words = shuffle([...(P.rhymeWords || ['moon'])]);
+  // in every ten: five prompts, two blank pages, two rhyming dictionaries, one character creator
+  const ROTA = ['prompt', 'prompt', 'blank', 'rhyme', 'prompt', 'blank', 'prompt', 'prompt', 'rhyme', 'creator'];
   return Array.from({ length: want.studio || 0 }, (_, i) => {
-    const seed = Math.floor(rand() * 2 ** 31), k = i % 10;
-    if (k === 9) return { id: `st${seed.toString(36)}`, cat: 'studio', sub: 'creator', seed, title: 'Character creator' };
-    if (k % 3 === 2) return { id: `st${seed.toString(36)}`, cat: 'studio', sub: 'blank', seed, title: pick(P.blankTitles) };
-    return { id: `st${seed.toString(36)}`, cat: 'studio', sub: 'prompt', seed, prompt: prompts[i % prompts.length] };
+    const seed = Math.floor(rand() * 2 ** 31), sub = ROTA[i % ROTA.length], sid = `st${seed.toString(36)}`;
+    if (sub === 'creator') return { id: sid, cat: 'studio', sub, seed, title: 'Character creator' };
+    if (sub === 'blank') return { id: sid, cat: 'studio', sub, seed, title: pick(P.blankTitles) };
+    if (sub === 'rhyme') return { id: sid, cat: 'studio', sub, seed, word: words[Math.floor(i / 5) % words.length] };
+    return { id: sid, cat: 'studio', sub: 'prompt', seed, prompt: prompts[i % prompts.length] };
   });
 }
 
 // ------------------------------------------------------------------ long reads: novels (Gutenberg), poems (PoetryDB), long articles (Wikipedia)
+// Gutendex refuses bursts (HTTP 403), so its requests go one at a time with a pause and a retry.
+let gutQueue = Promise.resolve();
+function gutendex(params) {
+  const run = async () => {
+    const url = `https://gutendex.com/books/?${new URLSearchParams(params)}`;
+    for (let a = 0; ; a++) {
+      try { return await fetchJSON(url, { timeout: 30000, retries: 1 }); }
+      catch (e) { if (a >= 2 || (e.status && ![403, 429].includes(e.status))) throw e; await sleep(5000 * (a + 1)); }
+    }
+  };
+  const p = gutQueue.then(() => sleep(1200)).then(run);
+  gutQueue = p.catch(() => {});
+  return p;
+}
+const gutTextUrl = (b) => { const f = b.formats || {}; const k = Object.keys(f).filter((x) => x.startsWith('text/plain') && !f[x].endsWith('.zip')).sort((a) => (/utf-8/i.test(a) ? -1 : 1))[0]; return k && f[k]; };
+// the body of a Project Gutenberg plain-text file, without licence, italics marks or footnote markers
+function gutBody(t) {
+  t = t.replace(/\r/g, '');
+  const s0 = t.search(/\*\*\* ?START OF [^\n]*\n/i), s1 = t.search(/\*\*\* ?END OF /i);
+  if (s0 >= 0) t = t.slice(t.indexOf('\n', s0) + 1, s1 > s0 ? s1 : undefined);
+  return t.replace(/_/g, '').replace(/\[(?:FN#|Footnote )?\d+\]/g, '');
+}
+
+// ---- classic erotica (tools/data/erotica.mjs)
+const eroNorm = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const eroHas = (s, phrase) => ` ${eroNorm(s)} `.includes(` ${eroNorm(phrase)} `);
+const eroOk = (text, pk = {}, soft = false) => { const s = pk.allow ? text.replace(new RegExp(pk.allow.source, 'gi'), ' ') : text; return !eroticaHardBan.test(s) && !(soft && eroticaSoftBan.test(s)); };
+const eroSensual = (text) => new Set((text.match(eroticaSensual) || []).map((w) => w.toLowerCase().slice(0, 5))).size;
+const isNote = (p) => /^\[?(?:footnote|fn#|illustration|note:|transcriber)/i.test(p);
+// prose: from the paragraph holding `at`, `n` paragraphs (or through the one holding `to`)
+function eroProse(paras, pk) {
+  const ats = [].concat(pk.at);
+  const s = paras.findIndex((p) => ats.some((a) => eroHas(p, a)));
+  if (s < 0) return null;
+  const run = [];
+  for (let i = s; i < paras.length && run.length < (pk.n || 5); i++) {
+    if (isNote(paras[i])) continue;
+    run.push(paras[i]);
+    if (pk.to && eroHas(paras[i], pk.to)) break;
+  }
+  if (pk.to && !run.some((p) => eroHas(p, pk.to))) return null;
+  return run.join(' ').length >= 400 ? run : null;
+}
+// verse: from the line holding `at` (the poem's line, not its title) to the line holding `to`
+function eroVerse(lines, pk) {
+  const ats = [].concat(pk.at);
+  const hits = lines.map((l, i) => (ats.some((a) => eroHas(l, a)) ? i : -1)).filter((i) => i >= 0);
+  const s = hits.find((i, k) => !(hits[k + 1] - i <= 4));
+  if (s === undefined) return null;
+  const ind = (l) => l.match(/^\s*/)[0].length, base = ind(lines[s]), out = [];
+  let blank = 0, end = -1;
+  for (let i = s; i < lines.length && out.length < (pk.max || 90); i++) {
+    const raw = lines[i];
+    if (!raw.trim()) { if (++blank >= 3) break; continue; }
+    if (base > 1 && ind(raw) < base) break;
+    const text = raw.trim().replace(/\s{2,}\d+$/, '');
+    if (!blank && out.length && ind(raw) > base + 1) out[out.length - 1] += ` ${text}`; // a wrapped long line
+    else { if (blank && out.length) out.push(''); out.push(text); }
+    blank = 0;
+    if (end < 0 && pk.to && eroHas(out[out.length - 1], pk.to)) end = out.length + (pk.plus || 0);
+    if (end >= 0 && out.filter(Boolean).length >= end - out.slice(0, end).filter((x) => !x).length) break;
+  }
+  if (pk.to && end < 0) return null;
+  while (out.length && !out[out.length - 1]) out.pop();
+  return out.length >= 4 ? out : null;
+}
+// chapter:verse ranges ("1:2 Let him kiss me…"), in the book that holds the work's `at` words
+function eroVerses(text, w, pk) {
+  const m = new RegExp(eroNorm(w.at).split(' ').join('\\W+'), 'i').exec(text);
+  if (!m) return null;
+  const start = text.lastIndexOf('1:1', m.index);
+  const re = /(?:^|\s)(?:\d+:)?(\d+):(\d+)\s+/g, marks = [];
+  re.lastIndex = start < 0 ? m.index - 200 : start;
+  let x;
+  while ((x = re.exec(text))) {
+    const c = +x[1], v = +x[2];
+    if (marks.length && c === 1 && v === 1) break; // the next book
+    marks.push({ c, v, at: x.index + x[0].length, from: x.index });
+    if (marks.length > 400) break;
+  }
+  const [c1, v1, c2, v2] = pk.verses, key = (c, v) => c * 1000 + v;
+  const lines = marks.map((mk, i) => ({ k: key(mk.c, mk.v), t: text.slice(mk.at, marks[i + 1]?.from ?? mk.at + 600).replace(/\s+/g, ' ').trim() }))
+    .filter((l) => l.k >= key(c1, v1) && l.k <= key(c2, v2)).map((l) => l.t);
+  return lines.length >= Math.min(4, key(c2, v2) - key(c1, v1) + 1) ? lines : null;
+}
+// random excerpts inside `span`: verse runs of 8–28 lines, or 2–5 paragraphs of prose
+function eroAuto(body, w, a) {
+  const out = [], [f0, f1] = a.span || [0, 1], tries = 80;
+  if (a.prose || w.kind === 'novel') {
+    const paras = body.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').trim()).filter((p) => p && !isNote(p));
+    const i0 = Math.floor(paras.length * f0), i1 = Math.floor(paras.length * f1);
+    for (let t = 0; t < tries && out.length < a.count; t++) {
+      const i = i0 + Math.floor(rand() * Math.max(1, i1 - i0 - 2)), k = 2 + Math.floor(rand() * 4);
+      const run = paras.slice(i, i + k), txt = run.join(' ');
+      if (txt.length < 500 || txt.length > 3600 || run.some((p) => p.length < 40 || p === p.toUpperCase())) continue;
+      if (!eroOk(txt, a, true) || !eroOk(`${paras[i - 1] || ''} ${paras[i + k] || ''}`) || eroSensual(txt) < 4) continue;
+      if (!out.some((o) => o.paras[0] === run[0])) out.push({ paras: run });
+    }
+    return out;
+  }
+  // verse: blocks of short, capitalised lines between headings
+  const L = body.split('\n'), i0 = Math.floor(L.length * f0), i1 = Math.floor(L.length * f1);
+  const verse = (l) => { const t = l.trim(); return t.length > 0 && t.length <= 72 && /^["“‘'(]?[A-Z]/.test(t) && !/^[^a-z]+$/.test(t); };
+  for (let t = 0; t < tries && out.length < a.count; t++) {
+    let i = i0 + Math.floor(rand() * Math.max(1, i1 - i0 - 30));
+    while (i < i1 && !(verse(L[i]) && (!L[i - 1]?.trim() || /[.!?;:]\s*$/.test(L[i - 1])))) i++;
+    const run = [];
+    for (let j = i; j < i1 && run.filter(Boolean).length < 28; j++) {
+      const s = L[j].trim().replace(/\s{2,}\d+$/, '');
+      if (!s) { if (run.length && run[run.length - 1] !== '') run.push(''); if (!L[j + 1]?.trim()) break; continue; }
+      if (!verse(L[j])) break;
+      run.push(s);
+    }
+    while (run.length && (!run[run.length - 1] || (run.filter(Boolean).length > 8 && !/[.!?;]\s*$/.test(run[run.length - 1])))) run.pop();
+    const txt = run.join(' ');
+    if (run.filter(Boolean).length < 8 || !eroOk(txt, a, true) || !eroOk(L.slice(Math.max(0, i - 6), i).join(' ')) || eroSensual(txt) < 4) continue;
+    if (!out.some((o) => o.lines[0] === run[0])) out.push({ lines: run });
+  }
+  return out;
+}
+async function buildErotica() {
+  const posts = [], per = {};
+  for (const w of eroticaWorks) {
+    // Gutendex first (a verified edition from `ids` wins when listed), then the known ids
+    const cands = [];
+    try {
+      const j = await gutendex({ search: w.search, languages: 'en' });
+      const fit = (j.results || []).filter((b) => (!w.title || w.title.test(b.title)) && (!w.author || (b.authors || []).some((a) => w.author.test(a.name))) && gutTextUrl(b))
+        .sort((a, b) => (w.ids?.includes(b.id) ? 1 : 0) - (w.ids?.includes(a.id) ? 1 : 0) || (b.download_count || 0) - (a.download_count || 0));
+      for (const b of fit.slice(0, w.multi || 1)) cands.push({ id: b.id, url: gutTextUrl(b), title: b.title, listed: true });
+    } catch (e) { warn(`gutendex ${w.key}: ${e.message}`); }
+    for (const gid of w.ids || []) if (!cands.some((c) => c.id === gid)) cands.push({ id: gid, url: `https://www.gutenberg.org/cache/epub/${gid}/pg${gid}.txt` });
+    let got = [];
+    for (const c of cands) {
+      let raw;
+      try { raw = await fetchText(c.url, { timeout: 60000, retries: 1 }); } catch (e) { warn(`gutenberg ${w.key} #${c.id}: ${e.message}`); continue; }
+      // an id from our own list must still be the right book
+      if (!c.listed && w.title && !w.title.test((raw.slice(0, 4000).match(/^Title:\s*(.+)$/m) || [])[1] || '')) { warn(`gutenberg ${w.key} #${c.id}: not the expected title`); continue; }
+      const body = gutBody(raw), paras = body.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean), lines = body.split('\n');
+      const base = { book: w.book || c.title, author: w.by, year: w.year, url: `https://www.gutenberg.org/ebooks/${c.id}`, source: 'Project Gutenberg', topic: 'erotica', erotica: true };
+      got = [];
+      for (const pk of w.picks || []) {
+        const kind = pk.kind || w.kind;
+        const res = pk.verses ? eroVerses(body, w, pk) : kind === 'poem' ? eroVerse(lines, pk) : eroProse(paras, pk);
+        if (!res) { warn(`erotica ${w.key}: "${pk.title}" not found in #${c.id}`); continue; }
+        if (!eroOk(res.join(' '), pk)) { warn(`erotica ${w.key}: "${pk.title}" failed the content check`); continue; }
+        got.push({ kind, title: pk.title, ...base, [kind === 'poem' ? 'lines' : 'paras']: res });
+      }
+      if (w.auto) for (const x of eroAuto(body, w, w.auto)) got.push({ kind: x.lines ? 'poem' : 'novel', title: x.lines ? `from ${w.book}` : w.book, ...base, ...x });
+      if (got.length) break;
+    }
+    per[w.key] = got.length;
+    posts.push(...got);
+    log(`erotica: ${w.key} -> ${got.length}`);
+  }
+  report.sources.erotica = per;
+  return posts;
+}
+
 async function buildReads(wiki) {
   const R = config.reads || {}, n = want.read || 0, out = [];
   if (!n) return out;
   if (OFFLINE) {
     for (let i = 0; i < n; i++) out.push(i % 3 === 1 ? { kind: 'poem', title: `Offline poem ${i}`, author: 'Anonymous', lines: Array.from({ length: 14 }, (_, k) => `Placeholder line ${k + 1} of a poem for layout testing`) } : { kind: i % 3 ? 'article' : 'novel', title: `Offline long read ${i}`, book: 'A Test Book', author: 'A. Writer', paras: Array.from({ length: 5 }, (_, k) => `Paragraph ${k + 1}. This is placeholder text for the long reads layout, written so the card has something to fold and unfold. It is never committed.`) });
+    // classic erotica fixtures: always shown (no adult flag), flagged erotica
+    const ero = { book: 'A Classic of Love', author: 'An Old Poet', year: 1866, source: 'Project Gutenberg', topic: 'erotica', erotica: true, url: 'https://www.gutenberg.org/' };
+    out.splice(0, 2, { kind: 'novel', title: 'Offline erotica excerpt', ...ero, paras: Array.from({ length: 4 }, (_, k) => `Paragraph ${k + 1} of a classic erotica excerpt. Placeholder text for the long reads layout; the real package takes a vetted passage from Project Gutenberg.`) },
+      { kind: 'poem', title: 'Offline erotic poem', ...ero, lines: Array.from({ length: 12 }, (_, k) => (k % 5 === 4 ? '' : `Placeholder line ${k + 1} of a love poem`)) });
     return out.map((x, i) => ({ id: `rd-off-${i}`, cat: 'read', sub: x.kind, ...x }));
   }
   // novels: popular public-domain books on our themes, excerpts of five paragraphs
   const books = [];
-  await pool(R.gutenbergTopics || [], 3, async (topic) => {
+  await pool(few(R.gutenbergTopics, 2), 3, async (topic) => {
     try {
-      const j = await fetchJSON(`https://gutendex.com/books/?${new URLSearchParams({ topic, languages: 'en', sort: 'popular' })}`, { timeout: 30000 });
+      const j = await gutendex({ topic, languages: 'en', sort: 'popular' });
       for (const b of (j.results || []).slice(0, R.booksPerTopic || 4)) {
         const txt = Object.entries(b.formats || {}).find(([k, v]) => k.startsWith('text/plain') && !v.endsWith('.zip'))?.[1];
         if (txt && !books.some((x) => x.id === b.id)) books.push({ id: b.id, title: b.title, author: (b.authors?.[0]?.name || '').split(', ').reverse().join(' '), year: b.authors?.[0]?.death_year, txt, topic });
@@ -844,7 +1107,7 @@ async function vetSprite(x) {
 }
 async function buildThemes() {
   const kits = [];
-  await pool(themeDefs, 2, async (t) => {
+  await pool(few(themeDefs, 3), 2, async (t) => {
     const sprites = [];
     for (const kw of t.sprites) {
       try {
@@ -913,7 +1176,7 @@ function buildGames() {
   return shuffle(posts);
 }
 
-const PSYCH_ALGOS = ['julia', 'mandel', 'tunnel', 'plasma', 'moire', 'kaleido', 'flow', 'spiro', 'rings', 'warp'];
+const PSYCH_ALGOS = ['julia', 'mandel', 'tunnel', 'plasma', 'moire', 'kaleido', 'flow', 'spiro', 'rings', 'warp', 'sand', 'fluid', 'boids', 'orbits', 'pendulum', 'reaction', 'magnet', 'cloth'];
 function buildPsych(quotes, wiki) {
   const lines = quotes.filter((q) => q.text.length <= 180).map((q) => ({ text: q.text, author: q.author }));
   shuffle(lines);

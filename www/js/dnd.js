@@ -1,7 +1,11 @@
 // A level-1 Dungeons & Dragons 5e character, rolled the classic way (4d6, drop the
 // lowest), using the races, classes and spells of the free System Reference Document.
+// Every adventurer comes with a persona (how they look, in both sprite styles) and can
+// become the player's hero. Stats are flavour only.
 import { el } from './util.js';
-import { humanoid } from './games/creature.js';
+import { crystalSheet, drawFrame } from './crystal/sprites.js';
+import { normPersona, personaToCrystal, describePersona } from './persona.js';
+import { setHero, makeHero } from './hero.js';
 
 const AB = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 const RACES = [
@@ -36,18 +40,66 @@ const BACKGROUNDS = [
   ['Hermit', ['Medicine', 'Religion']], ['Outlander', ['Athletics', 'Survival']], ['Charlatan', ['Deception', 'Sleight of Hand']], ['Entertainer', ['Acrobatics', 'Performance']], ['Noble', ['History', 'Persuasion']], ['Sailor', ['Athletics', 'Perception']], ['Urchin', ['Sleight of Hand', 'Stealth']]
 ];
 const ALIGN = ['Lawful Good', 'Neutral Good', 'Chaotic Good', 'Lawful Neutral', 'True Neutral', 'Chaotic Neutral', 'Lawful Evil', 'Neutral Evil', 'Chaotic Evil'];
-const TRAITS = ['Talks to their weapon and expects answers.', 'Collects teeth. Not only their own.', 'Is unfailingly polite to the dead.', 'Cannot pass a door without knocking twice.', 'Keeps a diary addressed to a god who never writes back.', 'Hums when lying.', 'Eats only things that are round.', 'Believes they are being followed by a specific crow.', 'Quotes proverbs that do not exist.', 'Laughs at funerals, cries at weddings.'];
-const IDEALS = ['Curiosity: the forbidden door is the one worth opening.', 'Mercy: everyone gets one second chance. Some get three.', 'Freedom: chains are meant to be broken, especially metaphorical ones.', 'Knowledge: the library is the only temple.', 'Chaos: the dice decide, and the dice are always right.', 'Duty: a promise to a stranger is still a promise.', 'Beauty: even a dungeon deserves a nice tablecloth.'];
-const BONDS = ['Owes a large debt to a talking frog.', 'Searching for the sibling who sold their shadow.', 'Carries the last letter of a dead friend, unopened.', 'Protects a village that does not know it exists.', 'Swore vengeance on a minor noble for a stolen hat.', 'Is the only one who remembers a forgotten god.'];
-const FLAWS = ['Cannot resist a riddle, even mid-battle.', 'Trusts anyone who offers soup.', 'Panics around mirrors.', 'Spends all gold on maps of places that might not exist.', 'Insults dragons by accident.', 'Is certain they are the chosen one. They are not.'];
+export const TRAITS = ['Talks to their weapon and expects answers.', 'Narrates their own actions in the third person.', 'Apologises to doors before kicking them in.', 'Keeps a running tally of everyone who owes them a favour.', 'Sleeps with one boot on, just in case.', 'Trusts cats, distrusts anyone who dislikes cats.', 'Names every horse they ride "Horse".', 'Collects keys to locks they will never find.', 'Insists on a toast before every fight.', 'Speaks fondly of a hometown no map has heard of.', 'Collects teeth. Not only their own.', 'Is unfailingly polite to the dead.', 'Cannot pass a door without knocking twice.', 'Keeps a diary addressed to a god who never writes back.', 'Hums when lying.', 'Eats only things that are round.', 'Believes they are being followed by a specific crow.', 'Quotes proverbs that do not exist.', 'Laughs at funerals, cries at weddings.'];
+export const IDEALS = ['Greed: the treasure is the point, the adventure is the tax.', 'Community: nobody eats until everybody eats.', 'Honour: a lie is a debt the soul pays later.', 'Change: the old order deserves a gentle shove off a cliff.', 'Curiosity: the forbidden door is the one worth opening.', 'Mercy: everyone gets one second chance. Some get three.', 'Freedom: chains are meant to be broken, especially metaphorical ones.', 'Knowledge: the library is the only temple.', 'Chaos: the dice decide, and the dice are always right.', 'Duty: a promise to a stranger is still a promise.', 'Beauty: even a dungeon deserves a nice tablecloth.'];
+export const BONDS = ['Guards a sealed box they have never been allowed to open.', 'Writes letters to a mentor who vanished at sea.', 'Was raised by the monks of a monastery that burned down.', 'Promised to return a borrowed spoon, whatever it takes.', 'Owes a large debt to a talking frog.', 'Searching for the sibling who sold their shadow.', 'Carries the last letter of a dead friend, unopened.', 'Protects a village that does not know it exists.', 'Swore vengeance on a minor noble for a stolen hat.', 'Is the only one who remembers a forgotten god.'];
+export const FLAWS = ['Gambles on anything, including the weather.', 'Holds grudges with professional dedication.', 'Has never once read the fine print.', 'Faints at the sight of their own blood (only their own).', 'Cannot resist a riddle, even mid-battle.', 'Trusts anyone who offers soup.', 'Panics around mirrors.', 'Spends all gold on maps of places that might not exist.', 'Insults dragons by accident.', 'Is certain they are the chosen one. They are not.'];
+
+export const QUIRKS = ['Hums tavern songs off-key when nervous.', 'Taps their nose before telling a lie.', 'Counts their coins whenever they sit down.', 'Speaks to plants as if they were old friends.', 'Never sits with their back to a door.', 'Laughs a beat too late at every joke.', 'Keeps a pressed flower in their spellbook, or their boot.', 'Sniffs food suspiciously, then eats it anyway.', 'Twirls a coin across their knuckles.', 'Refers to the party as "my associates".', 'Whistles at dramatic moments.', 'Sketches every monster they meet.'];
+export const HOOKS = ['A stranger died in their arms, whispering a name that turned out to be theirs.', 'They woke up in a crypt with a map tattooed on their back.', 'Their village was traded to a dragon in a game of cards; they intend to win it back.', 'A prophecy names them as the one who will lose the final battle. They plan to read it more carefully.', 'They are being hunted by a bounty hunter who is also their twin.', 'A god owes them a favour and keeps changing the subject.', 'They carry a sword that remembers its previous owners and keeps comparing.', 'They signed the wrong contract and now technically own a haunted lighthouse.', 'Their shadow has started arriving a few seconds late.', 'An heir to a minor throne, seven claimants removed and counting.'];
+export { RACES, CLASSES, BACKGROUNDS, ALIGN };
+// what an adventurer of each class and race tends to look like (choices for the persona)
+const CLOOK = {
+  Barbarian: { top: ['none', 'vest'], bot: ['pants', 'shorts'], head: ['none', 'none', 'bandana'], weapon: ['sword', 'dagger'], hands: ['gloves', 'none'], feet: ['boots'], build: ['brawny', 'athletic'], cape: 0.15 },
+  Bard: { top: ['jacket', 'tunic', 'longsleeve'], head: ['none', 'fedora', 'none'], weapon: ['sword', 'dagger'], feet: ['boots', 'shoes'], cape: 0.3 },
+  Cleric: { top: ['robe', 'armor'], head: ['none', 'hood', 'helm'], weapon: ['wrench', 'staff'], feet: ['boots', 'shoes'], cape: 0.2 },
+  Druid: { top: ['robe', 'tunic'], head: ['hood', 'none'], weapon: ['staff'], feet: ['none', 'shoes'], cape: 0.15 },
+  Fighter: { top: ['armor'], head: ['helm', 'none'], weapon: ['sword'], hands: ['gauntlets'], feet: ['boots'], build: ['athletic', 'brawny'], cape: 0.3 },
+  Monk: { top: ['vest', 'robe'], hair: ['bald', 'topknot', 'buzz'], weapon: ['none', 'staff'], feet: ['none', 'shoes'], build: ['athletic', 'slim'], cape: 0 },
+  Paladin: { top: ['armor'], head: ['helm', 'none'], weapon: ['sword'], hands: ['gauntlets'], feet: ['boots'], build: ['athletic', 'brawny'], cape: 0.6 },
+  Ranger: { top: ['tunic', 'vest', 'jacket'], head: ['hood', 'none', 'bandana'], weapon: ['dagger', 'sword'], hands: ['gloves'], feet: ['boots'], cape: 0.35 },
+  Rogue: { top: ['vest', 'jacket', 'longsleeve'], head: ['hood', 'bandana', 'none'], weapon: ['dagger'], hands: ['gloves'], feet: ['boots'], build: ['slim', 'average'], cape: 0.2 },
+  Sorcerer: { top: ['robe', 'coat', 'tunic'], head: ['none', 'none', 'wizard'], weapon: ['staff', 'none'], feet: ['shoes', 'boots'], cape: 0.3 },
+  Warlock: { top: ['coat', 'robe', 'jacket'], head: ['hood', 'none', 'fedora'], weapon: ['staff', 'dagger', 'none'], feet: ['boots', 'shoes'], cape: 0.3 },
+  Wizard: { top: ['robe'], head: ['wizard', 'wizard', 'hood'], weapon: ['staff'], feet: ['shoes'], build: ['slim', 'average', 'elder'], cape: 0.25 },
+};
+const RLOOK = {
+  'Hill Dwarf': { build: ['stocky'], beard: ['long', 'short', 'long', 'none'], skin: ['Fair', 'Template', 'Bronze', 'Porcelain'] },
+  'High Elf': { build: ['slim', 'lanky'], beard: ['none'], hair: ['long', 'ponytail', 'braid', 'bob'], skin: ['Porcelain', 'Fair', 'Olive', 'Umber'] },
+  'Lightfoot Halfling': { build: ['small'], feet: ['none', 'shoes'], beard: ['none', 'none', 'stubble'] },
+  'Rock Gnome': { build: ['small'], hair: ['spiky', 'afro', 'bun', 'pigtails'], beard: ['none', 'short', 'long'] },
+  Dragonborn: { skin: ['Infernal', 'Goblin', 'Bronze', 'Cerulean', 'Chrome'], hair: ['bald'], beard: ['none'], build: ['brawny', 'athletic'] },
+  'Half-Orc': { skin: ['Goblin', 'Olive', 'Umber'], build: ['brawny', 'heavy', 'athletic'], hair: ['mohawk', 'topknot', 'long', 'bald'] },
+  Tiefling: { skin: ['Infernal', 'Infernal', 'Cerulean', 'Umber'], hair: ['long', 'ponytail', 'short', 'spiky', 'braid'] },
+};
+const CLOTHN = ['Navy', 'Denim', 'Khaki', 'Drab', 'Hazard', 'Neon', 'White', 'Azure', 'Scarlet', 'Forest', 'Plum', 'Linen', 'Coal', 'Leather', 'Saffron', 'Teal', 'Steel'];
+const HAIRN = ['Chestnut', 'Gold', 'Ink', 'Crimson', 'Silver', 'Violet', 'Moss', 'Rose', 'Umber', 'Copper', 'Azure', 'Snow'];
+const SKINN = ['Porcelain', 'Fair', 'Template', 'Olive', 'Bronze', 'Umber', 'Ebony'];
+const HAIRS = ['short', 'spiky', 'bob', 'long', 'ponytail', 'braid', 'pigtails', 'topknot', 'bun', 'buzz', 'afro', 'mohawk', 'bald'];
+// a look for an adventurer, from class, race and dice
+export function adventurerPersona(race, cls, rnd, seed) {
+  const pick = (a) => a[Math.floor(rnd() * a.length)], C = CLOOK[cls.n] || {}, R = RLOOK[race.n] || {}, from = (k, d) => pick(R[k] || C[k] || d);
+  const metal = (k) => (k === 'armor' || k === 'helm' ? pick(['Steel', 'Steel', 'Coal', 'White', 'Saffron']) : pick(CLOTHN));
+  const top = pick(C.top || ['tunic']), head = pick(C.head || ['none']);
+  return normPersona({
+    seed, era: 'Fantasy', build: from('build', ['average', 'athletic', 'slim', 'heavy', 'lanky']), skin: from('skin', SKINN), hair: from('hair', HAIRS), hairColor: pick(HAIRN),
+    beard: from('beard', ['none', 'none', 'none', 'stubble', 'short', 'long']), head, headColor: metal(head), top, topColor: metal(top), trimColor: pick(CLOTHN),
+    bot: top === 'robe' ? 'none' : pick(C.bot || ['pants', 'pants', 'skirt']), botColor: pick(CLOTHN), feet: from('feet', ['boots', 'shoes']), feetColor: pick(['Leather', 'Coal', 'Leather', 'Steel']),
+    hands: pick(C.hands || ['none', 'none', 'gloves']), handsColor: pick(['Leather', 'Coal', 'Steel', 'Linen']), belt: rnd() < 0.7 ? 'on' : 'off', beltColor: pick(['Leather', 'Saffron', 'Coal', 'Scarlet']),
+    cape: rnd() < (C.cape ?? 0.2) ? 'cape' : 'none', capeColor: pick(CLOTHN), weapon: pick(C.weapon || ['dagger']), weaponColor: pick(['Leather', 'Coal', 'Saffron', 'Scarlet', 'Azure', 'Teal']),
+  }, seed);
+}
+const RACE_LOOK = { Dragonborn: 'Scales, a crest of horn and a smell of struck matches.', Tiefling: 'Curled horns and a tail that betrays every mood.', 'High Elf': 'Pointed ears and an unhurried stare.', 'Half-Elf': 'Faintly pointed ears.', 'Half-Orc': 'Tusks, and a grin that uses them.', 'Hill Dwarf': 'Broad as a door, and about as easy to move.', 'Rock Gnome': 'Soot on the nose and a pocketful of springs.', 'Lightfoot Halfling': 'Bare, leathery feet and quick hands.' };
 
 const mod = (v) => Math.floor((v - 10) / 2);
 const sign = (n) => (n >= 0 ? `+${n}` : `${n}`);
 
-export function rollCharacter(rnd) {
-  const pick = (a) => a[Math.floor(rnd() * a.length)];
+// fixed: choices to keep ({ race, cls, bg, align } by name, trait/ideal/... text, persona, name); every roll still
+// happens, so changing one choice leaves the dice and the other choices as they were
+export function rollCharacter(rnd, fixed = {}) {
+  const pick = (a) => a[Math.floor(rnd() * a.length)], keep = (v, k, list, key = (x) => x) => (fixed[k] !== undefined ? list.find((x) => key(x) === fixed[k]) ?? v : v);
   const d6 = () => 1 + Math.floor(rnd() * 6);
-  const race = pick(RACES), cls = pick(CLASSES), [bg, bgSkills] = pick(BACKGROUNDS);
+  const race = keep(pick(RACES), 'race', RACES, (r) => r.n), cls = keep(pick(CLASSES), 'cls', CLASSES, (c) => c.n), [bg, bgSkills] = keep(pick(BACKGROUNDS), 'bg', BACKGROUNDS, (b) => b[0]);
   const rolls = Array.from({ length: 6 }, () => { const r = [d6(), d6(), d6(), d6()].sort((a, b) => b - a); return { r, total: r[0] + r[1] + r[2] }; }).sort((a, b) => b.total - a.total);
   // best rolls to the class's key abilities, the rest at random
   const order = [...cls.pri, ...AB.filter((a) => !cls.pri.includes(a)).sort(() => rnd() - 0.5)], base = {}, rollOf = {};
@@ -58,22 +110,43 @@ export function rollCharacter(rnd) {
   const skills = new Set(bgSkills);
   for (const sk of [...pool].sort(() => rnd() - 0.5)) { if (skills.size >= bgSkills.length + cls.skills[0]) break; skills.add(sk); }
   const ac = cls.armor === 'chain' ? 16 : cls.armor === 'scale' ? 14 + Math.min(2, m.DEX) : cls.armor === 'leather' ? 11 + m.DEX : cls.n === 'Barbarian' ? 10 + m.DEX + m.CON : cls.n === 'Monk' ? 10 + m.DEX + m.WIS : 10 + m.DEX;
-  const name = `${pick(race.syl.slice(0, 7))}${pick(race.syl.slice(7))}`;
+  const name0 = `${pick(race.syl.slice(0, 7))}${pick(race.syl.slice(7))}`, virtue = race.n === 'Tiefling' && rnd() < 0.5 ? pick(VIRTUE) : null;
   const ch = {
-    name: race.n === 'Tiefling' && rnd() < 0.5 ? pick(VIRTUE) : name, race, cls, bg, align: pick(ALIGN), level: 1, prof: 2,
+    name: fixed.name || virtue || name0, race, cls, bg, align: keep(pick(ALIGN), 'align', ALIGN), level: 1, prof: 2,
     score, base, rollOf, m, skills: [...skills],
     hp: cls.hd + m.CON + (race.hp || 0), ac: ac + (cls.shield ? 2 : 0), init: m.DEX, speed: race.speed,
     passive: 10 + m.WIS + (skills.has('Perception') ? 2 : 0),
-    trait: pick(TRAITS), ideal: pick(IDEALS), bond: pick(BONDS), flaw: pick(FLAWS),
+    trait: keep(pick(TRAITS), 'trait', TRAITS), ideal: keep(pick(IDEALS), 'ideal', IDEALS), bond: keep(pick(BONDS), 'bond', BONDS), flaw: keep(pick(FLAWS), 'flaw', FLAWS),
     age: Math.floor({ 'Hill Dwarf': 60, 'High Elf': 120, 'Rock Gnome': 70 }[race.n] || 18 + rnd() * 30) + Math.floor(rnd() * 40), seed: Math.floor(rnd() * 1e9)
   };
+  ch.trait2 = keep(pick(TRAITS.filter((x) => x !== ch.trait)), 'trait2', TRAITS); ch.quirk = keep(pick(QUIRKS), 'quirk', QUIRKS); ch.hook = keep(pick(HOOKS), 'hook', HOOKS);
+  const look = adventurerPersona(race, cls, rnd, ch.seed);
+  ch.persona = fixed.persona ? normPersona(fixed.persona, fixed.persona.seed ?? ch.seed) : look;
+  ch.appearance = `${describePersona(ch.persona)}${RACE_LOOK[race.n] ? ` ${RACE_LOOK[race.n]}` : ''}`;
   if (cls.cast) {
     ch.cantrips = [...cls.cantrips].sort(() => rnd() - 0.5).slice(0, cls.nc);
     ch.spells = [...cls.spells].sort(() => rnd() - 0.5).slice(0, cls.ns);
     ch.dc = 8 + 2 + m[cls.cast]; ch.atk = 2 + m[cls.cast];
   }
-  ch.sprite = humanoid(ch.seed, cls.hue, {});
   return ch;
+}
+// a plain, storable copy (races and classes by name) and back
+export function toSheet(ch) {
+  const { race, cls, sheetCv, ...rest } = ch;
+  return { ...rest, race: race.n, cls: cls.n };
+}
+export function fromSheet(d) {
+  if (!d) return null;
+  const race = RACES.find((r) => r.n === d.race) || RACES[3], cls = CLASSES.find((c) => c.n === d.cls) || CLASSES[4];
+  const ch = { ...d, race, cls, persona: normPersona(d.persona, d.seed) };
+  ch.m ||= Object.fromEntries(AB.map((a) => [a, mod(ch.score?.[a] ?? 10)]));
+  return ch;
+}
+// make a rolled adventurer the player's hero (games then star them, in both styles)
+export function saveAsHero(ch) {
+  const h = makeHero(ch.name, ch.persona, toSheet(ch));
+  setHero(h);
+  return h;
 }
 
 // the sheet as HTML for under the canvas
@@ -91,18 +164,27 @@ export function sheet(ch) {
     ch.cantrips ? el('p', `Spell save DC ${ch.dc} · spell attack ${sign(ch.atk)} · Cantrips: ${ch.cantrips.join(', ')} · 1st level: ${ch.spells.join(', ')}`) : null,
     el('p', `Equipment: ${ch.cls.gear.join(', ')}, a ${ch.bg.toLowerCase()}’s keepsake, ${10 + Math.floor((ch.seed % 7) * 3)} gp`),
     el('p', `Languages: ${ch.race.langs.join(', ')}`),
-    el('p', `Trait: ${ch.trait} Ideal: ${ch.ideal} Bond: ${ch.bond} Flaw: ${ch.flaw}`)
+    el('p', `Personality: ${ch.trait}${ch.trait2 ? ` ${ch.trait2}` : ''}`),
+    el('p', `Ideal: ${ch.ideal} Bond: ${ch.bond} Flaw: ${ch.flaw}`),
+    ch.quirk ? el('p', `Quirk: ${ch.quirk}`) : null,
+    ch.appearance ? el('p', `Appearance: ${ch.appearance}`) : null,
+    ch.hook ? el('p', `Hook: ${ch.hook}`) : null
   );
 }
 export function sheetText(ch) {
-  return `${ch.name} — ${ch.race.n} ${ch.cls.n} 1\n${ch.bg} · ${ch.align}\n\n${AB.map((a) => `${a} ${ch.score[a]} (${sign(ch.m[a])})`).join('  ')}\nHP ${ch.hp}  AC ${ch.ac}  Init ${sign(ch.init)}  Speed ${ch.speed}\nSkills: ${ch.skills.join(', ')}\nFeatures: ${[...ch.cls.feats, ...ch.race.traits].join(', ')}\n${ch.cantrips ? `Cantrips: ${ch.cantrips.join(', ')}\nSpells: ${ch.spells.join(', ')}\n` : ''}Equipment: ${ch.cls.gear.join(', ')}\nTrait: ${ch.trait}\nIdeal: ${ch.ideal}\nBond: ${ch.bond}\nFlaw: ${ch.flaw}\n`;
+  return `${ch.name} — ${ch.race.n} ${ch.cls.n} 1\n${ch.bg} · ${ch.align}\n\n${AB.map((a) => `${a} ${ch.score[a]} (${sign(ch.m[a])})`).join('  ')}\nHP ${ch.hp}  AC ${ch.ac}  Init ${sign(ch.init)}  Speed ${ch.speed}\nSkills: ${ch.skills.join(', ')}\nFeatures: ${[...ch.cls.feats, ...ch.race.traits].join(', ')}\n${ch.cantrips ? `Cantrips: ${ch.cantrips.join(', ')}\nSpells: ${ch.spells.join(', ')}\n` : ''}Equipment: ${ch.cls.gear.join(', ')}\nPersonality: ${ch.trait}${ch.trait2 ? ` ${ch.trait2}` : ''}\nIdeal: ${ch.ideal}\nBond: ${ch.bond}\nFlaw: ${ch.flaw}\n${ch.quirk ? `Quirk: ${ch.quirk}\n` : ''}${ch.appearance ? `Appearance: ${ch.appearance}\n` : ''}${ch.hook ? `Hook: ${ch.hook}\n` : ''}`;
 }
 // portrait and ability boxes on the canvas
 export function drawCharacter(c, ch, t, pal, W, H) {
   const k = Math.min(1, t / 0.8);
-  c.save(); c.imageSmoothingEnabled = false;
-  const fr = Math.floor(t * 2) % 2 ? ch.sprite.idle : ch.sprite.walk[0];
-  c.globalAlpha = k; c.drawImage(fr, 30, 40 + (1 - k) * 30, 120, 160); c.globalAlpha = 1;
+  if (!ch.sheetCv) Object.defineProperty(ch, 'sheetCv', { value: crystalSheet(ch.persona.seed, { char: personaToCrystal(ch.persona), dirs: ['S', 'SE', 'E'] }), enumerable: false });
+  const w = ch.persona.weapon, act = w === 'pistol' || w === 'rifle' ? 'shoot' : w === 'staff' || w === 'none' ? 'cast' : 'attack';
+  const seq = [['idle', 'S', 1.6], ['walk', 'SE', 1.2], [act, 'E', 0.8], ['idle', 'SE', 1], ['cheer', 'S', 1.2]], tot = seq.reduce((a, q) => a + q[2], 0);
+  let u = t % tot, i = 0; while (u > seq[i][2]) { u -= seq[i][2]; i++; }
+  const [anim, dir] = seq[i], A = ch.sheetCv.meta.animations[anim];
+  c.save(); c.globalAlpha = k;
+  c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(90, 202, 34, 7, 0, 0, 7); c.fill();
+  drawFrame(c, ch.sheetCv, anim, dir, A.loop ? Math.floor(u * A.fps) % A.frames : Math.min(A.frames - 1, Math.floor(u * A.fps)), 90, 204 + (1 - k) * 20, 4);
   c.restore();
   c.fillStyle = pal.ink; c.textAlign = 'left'; c.textBaseline = 'middle';
   c.font = '700 18px Georgia, serif'; c.fillText(ch.name, 170, 50);
