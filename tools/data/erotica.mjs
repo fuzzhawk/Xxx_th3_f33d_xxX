@@ -44,11 +44,12 @@ export const eroticaWorks = [
     picks: [
       { at: 'Out of the rolling ocean the crowd', to: 'for your dear sake my love', title: 'Out of the Rolling Ocean the Crowd' },
       { at: 'We two, how long we were fool’d', to: 'all but our own joy', title: 'We Two, How Long We Were Fool’d' },
-      { at: 'One hour to madness and joy', to: 'brief hour of madness and joy', title: 'One Hour to Madness and Joy' },
+      { at: 'Ages and ages returning at intervals', to: 'Offspring of my loins', title: 'Ages and Ages Returning at Intervals' },
+      { at: 'O hymen! O hymenee! why do you tantalize me', to: 'soon certainly kill me', title: 'O Hymen! O Hymenee!' },
       { at: 'Once I pass’d through a populous city', to: 'silent lips sad and tremulous', title: 'Once I Pass’d Through a Populous City' },
       { at: 'As Adam early in the morning', to: 'Be not afraid of my body', title: 'As Adam Early in the Morning' }
     ] },
-  { key: 'swinburne', search: 'swinburne poems ballads', title: /poems (?:and|&) ballads|laus veneris/i, author: /swinburne/i, book: 'Poems and Ballads', by: 'Algernon Charles Swinburne', year: 1866, kind: 'poem', multi: 3,
+  { key: 'swinburne', search: 'swinburne poems ballads', title: /poems (?:and|&) ballads|laus veneris/i, author: /swinburne/i, ids: [35402], book: 'Poems and Ballads', by: 'Algernon Charles Swinburne', year: 1866, kind: 'poem', multi: 3,
     picks: [
       { at: 'If love were what the rose is', to: 'find his mouth a rein', plus: 2, title: 'A Match' },
       { at: 'Lying asleep between the strokes of night', to: 'eyelids of my soul’s desire', title: 'Love and Sleep' },

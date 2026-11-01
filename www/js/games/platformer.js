@@ -15,7 +15,7 @@ import { mulberry32 } from '../util.js';
 // climb ladders (back view), flinch, knockdown, kneel after a fall; cheers and surprise play only in the
 // air or while standing for a respawn, so emotes never touch the motion.
 const TAU = Math.PI * 2;
-const SDT = 1 / 60, DEC = 2, TICKS = 4; // search step, search steps per decision, game ticks per decision
+const SDT = 1 / 60, DEC = 3, TICKS = 6; // search step, search steps per decision, game ticks per decision
 const BK = 96, DEEP = 1400, KILL = 560, SAVE = 430, CRUMBLE = 0.45, FMIN = 230, FMAX = 350;
 // power-ups: state key, seconds, colour, label
 const PWR = { shield: ['sh', 14, '#7fe3ff', 'SHIELD'], magnet: ['mg', 9, '#ff6b7a', 'MAGNET'], wings: ['wg', 9, '#fff3c4', 'WINGS'], speed: ['sp', 6, '#ffc23a', 'SPEED'], star: ['st', 7, '#ffe45e', 'STAR'] };
@@ -26,7 +26,7 @@ const AREAS = [
   { id: 'works', name: 'WORKS', kinds: { belts: 3, movers: 2, crumble: 1, upper: 1 } },
   { id: 'sky', name: 'SKYWAY', kinds: { sky: 3, bounce: 2, movers: 1.5, gaps: 1 } }
 ];
-const SURF = { g: 1, o: 1, l: 1, p: 1, c: 1, m: 1 };
+const SURF = { g: 1, o: 1, l: 1, p: 1, c: 1, m: 1 }, NONE = [];
 const hash = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
 const mixc = (a, b, t) => { const p = rgbOf(a), q = rgbOf(b); return `rgb(${p.map((v, i) => Math.round(v + (q[i] - v) * t)).join(',')})`; };
 
@@ -74,8 +74,9 @@ export class Platformer extends Game {
   canJump(s) { return s.wait <= 0 && (!!s.on || !!s.lad || s.coy > 0 || s.j <= (s.wg > 0 ? 3 : 1)); }
 
   // ---------------------------------------------------------------- world queries
-  put(grid, o) {
-    let x0 = o.x, x1 = o.x + o.w;
+  // each bucket lists everything a hero centred in it can touch (actors reach further: magnet, shots)
+  put(grid, o, act) {
+    let x0 = o.x - (act ? 190 : 60), x1 = o.x + o.w + (act ? 170 : 60);
     if (o.k === 'm') { x0 -= Math.abs(o.ax); x1 += Math.abs(o.ax); }
     if (o.k === 'f') x1 += o.span;
     for (let b = Math.floor(x0 / BK), e = Math.floor(x1 / BK); b <= e; b++) { const a = grid.get(b); if (a) a.push(o); else grid.set(b, [o]); }
@@ -129,7 +130,7 @@ export class Platformer extends Game {
       if (s.on || s.lad || s.coy > 0) { s.vy = -P.jv; s.j = 1; s.coy = 0; if (s.lad) { s.lad = null; s.lc = 0.3; } s.on = null; s.jc++; ev && ev.push(['jump']); }
       else if (s.j <= (s.wg > 0 ? 3 : 1)) { s.vy = -P.av; s.j++; s.jc++; ev && ev.push(['air']); }
     }
-    const os = this.q(s.x - 40, s.x + w + 40, grid, this.qa);
+    const os = grid.get(Math.floor((s.x + w / 2) / BK)) || NONE;
     const pb = s.y + h, pvy = s.vy;
     if (s.lad) {
       const L = s.lad; s.vx = 0; s.vy = 0; s.y -= P.climb * dt;
@@ -179,7 +180,7 @@ export class Platformer extends Game {
     for (const o of os) if (o.k === 's' && s.x + 3 < o.x + o.w - 2 && s.x + w - 3 > o.x + 2 && s.y + h - 2 > o.y + 4 && s.y + 5 < o.y + o.h) this.harm(s);
     // foes: stomp from above, smash with star or speed, otherwise they hurt; the hero's own swing or shot
     const reach = s.gun ? 150 : 64, mr = items && s.mg > 0 ? 110 : 0;
-    const as = this.q(s.x - 40 - mr, s.x + w + Math.max(reach, mr) + 20, agrid, this.qb);
+    const as = agrid.get(Math.floor((s.x + w / 2) / BK)) || NONE;
     for (const f of as) {
       if (f.k !== 'f' || this.isDead(f, s)) continue;
       const fx = this.foeX(f, s.t), fy = this.foeY(f, s.t);
@@ -214,7 +215,7 @@ export class Platformer extends Game {
   key(s) { return ((Math.round(s.x / 3) * 512 + Math.max(0, Math.min(511, Math.round(s.y / 3) + 300))) * 64 + Math.max(0, Math.min(63, Math.round(s.vy / 50) + 30))) * 32 + s.j * 4 + (s.on ? 2 : 0) + (s.lad ? 1 : 0); }
   value(s) { return s.x + s.n * 40 + s.pw * 400 + s.heal * 300 + s.ko * 30 + s.bon * 20 - s.hurt * 3000 - s.jc * 6; }
   *search(s0, o) {
-    let fr = [{ s: s0, a: 0, up: null, v: 0 }], work = 0;
+    let fr = [{ s: s0, a: 0, up: null, v: 0 }], work = 0, far = s0.x, still = 0;
     for (let L = 0; L < o.layers; L++) {
       const nx = new Map();
       for (const nd of fr) for (let a = 0; a < 2; a++) {
@@ -229,6 +230,7 @@ export class Platformer extends Game {
       }
       if (!nx.size) return o.goal ? null : fr;
       fr = [...nx.values()];
+      if (o.goal) { let m = -1e9; for (const n of fr) m = Math.max(m, n.s.x); if (m > far + 1) { far = m; still = 0; } else if (++still > 40) return null; }
       if (fr.length > o.beam) { fr.sort((p, q) => q.v - p.v); fr.length = o.beam; }
       if (o.slice && work > o.slice) { work = 0; yield; }
     }
@@ -242,7 +244,7 @@ export class Platformer extends Game {
     return spare ? -200 : -700;
   }
   think() {
-    const it = this.search({ ...this.p, real: false, ev: null }, { layers: 45, beam: 44, items: true, grid: this.grid, agrid: this.agrid });
+    const it = this.search({ ...this.p, real: false, ev: null }, { layers: 26, beam: 24, items: true, grid: this.grid, agrid: this.agrid });
     let r; do r = it.next(); while (!r.done);
     let best = null, bv = -Infinity;
     for (const nd of r.value || []) { const v = nd.v + this.leaf(nd.s); if (v > bv) { bv = v; best = nd; } }
@@ -255,7 +257,7 @@ export class Platformer extends Game {
     if (this.dead > 0 || p.wait > 0) { this.plan = null; return; }
     if (this.tick % TICKS) return;
     const pl = this.plan, last = pl && pl[this.pk - 1];
-    if (!pl || this.pk >= Math.min(pl.length, 6) || (last && (Math.abs(last[1] - p.x) > 3 || Math.abs(last[2] - p.y) > 3))) this.think();
+    if (!pl || this.pk >= Math.min(pl.length, 5) || (last && (Math.abs(last[1] - p.x) > 3 || Math.abs(last[2] - p.y) > 3))) this.think();
     this.want = !!this.plan[this.pk++]?.[0];
   }
   down() { this.want = true; }
@@ -500,7 +502,7 @@ export class Platformer extends Game {
   *check(B) {
     const P = this.ph, grid = new Map(), agrid = new Map();
     for (const o of B.solids) this.put(grid, o);
-    for (const f of B.foes) this.put(agrid, f);
+    for (const f of B.foes) this.put(agrid, f, 1);
     this.put(grid, { k: 'g', id: -1, x: B.x1 - 1, y: B.y1, w: 300, h: DEEP });
     const goal = (s) => !!s.on && s.x > B.x1 + 4 && Math.abs(s.y + P.h - B.y1) < 0.5;
     const layers = Math.ceil(((B.x1 - B.x0) / P.run * 1.7 + 3) / (SDT * DEC));
@@ -510,14 +512,14 @@ export class Platformer extends Game {
     for (const [vx, fast] of tests) {
       const s = this.fresh(B.x0 + 2, B.y0 - P.h);
       s.on = B.entry; s.t = this.R(0, 40); s.vx = vx; s.wait = vx ? 0 : 0.6; if (fast) s.sp = 1e9;
-      if (!(yield* this.search(s, { layers, beam: 40, grid, agrid, items: false, goal, slice: 400 }))) return false;
+      if (!(yield* this.search(s, { layers, beam: 28, grid, agrid, items: false, goal, slice: 300 }))) return false;
     }
     return true;
   }
   commit(B) {
     for (const o of B.solids) this.put(this.grid, o);
-    for (const f of B.foes) this.put(this.agrid, f);
-    for (const it of B.items) this.put(this.agrid, it);
+    for (const f of B.foes) this.put(this.agrid, f, 1);
+    for (const it of B.items) this.put(this.agrid, it, 1);
     for (const d of B.deco) this.deco.push(d);
     this.segs.push(B); this.genX = B.x1; this.genY = B.y1;
     if (B.hasFast) this.fastTill = B.fastX;

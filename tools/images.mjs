@@ -17,47 +17,66 @@ export function imagesBuilder(K) {
   const plain = (s, n) => clip(stripTags(String(s || '')), n);
   const title = (t, date) => clip(`${t || 'Untitled'}${date ? ` (${date})` : ''}`, 90);
 
-  // ---------------------------------------------------------------- sources: each returns vetted [{ src, w, h, title, credit, link, by }] with .raw = results seen
-  const CATS = { fp: 'Featured_pictures_on_Wikimedia_Commons', qi: 'Quality_images' };
+  // ---------------------------------------------------------------- sources: each returns vetted [{ src, w, h, title, credit, link, by }]
+  // with .raw = results seen and .why = { reason: count } for the ones turned down
+  const CATS = { fp: 'Featured_pictures_on_Wikimedia_Commons', qi: 'Quality_images' }, samples = [];
+  const tally = (why, k) => { why[k] = (why[k] || 0) + 1; };
   async function commons(s, g) {
     const q = [s.commons, s.in && `incategory:${s.in.split('|').map((c) => CATS[c] || c.replace(/ /g, '_')).join('|')}`,
       ...(s.not || '').split(/\s+/).filter(Boolean).map((w) => `-${w}`), 'filetype:bitmap'].filter(Boolean).join(' ');
+    // same request shape as the builder's other Commons searches
     const p = { action: 'query', generator: 'search', gsrsearch: q, gsrnamespace: '6', gsrlimit: String(s.n || 40), gsrsort: s.sort || 'random', prop: 'imageinfo',
-      iiprop: 'url|size|mime|extmetadata', iiurlwidth: String(B.width), iiextmetadatafilter: 'LicenseShortName|Artist|ObjectName|Categories', format: 'json', formatversion: '2' };
-    const api = () => fetchJSON(`https://commons.wikimedia.org/w/api.php?${new URLSearchParams(p)}`, { timeout: 30000 });
+      iiprop: 'url|extmetadata|size|mime', iiurlwidth: String(B.width), format: 'json', formatversion: '2' };
+    const api = () => fetchJSON(`https://commons.wikimedia.org/w/api.php?${new URLSearchParams(p)}`, { timeout: 40000 });
     let j = await api();
     if (j.error && p.gsrsort) { delete p.gsrsort; j = await api(); }
     if (j.error) throw new Error(j.error.info || j.error.code);
-    const pages = j.query?.pages || [], out = [];
+    const pages = j.query?.pages || [], out = [], why = {};
     for (const pg of pages) {
-      const ii = pg.imageinfo?.[0], m = ii?.extmetadata || {}, lic = m.LicenseShortName?.value || '';
-      if (!ii?.thumburl || !/jpeg|tiff|png/.test(ii.mime || '') || !/\.(jpe?g|png)$/i.test(ii.thumburl) || ii.width < B.minWidth || !fits(ii.width, ii.height) || !licence.test(lic)) continue;
-      const file = pg.title.replace(/^File:/, '').replace(/\.\w+$/, ''), name = stripTags(m.ObjectName?.value || '') || file;
-      if (rejected(g, `${name} ${file}`, m.Categories?.value)) continue;
+      const ii = pg.imageinfo?.[0] || {}, m = ii.extmetadata || {}, lic = stripTags(String(m.LicenseShortName?.value || m.License?.value || ''));
+      const src = ii.thumburl || ii.url || '', w = +ii.thumbwidth || +ii.width, h = +ii.thumbheight || +ii.height;
+      const file = String(pg.title || '').replace(/^File:/, '').replace(/\.\w+$/, ''), name = stripTags(String(m.ObjectName?.value || '')) || file;
+      const no = !src || /\.(tiff?|svg|pdf|djvu|gif|webm|ogv|ogg)$/i.test(src.split('?')[0]) ? 'thumb' : !(+ii.width >= B.minWidth) ? 'small' : !fits(w, h) ? 'shape'
+        : !licence.test(lic) ? 'licence' : rejected(g, `${name} ${file}`, stripTags(String(m.Categories?.value || ''))) ? 'reject' : '';
+      if (no) {
+        tally(why, no);
+        if (samples.length < 6 && !samples.some((x) => x.g === g.id)) samples.push({ g: g.id, no, t: file.slice(0, 60), u: src.slice(-50), mime: ii.mime, w: ii.width, h: ii.height, lic: lic.slice(0, 30), keys: Object.keys(ii).join(',').slice(0, 120) });
+        continue;
+      }
       const by = plain(m.Artist?.value || 'Unknown', 40);
-      out.push({ src: ii.thumburl, w: ii.thumbwidth || ii.width, h: ii.thumbheight || ii.height, title: title(name), credit: `${by} · ${lic} · Wikimedia Commons`, link: ii.descriptionurl, by });
+      out.push({ src, w, h, title: title(name), credit: `${by} · ${lic} · Wikimedia Commons`, link: ii.descriptionurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(String(pg.title).replace(/ /g, '_'))}`, by });
     }
-    return Object.assign(out, { raw: pages.length });
+    return Object.assign(out, { raw: pages.length, why });
   }
 
   // Elasticsearch query as bracketed query-string params (GET), e.g. query[function_score][boost_mode]=replace
   const flat = (o, pre = '', out = {}) => { for (const [k, v] of Object.entries(o)) { const key = pre ? `${pre}[${k}]` : k; if (v && typeof v === 'object') flat(v, key, out); else out[key] = String(v); } return out; };
   async function aic(s, g) {
-    const filter = [{ term: { is_public_domain: true } }, { exists: { field: 'image_id' } }, ...(s.type ? [{ term: { artwork_type_id: s.type } }] : [])];
-    const must = [...(s.aic?.length ? [{ bool: { should: s.aic.map((a) => ({ match_phrase: { artist_title: a } })), minimum_should_match: 1 } }] : []),
-      ...(s.words ? [{ multi_match: { query: s.words, fields: ['title', 'term_titles'] } }] : [])];
-    // random order, seeded by the package, so each week draws a different set
-    const query = { function_score: { query: { bool: { filter, must } }, random_score: { seed: hashStr(`${id}/${g.id}`) % 1e9, field: 'id' }, boost_mode: 'replace' } };
-    const fields = 'id,title,image_id,artist_title,date_display,thumbnail,artwork_type_title,is_public_domain';
-    const j = await fetchJSON(`https://api.artic.edu/api/v1/artworks/search?${new URLSearchParams({ boost: 'false', limit: String(s.n || 60), fields, ...flat({ query }) })}`, { headers: { 'AIC-User-Agent': UA }, timeout: 30000 });
-    const iiif = j.config?.iiif_url || 'https://www.artic.edu/iiif/2', data = j.data || [], out = [];
+    // long artist lists go in chunks of five (a ten-name query was refused with 403); each chunk is retried once
+    const names = s.aic || [], chunks = names.length ? Array.from({ length: Math.ceil(names.length / 5) }, (_, k) => names.slice(k * 5, k * 5 + 5)) : [[]];
+    const fields = 'id,title,image_id,artist_title,date_display,thumbnail,artwork_type_title,is_public_domain', data = [], why = {}, out = [];
+    let iiif = 'https://www.artic.edu/iiif/2', fails = 0;
+    for (const [k, list] of chunks.entries()) {
+      const filter = [{ term: { is_public_domain: true } }, { exists: { field: 'image_id' } }, ...(s.type ? [{ term: { artwork_type_id: s.type } }] : [])];
+      const must = [...(list.length ? [{ bool: { should: list.map((a) => ({ match_phrase: { artist_title: a } })), minimum_should_match: 1 } }] : []),
+        ...(s.words ? [{ multi_match: { query: s.words, fields: ['title', 'term_titles'] } }] : [])];
+      // random order, seeded by the package, so each week draws a different set
+      const query = { function_score: { query: { bool: { filter, must } }, random_score: { seed: hashStr(`${id}/${g.id}/${k}`) % 1e9, field: 'id' }, boost_mode: 'replace' } };
+      const url = `https://api.artic.edu/api/v1/artworks/search?${new URLSearchParams({ boost: 'false', limit: String(Math.ceil((s.n || 60) / chunks.length)), fields, ...flat({ query }) })}`;
+      for (let t = 0; ; t++) {
+        try { const j = await fetchJSON(url, { headers: { 'AIC-User-Agent': UA }, timeout: 30000 }); iiif = j.config?.iiif_url || iiif; data.push(...(j.data || [])); break; }
+        catch (e) { if (t) { if (++fails === chunks.length) throw e; break; } await sleep(2500); }
+      }
+    }
     for (const a of data) {
       const t = a.thumbnail;
-      if (!a.is_public_domain || !a.image_id || !t || t.width < 843 || !fits(t.width, t.height) || (s.types && !s.types.includes(a.artwork_type_title)) || rejected(g, a.title || '')) continue;
+      const no = !a.is_public_domain || !a.image_id || !t ? 'licence' : !(t.width >= 843) ? 'small' : !fits(t.width, t.height) ? 'shape'
+        : s.types && !s.types.includes(a.artwork_type_title) ? 'type' : rejected(g, a.title || '') ? 'reject' : '';
+      if (no) { tally(why, no); continue; }
       const by = a.artist_title || 'Unknown';
       out.push({ src: `${iiif}/${a.image_id}/full/843,/0/default.jpg`, w: 843, h: Math.round(843 * t.height / t.width), title: title(a.title, a.date_display), credit: `${by} · Public domain · Art Institute of Chicago`, link: `https://www.artic.edu/artworks/${a.id}`, by });
     }
-    return Object.assign(out, { raw: data.length });
+    return Object.assign(out, { raw: data.length, why });
   }
 
   async function cma(s, g) {
@@ -65,34 +84,39 @@ export function imagesBuilder(K) {
     if (s.type) p.set('type', s.type);
     if (s.dept) p.set('department', s.dept);
     const j = await fetchJSON(`https://openaccess-api.clevelandart.org/api/artworks/?${p}`, { timeout: 40000 });
-    const data = j.data || [], out = [];
+    const data = j.data || [], out = [], why = {};
     for (const a of data) {
       const im = a.images?.web, w = +im?.width, h = +im?.height;
-      if (!im?.url || a.share_license_status !== 'CC0' || !fits(w, h) || rejected(g, a.title || '')) continue;
+      const no = !im?.url ? 'image' : a.share_license_status !== 'CC0' ? 'licence' : !fits(w, h) ? 'shape' : rejected(g, a.title || '') ? 'reject' : '';
+      if (no) { tally(why, no); continue; }
       const by = (a.creators?.[0]?.description || 'Unknown').replace(/\s*\(.*$/, '');
       out.push({ src: im.url, w, h, title: title(a.title, a.creation_date), credit: `${by} · CC0 · Cleveland Museum of Art`, link: a.url || `https://clevelandart.org/art/${a.accession_number}`, by });
     }
-    return Object.assign(out, { raw: data.length });
+    return Object.assign(out, { raw: data.length, why });
   }
 
   async function met(s, g) {
-    const base = 'https://collectionapi.metmuseum.org/public/collection/v1', p = new URLSearchParams({ hasImages: 'true', isPublicDomain: 'true' });
+    // v1/search now answers 410 Gone; v1.1/search takes the same filters (plus limit), objects stay on v1
+    const base = 'https://collectionapi.metmuseum.org/public/collection', p = new URLSearchParams({ hasImages: 'true', isPublicDomain: 'true' });
     if (s.artist) p.set('artistOrCulture', 'true');
     if (s.dept) p.set('departmentId', String(s.dept));
     if (s.medium) p.set('medium', s.medium);
     p.set('q', s.met);
-    const j = await fetchJSON(`${base}/search?${p}`, { timeout: 30000 });
+    let j;
+    try { j = await fetchJSON(`${base}/v1.1/search?${p}&limit=300`, { timeout: 30000, retries: 1 }); }
+    catch (e) { if (e.status !== 404 && e.status !== 410 && e.status !== 400) throw e; j = await fetchJSON(`${base}/v1/search?${p}`, { timeout: 30000, retries: 1 }); }
     const ids = shuffle((j.objectIDs || []).slice(0, 300)).slice(0, s.n || 12);
-    const objs = await pool(ids, 3, (oid) => fetchJSON(`${base}/objects/${oid}`, { retries: 1, timeout: 15000 }));
-    const out = [];
+    const objs = await pool(ids, 3, (oid) => fetchJSON(`${base}/v1/objects/${oid}`, { retries: 1, timeout: 15000 }));
+    const out = [], why = {};
     for (const o of objs) {
       // no pixel size in the record: take the shape from the work's size, "(73.7 x 92.1 cm)" is height × width
       const cm = /\(([\d.]+)\s*[x×]\s*([\d.]+)\s*cm\)/.exec(o?.dimensions || '');
-      if (!o?.isPublicDomain || !o.primaryImageSmall || !cm || !fits(+cm[2], +cm[1]) || rejected(g, o.title || '')) continue;
+      const no = !o ? 'fetch' : !o.isPublicDomain || !o.primaryImageSmall ? 'licence' : !cm || !fits(+cm[2], +cm[1]) ? 'shape' : rejected(g, o.title || '') ? 'reject' : '';
+      if (no) { tally(why, no); continue; }
       const by = o.artistDisplayName || 'Unknown';
       out.push({ src: o.primaryImageSmall, w: 960, h: Math.round(960 * cm[1] / cm[2]), title: title(o.title, o.objectDate), credit: `${by} · Public domain · The Met`, link: o.objectURL || `https://www.metmuseum.org/art/collection/search/${o.objectID}`, by });
     }
-    return Object.assign(out, { raw: ids.length });
+    return Object.assign(out, { raw: ids.length, why });
   }
 
   // ---------------------------------------------------------------- groups
@@ -102,7 +126,10 @@ export function imagesBuilder(K) {
     for (const [i, s] of g.src.entries()) {
       const kind = Object.keys(SOURCES).find((k) => k in s);
       if (!kind) continue;
-      try { const got = await SOURCES[kind](s, g); lists.push(shuffle([...got])); notes.push(`${kind} ${got.length}/${got.raw}`); }
+      try {
+        const got = await SOURCES[kind](s, g), why = Object.entries(got.why || {}).map(([k, v]) => `${k} ${v}`).join(' ');
+        lists.push(shuffle([...got])); notes.push(`${kind} ${got.length}/${got.raw}${why ? ` [${why}]` : ''}`);
+      }
       catch (e) { notes.push(`${kind} failed`); warn(`backgrounds ${g.id}: ${kind} source ${i + 1}: ${e.message}`); }
       await sleep(150);
     }
@@ -131,7 +158,7 @@ export function imagesBuilder(K) {
       out.push({ id: g.id, name: g.name, kind: g.kind, mood: g.mood, hue: g.hue, dark: g.dark || undefined, imgs: imgs.map(({ by, ...x }) => x) });
     });
     const n = out.reduce((a, g) => a + g.imgs.length, 0);
-    report.sources.backgrounds = { groups: out.length, images: n, per };
+    report.sources.backgrounds = { groups: out.length, images: n, per, ...(samples.length ? { turnedDown: samples } : {}) };
     log(`backgrounds: ${out.length}/${B.groups.length} groups, ${n} images`);
     return out;
   }

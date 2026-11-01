@@ -890,14 +890,15 @@ function buildStudio() {
 }
 
 // ------------------------------------------------------------------ long reads: novels (Gutenberg), poems (PoetryDB), long articles (Wikipedia)
-// Gutendex refuses bursts (HTTP 403), so its requests go one at a time with a pause and a retry.
+// Gutendex is slow and refuses bursts (HTTP 403), so its requests go one at a time, with a long
+// timeout, a pause and retries.
 let gutQueue = Promise.resolve();
 function gutendex(params) {
   const run = async () => {
     const url = `https://gutendex.com/books/?${new URLSearchParams(params)}`;
     for (let a = 0; ; a++) {
-      try { return await fetchJSON(url, { timeout: 30000, retries: 1 }); }
-      catch (e) { if (a >= 2 || (e.status && ![403, 429].includes(e.status))) throw e; await sleep(5000 * (a + 1)); }
+      try { return await fetchJSON(url, { timeout: 75000, retries: 0 }); }
+      catch (e) { if (a >= 2 || (e.status && ![403, 429].includes(e.status) && e.status < 500)) throw e; await sleep(5000 * (a + 1)); }
     }
   };
   const p = gutQueue.then(() => sleep(1200)).then(run);
@@ -947,7 +948,7 @@ function eroVerse(lines, pk) {
 function verseRun(lines, s, pk) {
   const ind = (l) => l.match(/^\s*/)[0].length, base = ind(lines[s]), out = [];
   let blank = 0, end = -1;
-  for (let i = s; i < lines.length && out.length < (pk.max || 90); i++) {
+  for (let i = s; i < lines.length && out.filter(Boolean).length < (pk.max || 100); i++) {
     const raw = lines[i];
     if (!raw.trim()) { if (++blank >= 3) break; continue; }
     if (base > 1 && ind(raw) < base) break;
@@ -1017,55 +1018,62 @@ function eroAuto(body, w, a) {
   return out;
 }
 async function buildErotica() {
-  const posts = [], per = {};
+  const posts = [], per = {}, books = {};
   for (const w of eroticaWorks) {
-    // Gutendex first (a verified edition from `ids` wins when listed), then the known ids
-    const cands = [];
-    try {
-      const j = await gutendex({ search: w.search, languages: 'en' });
-      const fit = (j.results || []).filter((b) => (!w.title || w.title.test(b.title)) && (!w.author || (b.authors || []).some((a) => w.author.test(a.name))) && gutTextUrl(b))
-        .sort((a, b) => (w.ids?.includes(b.id) ? 1 : 0) - (w.ids?.includes(a.id) ? 1 : 0) || (b.download_count || 0) - (a.download_count || 0));
-      for (const b of fit.slice(0, w.multi || 1)) cands.push({ id: b.id, url: gutTextUrl(b), title: b.title, listed: true });
-    } catch (e) { warn(`gutendex ${w.key}: ${e.message}`); }
-    for (const gid of w.ids || []) if (!cands.some((c) => c.id === gid)) cands.push({ id: gid, url: `https://www.gutenberg.org/cache/epub/${gid}/pg${gid}.txt` });
-    let got = [];
-    for (const c of cands) {
+    // known ebook ids first (each must still carry the right Title: line), then Gutendex
+    const tried = new Set();
+    let got = [], misses = [], used = null;
+    const attempt = async (c) => {
+      tried.add(c.id);
       let raw;
-      try { raw = await fetchText(c.url, { timeout: 60000, retries: 1 }); } catch (e) { warn(`gutenberg ${w.key} #${c.id}: ${e.message}`); continue; }
-      // an id from our own list must still be the right book
-      if (!c.listed && w.title && !w.title.test((raw.slice(0, 4000).match(/^Title:\s*(.+)$/m) || [])[1] || '')) { warn(`gutenberg ${w.key} #${c.id}: not the expected title`); continue; }
+      try { raw = await fetchText(c.url, { timeout: 60000, retries: 1 }); } catch (e) { misses = [`#${c.id}: ${e.message}`]; return false; }
+      const head = (raw.slice(0, 4000).match(/^Title:\s*(.+)$/m) || [])[1] || '';
+      if (!c.listed && w.title && !w.title.test(head)) { misses = [`#${c.id} is "${clip(head, 60)}", not this work`]; return false; }
       const body = gutBody(raw), paras = body.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean), lines = body.split('\n');
-      const base = { book: w.book || c.title, author: w.by, year: w.year, url: `https://www.gutenberg.org/ebooks/${c.id}`, source: 'Project Gutenberg', topic: 'erotica', erotica: true };
-      got = [];
+      const base = { book: w.book || c.title || head, author: w.by, year: w.year, url: `https://www.gutenberg.org/ebooks/${c.id}`, source: 'Project Gutenberg', topic: 'erotica', erotica: true };
+      const out = [], miss = [];
       for (const pk of w.picks || []) {
         const kind = pk.kind || w.kind;
         const res = pk.verses ? eroVerses(body, w, pk) : kind === 'poem' ? eroVerse(lines, pk) : eroProse(paras, pk);
-        if (!res) { warn(`erotica ${w.key}: "${pk.title}" not found in #${c.id}`); continue; }
-        if (!eroOk(res.join(' '), pk)) { warn(`erotica ${w.key}: "${pk.title}" failed the content check`); continue; }
-        got.push({ kind, title: pk.title, ...base, [kind === 'poem' ? 'lines' : 'paras']: res });
+        if (!res) { miss.push(`"${pk.title}" not found in #${c.id}`); continue; }
+        if (!eroOk(res.join(' '), pk)) { miss.push(`"${pk.title}" failed the content check`); continue; }
+        out.push({ kind, title: pk.title, ...base, [kind === 'poem' ? 'lines' : 'paras']: res });
       }
-      if (w.auto) for (const x of eroAuto(body, w, w.auto)) got.push({ kind: x.lines ? 'poem' : 'novel', title: x.lines ? `from ${w.book}` : w.book, ...base, ...x });
-      if (got.length) break;
+      if (w.auto) {
+        const auto = eroAuto(body, w, w.auto);
+        if (!auto.length) miss.push(`no excerpt in #${c.id} passed the content filters`);
+        for (const x of auto) out.push({ kind: x.lines ? 'poem' : 'novel', title: x.lines ? `from ${base.book}` : base.book, ...base, ...x });
+      }
+      misses = miss;
+      if (!out.length) return false;
+      got = out; used = `#${c.id} ${head || c.title || ''}`.trim();
+      return true;
+    };
+    let ok = false;
+    for (const gid of w.ids || []) if ((ok = await attempt({ id: gid, url: `https://www.gutenberg.org/cache/epub/${gid}/pg${gid}.txt` }))) break;
+    if (!ok) {
+      try {
+        const j = await gutendex({ search: w.search, languages: 'en' });
+        const fit = (j.results || []).filter((b) => !tried.has(b.id) && (!w.title || w.title.test(b.title)) && (!w.author || (b.authors || []).some((a) => w.author.test(a.name))) && gutTextUrl(b))
+          .sort((a, b) => (b.download_count || 0) - (a.download_count || 0));
+        if (!fit.length && !misses.length) misses = [`not on Gutendex ("${w.search}")`];
+        for (const b of fit.slice(0, w.multi || 1)) if ((ok = await attempt({ id: b.id, url: gutTextUrl(b), title: b.title, listed: true }))) break;
+      } catch (e) { misses.push(`gutendex: ${e.message}`); }
     }
-    per[w.key] = got.length;
+    for (const m of misses) warn(`erotica ${w.key}: ${m}`);
+    per[w.key] = got.length; books[w.key] = used || 'none';
     posts.push(...got);
-    log(`erotica: ${w.key} -> ${got.length}`);
+    log(`erotica: ${w.key} -> ${got.length}${used ? ` (${used})` : ''}`);
   }
   report.sources.erotica = per;
+  report.sources.eroticaBooks = books;
   return posts;
 }
 
-async function buildReads(wiki) {
-  const R = config.reads || {}, n = want.read || 0, out = [];
-  if (!n) return out;
-  if (OFFLINE) {
-    for (let i = 0; i < n; i++) out.push(i % 3 === 1 ? { kind: 'poem', title: `Offline poem ${i}`, author: 'Anonymous', lines: Array.from({ length: 14 }, (_, k) => `Placeholder line ${k + 1} of a poem for layout testing`) } : { kind: i % 3 ? 'article' : 'novel', title: `Offline long read ${i}`, book: 'A Test Book', author: 'A. Writer', paras: Array.from({ length: 5 }, (_, k) => `Paragraph ${k + 1}. This is placeholder text for the long reads layout, written so the card has something to fold and unfold. It is never committed.`) });
-    // classic erotica fixtures: always shown (no adult flag), flagged erotica
-    const ero = { book: 'A Classic of Love', author: 'An Old Poet', year: 1866, source: 'Project Gutenberg', topic: 'erotica', erotica: true, url: 'https://www.gutenberg.org/' };
-    out.splice(0, 2, { kind: 'novel', title: 'Offline erotica excerpt', ...ero, paras: Array.from({ length: 4 }, (_, k) => `Paragraph ${k + 1} of a classic erotica excerpt. Placeholder text for the long reads layout; the real package takes a vetted passage from Project Gutenberg.`) },
-      { kind: 'poem', title: 'Offline erotic poem', ...ero, lines: Array.from({ length: 12 }, (_, k) => (k % 5 === 4 ? '' : `Placeholder line ${k + 1} of a love poem`)) });
-    return out.map((x, i) => ({ id: `rd-off-${i}`, cat: 'read', sub: x.kind, ...x }));
-  }
+// Novels, poems and erotica don't depend on the week's Wikipedia picks, and Gutendex is slow, so
+// main() starts this first and the rest of the build runs meanwhile.
+async function readsPrefetch() {
+  const R = config.reads || {}, out = [];
   // novels: popular public-domain books on our themes, excerpts of five paragraphs
   const books = [];
   await pool(few(R.gutenbergTopics, 2), 3, async (topic) => {
@@ -1097,6 +1105,22 @@ async function buildReads(wiki) {
     const j = await fetchJSON(`https://poetrydb.org/random/${QUICK ? 20 : R.poemsFetch || 120}`, { timeout: 30000 });
     for (const p of shuffle(j || []).filter((p) => +p.linecount >= 8 && +p.linecount <= (R.poemMaxLines || 70)).slice(0, R.poems || 60)) out.push({ kind: 'poem', title: p.title, author: p.author, lines: p.lines, url: `https://www.google.com/search?q=${encodeURIComponent(`${p.title} ${p.author}`)}`, source: 'PoetryDB' });
   } catch (e) { warn(`poetrydb: ${e.message}`); }
+  const ero = await buildErotica();
+  return { out, ero, books: books.length };
+}
+async function buildReads(wiki, early) {
+  const R = config.reads || {}, n = want.read || 0;
+  if (!n) return [];
+  if (OFFLINE) {
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(i % 3 === 1 ? { kind: 'poem', title: `Offline poem ${i}`, author: 'Anonymous', lines: Array.from({ length: 14 }, (_, k) => `Placeholder line ${k + 1} of a poem for layout testing`) } : { kind: i % 3 ? 'article' : 'novel', title: `Offline long read ${i}`, book: 'A Test Book', author: 'A. Writer', paras: Array.from({ length: 5 }, (_, k) => `Paragraph ${k + 1}. This is placeholder text for the long reads layout, written so the card has something to fold and unfold. It is never committed.`) });
+    // classic erotica fixtures: always shown (no adult flag), flagged erotica
+    const ero = { book: 'A Classic of Love', author: 'An Old Poet', year: 1866, source: 'Project Gutenberg', topic: 'erotica', erotica: true, url: 'https://www.gutenberg.org/' };
+    out.splice(0, 2, { kind: 'novel', title: 'Offline erotica excerpt', ...ero, paras: Array.from({ length: 4 }, (_, k) => `Paragraph ${k + 1} of a classic erotica excerpt. Placeholder text for the long reads layout; the real package takes a vetted passage from Project Gutenberg.`) },
+      { kind: 'poem', title: 'Offline erotic poem', ...ero, lines: Array.from({ length: 12 }, (_, k) => (k % 5 === 4 ? '' : `Placeholder line ${k + 1} of a love poem`)) });
+    return out.map((x, i) => ({ id: `rd-off-${i}`, cat: 'read', sub: x.kind, ...x }));
+  }
+  const { out, ero, books } = await (early || readsPrefetch());
   // long articles: the first five paragraphs of this week's longest Wikipedia picks
   const long = [...wiki].sort((a, b) => (b.summary?.length || 0) - (a.summary?.length || 0)).slice(0, QUICK ? 3 : R.articles || 30);
   await pool(long, 3, async (w) => {
@@ -1108,9 +1132,8 @@ async function buildReads(wiki) {
     } catch (e) { warn(`long article ${w.title}: ${e.message}`); }
   });
   // classic erotica: a reserved share, mixed in with the rest (all of it in quick builds, to check every pick)
-  const ero = await buildErotica();
   const eroN = QUICK ? ero.length : Math.min(ero.length, R.erotica ?? 20);
-  report.sources.reads = { novels: out.filter((x) => x.kind === 'novel').length, poems: out.filter((x) => x.kind === 'poem').length, articles: out.filter((x) => x.kind === 'article').length, books: books.length, erotica: ero.length };
+  report.sources.reads = { novels: out.filter((x) => x.kind === 'novel').length, poems: out.filter((x) => x.kind === 'poem').length, articles: out.filter((x) => x.kind === 'article').length, books, erotica: ero.length };
   const mix = [...shuffle(ero).slice(0, eroN), ...shuffle(out).slice(0, Math.max(0, n - eroN))];
   return shuffle(mix).map((x) => ({ id: `rd${hashStr(`${x.title}${x.paras?.[0] || x.lines?.[0] || ''}`).toString(36)}`, cat: 'read', sub: x.kind, ...x }));
 }
@@ -1265,6 +1288,8 @@ async function main() {
   let wiki = [], video = [], web = [], quotes = [], commons = [], kym = [], sprites = [], themes = [], news = [], textures = [], backgrounds = [], oracleData = null;
   // which network sources this build needs (all of them unless --only)
   const pics = need('game', 'product');
+  const readsEarly = !OFFLINE && need('read') && want.read ? readsPrefetch() : null;
+  readsEarly?.catch(() => {});
   if (OFFLINE) {
     ({ wiki, video, web, quotes, commons, kym } = offlineFixtures());
     if (pics) { sprites = tagSprites(await moreSprites()); backgrounds = await buildBackgrounds(); }
@@ -1296,7 +1321,7 @@ async function main() {
     oracle: () => buildOracle(),
     power: () => power,
     studio: () => buildStudio(),
-    read: () => buildReads(wiki)
+    read: () => buildReads(wiki, readsEarly)
   };
   const posts = {};
   for (const [k, make] of Object.entries(all)) if (need(k)) posts[k] = await make();

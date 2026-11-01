@@ -9,6 +9,7 @@ Running list of wiring the lead must do before the final push.
 ## Notes from finished packages
 - Characters: persona.js shared spec; MARROW VER m5, Crystal VER c2 (caches refresh); brawler roster from the persona pool; saved hero fights every other match; hero = { name, seed, persona, dnd, crystal, marrow } (old saves upgrade).
 - Merge + Tetris: done; stacker.js deleted.
+- Creatures: spirits.js done; monster() returns it (square frames facing right; walk/attack/hurt/dead/big/anatomy lazy); beasts.js now unused (delete at the end if nothing imports it).
 - Images: background groups + sprite tags; CI showed Commons groups empty, Met 410 — fix in progress.
 
 ## To do

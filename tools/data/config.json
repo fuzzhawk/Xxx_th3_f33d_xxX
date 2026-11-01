@@ -539,15 +539,6 @@
         "max": 10
       },
       {
-        "name": "Achewood",
-        "urls": [
-          "https://achewood.com/rss.php"
-        ],
-        "home": "https://achewood.com/",
-        "scrape": true,
-        "max": 8
-      },
-      {
         "name": "Moonbeard",
         "urls": [
           "https://moonbeard.com/feed/"
@@ -595,14 +586,6 @@
           "https://www.mrlovenstein.com/rss.xml"
         ],
         "home": "https://www.mrlovenstein.com/",
-        "max": 8,
-        "nsfw": true
-      },
-      {
-        "name": "Extra Fabulous Comics",
-        "urls": [
-          "https://extrafabulouscomics.com/feed/"
-        ],
         "max": 8,
         "nsfw": true
       },
@@ -757,7 +740,8 @@
           ],
           [
             "The Electronic Intifada",
-            "https://electronicintifada.net/rss.xml"
+            "https://electronicintifada.net/rss.xml",
+            "https://news.google.com/rss/search?q=site:electronicintifada.net"
           ],
           [
             "Drop Site News",
@@ -765,11 +749,13 @@
           ],
           [
             "The Cradle",
-            "https://thecradlemedia.substack.com/feed"
+            "https://thecradlemedia.substack.com/feed",
+            "https://news.google.com/rss/search?q=site:thecradle.co"
           ],
           [
             "+972 Magazine",
-            "https://972mag.com/feed"
+            "https://972mag.com/feed",
+            "https://news.google.com/rss/search?q=site:972mag.com"
           ],
           [
             "Middle East Eye",
@@ -807,7 +793,8 @@
         "feeds": [
           [
             "Democracy Now!",
-            "https://www.democracynow.org/democracynow.rss"
+            "https://www.democracynow.org/democracynow.rss",
+            "https://news.google.com/rss/search?q=site:democracynow.org"
           ],
           [
             "Common Dreams",
