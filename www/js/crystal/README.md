@@ -160,6 +160,10 @@ S.setCharacter({ job: 'Detective', weapon: 'rifle', trimColor: 'Scarlet' }, seed
 | Headwear | bandana, hood, helm, wizard hat, cap, hard hat, fedora, space helmet, visor |
 | Tops | vest, short sleeve, long sleeve, long tunic, robe, open jacket, suit and tie, long coat, armour |
 | Weapons | sword, dagger, staff, pistol, rifle, energy saber, wrench |
+| Hair | bald, buzz, short, spiky, bob, long, ponytail, braid, pigtails, topknot, bun, mohawk, afro |
+| Extras | `beard` (none, stubble, short, long), `cape` (none, cape) + `capeColor`, bottoms `skirt` |
+
+The same person in MARROW style: `www/js/persona.js` (`personaToCrystal`, `personaToMarrow`, `personaFor(seed, era)`).
 
 `trimColor` colours ties, coat linings and hat bands. `weaponColor` colours hilts, staff wood and the saber's beam.
 

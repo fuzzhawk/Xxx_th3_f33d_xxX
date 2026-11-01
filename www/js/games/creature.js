@@ -3,7 +3,7 @@
 // seeded, so the same post always produces the same cast.
 import { mulberry32 } from '../util.js';
 import { marrowSheet } from '../marrow/sprites.js';
-import { beast } from '../beasts.js';
+import { spirit } from '../spirits.js';
 
 const cache = new Map();
 const memo = (key, fn) => { if (!cache.has(key)) { cache.set(key, fn()); if (cache.size > 400) cache.delete(cache.keys().next().value); } return cache.get(key); };
@@ -247,8 +247,8 @@ export function humanoid(seed, hue = 0, opts = {}) {
   return memo(`mh${id}|${JSON.stringify(opts.marrow || null)}|${opts.monsters ? 1 : 0}`, () => marrowSheet(id, { look: opts.marrow, monsters: opts.monsters }, ph));
 }
 
-// Creatures: BEASTS (skeleton + signed-distance pixel renderer, procedural poses).
-// Returns { frames: [a, b], walk, attack, hurt, dead, plan, hue }.
+// Creatures: SPIRITS (folk-tale spirits × cute animal chimeras, drawn smooth at 4×, shrunk to pixels).
+// Returns { frames: [a, b], walk, attack, hurt, dead, plan, hue, genome, name, species, palette, anatomy, big }.
 export function monster(seed, hue = 0, size = 18, tier = 0, opts = {}) {
-  return memo(`b${seed}|${Math.round(hue)}|${size}|${tier}|${opts.plan || ''}`, () => beast(seed, hue, size, tier, { plan: opts.plan, grit: opts.grit }));
+  return memo(`b${seed}|${Math.round(hue)}|${Math.round(size)}|${tier}|${opts.plan || ''}|${opts.grit ?? ''}|${opts.dither ?? ''}|${opts.outline ?? ''}`, () => spirit(seed, hue, size, tier, { plan: opts.plan, grit: opts.grit, dither: opts.dither, outline: opts.outline }));
 }

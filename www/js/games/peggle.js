@@ -124,7 +124,7 @@ export class PegShot extends Game {
   stampPeg(p, on) {
     if (p.brick) this.mat.solidRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h, on);
     else this.mat.solid(p.x, p.y, p.r, on);
-    p.sc = on ? `${Math.floor(p.x / 3)},${Math.floor(p.y / 3)}` : null;
+    p.sc = on ? Math.floor(p.x / 3) * 1000 + Math.floor(p.y / 3) : -1;
   }
   stampBucket(on) {
     const m = this.mat, x = this.bucket.cell * m.cs;
@@ -195,7 +195,9 @@ export class PegShot extends Game {
       if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy) * 0.9; }
       const cell = this.grid[Math.floor(b.y / GC) * this.gx + Math.floor(b.x / GC)] || [];
       for (const p of cell) if (p.brick ? hitBrick(b, p, 0.6) : bounce(b, p.x, p.y, p.r, 0.78)) if (!seen.has(p)) { seen.add(p); v += p.k === 'orange' ? (left === 1 ? 40 : 10) : p.purple ? 12 : p.k === 'green' ? 7 : p.k === 'bomb' ? 7 + this.pegs.filter((q) => q.k === 'orange' && !q.gone && Math.hypot(q.x - p.x, q.y - p.y) < 46).length * 6 : 1; }
-      for (const p of this.moving) { const [x, y, ux, uy] = this.pegAt(p, t); if (bounce(b, x, y, p.r, 0.78, ux, uy) && !seen.has(p)) { seen.add(p); v += p.k === 'orange' ? (left === 1 ? 40 : 10) : p.k === 'bomb' ? 8 : 1; } }
+      for (const p of this.moving) {
+        if (p.R ? Math.abs(b.x - p.cx) > p.R + 16 || Math.abs(b.y - p.cy) > p.R + 16 : Math.abs(b.y - p.y) > 16 || Math.abs(b.x - p.sx) > p.amp + 16) continue;
+        const [x, y, ux, uy] = this.pegAt(p, t); if (bounce(b, x, y, p.r, 0.78, ux, uy) && !seen.has(p)) { seen.add(p); v += p.k === 'orange' ? (left === 1 ? 40 : 10) : p.k === 'bomb' ? 8 : 1; } }
       bx += bd * 90 * dt; if (bx > W - BK_W / 2 - 6) bd = -1; if (bx < BK_W / 2 + 6) bd = 1;
       if (b.y > BK_Y && Math.abs(b.x - bx) < BK_W / 2 - 6) { v += 6; break; }
       if (b.y > H + 10) break;
@@ -241,6 +243,7 @@ export class PegShot extends Game {
     const t = this.matOf(p), col = t === SAND ? (p.purple ? COL.purple : COL[p.k]) : null;
     if (p.brick) this.mat.crumbleRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h, t, col);
     else this.mat.crumble(p.x, p.y, p.r, t, col);
+    if (t !== EMBER) this.mat.spray(p.x, p.y, p.brick ? 18 : 12, t, col, 70, 0, -30);
     this.fx.puffs(p.x, p.y, 2, '#e8e0d8', 30, 0.6);
     if (t === LAVA || t === EMBER) this.fx.sparks(p.x, p.y, 5, '#ffb347', 120);
   }
@@ -290,7 +293,7 @@ export class PegShot extends Game {
       if (p.gone) continue;
       if (p.R || p.amp) {
         [p.x, p.y] = this.pegAt(p, this.lt);
-        const sc = `${Math.floor(p.x / 3)},${Math.floor(p.y / 3)}`;
+        const sc = Math.floor(p.x / 3) * 1000 + Math.floor(p.y / 3);
         if (sc !== p.sc) { m.solid(p.ox ?? p.x, p.oy ?? p.y, p.r, false); m.solid(p.x, p.y, p.r, true); p.sc = sc; p.ox = p.x; p.oy = p.y; }
       }
       if (p.fuse > 0 && (p.fuse -= sdt) <= 0) { p.fuse = 0; this.crumble(p); this.explode(p.x, p.y, 46); }
@@ -363,7 +366,7 @@ export class PegShot extends Game {
     if (this.phase === 'fly' && !this.balls.length) {
       this.phase = 'clear'; this.clearT = 0;
       this.queue = this.pegs.filter((p) => p.lit && !p.gone);
-      if (this.shot?.pts > 0) this.fx.pop(CX, 70, `SHOT +${this.shot.pts}`, '#fff', 13);
+      if (this.shot?.pts > 0) this.fx.pop(CX, 112, `SHOT +${this.shot.pts}`, '#fff', 13);
     } else if (this.phase === 'clear') {
       if ((this.clearT -= dt) > 0) return;
       this.clearT = 0.045;
@@ -394,7 +397,12 @@ export class PegShot extends Game {
     g.addColorStop(0, lit ? '#fff' : '#ffffffaa'); g.addColorStop(lit ? 0.5 : 0.25, col); g.addColorStop(1, lit ? col : '#00000055');
     x.fillStyle = col; x.beginPath(); x.arc(0, 0, r, 0, TAU); x.fill(); x.fillStyle = g; x.fill();
     x.lineWidth = lit ? 1.6 : 1; x.strokeStyle = lit ? '#fff' : 'rgba(0,0,0,.55)'; x.stroke();
-    if (k === 'bomb') { x.fillStyle = '#1b1416'; x.beginPath(); x.arc(0, 0.8, r * 0.5, 0, TAU); x.fill(); x.strokeStyle = '#ffd34d'; x.lineWidth = 1.2; x.beginPath(); x.moveTo(r * 0.25, -r * 0.2); x.quadraticCurveTo(r * 0.6, -r * 0.8, r * 0.2, -r * 0.9); x.stroke(); }
+    if (k === 'bomb') {
+      x.fillStyle = '#17110f'; x.beginPath(); x.arc(0, r * 0.12, r * 0.62, 0, TAU); x.fill();
+      x.fillStyle = 'rgba(255,255,255,.55)'; x.beginPath(); x.arc(-r * 0.22, -r * 0.08, r * 0.16, 0, TAU); x.fill();
+      x.strokeStyle = '#d9b37a'; x.lineWidth = 1.3; x.beginPath(); x.moveTo(r * 0.3, -r * 0.4); x.quadraticCurveTo(r * 0.7, -r * 0.9, r * 0.35, -r * 1.15); x.stroke();
+      x.fillStyle = '#ffe14d'; x.beginPath(); x.arc(r * 0.35, -r * 1.15, 1.4, 0, TAU); x.fill();
+    }
     return (this.spr[key] = cv);
   }
   draw(c) {
@@ -405,7 +413,7 @@ export class PegShot extends Game {
     for (const p of this.pegs) {
       if (p.gone) continue;
       const k = p.purple ? 'purple' : p.k, col = COL[k];
-      if (p.lit || p.flash) { const g = glowSprite(col), q = (p.brick ? p.w : 18) * (1.6 + p.flash); c.globalCompositeOperation = 'lighter'; c.globalAlpha = p.lit ? 0.55 : p.flash; c.drawImage(g, p.x - q / 2, p.y - q / 2, q, q); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; }
+      if (p.lit || p.flash || p.k === 'bomb') { const g = glowSprite(col), q = (p.brick ? p.w : 18) * (1.6 + p.flash); c.globalCompositeOperation = 'lighter'; c.globalAlpha = p.lit ? 0.55 : p.flash || 0.22 + Math.sin(this.t * 5 + p.x) * 0.12; c.drawImage(g, p.x - q / 2, p.y - q / 2, q, q); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; }
       if (p.brick) {
         c.fillStyle = col; c.globalAlpha = p.lit ? 1 : 0.85; roundRect(c, p.x - p.w / 2, p.y - p.h / 2, p.w, p.h, 3); c.fill(); c.globalAlpha = 1;
         c.strokeStyle = p.lit ? '#fff' : 'rgba(0,0,0,.5)'; c.lineWidth = p.lit ? 1.5 : 1; c.stroke();

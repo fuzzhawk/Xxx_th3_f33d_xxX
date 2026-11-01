@@ -115,7 +115,7 @@ export class Dash extends Game {
   hurt(o, pit) {
     const p = this.p;
     if (pit) {
-      if (!p.shield || p.y > H) return p.y > H - 10;
+      if (!p.shield) return o === 'wall' || p.y > H - 10;
       p.shield = false; p.vy = -900; p.y = Math.min(p.y, G - S); this.pop(); return false;
     }
     if (p.inv > 0) return false;
