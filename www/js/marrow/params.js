@@ -23,9 +23,12 @@ export const PRESET_NAMES = Object.keys(PRESETS);
 export function randomParams(seed, opts = {}) {
   const r = mulberry(seed), g = (m, s, lo, hi) => { const v = m + s * ((r() + r() + r()) - 1.5) * 1.15; return Math.min(hi, Math.max(lo, v)); };
   const p = deep(DEFAULTS); p.atkType = opts.atkType || p.atkType;
-  p.height = +g(1.74, .22, 1.2, 2.2).toFixed(2); p.muscle = +g(1.05, .35, .55, 1.75).toFixed(2); p.fat = Math.round(g(19, 12, 5, 42)); p.bias = +g(0, .5, -.8, .8).toFixed(2); p.bone = +g(1, .12, .86, 1.24).toFixed(2);
+  p.height = +g(1.74, .22, 1.2, 2.2).toFixed(2); p.muscle = +g(1.05, .35, .55, 1.75).toFixed(2); p.fat = Math.round(g(16, 9, 5, 38)); p.bias = +g(0, .5, -.8, .8).toFixed(2); p.bone = +g(1, .12, .86, 1.24).toFixed(2);
   for (const k of ['headL', 'neckL', 'torsoL', 'upperArmL', 'forearmL', 'handL', 'thighL', 'shankL', 'footL']) p[k] = +g(1, .1, .82, 1.25).toFixed(2);
-  p.chest = +g(1, .14, .82, 1.35).toFixed(2); p.belly = +g(1, .22, .65, 1.55).toFixed(2);
+  // a touch heroic: bigger heads and hands, longer legs, shorter trunks, fuller chests, flatter bellies
+  p.headL = +g(1.1, .07, .95, 1.3).toFixed(2); p.handL = +g(1.05, .07, .9, 1.25).toFixed(2); p.torsoL = +g(.96, .06, .84, 1.1).toFixed(2);
+  p.thighL = +g(1.03, .06, .9, 1.18).toFixed(2); p.shankL = +g(1.03, .06, .9, 1.18).toFixed(2);
+  p.chest = +g(1.07, .13, .85, 1.35).toFixed(2); p.belly = +g(.92, .18, .65, 1.45).toFixed(2);
   p.strength = +g(1, .28, .45, 1.8).toFixed(2); p.fastTwitch = Math.round(g(50, 18, 22, 78)); p.actTime = Math.round(g(26, 10, 12, 60)); p.control = +g(18, 4, 10, 28).toFixed(1);
   for (const t in p.joints) { const u = p.joints[t]; u.min = Math.round(u.min * g(1, .22, .6, 1.4)); u.max = Math.round(u.max * g(1, .18, .65, 1.3)); u.sPos = Math.round(g(100, 30, 40, 180)); u.sNeg = Math.round(g(100, 30, 40, 180)); }
   p.walkCadence = Math.round(g(108, 14, 84, 140)); p.walkStride = +g(1.05, .15, .75, 1.35).toFixed(2); p.walkArm = Math.round(g(18, 8, 4, 38)); p.walkLean = Math.round(g(4, 4, -2, 15)); p.walkKnee = +g(1, .15, .7, 1.4).toFixed(2);

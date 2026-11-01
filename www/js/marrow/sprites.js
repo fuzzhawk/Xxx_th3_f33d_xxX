@@ -4,7 +4,7 @@
 // character is only ever built once.
 import { idbGet, idbSet } from '../store.js';
 
-const VER = 'm4';
+const VER = 'm5';
 let worker = null, nextId = 1;
 const pending = new Map(), queue = [];
 let busy = false;
@@ -58,7 +58,7 @@ async function fill(key, msg, targets) {
 
 const W0 = 36, H0 = 48, SCALE0 = 0.47;
 // The generic sheet every game uses: { idle, walk: [a, b], walkCycle, jump, punch, kick, special, block, hurt, ko }
-const PICK = { walk: 8, turn: [0.04], jump: [0.42], punch: [0.5], kick: [0.5], hadouken: [0.55], block: [0.85], hurt: [0.25] };
+const PICK = { walk: 8, turn: [0.04], jump: [0.42], punch: ['@h'], kick: ['@h'], hadouken: ['@h'], block: [0.85], hurt: [0.25] };
 export function marrowSheet(seed, opts = {}, placeholder = null) {
   const look = opts.look || null, g = opts.grit ?? gritFor(seed);
   const key = `${VER}|sheet|${seed}|${JSON.stringify(look)}|${opts.monsters ? 1 : 0}|${g}`;

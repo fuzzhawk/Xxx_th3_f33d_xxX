@@ -40,8 +40,8 @@ function frames(job) {
     const wr = c.wear[id] ||= simWear(c.R, a, c.p);
     let fm = null, fa = null;
     if (job.face) { c.faceM ||= buildFace(c.p, Object.fromEntries(Object.keys(FACE_DEFAULTS).map((k) => [k, c.p[k] ?? FACE_DEFAULTS[k]])), c.p, 2); fm = c.faceM; fa = c.faces[id] ||= simFaceForAnim(c.R, fm, a, id, 'auto'); }
-    // spec: a frame count (evenly spaced) or a list of fractions of the move
-    const times = Array.isArray(spec) ? spec.map((f) => f * (a.duration - 1 / 120)) : Array.from({ length: spec }, (_, i) => (a.loop ? i * a.duration / spec : i * (a.duration - 1 / 120) / Math.max(1, spec - 1)));
+    // spec: a frame count, or fractions of the move ('@h' etc. name a timing mark: strike start, first contact, strike end)
+    const times = Array.isArray(spec) ? spec.map((f) => (typeof f === 'string' ? (a.marks?.[f.slice(1)] ?? 0.5) : f) * (a.duration - 1 / 120)) : Array.from({ length: spec }, (_, i) => (a.loop ? i * a.duration / spec : i * (a.duration - 1 / 120) / Math.max(1, spec - 1)));
     out[id] = times.map((t, k) => {
       const fr = frameAt(a, t), f2 = fr.dx !== undefined ? Object.assign({}, fr, { x: fr.dx }) : fr;
       const wear = { w: c.p, spec: wr.spec, pos: wearAt(a, wr, t), offsets: wr.offsets };
@@ -52,7 +52,7 @@ function frames(job) {
       transfer.push(d.buffer);
       return d;
     });
-    meta[id] = { loop: !!a.loop, duration: a.duration, travel: !!a.travel };
+    meta[id] = { loop: !!a.loop, duration: a.duration, travel: !!a.travel, speed: a.speed || 0, marks: a.marks || null };
   }
   return { out, meta, transfer, outfit: c.p.outfit, skin: c.skin };
 }

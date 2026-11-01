@@ -5,27 +5,38 @@
 // super meter that unlocks a cinematic ultra; ultra finishes on the last round.
 // On autopilot the crowd bets salt on every match (SaltyBet-style).
 import { Game, W, H, roundRect } from './engine.js';
-import { humanoid, creatureName } from './creature.js';
+import { creatureName } from './creature.js';
 import { marrowAnims } from '../marrow/sprites.js';
+import { crystalSheet, drawFrame } from '../crystal/sprites.js';
+import { ERAS, personaFor, poolSeed, normPersona, personaToMarrow, personaToCrystal } from '../persona.js';
+import { getHero } from '../hero.js';
 
-// frames per animation rendered by MARROW (fractions for single held poses)
-// about twice the frames of a typical fighter sheet, so moves read smoothly; guard breathes in and out
-const BREATH = [0.02, 0.035, 0.05, 0.065, 0.08, 0.095, 0.11, 0.095, 0.08, 0.065, 0.05, 0.035];
-const ANIMS = { guard: BREATH, walk: 12, jump: 12, punch: 10, kick: 11, palm: 10, sidekick: 11, sweep: 11, overhead: 11, flyknee: 12, flurry: 16, uppercut: 12, hadouken: 11, spinkick: 14, hurt: 8, knockdown: 12, block: [0.6, 0.7], dance: 16 };
-// gameplay for each attack: duration, when it hits (fraction), reach, damage, hits, effects
+// frames per animation rendered by MARROW (fractions for single held poses). The clips start straight out of the
+// guard and end as they return to it; guard is a looping bounce, fwalk a guarded walk (played backwards to retreat).
+const ANIMS = { guard: 12, fwalk: 12, jump: 12, punch: 9, kick: 10, palm: 9, sidekick: 10, sweep: 10, overhead: 10, flyknee: 11, flurry: 14, uppercut: 11, hadouken: 10, spinkick: 12, hurt: 7, knockdown: 12, block: [0.55, 0.8], dance: 14 };
+// gameplay for each attack: duration, when it hits (fraction), reach, damage, hits, effects. Short start-ups and
+// recoveries; a hit can be cancelled into the listed follow-ups (or any special) from `cancel` of the way through.
 const MOVES = {
-  punch: { t: 0.32, at: [0.45], reach: 46, dmg: 5, chain: ['punch', 'palm', 'kick'] },
-  kick: { t: 0.48, at: [0.5], reach: 58, dmg: 8, chain: ['sidekick', 'uppercut'] },
-  palm: { t: 0.42, at: [0.55], reach: 50, dmg: 9, push: 22, chain: ['kick', 'flurry'] },
-  sidekick: { t: 0.52, at: [0.5], reach: 66, dmg: 11, push: 30, chain: ['uppercut', 'hadouken'] },
-  sweep: { t: 0.55, at: [0.45], reach: 62, dmg: 8, low: 1, down: 1 },
-  overhead: { t: 0.58, at: [0.5], reach: 52, dmg: 13, high: 1 },
-  flyknee: { t: 0.7, at: [0.4], reach: 56, dmg: 12, lunge: 120 },
-  flurry: { t: 0.85, at: [0.2, 0.32, 0.44, 0.56, 0.68], reach: 46, dmg: 3, chain: ['uppercut'] },
-  uppercut: { t: 0.8, at: [0.35], reach: 50, dmg: 15, down: 1, special: 1 },
-  hadouken: { t: 0.62, at: [0.5], reach: 0, dmg: 12, ball: 1, special: 1 },
-  spinkick: { t: 0.9, at: [0.3, 0.45, 0.6, 0.75], reach: 60, dmg: 4, lunge: 90, special: 1 }
+  punch: { t: 0.24, at: [0.36], reach: 46, dmg: 5, chain: ['punch', 'palm', 'kick'] },
+  kick: { t: 0.38, at: [0.44], reach: 58, dmg: 8, chain: ['sidekick', 'uppercut'] },
+  palm: { t: 0.34, at: [0.46], reach: 50, dmg: 9, push: 22, chain: ['kick', 'flurry'] },
+  sidekick: { t: 0.42, at: [0.44], reach: 66, dmg: 11, push: 30, chain: ['uppercut', 'hadouken'] },
+  sweep: { t: 0.46, at: [0.42], reach: 62, dmg: 8, low: 1, down: 1 },
+  overhead: { t: 0.48, at: [0.46], reach: 52, dmg: 13, high: 1 },
+  flyknee: { t: 0.58, at: [0.38], reach: 56, dmg: 12, lunge: 130 },
+  flurry: { t: 0.7, at: [0.16, 0.29, 0.42, 0.55, 0.68], reach: 46, dmg: 3, chain: ['uppercut'] },
+  uppercut: { t: 0.62, at: [0.3], reach: 50, dmg: 15, down: 1, special: 1 },
+  hadouken: { t: 0.5, at: [0.42], reach: 0, dmg: 12, ball: 1, special: 1 },
+  spinkick: { t: 0.74, at: [0.28, 0.44, 0.6, 0.76], reach: 60, dmg: 4, lunge: 100, special: 1 }
 };
+const CANCEL = 0.3, BUFFER = 0.22, WALK = 125, DASH = 340, PXM = 96 * 0.3 * 2.1; // game px per MARROW metre
+// gameplay time (fraction of the move) to clip time, so the clip's moment of contact lands on the hit
+function warp(u, m, mk) {
+  if (!mk) return u;
+  const n = m.at.length, k = n > 1 ? [[0, 0], [m.at[0], mk.a + (mk.h - mk.a) * 0.6], [m.at[n - 1], mk.e], [1, 1]] : [[0, 0], [m.at[0], mk.h], [1, 1]];
+  for (let i = 1; i < k.length; i++) if (u <= k[i][0]) return k[i - 1][1] + (k[i][1] - k[i - 1][1]) * (u - k[i - 1][0]) / Math.max(1e-6, k[i][0] - k[i - 1][0]);
+  return 1;
+}
 const ULTRAS = [
   { kind: 'barrage', names: ['Thousand Marrow Palms', 'Nine Hells Barrage', 'Requiem of Fists', 'The Long Goodbye'] },
   { kind: 'beam', names: ['Eclipse Cannon', 'Final Sermon', 'Big Bang of Spite', 'Solar Exorcism'] },
@@ -41,10 +52,14 @@ export class Fighter extends Game {
   setup() { this.matchN = 0; this.salt = loadSalt(); this.fx = []; this.newMatch(); }
   newMatch() {
     const s = (this.post.seed || 1) * 13 + this.matchN * 7919; this.matchN++;
+    // fighters are personas from the shared pool (the same people the other games draw in Crystal style);
+    // a saved hero from the Studio fights every other match
+    const hero = this.matchN % 2 === 1 ? getHero() : null;
     this.roster = [0, 1].map((k) => {
-      const seed = s * 31 + k * 977, id = ((seed >>> 0) * 2654435761 >>> 0) % 120 + 1;
-      const ultra = ULTRAS[(seed >>> 4) % 3];
-      return { id, sheet: humanoid(seed), anims: marrowAnims(id, ANIMS, { size: SZ, face: true, scale: 0.3 }), name: `${creatureName(seed)}${this.rng() < 0.6 ? ` ${EPITHETS[this.ri(0, EPITHETS.length - 1)]}` : ''}`, pow: this.r(0.8, 1.3), spd: this.r(0.8, 1.25), tough: this.r(0.85, 1.25), ultra: { ...ultra, name: ultra.names[(seed >>> 7) % 4] } };
+      const seed = s * 31 + k * 977, mine = k === 0 && hero;
+      const persona = mine ? normPersona(hero.persona || hero.crystal, hero.seed) : personaFor(poolSeed(seed), ERAS[(seed >>> 5) % 3]), id = persona.seed;
+      const ultra = ULTRAS[(seed >>> 4) % 3], look = personaToMarrow(persona, { weapon: false });
+      return { id, persona, stand: crystalSheet(id, { char: personaToCrystal(persona), dirs: ['E'] }), anims: marrowAnims(id, ANIMS, { size: SZ, face: true, scale: 0.3, look }), name: mine ? hero.name : `${creatureName(seed)}${this.rng() < 0.6 ? ` ${EPITHETS[this.ri(0, EPITHETS.length - 1)]}` : ''}`, pow: this.r(0.8, 1.3), spd: this.r(0.8, 1.25), tough: this.r(0.85, 1.25), ultra: { ...ultra, name: ultra.names[(seed >>> 7) % 4] } };
     });
     this.roster.forEach((r) => r.anims.ready.then(() => { r.ready = true; }));
     this.names = this.roster.map((r) => r.name);
@@ -56,7 +71,7 @@ export class Fighter extends Game {
     this.p = [this.mk(0, 100, 1), this.mk(1, W - 100, -1)];
     this.timer = 60; this.balls = []; this.pause = Math.max(this.pause || 0, 1.2); this.banner = `ROUND ${this.round}`; this.cine = null; this.slow = 1; this.freeze = 0; this.shake = 0; this.roundOver = null;
   }
-  mk(i, x, face) { const r = this.roster[i], max = Math.round((this.mods.glass ? 40 : 100) * r.tough); return { i, x, y: 0, vx: 0, vy: 0, face, hp: max, max, act: null, at: 0, hits: 0, stun: 0, down: 0, block: 0, ai: 0, combo: 0, comboT: 0, meter: 0, crouch: false, pow: r.pow, spd: r.spd, r }; }
+  mk(i, x, face) { const r = this.roster[i], max = Math.round((this.mods.glass ? 40 : 100) * r.tough); return { i, x, y: 0, vx: 0, vy: 0, face, hp: max, max, act: null, at: 0, hits: 0, stun: 0, down: 0, block: 0, ai: 0, combo: 0, comboT: 0, meter: 0, crouch: false, pow: r.pow, spd: r.spd, r, buf: null, dash: 0, walkPh: 0 }; }
   // ---------------------------------------------------------------- betting (autopilot only)
   autoTap(x, y) {
     if (!(this.betT > 0) || y < 150 || y > 360) return false;
@@ -78,15 +93,17 @@ export class Fighter extends Game {
   // ---------------------------------------------------------------- moves
   floor() { return H - 72; }
   can(f) { return !f.act && f.stun <= 0 && f.down <= 0 && f.hp > 0 && !this.cine; }
-  doMove(f, a) {
-    if (a === 'jump') { if (this.can(f) && f.y === 0) { f.vy = -600 * Math.sqrt(this.G); f.air = 0; } return; }
+  // returns true when the move starts; otherwise the press is buffered for a moment and retried every step
+  doMove(f, a, buffered) {
+    if (a === 'jump') { if (this.can(f) && f.y === 0) { f.vy = -620 * Math.sqrt(this.G); f.air = 0; return true; } if (!buffered) f.buf = { a, t: BUFFER }; return false; }
     if (f.y < 0 && (a === 'kick' || a === 'punch')) a = a === 'kick' ? 'flyknee' : 'overhead';
     if (f.crouch) a = a === 'kick' ? 'sweep' : a === 'punch' ? 'uppercut' : a;
-    // chaining: an attack can cancel into its listed follow-ups right after it connects
-    const cancel = f.act && f.landed && MOVES[f.act].chain?.includes(a) && f.at > MOVES[f.act].t * 0.45;
-    if (!this.can(f) && !cancel) return;
     if (a === 'special') { const d = Math.abs(this.p[1 - f.i].x - f.x); a = d > 150 ? 'hadouken' : d < 70 ? 'uppercut' : 'spinkick'; }
-    f.act = a; f.at = 0; f.hits = 0; f.landed = false;
+    // cancels: once a hit connects, the move can be cut short by its listed follow-ups or by any special
+    const cur = f.act && MOVES[f.act], cancel = cur && f.landed && f.at > cur.t * CANCEL && a !== f.act && (cur.chain?.includes(a) || (MOVES[a].special && !cur.special));
+    if (!this.can(f) && !cancel) { if (!buffered && f.hp > 0) f.buf = { a, t: BUFFER }; return false; }
+    f.act = a; f.at = 0; f.hits = 0; f.landed = false; f.buf = null;
+    return true;
   }
   ultra(f) {
     if (f.meter < 100 || !this.can(f) || this.cine) return;
@@ -125,7 +142,7 @@ export class Fighter extends Game {
     if (f.ai > 0) return;
     f.ai = this.r(0.12, 0.3) / f.spd;
     if (dist > 170 && this.rng() < 0.3) return this.doMove(f, 'hadouken');
-    if (dist > 62) { f.vx = Math.sign(o.x - f.x) * 125 * f.spd; if (this.rng() < 0.07) this.doMove(f, 'jump'); if (dist < 110 && this.rng() < 0.15) this.doMove(f, 'flyknee'); return; }
+    if (dist > 62) { f.vx = Math.sign(o.x - f.x) * WALK * f.spd; if (this.rng() < 0.07) this.doMove(f, 'jump'); if (dist < 110 && this.rng() < 0.15) this.doMove(f, 'flyknee'); return; }
     f.vx = 0;
     const roll = this.rng();
     if (roll < 0.12) { f.crouch = true; this.doMove(f, 'kick'); }
@@ -136,16 +153,28 @@ export class Fighter extends Game {
   }
   autopilot(dt) { this.ai(this.p[0], this.p[1], dt); }
   // buttons along the bottom: ◀ ▶ ▲ ▼ P K S; ULTRA appears when the meter is full
-  down(x, y) {
+  // every finger holds its own button, so walking or crouching survives taps on the attack buttons;
+  // a double tap on ◀ or ▶ dashes
+  down(x, y, id = 0) {
     const f = this.p[0];
     if (f.meter >= 100 && y > 84 && y < 120 && Math.abs(x - 80) < 70) { this.ultra(f); return; }
     if (y < H - 52) { this.doMove(f, 'punch'); return; }
-    const b = Math.floor(x / (W / 7));
-    if (b === 0) { f.vx = -140 * f.spd; f.hold = -1; } else if (b === 1) { f.vx = 140 * f.spd; f.hold = 1; } else if (b === 2) this.doMove(f, 'jump'); else if (b === 3) f.crouch = true;
+    const b = Math.max(0, Math.min(6, Math.floor(x / (W / 7))));
+    (this.held ||= new Map()).set(id, b);
+    if (b <= 1) {
+      const dir = b ? 1 : -1, now = this.t;
+      if (this.lastDir === dir && now - this.lastDirT < 0.26 && this.can(f) && f.y === 0) { f.dash = 0.17; f.vx = dir * DASH; }
+      this.lastDir = dir; this.lastDirT = now; f.hold = dir; if (!(f.dash > 0)) f.vx = dir * WALK * f.spd;
+    } else if (b === 2) this.doMove(f, 'jump'); else if (b === 3) f.crouch = true;
     else this.doMove(f, ['punch', 'kick', 'special'][b - 4]);
   }
-  up() { const f = this.p[0]; if (f.hold) { f.vx = 0; f.hold = 0; } f.crouch = false; }
-  tap(x, y) { this.down(x, y); this.up(); }
+  up(x, y, id = 0) {
+    const f = this.p[0], b = this.held?.get(id); this.held?.delete(id);
+    const still = (k) => [...(this.held?.values() || [])].includes(k);
+    if (b === undefined || b <= 1) { const k = still(0) ? 0 : still(1) ? 1 : -1; if (k < 0) { f.hold = 0; if (!(f.dash > 0)) f.vx = 0; } else { f.hold = k ? 1 : -1; f.vx = f.hold * WALK * f.spd; } }
+    if ((b === undefined || b === 3) && !still(3)) f.crouch = false;
+  }
+  tap(x, y) { this.down(x, y, 'tap'); this.up(x, y, 'tap'); }
   // ---------------------------------------------------------------- simulation
   step(dt) {
     for (const e of this.fx) e.t -= dt; this.fx = this.fx.filter((e) => e.t > 0);
@@ -174,6 +203,8 @@ export class Fighter extends Game {
         continue;
       }
       if (f.getup > 0) { f.getup -= dt; continue; }
+      if (f.buf && (f.buf.t -= dt) > 0) this.doMove(f, f.buf.a, true); else f.buf = null;
+      if (f.dash > 0 && (f.dash -= dt) <= 0) f.vx = f.hold ? f.hold * WALK * f.spd : 0;
       if (f.act) {
         const m = MOVES[f.act]; f.at += dt * (m.special ? 1 : f.spd);
         if (m.lunge) f.x += f.face * m.lunge * dt;
@@ -184,7 +215,8 @@ export class Fighter extends Game {
         }
         if (f.at >= m.t) { f.act = null; f.landed = false; }
       }
-      if (f.stun <= 0 && !f.act && !f.crouch) f.x += f.vx * dt; else if (!f.act) f.x += f.vx * 0.2 * dt;
+      if (f.stun <= 0 && !f.act && !f.crouch) { f.x += f.vx * dt; const wm = f.r.anims.meta?.fwalk, len = Math.max(0.35, (wm?.speed || 0.8) * (wm?.duration || 1)); f.walkPh += (f.vx * f.face / PXM / len) * dt * (f.dash > 0 ? 0.5 : 1); }
+      else if (!f.act) f.x += f.vx * 0.2 * dt;
       f.vy += 1500 * this.G * dt; f.y = Math.min(0, f.y + f.vy * dt); if (f.y === 0) f.vy = 0;
       f.x = Math.max(28, Math.min(W - 28, f.x));
     }
@@ -222,7 +254,7 @@ export class Fighter extends Game {
     const lethal = () => o.hp <= 0;
     if (c.kind === 'barrage') {
       if (c.t < 0.3) f.x += f.face * 420 * dt;
-      f.act = c.t < 1.5 ? 'flurry' : 'uppercut'; f.at = c.t < 1.5 ? (c.t % 0.85) : c.t - 1.5;
+      f.act = c.t < 1.5 ? 'flurry' : 'uppercut'; f.at = c.t < 1.5 ? (c.t % MOVES.flurry.t) : Math.min(MOVES.uppercut.t * 0.95, c.t - 1.5);
       if (c.t > 0.35 && c.t < 1.5 && c.t * 10 > c.hits + 4) { c.hits++; this.hit(f, o, 2.5, { unblockable: 1, move: { push: 2 } }); o.stun = 0.4; this.freeze = 0.02; }
       if (c.t > 1.75 && !c.fin) { c.fin = 1; this.hit(f, o, 18, { unblockable: 1, launch: 260, lift: 520, move: { down: 1 } }); this.finishFx(f, o); }
       if (c.t > 2.4) this.endUltra();
@@ -234,7 +266,7 @@ export class Fighter extends Game {
       if (c.t > 2 && !c.fin) { c.fin = 1; this.hit(f, o, 10, { unblockable: 1, launch: 300, lift: 420, move: { down: 1 } }); this.finishFx(f, o); }
       if (c.t > 2.6) this.endUltra();
     } else {
-      f.act = c.t < 1.6 ? 'spinkick' : 'overhead'; f.at = c.t < 1.6 ? (c.t % 0.9) : c.t - 1.6;
+      f.act = c.t < 1.6 ? 'spinkick' : 'overhead'; f.at = c.t < 1.6 ? (c.t % MOVES.spinkick.t) : Math.min(MOVES.overhead.t * 0.95, c.t - 1.6);
       if (c.t < 1.6) { f.x += f.face * 160 * dt * (Math.abs(o.x - f.x) > 40 ? 1 : 0); f.y = -Math.abs(Math.sin(c.t * 4)) * 30; }
       if (c.t < 1.6 && c.t * 7 > c.hits + 1) { c.hits++; this.hit(f, o, 3, { unblockable: 1, move: { push: 4 } }); o.stun = 0.4; }
       if (c.t > 1.9 && !c.fin) { c.fin = 1; f.y = 0; this.hit(f, o, 16, { unblockable: 1, launch: 200, lift: 380, move: { down: 1 } }); this.finishFx(f, o); }
@@ -253,20 +285,21 @@ export class Fighter extends Game {
   // ---------------------------------------------------------------- drawing
   frameOf(f) {
     const A = f.r.anims, pick = (name, k) => { const l = A[name]; return l?.[Math.max(0, Math.min(l.length - 1, Math.floor(k * l.length)))]; };
+    const loop = (name, rate = 1) => pick(name, (((this.t * rate) / (A.meta?.[name]?.duration || 1) + f.i * 0.37) % 1 + 1) % 1);
     if (f.down > 0 || (f.hp <= 0)) return pick('knockdown', Math.min(1, (f.downT || 0) / 0.9));
     if (f.getup > 0) return pick('knockdown', f.getup / 0.5);
-    if (f.victory) return pick('dance', (this.t * 0.8) % 1);
-    if (f.stun > 0) return pick('hurt', Math.min(1, (f.hurtT || 0) / 0.4));
-    if (f.act) return pick(f.act, f.at / MOVES[f.act].t);
-    if (f.block > 0) return A.block[A.block.length - 1];
+    if (f.victory) return loop('dance');
+    if (f.stun > 0) return pick('hurt', Math.min(1, (f.hurtT || 0) / 0.35));
+    if (f.act) return pick(f.act, warp(f.at / MOVES[f.act].t, MOVES[f.act], A.meta?.[f.act]?.marks));
+    if (f.block > 0 || f.crouch) return A.block[f.crouch ? 0 : A.block.length - 1];
     if (f.y < 0) return pick('jump', 0.35 + Math.min(0.4, -f.vy / 2000));
-    if (Math.abs(f.vx) > 1) return pick('walk', (this.t * 1.2) % 1);
-    return pick('guard', (this.t * 0.7) % 1);
+    if (Math.abs(f.vx) > 1) return pick('fwalk', ((f.walkPh % 1) + 1) % 1);
+    return loop('guard');
   }
-  legacyFrame(f) {
-    const s = f.r.sheet;
-    if (f.down > 0 || f.hp <= 0) return s.ko; if (f.stun > 0) return s.hurt; if (f.act) return ['punch', 'palm', 'flurry', 'uppercut', 'overhead'].includes(f.act) ? s.punch : f.act === 'hadouken' ? s.special : s.kick;
-    if (f.block > 0) return s.block; if (f.y < 0) return s.jump; if (Math.abs(f.vx) > 1) return s.walk[Math.floor(this.t * 8) % 2]; return s.idle;
+  // until MARROW has simulated the fighter, the same person stands in as a Crystal sprite
+  standIn(c, f, x, y, s) {
+    const st = f.down > 0 || f.hp <= 0 ? ['knockdown', 5] : f.stun > 0 ? ['flinch', 0] : f.act ? (MOVES[f.act].ball ? ['cast', 2] : ['attack', Math.min(4, Math.floor(f.at / MOVES[f.act].t * 5))]) : f.y < 0 ? ['jump', 2] : Math.abs(f.vx) > 1 ? ['walk', Math.floor(this.t * 10) % 6] : ['idle', Math.floor(this.t * 4) % 4];
+    drawFrame(c, f.r.stand, st[0], 'E', st[1], x, y, s);
   }
   draw(c) {
     c.save();
@@ -283,7 +316,7 @@ export class Fighter extends Game {
       c.imageSmoothingEnabled = false;
       if (aura) { c.shadowColor = this.col(0); c.shadowBlur = 18 + Math.sin(this.t * 30) * 8; }
       if (fr) c.drawImage(fr, -SZ * DRAW / 2, -SZ * DRAW * 0.94, SZ * DRAW, SZ * DRAW);
-      else { const lf = this.legacyFrame(f); c.drawImage(lf, -36, -96, 72, 96); }
+      else this.standIn(c, f, 0, 0, 2.6);
       c.restore();
     }
     for (const b of this.balls) {
@@ -339,7 +372,7 @@ export class Fighter extends Game {
       c.fillStyle = mine ? col : 'rgba(255,255,255,.06)'; c.globalAlpha = mine ? 0.35 : 1; roundRect(c, cx - 78, 130, 156, 236, 10); c.fill(); c.globalAlpha = 1;
       c.strokeStyle = col; c.lineWidth = 2; roundRect(c, cx - 78, 130, 156, 236, 10); c.stroke();
       c.save(); c.translate(cx, 238); if (i) c.scale(-1, 1); c.imageSmoothingEnabled = false;
-      const fr = r.ready ? r.anims.guard[0] : r.sheet.idle; if (r.ready) c.drawImage(fr, -SZ * 0.6, -SZ * 1.15, SZ * 1.2, SZ * 1.2); else c.drawImage(fr, -30, -88, 60, 80);
+      if (r.ready) c.drawImage(r.anims.guard[Math.floor(this.t * 12) % r.anims.guard.length], -SZ * 0.6, -SZ * 1.15, SZ * 1.2, SZ * 1.2); else drawFrame(c, r.stand, 'idle', 'E', Math.floor(this.t * 4) % 4, 0, -4, 2.1);
       c.restore();
       this.text(c, r.name.length > 20 ? `${r.name.slice(0, 19)}…` : r.name, cx, 256, 10, '#fff');
       [['POW', r.pow], ['SPD', r.spd], ['TUF', r.tough]].forEach(([k, v], j) => { const y = 274 + j * 14; this.text(c, k, cx - 66, y, 9, '#aaa', 'left'); c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(cx - 38, y - 3, 100, 6); c.fillStyle = col; c.fillRect(cx - 38, y - 3, 100 * (v - 0.75) / 0.6, 6); });

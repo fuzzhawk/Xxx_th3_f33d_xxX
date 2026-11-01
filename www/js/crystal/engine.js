@@ -37,10 +37,12 @@ const DIRSRC={S:['S',0],SW:['SW',0],W:['W',0],NW:['NW',0],N:['N',0],NE:['NW',1],
 const DIRNAME={S:'South',SW:'South-west',W:'West',NW:'North-west',N:'North',NE:'North-east',E:'East',SE:'South-east'};
 
 const SKIN={Chrome:['#606878','#9aa4b8','#d0d8e8'],Cerulean:['#284878','#4070b0','#70a8e0'],Template:['#b87840','#d89868','#f0b890'],Fair:['#c08868','#e0b090','#f8d8c0'],Olive:['#987040','#c09868','#e0c090'],
-  Bronze:['#885028','#b07848','#d8a070'],Umber:['#583020','#804830','#a86848'],Goblin:['#486838','#689850','#98c070']};
+  Bronze:['#885028','#b07848','#d8a070'],Umber:['#583020','#804830','#a86848'],Goblin:['#486838','#689850','#98c070'],
+  Porcelain:['#d0a088','#f0cdb4','#fff0e2'],Ebony:['#2c1810','#4a2a1c','#6e4432'],Infernal:['#701c1c','#a83434','#d86050']};
 const HAIR={Chestnut:['#583018','#885028','#b07840','#d8a868'],Gold:['#986818','#c89830','#f0c858','#f8f0a0'],Ink:['#181830','#303058','#505088','#8080b8'],
   Crimson:['#681818','#a02828','#d04838','#f08868'],Silver:['#606878','#9098a8','#c0c8d0','#f0f0f8'],Violet:['#402858','#684890','#9070c0','#c0a8e8'],
-  Moss:['#284020','#487038','#70a050','#b0d888'],Rose:['#883058','#c05080','#e880a8','#f8c0d8']};
+  Moss:['#284020','#487038','#70a050','#b0d888'],Rose:['#883058','#c05080','#e880a8','#f8c0d8'],
+  Umber:['#1c0e08','#382010','#583820','#886040'],Copper:['#702410','#a84418','#d87030','#f0a860'],Azure:['#182c68','#2c50b0','#4c80e0','#90c0f8'],Snow:['#7880a0','#b8c0d0','#e4e8f0','#ffffff']};
 const CLOTH={Navy:['#101838','#202c60','#384890'],Denim:['#203050','#385080','#5878b0'],Khaki:['#605830','#988c58','#c8bc88'],Drab:['#2c3418','#4a5428','#6c7840'],Hazard:['#a03808','#e06010','#f89838'],Neon:['#701860','#c02898','#f060d0'],White:['#b8c0c8','#e0e4ec','#ffffff'],Azure:['#183878','#3060b8','#5890e0'],Scarlet:['#701818','#b03030','#e06048'],Forest:['#1c4c28','#2f7f3c','#58b058'],Plum:['#401858','#703090','#a058c0'],
   Linen:['#a09888','#d0c8b8','#f8f0e0'],Coal:['#202028','#383848','#585870'],Leather:['#503018','#805028','#b07840'],Saffron:['#985010','#d08020','#f8b048'],
   Teal:['#105858','#208888','#48b8b0'],Steel:['#485060','#7880a0','#b0b8d0']};
@@ -49,7 +51,7 @@ const GLASS=['#102838','#24607e','#58b8d8','#d0f4ff'], GUNMETAL=['#181820','#383
 const OUTLINES={Ink:'#181818',Umber:'#2a160c',Navy:'#10102c'};
 
 const DEFAULT={skin:'Template',hair:'short',hairColor:'Chestnut',head:'none',headColor:'Scarlet',top:'tee',topColor:'Azure',bot:'pants',botColor:'Leather',
-  feet:'boots',feetColor:'Leather',hands:'none',handsColor:'Leather',belt:'on',beltColor:'Leather',weapon:'sword',weaponColor:'Leather',trimColor:'White',
+  feet:'boots',feetColor:'Leather',hands:'none',handsColor:'Leather',belt:'on',beltColor:'Leather',weapon:'sword',weaponColor:'Leather',trimColor:'White',cape:'none',capeColor:'Scarlet',beard:'none',
   outline:'Ink',selout:'on',shadow:'auto',job:'Freelancer'};
 let cfg=Object.assign({},DEFAULT);
 let seed=1337;
@@ -84,7 +86,7 @@ function buildRaw(frameKey){
   const coverable=i=>mat[i]&&mat[i]!=='line'&&!mat[i].startsWith('eye');
   const cover=(pred,m)=>{for(let i=0;i<N;i++)if(coverable(i)&&pred(reg[i],Y(i)))mat[i]=m;};
   const T=cfg.top;
-  if(cfg.bot==='pants'||cfg.bot==='shorts')cover(r=>r==='p','bot');
+  if(cfg.bot==='pants'||cfg.bot==='shorts'||cfg.bot==='skirt')cover(r=>r==='p','bot');
   if(T==='vest'||T==='tee'||T==='longsleeve')cover(r=>r==='t','top');
   if(T==='tunic'||T==='robe'||T==='coat')cover(r=>r==='t'||r==='p','top');
   if(T==='jacket'||T==='suit'||T==='armor')cover(r=>r==='t','top');
@@ -119,6 +121,9 @@ function buildRaw(frameKey){
   if(st==='spiky')P={hD:back?8:7,eD:4,vol:6,spikes:1};
   if(st==='bob')P={hD:10,eD:4,edge:9,vol:9};
   if(st==='long')P={hD:10,eD:4,edge:8,vol:10,fall:15};
+  if(st==='buzz'||st==='mohawk')P={hD:back?6:5,eD:3,vol:3};
+  if(st==='bun'||st==='braid'||st==='pigtails')P={hD:back?8:7,eD:4,vol:6};
+  if(st==='afro')P={hD:back?9:8,eD:4,edge:7,vol:9};
   if(cfg.head==='hood'&&P&&st!=='long')P=null;
   if(P){
     for(const i of headIdx){if(mat[i]!=='skin')continue;const r=reg[i],y=fy(i);
@@ -149,14 +154,31 @@ function buildRaw(frameKey){
       if(view!=='front'){let y=OY+5;let rx=-1;for(let x=CW-1;x>=0;x--){if(hair.has(I(x,y))){rx=x;break;}} if(rx>0&&inb(rx+1,y+1)){hair.add(I(rx+1,y));hair.add(I(rx+1,y+1));}}
     }
   }
-  if(st==='ponytail'){
-    const path=[[1,4],[2,5],[2,6],[2,7],[2,8],[2,9],[1,10],[1,11],[2,12]];
-    if(view==='back'){for(let k=0;k<7;k++){const y=OY+8+k;[cx-1,cx].forEach(x=>{const i=I(x,y);if(!(mat[i]||'').startsWith('eye'))hair.add(i);});}}
+  if(st==='ponytail'||st==='braid'){
+    const path=st==='braid'?[[1,4],[2,5],[2,6],[1,7],[2,8],[2,9],[1,10],[2,11],[2,12],[1,13],[2,14],[1,15]]:[[1,4],[2,5],[2,6],[2,7],[2,8],[2,9],[1,10],[1,11],[2,12]];
+    if(view==='back'){for(let k=0;k<(st==='braid'?10:7);k++){const y=OY+8+k;[cx-1,cx].forEach(x=>{const i=I(x,y);if(!(mat[i]||'').startsWith('eye'))hair.add(i);});}}
     else if(view!=='front'){for(const[dx,dy]of path){const x=hx1+dx,y=OY+dy;if(!inb(x,y))continue;
       for(const xx of [x,x-1]){const i=I(xx,y);if(view==='q'&&mat[i]&&!hair.has(i)&&mat[i]!=='line')continue; if(!(mat[i]||'').startsWith('eye'))hair.add(i);}}}
   }
   if(st==='topknot'){
     const ty=hy0-1; for(const[dx,dy]of[[-1,-2],[0,-2],[1,-2],[-1,-1],[0,-1],[1,-1],[0,-3]]){const x=cx+dx,y=ty+dy;if(inb(x,y))hair.add(I(x,y));}
+  }
+  if(st==='mohawk'){ // a crest down the middle (a strip along the crown in profile) standing up
+    const keep=view==='front'||view==='back'?(i=>Math.abs(X(i)-cx)<=1):(i=>fy(i)<=2);
+    [...hair].forEach(i=>{if(!keep(i))hair.delete(i);});
+    const tops={};hair.forEach(i=>{const x=X(i);tops[x]=Math.min(tops[x]??99,Y(i));});
+    for(const x in tops)for(let k=1;k<=2;k++)if(inb(+x,tops[x]-k))hair.add(I(+x,tops[x]-k));
+  }
+  if(st==='afro'){for(let pass=0;pass<2;pass++){const add=[];hair.forEach(i=>{for(const j of nb(i,N4))if(!mat[j]&&fy(j)<=8-pass*2&&!hair.has(j))add.push(j);});add.forEach(j=>hair.add(j));}}
+  if(st==='bun'){const bx=view==='front'||view==='back'?cx:hx1+1,by=OY+(view==='front'?-1:2);
+    for(const[dx,dy]of[[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[0,1]]){const x=bx+dx,y=by+dy;if(inb(x,y)&&!(mat[I(x,y)]||'').startsWith('eye'))hair.add(I(x,y));}}
+  if(st==='pigtails'){for(const sx of(view==='front'||view==='back'?[hx0-1,hx1+1]:[hx1+1])){const o=sx<cx?-1:1;
+    for(let k=0;k<7;k++){const y=OY+4+k;if(inb(sx,y)&&!(mat[I(sx,y)]||'').startsWith('eye'))hair.add(I(sx,y));if(k>0&&k<5&&inb(sx+o,y))hair.add(I(sx+o,y));}}}
+  const bd=cfg.beard;
+  if(bd&&bd!=='none'&&!back){ // beards on the lower face (stubble just shades it); a long one hangs over the chest
+    for(const i of headIdx){if(mat[i]!=='skin'||reg[i]!=='e')continue;const y=fy(i);
+      if(bd==='stubble'){if(y>=9)tone[i]=0;continue;} if(y>=9||(y===8&&(bd==='long'||view!=='front')))hair.add(i);}
+    if(bd==='long'){const bx=view==='front'?cx:hx0+2;for(let k=0;k<3;k++){const y=OY+11+k;for(let x=bx-2+k;x<=bx+2-k;x++)if(inb(x,y))hair.add(I(x,y));}}
   }
   const head=cfg.head;
   if(head==='bandana'){
@@ -385,6 +407,7 @@ function armMat(t){let m='skin';const T=cfg.top;
 function legMat(t){let m='skin';
   if(cfg.bot==='pants'&&t<1)m='bot';
   if(cfg.bot==='shorts'&&t<0.3)m='bot';
+  if(cfg.bot==='skirt'&&t<0.2)m='bot';
   if(cfg.feet==='boots'&&t>0.62)m='boot';
   if(cfg.feet==='shoes'&&t>1)m='boot';
   return m;}
@@ -468,8 +491,9 @@ function composeP(dir,P){
       const ex=coreCells.get(i);if(ex&&ex.m!=='hair')continue;coreCells.set(i,{m:'hair',t:s===steps?Math.max(0,t-1):t,auth:0});}}
   // skirt for tunic / robe, flaring with the legs
   const T=cfg.top;
-  if(T==='tunic'||T==='robe'||T==='coat'){
-    const hemT=T==='robe'?0.92:T==='coat'?0.72:0.34;
+  const skM=T==='tunic'||T==='robe'||T==='coat'?'top':'bot';
+  if(skM==='top'||cfg.bot==='skirt'){
+    const hemT=T==='robe'?0.92:T==='coat'?0.72:T==='tunic'?0.34:0.42;
     const hemPts=Object.values(legs).map(l=>{const a=S(l.hip),b=S(l.kn),c=S(l.an);const tt=hemT*2;return tt<=1?[a[0]+(b[0]-a[0])*tt,a[1]+(b[1]-a[1])*tt]:[b[0]+(c[0]-b[0])*(tt-1),b[1]+(c[1]-b[1])*(tt-1)];});
     const hips=Object.values(legs).map(l=>S(l.hip));
     const topY=Math.min(...hips.map(h=>h[1]))-1, hemY=Math.max(...hemPts.map(h=>h[1]));
@@ -481,7 +505,7 @@ function composeP(dir,P){
         const v=(x+.5-xl)/Math.max(1,xr-xl);let t=v<0.38?2:v>0.72?0:1;if(u>0.85)t=Math.max(0,t-1);
         if((x+y+seed)%5===0&&u>0.3&&t===1)t=0;
         const open=T==='coat'&&base!=='N'&&base!=='NW'&&x===Math.floor((xl+xr)/2+(base==='S'?0:-1));
-        coreCells.set(i,{m:open?'trim':'top',t:open?2:t,auth:0});}}
+        coreCells.set(i,{m:open?'trim':skM,t:open?2:t,auth:0});}}
   }
   const coreConn=[];
   // --- limbs
@@ -549,6 +573,18 @@ function composeP(dir,P){
     }
   }
   if(wpnPart)parts.push(wpnPart);
+  if(cfg.cape&&cfg.cape!=='none'){
+    // a cape from the shoulders to the knees: behind the body, over it from the back, streaming with the motion
+    const backV=base==='N'||base==='NW',side=base!=='S'&&base!=='N';
+    const sy=oy+11+torsoShift[1],ky=Math.max(...Object.values(legs).map(l=>S(l.kn)[1]))+1-Math.max(0,lift)*1.5;
+    const bx=PX+torsoShift[0]+(side?(base==='W'?2:1):0),w0=base==='W'?1.5:3.5,w1=base==='W'?2.5:5,tr=trailX*2.6+(side?1.5:0),cc=new Map();
+    for(let y=Math.floor(sy);y<=Math.ceil(ky);y++){const u=(y-sy)/Math.max(1,ky-sy);if(u<0||u>1)continue;
+      const c0=bx+tr*u*u,w=w0+(w1-w0)*u,xl=c0-w,xr=c0+w;
+      for(let x=Math.floor(xl);x<=Math.ceil(xr);x++){if(!inb(x,y)||x+.5<xl||x+.5>xr)continue;
+        const v=(x+.5-xl)/Math.max(1,xr-xl);let t=backV?(v<.35?2:v>.75?0:1):(v<.3?1:0);if((x+y+seed)%4===0&&u>.3&&t>0)t--;
+        cc.set(I(x,y),{m:'cape',t});}}
+    parts.push({id:'cape',cells:cc,key:backV?2.5:-3,conn:[]});
+  }
   parts.push({id:'core',cells:coreCells,key:0,conn:coreConn});
   parts.sort((a,b)=>a.key-b.key);
   // --- paint back to front, each part inking its own 4-ring
@@ -638,7 +674,7 @@ function rotO(o,cw){
 
 /* ---------------- colour ---------------- */
 const RAMP_MATS=new Set(['skin','hair','hat','top','bot','belt','glove','boot','blade','hilt','wood','gem','trim','glass','gun','beam','flash']);
-function rampOf(m){switch(m){case'skin':return SKIN[cfg.skin];case'hair':return HAIR[cfg.hairColor];case'hat':return CLOTH[cfg.headColor];case'top':return CLOTH[cfg.topColor];
+function rampOf(m){switch(m){case'skin':return SKIN[cfg.skin]||SKIN.Template;case'cape':return CLOTH[cfg.capeColor]||CLOTH.Scarlet;case'hair':return HAIR[cfg.hairColor];case'hat':return CLOTH[cfg.headColor];case'top':return CLOTH[cfg.topColor];
   case'bot':return CLOTH[cfg.botColor];case'belt':case'buckle':return CLOTH[cfg.beltColor];case'glove':return CLOTH[cfg.handsColor];case'boot':return CLOTH[cfg.feetColor];
   case'blade':return STEEL4;case'hilt':return CLOTH[cfg.weaponColor];case'wood':return CLOTH[cfg.weaponColor];case'gem':return CLOTH.Teal;case'trim':return CLOTH[cfg.trimColor]||CLOTH.White;case'glass':return GLASS;case'gun':return GUNMETAL;case'flash':return FLASH;
   case'beam':{const r=CLOTH[cfg.weaponColor]||CLOTH.Azure;return[r[1],r[2],mix(r[2],'#ffffff',0.55),'#ffffff'];}}return null;}
@@ -816,8 +852,8 @@ const JOBS={
   'Star Knight':{era:'Sci-fi',hair:'short',hairColor:'Chestnut',head:'none',top:'tunic',topColor:'Khaki',bot:'pants',botColor:'Leather',feet:'boots',feetColor:'Leather',hands:'none',belt:'on',beltColor:'Leather',weapon:'saber',weaponColor:'Azure',skin:'Template'},
   Mannequin:{era:'Base',hair:'bald',head:'none',top:'none',bot:'none',feet:'none',hands:'none',belt:'off',weapon:'none',skin:'Template'}
 };
-const OPTIONS={hair:['bald','short','spiky','bob','long','ponytail','topknot'],head:['none','bandana','hood','helm','wizard','cap','hardhat','fedora','spacehelm','visor'],
-  top:['none','vest','tee','longsleeve','tunic','robe','jacket','suit','coat','armor'],bot:['none','shorts','pants'],feet:['none','shoes','boots'],hands:['none','gloves','gauntlets'],
+const OPTIONS={hair:['bald','buzz','short','spiky','bob','long','ponytail','braid','pigtails','topknot','bun','mohawk','afro'],beard:['none','stubble','short','long'],cape:['none','cape'],capeColor:Object.keys(CLOTH),head:['none','bandana','hood','helm','wizard','cap','hardhat','fedora','spacehelm','visor'],
+  top:['none','vest','tee','longsleeve','tunic','robe','jacket','suit','coat','armor'],bot:['none','shorts','pants','skirt'],feet:['none','shoes','boots'],hands:['none','gloves','gauntlets'],
   belt:['on','off'],weapon:['none','sword','dagger','staff','pistol','rifle','saber','wrench'],shadow:['auto','on','off'],selout:['on','off'],
   skin:Object.keys(SKIN),hairColor:Object.keys(HAIR),headColor:Object.keys(CLOTH),topColor:Object.keys(CLOTH),botColor:Object.keys(CLOTH),
   feetColor:Object.keys(CLOTH),handsColor:Object.keys(CLOTH),beltColor:Object.keys(CLOTH),weaponColor:Object.keys(CLOTH),trimColor:Object.keys(CLOTH),outline:Object.keys(OUTLINES)};
@@ -825,7 +861,7 @@ function setCharacter(c,s){c=c||{};cfg=Object.assign({},DEFAULT,JOBS[c.job]||{},
 function randomCharacter(s,era){const r=rngFrom(s);const pick=a=>a[Math.floor(r()*a.length)];const C=Object.keys(CLOTH);
   // start from a random preset of the chosen era (or any), then remix colours and a few parts
   const pool=Object.keys(JOBS).filter(j=>j!=='Mannequin'&&(!era||JOBS[j].era===era));const base=Object.assign({},DEFAULT,JOBS[pick(pool)]);delete base.era;
-  return Object.assign(base,{skin:pick(Object.keys(SKIN).filter(k=>k!=='Chrome'&&k!=='Cerulean'&&k!=='Goblin').concat(r()<0.08?['Chrome','Cerulean','Goblin']:[])),
+  return Object.assign(base,{skin:pick(Object.keys(SKIN).filter(k=>k!=='Chrome'&&k!=='Cerulean'&&k!=='Goblin'&&k!=='Infernal').concat(r()<0.08?['Chrome','Cerulean','Goblin']:[])),
     hair:pick(['short','spiky','bob','long','ponytail','short','spiky','topknot','bald']),hairColor:pick(Object.keys(HAIR)),
     headColor:r()<0.5?base.headColor:pick(C),topColor:pick(C),botColor:pick(C),trimColor:pick(C),
     feetColor:pick(['Leather','Coal','Scarlet','Steel','White']),handsColor:pick(['Leather','Linen','Steel','Coal','White']),beltColor:pick(['Leather','Saffron','Scarlet','Coal','Steel']),

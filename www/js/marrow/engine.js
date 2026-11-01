@@ -319,6 +319,8 @@ function postureAdd(p, tgt) {
 }
 const hunchTilt = p => (p.hunch || 0) * 14 * D2R;
 function gaitCfg(p, kind) {
+  if (kind === 'fwalk') return { kind, guard: 1, C: GAIT, M: GAIT_M, toff: .62, T: 120 / (p.walkCadence * 1.15), stride: .6 * p.walkStride, knee: 1.2, kb: 14, hb: 9, arm: 7, lean: 5, elbow: 118,
+    ms: (0.5 + 0.3 * p.walkStride) * (0.6 + 0.4 * p.walkCadence / 108), bob: 1 };
   if (kind === 'run') return { kind, C: RUN, M: RUN_M, toff: .38, T: 120 / p.runCadence, stride: p.runStride, knee: p.runKnee, arm: p.runArm, lean: p.runLean, elbow: 88, soft: true,
     ms: (0.5 + 0.5 * p.runStride) * (0.6 + 0.4 * p.runCadence / 170), bob: 1 };
   return { kind: 'walk', C: GAIT, M: GAIT_M, toff: .62, T: 120 / p.walkCadence, stride: p.walkStride, knee: p.walkKnee, arm: p.walkArm, lean: p.walkLean, elbow: 14,
@@ -328,16 +330,16 @@ function gaitTargets(p, G, ph, F, tgt) {
   const hm = G.kind === 'run' ? 20 : 8;
   for (const s of ['N', 'F']) {
     const phi = s === 'N' ? ph : ph + .5;
-    tgt[J['hip' + s]] = (hm + (G.C.hip(phi) - hm) * G.stride + G.lean) * D2R + hunchTilt(p);
-    const k = G.C.knee(phi); tgt[J['knee' + s]] = (k + (G.knee - 1) * Math.max(0, k - 12) + (G.stride - 1) * 6 * Math.max(0, k - 30) / 30 + (p.hunch || 0) * 8) * D2R;
+    tgt[J['hip' + s]] = (hm + (G.C.hip(phi) - hm) * G.stride + G.lean + (G.hb || 0)) * D2R + hunchTilt(p);
+    const k = G.C.knee(phi); tgt[J['knee' + s]] = (k + (G.knee - 1) * Math.max(0, k - 12) + (G.stride - 1) * 6 * Math.max(0, k - 30) / 30 + (p.hunch || 0) * 8 + (G.kb || 0)) * D2R;
     tgt[J['ankle' + s]] = G.C.ankle(phi) * (0.6 + 0.4 * G.stride) * D2R;
     tgt[J['toe' + s]] = G.C.toe(phi) * D2R;
-    const sp = (G.kind === 'run' ? 2 : 4) - G.arm * Math.cos(2 * Math.PI * (phi - 0.04));
+    const sp = (G.guard ? GUARD['shoulder' + s] : G.kind === 'run' ? 2 : 4) - G.arm * Math.cos(2 * Math.PI * (phi - 0.04));
     tgt[J['shoulder' + s]] = sp * D2R;
-    tgt[J['elbow' + s]] = (G.kind === 'run' ? G.elbow + 18 * Math.sin(2 * Math.PI * (phi - .3)) : 14 + 0.45 * Math.max(0, sp + 10)) * D2R;
-    tgt[J['wrist' + s]] = 6 * D2R;
+    tgt[J['elbow' + s]] = (G.guard ? GUARD['elbow' + s] + 5 * Math.sin(2 * Math.PI * (phi - .3)) : G.kind === 'run' ? G.elbow + 18 * Math.sin(2 * Math.PI * (phi - .3)) : 14 + 0.45 * Math.max(0, sp + 10)) * D2R;
+    tgt[J['wrist' + s]] = (G.guard ? -8 : 6) * D2R;
   }
-  tgt[J.lumbar] = 2 * Math.sin(4 * Math.PI * ph) * D2R; tgt[J.thoracic] = 1 * D2R;
+  tgt[J.lumbar] = ((G.guard ? -4 : 0) + 2 * Math.sin(4 * Math.PI * ph)) * D2R; tgt[J.thoracic] = (G.guard ? 0 : 1) * D2R;
   postureAdd(p, tgt);
   if (F) gazeTargets(F, tgt, 4);
 }
@@ -668,7 +670,7 @@ function simJump(R, p) {
    launch = {vx, vy} m/s throws the body into ballistic flight (scaled by leg power); land / ground
    end the phase on touchdown; roll = {to} pitches the whole body around its contact with the floor. */
 const MOVES = [
-  ['walk', 'Walk', 'Locomotion'], ['run', 'Run', 'Locomotion'], ['jump', 'Jump', 'Locomotion'], ['runjump', 'Running jump', 'Locomotion'],
+  ['walk', 'Walk', 'Locomotion'], ['fwalk', 'Fighting walk', 'Locomotion'], ['guard', 'Fighting stance', 'Fighting'], ['run', 'Run', 'Locomotion'], ['jump', 'Jump', 'Locomotion'], ['runjump', 'Running jump', 'Locomotion'],
   ['turn', 'Turn around', 'Locomotion'], ['roll', 'Dive roll', 'Locomotion'],
   ['punch', 'Punch', 'Fighting'], ['kick', 'Front kick', 'Fighting'], ['overhead', 'Overhead smash', 'Fighting'], ['fire', 'Fire weapon', 'Fighting'],
   ['palm', 'Palm strike', 'Kung fu'], ['sidekick', 'Side kick', 'Kung fu'], ['flyknee', 'Flying knee', 'Kung fu'], ['sweep', 'Spinning sweep', 'Kung fu'], ['flurry', 'Chain punches', 'Kung fu'],
@@ -678,30 +680,30 @@ const MOVES = [
 ];
 const MOVE_NAME = Object.fromEntries(MOVES.map(m => [m[0], m[1]]));
 const STAND = { shoulderN: 4, elbowN: 14, wristN: 4, shoulderF: 2, elbowF: 14, wristF: 4, lumbar: 0, thoracic: 0 };
-const GUARD = { shoulderN: 52, elbowN: 122, wristN: 0, shoulderF: 40, elbowF: 128, wristF: 0, lumbar: 4, thoracic: 4 };
+const GUARD = { shoulderN: 56, elbowN: 116, wristN: -8, shoulderF: 44, elbowF: 124, wristF: -8, lumbar: -5, thoracic: -1 };
 const LEGREST = { hipN: 20, kneeN: 30, ankleN: 0, toeN: 0, hipF: 20, kneeF: 30, ankleF: 0, toeF: 0 };
 function moveScript(p, id) {
   const w = p.atkWind / 100, rc = p.atkRecover, E = p.danceEnergy || 1;
   const G = o => Object.assign({}, GUARD, o || {}), S = o => Object.assign({}, STAND, o || {});
-  const fight = { stance: { N: .12, F: -.15 }, anchorX: .4 };
+  const fight = { stance: { N: .12, F: -.15 }, heel: { F: 26 }, anchorX: .4 };
   switch (id) {
     case 'kick': return { ...fight, anchorX: .36, hit: 'toesN', phases: [
-      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'shift', d: .28, wf: 0, cr: .04, lean: 3 },
       { n: 'chamber', d: .22 + .12 * w, tg: { hipN: 92, kneeN: 118, ankleN: -12, toeN: 0, shoulderN: 45, shoulderF: 30 }, wf: 0, cr: .045, lean: -2 - 4 * w, legs: { N: 'swing' } },
       { n: 'strike', strike: 1, d: .4, snap: 1, until: ['kneeN'], tg: { hipN: 98, kneeN: 3, ankleN: 14, toeN: 45, lumbar: -6, shoulderN: 30, shoulderF: 20, elbowN: 110 }, cr: .05, lean: -12 },
       { n: 'impact', strike: 1, d: .06 },
       { n: 'retract', d: .22 * rc, tg: { hipN: 90, kneeN: 112, ankleN: -8, toeN: 5, lumbar: 4 }, lean: -2 },
       { n: 'plant', d: .38 * rc, tg: G(), cr: .04, lean: 3, legs: { N: 'plant' } },
-      { n: 'shift back', d: .28 * rc, wf: .45, cr: .035, lean: 6 },
+      { n: 'shift back', d: .28 * rc, wf: .45, cr: .04, lean: 4 },
       { n: 'guard', d: .2 },
     ] };
     case 'overhead': return { ...fight, hit: 'handN', phases: [
-      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'raise', d: .35 + .25 * w, tg: { shoulderN: 150 + 18 * w, elbowN: 95, wristN: -25, shoulderF: 145 + 18 * w, elbowF: 100, wristF: -25, lumbar: -6 - 8 * w, thoracic: -4 - 6 * w }, wf: .35, cr: .03, lean: 2 - 6 * w },
       { n: 'strike', strike: 1, d: .5, snap: 1, until: ['shoulderN'], tg: { shoulderN: 22, elbowN: 8, wristN: 12, shoulderF: 18, elbowF: 12, wristF: 12, lumbar: 28, thoracic: 16 }, wf: .66, cr: .09, lean: 20 },
       { n: 'impact', strike: 1, d: .08 },
-      { n: 'recover', d: .45 * rc, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'recover', d: .45 * rc, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'guard', d: .2 },
     ] };
     case 'fire': {
@@ -719,7 +721,7 @@ function moveScript(p, id) {
       return { stance: { N: .08, F: -.1 }, anchorX: .38, weapon: p.weapon, hit: null, phases: ph };
     }
     case 'palm': return { ...fight, hit: 'handN', phases: [
-      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'coil', d: .14 + .1 * w, tg: { shoulderN: 20, elbowN: 135, wristN: -60, shoulderF: 55, elbowF: 110, lumbar: 0 }, wf: .35, cr: .05, lean: 4 },
       { n: 'step', d: .16, tg: {}, wf: .2, legs: { N: 'plant' }, step: { side: 'N', dx: .1 }, cr: .06 },
       { n: 'strike', strike: 1, d: .35, snap: 1, until: ['elbowN'], tg: { shoulderN: 84, elbowN: 3, wristN: -68, shoulderF: 15, elbowF: 125, lumbar: 8, thoracic: 6 }, wf: .7, cr: .08, lean: 12 },
@@ -728,27 +730,27 @@ function moveScript(p, id) {
       { n: 'guard', d: .2 },
     ] };
     case 'sidekick': return { ...fight, anchorX: .34, hit: 'footN', phases: [
-      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'shift', d: .25, wf: 0, cr: .045, lean: 0 },
       { n: 'chamber', d: .22 + .1 * w, tg: { hipN: 100, kneeN: 132, ankleN: 12, toeN: 0, shoulderN: 40, elbowN: 115, shoulderF: 60, elbowF: 100 }, cr: .05, lean: -14, legs: { N: 'swing' } },
       { n: 'strike', strike: 1, d: .4, snap: 1, until: ['kneeN'], tg: { hipN: 96, kneeN: 2, ankleN: 18, toeN: 20, lumbar: -14, thoracic: -6, shoulderN: 25, elbowN: 95, shoulderF: 70, elbowF: 60 }, cr: .06, lean: -36 },
       { n: 'impact', strike: 1, d: .1 },
       { n: 'retract', d: .22 * rc, tg: { hipN: 98, kneeN: 125, ankleN: 5, lumbar: 2, thoracic: 2 }, lean: -10 },
       { n: 'plant', d: .38 * rc, tg: G(), cr: .04, lean: 3, legs: { N: 'plant' } },
-      { n: 'shift back', d: .26 * rc, wf: .45, cr: .035, lean: 6 },
+      { n: 'shift back', d: .26 * rc, wf: .45, cr: .04, lean: 4 },
       { n: 'guard', d: .2 },
     ] };
     case 'flyknee': return { ...fight, travel: 1, hit: 'thighN', phases: [
-      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'load', d: .2 + .1 * w, tg: { shoulderN: -25, elbowN: 40, shoulderF: -30, elbowF: 40 }, wf: .5, cr: .12, lean: 18 },
       { n: 'launch', strike: 1, d: .5, launch: { vx: 1.3, vy: 2.5 }, land: 1, tg: { hipN: 122, kneeN: 142, ankleN: -25, hipF: -6, kneeF: 45, ankleF: -30, shoulderN: 125, elbowN: 85, shoulderF: 135, elbowF: 75, lumbar: 6 }, lean: 6 },
       { n: 'descend', d: .4, land: 1, tg: { hipN: 50, kneeN: 45, ankleN: -15, hipF: 30, kneeF: 20, ankleF: -15, shoulderN: 60, elbowN: 110, shoulderF: 50, elbowF: 115 }, lean: 6, minT: .12 },
       { n: 'land', d: .25, tg: G(), cr: .1, lean: 10, legs: { N: 'stance', F: 'stance' } },
-      { n: 'recover', d: .4 * rc, wf: .45, cr: .035, lean: 6 },
+      { n: 'recover', d: .4 * rc, wf: .45, cr: .04, lean: 4 },
       { n: 'guard', d: .15 },
     ] };
     case 'sweep': return { ...fight, anchorX: .5, hit: 'footN', phases: [
-      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .3, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'drop', d: .32, tg: { hipN: 98, kneeN: 4, ankleN: 10, toeN: 10, shoulderN: 60, elbowN: 35, shoulderF: 85, elbowF: 15, lumbar: 10, thoracic: 8 }, wf: 0, cr: .27, lean: 26, legs: { N: 'swing' } },
       { n: 'spin', strike: 1, d: .42 / Math.sqrt(Math.max(.3, p.strength)), yaw: 360, linYaw: 1 },
       { n: 'rise', d: .4 * rc, tg: G(), cr: .04, lean: 6, legs: { N: 'plant' } },
@@ -761,7 +763,7 @@ function moveScript(p, id) {
         const near = i % 2 === 0;
         ph.push({ n: near ? 'near punch' : 'far punch', strike: near ? 1 : 0, d: .15, snap: 1, tg: near ? { shoulderN: 84, elbowN: 4, shoulderF: 46, elbowF: 112 } : { shoulderF: 86, elbowF: 6, shoulderN: 46, elbowN: 112 }, lean: 7, wf: .55 });
       }
-      ph.push({ n: 'recover', d: .35 * rc, tg: G(), wf: .45, cr: .035, lean: 6 }, { n: 'guard', d: .15 });
+      ph.push({ n: 'recover', d: .35 * rc, tg: G(), wf: .45, cr: .04, lean: 4 }, { n: 'guard', d: .15 });
       return { ...fight, stance: { N: .1, F: -.12 }, hit: 'handN', phases: ph };
     }
     case 'dance': {
@@ -778,6 +780,11 @@ function moveScript(p, id) {
         { n: 'reset', d: b, tg: { shoulderN: 90, elbowN: 60, shoulderF: 30, elbowF: 95, lumbar: -2, thoracic: -2 }, cr: .02, lean: 2 },
       ] };
     }
+    case 'guard': return { ...fight, hit: null, loop: 1, loopStart: 1, phases: [
+      { n: 'settle', d: .35, tg: G(), wf: .45, cr: .04, lean: 4 },
+      { n: 'sink', d: .44, tg: G({ shoulderN: 52, elbowN: 121, wristN: -4, shoulderF: 40, elbowF: 129, lumbar: -3, thoracic: 1 }), wf: .38, cr: .066, lean: 6 },
+      { n: 'rise', d: .44, tg: G({ shoulderN: 59, elbowN: 112, wristN: -10, shoulderF: 47, elbowF: 121, lumbar: -6, thoracic: -2 }), wf: .52, cr: .03, lean: 3 },
+    ] };
     case 'turn': return { stance: { N: .05, F: -.05 }, anchorX: .5, phases: [
       { n: 'stand', d: .25, tg: S(), wf: .5, cr: .02, lean: 3 },
       { n: 'wind', d: .12, tg: S({ shoulderN: 20, shoulderF: -10, elbowN: 40 }), cr: .05, wf: .6, yaw: -12 },
@@ -794,10 +801,10 @@ function moveScript(p, id) {
     ] };
     // ---- added for The Feed's brawler: reactions and special moves
     case 'hurt': return { ...fight, hit: null, phases: [
-      { n: 'guard', d: .1, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .1, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'impact', d: .1, snap: 1, tg: { neck: -38, head: -15, lumbar: -20, thoracic: -14, shoulderN: 18, elbowN: 55, shoulderF: -12, elbowF: 45 }, wf: .2, cr: .05, lean: -20 },
       { n: 'reel', d: .24, tg: { neck: -18, lumbar: -10, thoracic: -6, shoulderN: 35, elbowN: 95, shoulderF: 28, elbowF: 95 }, wf: .3, cr: .06, lean: -10 },
-      { n: 'recover', d: .3, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'recover', d: .3, tg: G(), wf: .45, cr: .04, lean: 4 },
     ] };
     case 'knockdown': return { ...fight, travel: 1, hit: null, phases: [
       { n: 'impact', d: .1, snap: 1, tg: { neck: -40, lumbar: -25, thoracic: -15, shoulderN: 60, elbowN: 30, shoulderF: 50, elbowF: 20 }, wf: .1, lean: -25 },
@@ -805,12 +812,12 @@ function moveScript(p, id) {
       { n: 'down', d: .9, tg: { hipN: 12, kneeN: 18, hipF: 6, kneeF: 12, shoulderN: 100, elbowN: 15, shoulderF: 92, elbowF: 12, neck: 5, lumbar: 0, thoracic: 0 }, lean: -88, gaze: 0 },
     ] };
     case 'block': return { ...fight, hit: null, phases: [
-      { n: 'guard', d: .15, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .15, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'brace', d: .22, tg: { shoulderN: 72, elbowN: 150, wristN: -20, shoulderF: 66, elbowF: 150, wristF: -20, lumbar: 8, thoracic: 6, neck: 18 }, wf: .35, cr: .09, lean: 2 },
       { n: 'hold', d: .45 },
     ] };
     case 'uppercut': return { ...fight, travel: 1, hit: 'handN', phases: [
-      { n: 'guard', d: .22, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .22, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'crouch', d: .18, tg: { shoulderN: 28, elbowN: 140, wristN: -10, shoulderF: 45, elbowF: 120, lumbar: 10, thoracic: 6 }, wf: .55, cr: .2, lean: 14 },
       { n: 'rise', strike: 1, d: .45, snap: 1, launch: { vx: .5, vy: 2.5 }, land: 1, tg: { shoulderN: 170, elbowN: 12, wristN: 0, shoulderF: 30, elbowF: 125, hipN: 62, kneeN: 95, ankleN: -20, hipF: -6, kneeF: 18, lumbar: -10, thoracic: -6 }, lean: -4 },
       { n: 'descend', d: .38, land: 1, minT: .1, tg: { hipN: 40, kneeN: 50, hipF: 22, kneeF: 30, shoulderN: 120, elbowN: 60, shoulderF: 60, elbowF: 90 }, lean: 4 },
@@ -818,26 +825,26 @@ function moveScript(p, id) {
       { n: 'guard', d: .15 },
     ] };
     case 'hadouken': return { ...fight, hit: 'handN', phases: [
-      { n: 'guard', d: .22, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .22, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'gather', d: .3, tg: { shoulderN: 18, elbowN: 140, wristN: -60, shoulderF: 24, elbowF: 135, wristF: -60, lumbar: -4, thoracic: -2 }, wf: .3, cr: .13, lean: -6 },
       { n: 'thrust', strike: 1, d: .28, snap: 1, until: ['elbowN'], tg: { shoulderN: 86, elbowN: 4, wristN: -70, shoulderF: 82, elbowF: 8, wristF: -70, lumbar: 10, thoracic: 6 }, wf: .72, cr: .11, lean: 16, step: { side: 'N', dx: .08 }, legs: { N: 'plant' } },
       { n: 'hold', strike: 1, d: .25 },
-      { n: 'recover', d: .35, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'recover', d: .35, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'guard', d: .15 },
     ] };
     case 'spinkick': return { ...fight, travel: 1, hit: 'footN', phases: [
-      { n: 'guard', d: .22, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .22, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'hop', d: .18, tg: { hipN: 30, kneeN: 60, shoulderN: 70, shoulderF: 70 }, cr: .14, lean: 4 },
       { n: 'spin', strike: 1, d: .8, launch: { vx: .9, vy: 1.6 }, land: 1, yaw: 720, linYaw: 1, tg: { hipN: 92, kneeN: 4, ankleN: 10, hipF: 40, kneeF: 90, shoulderN: 90, elbowN: 10, shoulderF: 90, elbowF: 10 }, lean: -8 },
       { n: 'land', d: .26, tg: G(), cr: .1, lean: 8, legs: { N: 'stance', F: 'stance' } },
       { n: 'guard', d: .2 },
     ] };
     default: return { ...fight, hit: 'handN', phases: [
-      { n: 'guard', d: .32, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'guard', d: .32, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'wind-up', d: .08 + .14 * w, tg: { shoulderN: 50 - 30 * w, elbowN: 128, lumbar: 4 - 6 * w }, wf: .42 - .1 * w, lean: 6 - 4 * w },
       { n: 'strike', strike: 1, d: .4, snap: 1, until: ['shoulderN', 'elbowN'], tg: { shoulderN: 88, elbowN: 3, wristN: -4, shoulderF: 32, elbowF: 125, lumbar: 10, thoracic: 8 }, wf: .62, cr: .045, lean: 13 },
       { n: 'impact', strike: 1, d: .07 },
-      { n: 'recover', d: .34 * rc, tg: G(), wf: .45, cr: .035, lean: 6 },
+      { n: 'recover', d: .34 * rc, tg: G(), wf: .45, cr: .04, lean: 4 },
       { n: 'guard', d: .2 },
     ] };
   }
@@ -859,6 +866,7 @@ function legPower(R) { // leg extensor torque per body weight, relative to the r
   return clamp(Math.sqrt(((R.jt.knee.tNeg + R.jt.hip.tNeg + R.jt.ankle.tNeg) / (R.M * GRAV)) / ref), .55, 1.4);
 }
 
+const FOLLOW = JOINTS.map(j => ({ lumbar: [44, .8], thoracic: [36, .74], neck: [28, .6, 1], head: [22, .55, 1], shoulder: [30, .62], elbow: [24, .58], wrist: [17, .5, 1] })[j.type] || null);
 function simScript(R, p, id, init, scOverride) {
   const H = R.H, dt = 1 / 480, recDt = 1 / 120, M = R.M;
   const sc = scOverride || moveScript(p, id);
@@ -870,20 +878,25 @@ function simScript(R, p, id, init, scOverride) {
   const cop = s => anchors[s].x - .045 * H;
   const LEGJ = { N: ['hipN', 'kneeN', 'ankleN', 'toeN'].map(k => J[k]), F: ['hipF', 'kneeF', 'ankleF', 'toeF'].map(k => J[k]) };
   const LEG = {};
-  for (const s of ['N', 'F']) LEG[s] = { s, set: (s2, hip) => legIK(R, s2.q, s, s2.tilt, hip, anchors[s], Math.min(betaNeeded(R, hip, anchors[s]), 70 * D2R)) };
+  // fighters stand on the ball of the rear foot; the heel comes down as weight moves back onto it
+  const heelB = s => sc.heel && sc.heel[s] && mode === 'stance' ? sc.heel[s] * D2R * clamp((s === 'F' ? curPar.wf : 1 - curPar.wf) * 2.2, 0, 1) : 0;
+  for (const s of ['N', 'F']) LEG[s] = { s, set: (s2, hip) => legIK(R, s2.q, s, s2.tilt, hip, anchors[s], Math.min(Math.max(heelB(s), betaNeeded(R, hip, anchors[s])), 70 * D2R)) };
   const hCache = {};
   const standH = () => {
     const sup = ['N', 'F'].filter(s => legMode[s] === 'stance');
-    const key = sup.map(s => s + anchors[s].x.toFixed(4)).join('|');
+    const key = sup.map(s => s + anchors[s].x.toFixed(4) + (heelB(s) * 20 | 0)).join('|');
     if (hCache[key] !== undefined) return hCache[key];
     let lo = .3 * H, hi = .75 * H;
     const cx = sup.length ? sup.reduce((a, s) => a + cop(s), 0) / sup.length + .02 * H : 0;
-    for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; const hip = { x: cx, y: m }; if (sup.every(s => legReachOK(R, hip, anchors[s], 8 * D2R))) lo = m; else hi = m; }
+    for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; const hip = { x: cx, y: m }; if (sup.every(s => legReachOK(R, hip, anchors[s], Math.max(8 * D2R, heelB(s))))) lo = m; else hi = m; }
     return hCache[key] = lo;
   };
   // expand loops: record the second pass of the loop body
   let phases = sc.phases, recStartPhase = 0;
   if (sc.loop) { const intro = phases.slice(0, sc.loopStart), body = phases.slice(sc.loopStart); phases = [...intro, ...body, ...body]; recStartPhase = intro.length + body.length; }
+  // fighting moves open and close in the guard: keep the frames from the end of the opening guard to just after the closing one starts
+  const last = phases.length - 1, trim = !sc.loop && !init && last > 1 && phases[0].n === 'guard', trimEnd = trim && /^(guard|settle)$/.test(phases[last].n);
+  let recEnd = Infinity, fInit = false; const marks = [], fq = new Float64Array(NJ), fw = new Float64Array(NJ);
   const ph0 = phases[0];
   const curTg = Object.assign({}, LEGREST, ph0.tg || {});
   const curPar = { wf: ph0.wf ?? .5, cr: ph0.cr ?? .03, lean: ph0.lean ?? 3, yaw: ph0.yaw ?? 0 };
@@ -895,10 +908,10 @@ function simScript(R, p, id, init, scOverride) {
     for (const k in curTg) st.q[J[k]] = curTg[k] * D2R;
     st.tilt = curPar.lean * D2R + hunchTilt(p); st.x = (cop('N') + cop('F')) / 2;
     balancedLegs(R, st, standH() - curPar.cr * H, lerp(cop('F'), cop('N'), curPar.wf), [LEG.N, LEG.F]);
-    { const F = fk(R, st); tgt.set(st.q); postureAdd(p, tgt); gazeTargets(F, tgt, 5); st.q.set(tgt); }
+    { const F = fk(R, st); tgt.set(st.q); postureAdd(p, tgt); gazeTargets(F, tgt, 1.5); st.q.set(tgt); }
   }
   let prevTg = Object.assign({}, curTg), prev = Object.assign({}, curPar);
-  let pi = 0, t = 0, tp = 0, nextRec = 0, recT0 = sc.loop ? null : 0;
+  let pi = 0, t = 0, tp = 0, nextRec = 0, recT0 = sc.loop || trim ? null : 0;
   const frames = [], servoMask = new Uint8Array(NJ);
   let comB = null, roll = null, flashUntil = -1, blend = { N: 0, F: 0 }, qBlend = { N: null, F: null };
   let peakV = 0, strikeT = 0, strikeStart = -1, reach = -Infinity, prevHit = null, reachedAt = null, airT = 0, maxCom = -Infinity, comStand = null;
@@ -920,6 +933,9 @@ function simScript(R, p, id, init, scOverride) {
     if (ph.strike && strikeStart < 0) strikeStart = t;
     if (ph.flash) flashUntil = t + .045;
     if (i === recStartPhase && sc.loop) recT0 = t;
+    if (trim && i === 1) recT0 = t;
+    if (trimEnd && i === last) recEnd = t + .06;
+    if (recT0 !== null) marks.push({ n: ph.n, t: t - recT0, s: !!ph.strike, u: !!ph.until });
     if (ph.step) { const s = ph.step.side; anchors[s] = { x: anchors[s].x + ph.step.dx * H, y: 0 }; }
     if (ph.legs) for (const s of ['N', 'F']) {
       const m = ph.legs[s]; if (!m) continue;
@@ -936,7 +952,7 @@ function simScript(R, p, id, init, scOverride) {
     else if (mode === 'roll') { st.tilt -= 2 * Math.PI; tiltOff += 2 * Math.PI; toStance(['N', 'F']); prev = Object.assign({}, curPar); }
   };
   startPhase(0);
-  while (pi < phases.length && t < 12) {
+  while (pi < phases.length && t < 12 && t <= recEnd) {
     const ph = phases[pi], el = t - tp, u = el / ph.d;
     const bl = ph.snap ? sstep(el / .1) : sstep(u);
     if (ph.tg) for (const k in ph.tg) curTg[k] = ph.snap ? ph.tg[k] : lerp(prevTg[k] ?? ph.tg[k], ph.tg[k], bl);
@@ -948,7 +964,15 @@ function simScript(R, p, id, init, scOverride) {
     else if (mode === 'air') st.tilt = lerp(st.tilt, curPar.lean * D2R + hunchTilt(p), Math.min(1, dt / .09));
     else st.tilt = curPar.lean * D2R + hunchTilt(p);
     let F = fk(R, st);
-    if (ph.gaze !== 0) gazeTargets(F, tgt, 5);
+    if (ph.gaze !== 0) gazeTargets(F, tgt, 1.5);
+    // follow-through: spine, arms and head trail the body's intent through light springs, so they lag, overshoot
+    // and settle; a snapping strike drives its own joints directly, but its wrist and head still whip behind
+    for (let j = 0; j < NJ; j++) {
+      const f = FOLLOW[j]; if (!f) continue;
+      if (!fInit || (ph.snap && ph.tg && JOINTS[j].id in ph.tg && !f[2])) { fq[j] = tgt[j]; fw[j] = 0; continue; }
+      fw[j] += (f[0] * f[0] * (tgt[j] - fq[j]) - 2 * f[1] * f[0] * fw[j]) * dt; fq[j] += fw[j] * dt; tgt[j] = fq[j];
+    }
+    fInit = true;
     // swing legs returning to a footprint: lift, travel, set down
     for (const s of ['N', 'F']) if (legMode[s] === 'plant' && mode === 'stance') {
       const k = sstep(clamp(u / .9, 0, 1)), a = anchors[s], f0 = plantFrom[s];
@@ -1008,7 +1032,7 @@ function simScript(R, p, id, init, scOverride) {
       if (prevHit && ph.strike) { const v = Math.hypot(tip.x - prevHit.x, tip.y - prevHit.y) / dt; peakV = Math.max(peakV, v); reach = Math.max(reach, tip.x - st.x); }
       prevHit = tip;
     }
-    if (recT0 !== null && t >= recT0 + nextRec - 1e-9) {
+    if (recT0 !== null && t >= recT0 + nextRec - 1e-9 && t <= recEnd) {
       const grf = []; for (const s of ['N', 'F']) if (stance[s].w > 0.01) grf.push({ x: copOf(F, s), f: stance[s].fy });
       frames.push(record(R, st, F, t - recT0, { grf, phase: ph.n, yaw: curPar.yaw * D2R, flash: t < flashUntil, weapon: sc.weapon || null, tilt: st.tilt + tiltOff }));
       nextRec += recDt;
@@ -1033,7 +1057,17 @@ function simScript(R, p, id, init, scOverride) {
   metrics.push(['Length', (frames.length * recDt).toFixed(2) + ' s'], ['Peak effort', peak.label]);
   const warn = effortWarn(peak);
   if (sc.phases.some(x => x.until) && !reachedAt) warn.push('The strike never reached full extension before the phase timed out: too weak or too heavy a limb for this effort.');
-  return { name: id, frames, duration: frames.length * recDt, loop: !!sc.loop, travel: !!sc.travel, anchorX: sc.anchorX, metrics, warn };
+  // timing marks as fractions of the clip: strike starts (a), first contact (h), strikes end (e)
+  const dur = frames.length * recDt, mk = { a: 0, h: .5, e: 1 }, si = marks.findIndex(m => m.s);
+  if (si >= 0 && dur > 0) {
+    const endOf = k => { let j = k; while (j < marks.length && marks[j].s && !/impact|hold/.test(marks[j].n)) j++; return j < marks.length ? marks[j] : null; };
+    const hit = endOf(si), li = marks.length - 1 - [...marks].reverse().findIndex(m => m.s), after = marks.slice(li + 1).find(m => !m.s);
+    mk.a = marks[si].t / dur;
+    mk.h = (hit && (/impact|hold/.test(hit.n) || marks[si].u) ? hit.t : ((marks[si].t + (hit ? hit.t : dur)) / 2)) / dur;
+    mk.e = (after ? after.t : dur) / dur;
+    for (const k in mk) mk[k] = clamp(mk[k], 0, 1);
+  }
+  return { name: id, frames, duration: dur, loop: !!sc.loop, travel: !!sc.travel, anchorX: sc.anchorX, metrics, warn, marks: mk };
 }
 const simAttack = (R, p) => simScript(R, p, p.atkType || 'punch');
 
@@ -1065,7 +1099,7 @@ function simRunJump(R, p) {
 }
 
 function simMove(R, p, id) {
-  if (id === 'walk' || id === 'run') return simGait(R, p, id);
+  if (id === 'walk' || id === 'run' || id === 'fwalk') return simGait(R, p, id);
   if (id === 'jump') return simJump(R, p);
   if (id === 'runjump') return simRunJump(R, p);
   return simScript(R, p, id);
@@ -1094,10 +1128,10 @@ function frameAt(anim, t) { // linear interpolation between recorded frames
 /* point = [segment, u (fraction of segment length), v (fraction of height, + = anterior)] */
 // [name, region, points, belly radius (×H), belly centre, joint actions [type, +1 if it drives + rotation], fat weight]
 const MUSCLES = [
-  ['Gluteus maximus', 'leg', [['pelvis', .72, -.05], ['thigh', .22, -.018]], .037, .45, [['hip', -1]], 1.5],
+  ['Gluteus maximus', 'leg', [['pelvis', .72, -.045], ['thigh', .22, -.016]], .03, .45, [['hip', -1]], 1.5],
   ['Rectus femoris', 'leg', [['pelvis', .1, .034], ['thigh', .97, .024], ['shank', .04, .02]], .021, .5, [['hip', 1], ['knee', -1]], .9],
   ['Vastus lateralis', 'leg', [['thigh', .12, .006], ['thigh', .97, .022], ['shank', .04, .02]], .035, .6, [['knee', -1]], 1.1],
-  ['Hamstrings', 'leg', [['pelvis', -.1, -.038], ['thigh', .9, -.02], ['shank', .07, -.014]], .027, .5, [['hip', -1], ['knee', 1]], 1],
+  ['Hamstrings', 'leg', [['pelvis', -.1, -.034], ['thigh', .9, -.02], ['shank', .07, -.014]], .024, .5, [['hip', -1], ['knee', 1]], 1],
   ['Gastrocnemius', 'leg', [['shank', .03, -.013], ['shank', .55, -.016], ['foot', -.5, -.012]], .03, .42, [['knee', 1], ['ankle', -1]], .5],
   ['Soleus', 'leg', [['shank', .25, -.008], ['shank', .78, -.012], ['foot', -.5, -.012]], .02, .55, [['ankle', -1]], .4],
   ['Tibialis anterior', 'leg', [['shank', .1, .012], ['shank', .8, .012], ['foot', .35, -.008]], .011, .4, [['ankle', 1]], .3],
@@ -1107,7 +1141,7 @@ const MUSCLES = [
   ['Triceps', 'arm', [['upperArm', .1, -.012], ['upperArm', .92, -.014], ['forearm', -.04, -.008]], .019, .45, [['elbow', -1], ['shoulder', -1]], .9],
   ['Forearm flexors', 'arm', [['upperArm', .86, .006], ['forearm', .5, .009], ['hand', .05, .004]], .015, .3, [['wrist', 1], ['elbow', 1]], .5],
   ['Forearm extensors', 'arm', [['upperArm', .9, -.008], ['forearm', .5, -.008], ['hand', .05, -.004]], .014, .3, [['wrist', -1]], .5],
-  ['Pectoralis major', 'arm', [['thorax', .62, .056], ['upperArm', .12, .008]], .023, .4, [['shoulder', 1]], 1.1],
+  ['Pectoralis major', 'arm', [['thorax', .62, .058], ['upperArm', .12, .008]], .027, .4, [['shoulder', 1]], 1.1],
   ['Latissimus dorsi', 'arm', [['abdomen', .4, -.045], ['upperArm', .14, -.004]], .022, .45, [['shoulder', -1]], .9],
   ['Rectus abdominis', 'core', [['pelvis', .4, .044], ['thorax', .3, .058]], .01, .5, [['lumbar', 1]], 0],
   ['External oblique', 'core', [['thorax', .25, .014], ['pelvis', .85, .02]], .03, .5, [['lumbar', 1]], 1.0],
@@ -1124,15 +1158,15 @@ const SOFT = [
   ['leg', 'cap', ['foot', -.45, -.022], ['foot', -.28, -.02], .017, .017, .3, 'bone'],
   ['leg', 'cap', ['foot', -.3, -.018], ['foot', .95, -.027], .019, .012, .3, 'bone'],
   ['leg', 'cap', ['toes', .1, .009], ['toes', .9, .006], .009, .007, .2, 'bone'],
-  ['leg', 'cap', ['pelvis', .3, -.04], null, .034, .034, 1.5, 'none'],
+  ['leg', 'cap', ['pelvis', .32, -.034], null, .029, .029, 1.05, 'none'],
   ['arm', 'cap', ['upperArm', .05, 0], ['upperArm', .95, 0], .02, .016, .95, 'deep'],
   ['arm', 'cap', ['forearm', 0, 0], ['forearm', .95, 0], .018, .012, .5, 'deep'],
   ['arm', 'cap', ['upperArm', 1.0, -.004], null, .014, .014, .3, 'none'],
   ['arm', 'cap', ['hand', .1, 0], ['hand', .78, .004], .0145, .013, .25, 'bone'],
   ['core', 'cap', ['pelvis', -.3, -.004], ['pelvis', .95, 0], .05, .05, 1.2, 'deep'],
-  ['core', 'cap', ['abdomen', 0, .004], ['abdomen', 1.0, .004], .043, .045, 1.8, 'deep', 'belly'],
+  ['core', 'cap', ['abdomen', 0, .004], ['abdomen', 1.0, .006], .041, .045, 1.4, 'deep', 'belly'],
   ['core', 'cap', ['thorax', .05, .004], ['thorax', .72, 0], .056, .058, .9, 'deep', 'chest'],
-  ['core', 'cap', ['thorax', .86, -.02], null, .044, .044, .8, 'deep'],
+  ['core', 'cap', ['thorax', .82, -.012], null, .04, .04, .7, 'deep'],
   ['core', 'cap', ['neck', -.1, 0], ['neck', 1.0, .003], .027, .025, .6, 'deep'],
   ['core', 'ell', ['head', .46, .012], null, .066, .056, .15, 'bone', 'head'],
   ['core', 'cap', ['head', .2, .026], ['head', .07, .05], .019, .016, .35, 'bone', 'head'],
@@ -1498,6 +1532,33 @@ function renderSprite(R, fr, o) {
       const ax = TX(ua.ox - ua.dx * .02 * H, sd, latA), ay = ua.oy - ua.dy * .02 * H, bx = TX(ua.ox + ua.dx * .2 * ua.len, sd, latA), by = ua.oy + ua.dy * .2 * ua.len;
       push(z, { k: 0, ax, ay, bx, by, r0: .042 * H * p.chest * (p.armBulk || 1) ** .5, r1: .036 * H * (p.armBulk || 1) ** .5, ck: 'pauldron', fold: false });
     }
+    if (HATS[ww.hat] && hg) {
+      const hr = hg.rx, at = (l, b) => [hg.cx + (hg.ax * l + hg.bx * b) * hr, hg.cy + (hg.ay * l + hg.by * b) * hr];
+      const seg = (l0, b0, l1, b1, r0, r1, ck) => { const a = at(l0, b0), b = at(l1, b1); push(2.45, { k: 0, ax: a[0], ay: a[1], bx: b[0], by: b[1], r0: r0 * H, r1: r1 * H, ck, fold: false }); };
+      const h = ww.hat;
+      if (h === 'cap') seg(.44, .2, .3, -1.6, .011, .008, 'hat');
+      if (h === 'hardhat') { seg(.28, 1.25, .28, -1.5, .01, .01, 'hat'); seg(1.12, .5, 1.12, -.5, .01, .01, 'hat'); }
+      if (h === 'fedora') { seg(.34, 1.5, .34, -1.6, .009, .009, 'hat'); seg(.62, .9, .62, -.9, .016, .016, 'hat'); seg(.95, .55, .95, -.55, .014, .014, 'hat'); seg(.48, .98, .48, -.98, .007, .007, 'band'); }
+      if (h === 'wizard') { seg(.3, 1.55, .3, -1.6, .009, .009, 'hat'); seg(.85, .1, 1.75, .45, .052, .028, 'hat'); seg(1.75, .45, 2.45, 1.15, .028, .006, 'hat'); }
+      if (h === 'helm') { seg(.55, -1.02, -.3, -1.08, .006, .005, 'hat'); seg(1.05, .7, 1.12, -.6, .008, .008, 'hat'); }
+      if (h === 'bandana') { seg(.35, 1, .05, 1.35, .01, .007, 'hat'); seg(.35, 1, -.25, 1.25, .009, .006, 'hat'); }
+    }
+    const WPN = ww.weapon;
+    if (WPN && WPN !== 'none' && !fr.weapon && WEAPON_LEN[WPN]) {
+      // held in the near hand: blades jut from the fist toward the front, a staff stands upright
+      const hN = F.S[SI.handN], fa = F.S[SI.forearmN], gx = hN.ox + hN.dx * hN.len * .5, gy = hN.oy + hN.dy * hN.len * .5;
+      let ux = -fa.dy, uy = fa.dx; if (ux < 0) { ux = -ux; uy = -uy; }
+      if (WPN === 'staff') { ux = .18; uy = 1; } else uy += .55;
+      const ul = Math.hypot(ux, uy); ux /= ul; uy /= ul;
+      const L = WEAPON_LEN[WPN], z = flip ? .55 : 4.55, px = -uy * .5, py = ux * .5;
+      const at = (k, w = 0) => [TX(gx + (ux * k + px * w) * H, 1, latA), gy + (uy * k + py * w) * H];
+      const seg = (k0, k1, r0, r1, ck, w0 = 0, w1 = 0) => { const a = at(k0, w0), b = at(k1, w1); push(z, { k: 0, ax: a[0], ay: a[1], bx: b[0], by: b[1], r0: r0 * H, r1: r1 * H, ck, fold: false }); };
+      if (WPN === 'sword' || WPN === 'dagger') { seg(-.05, .02, .008, .008, 'hilt'); seg(.03, .03, .006, .006, 'hilt', -.07, .07); seg(.04, L, .0075, .003, 'blade'); }
+      else if (WPN === 'saber') { seg(-.05, .04, .008, .008, 'gun'); seg(.05, L, .01, .008, 'beam'); }
+      else if (WPN === 'staff') { seg(-.5, L, .008, .008, 'wood'); seg(L + .01, L + .01, .017, .017, 'gem'); }
+      else if (WPN === 'wrench') { seg(-.03, L, .006, .006, 'blade'); seg(L, L + .035, .017, .012, 'blade'); }
+      else { seg(-.02, L, .011, .009, 'gun'); seg(0, 0, .008, .007, 'gun', 0, -.09); if (WPN === 'rifle') seg(-.2, -.02, .014, .011, 'gun'); }
+    }
     for (const [z, list] of byZ) {
       const L = { z, body: false, list, sd: new Float32Array(NPX).fill(1e9), win: new Int16Array(NPX).fill(-1) };
       evalList(list, false, L, () => 0, false);
@@ -1523,7 +1584,8 @@ function renderSprite(R, fr, o) {
   const levels = Math.max(2, Math.min(6, N));
   const R_skin = ramp(o.skin || '#c98e6b', levels), R_mus = PAL.muscle.map(c => ramp(c, levels)), R_ten = ramp(PAL.tendon, levels), R_bone = ramp(PAL.bone, levels), R_deep = ramp(PAL.deep, levels), R_metal = ramp(PAL.metal, levels);
   const rcache = {}; const rampHex = hex => rcache[hex] || (rcache[hex] = ramp(hex, levels));
-  const CK = ww ? { hair: ww.hairColor, tie: '#2a2228', cape: ww.capeColor, skirt: ww.skirtColor, scarf: ww.scarfColor, band: ww.bandColor, top: ww.topColor, pauldron: ww.pauldronColor } : {};
+  const CK = ww ? { hair: ww.hairColor, tie: '#2a2228', cape: ww.capeColor, skirt: ww.skirtColor, scarf: ww.scarfColor, band: ww.bandColor, top: ww.topColor, pauldron: ww.pauldronColor,
+    hat: ww.hatColor || '#8c2f2b', hilt: ww.weaponColor || '#6b4a2e', wood: ww.weaponColor || '#7a5230', beam: ww.weaponColor || '#58c8ff', blade: '#c4cad4', gem: '#58b8d8', gun: '#3a3d45' } : {};
   const rampAt = (li, i) => {
     const L = layers[li];
     if (L.raster) return [[L.rgba[i * 4], L.rgba[i * 4 + 1], L.rgba[i * 4 + 2]]];
@@ -1625,6 +1687,7 @@ function renderSprite(R, fr, o) {
       a rest shape, cloth cohesion between neighbouring strands, and
       collision with the moving body and the floor.
    ============================================================ */
+const WEAPON_LEN = { sword: .36, dagger: .15, staff: .42, saber: .4, wrench: .18, pistol: .1, rifle: .34 };
 const WEAR_DEFAULTS = {
   outfit: 'Traveller',
   topOn: true, topSleeve: 1.6, topLen: .9, topLoose: .25, topColor: '#5d6f4a', topPattern: 'solid', topTrim: '#c9a85c',
@@ -1640,6 +1703,7 @@ const WEAR_DEFAULTS = {
   pauldronOn: false, pauldronColor: '#8c97a6',
   wind: 0, clothWeight: 1,
   hairStyle: 'short', hairLen: 1, hairVolume: 1, hairStiff: .5, hairColor: '#3a2a20', beard: 'none',
+  hat: 'none', hatColor: '#8c2f2b', weapon: 'none', weaponColor: '#6b4a2e',
 };
 const HAIR_STYLES = [['bald', 'Bald'], ['buzz', 'Buzz cut'], ['short', 'Short'], ['bob', 'Bob'], ['long', 'Long'], ['ponytail', 'Ponytail'], ['pigtails', 'Pigtails'], ['braid', 'Braid'], ['topknot', 'Top knot'], ['bun', 'Bun'], ['mohawk', 'Mohawk'], ['spiky', 'Spiky (anime)'], ['afro', 'Afro']];
 const HAIR_COLORS = ['#141114', '#3a2a20', '#6b4423', '#a8743a', '#d8b46a', '#b8b2a8', '#8f2d1f', '#3d6fd6', '#e05a9c', '#58c26b'];
@@ -1685,9 +1749,21 @@ function shellGarments(w, H) {
     const off = { stubble: .002, short: .011, long: .013 }[w.beard] * H;
     out.push({ id: 'beard', off, color: w.hairColor, hair: true, beard: w.beard, cov: c => c.l !== undefined && c.l < -.12 && c.b < .3 && c.l > -1.4 && !(c.l > -.45 && c.b > -.05) });
   }
+  // headwear (shared with the Crystal sprites): a shell over part of the head; brims and crowns are added as rigid parts
+  const HAT = HATS[w.hat];
+  if (HAT) {
+    out.push({ id: 'hat', off: HAT[0] * H, color: w.hatColor || '#8c2f2b', hair: true, cov: c => (c.l !== undefined && HAT[1](c)) || (!!HAT[2] && c.s !== undefined && c.s >= 3.95 && c.s <= 4.7) });
+    if (w.hat === 'spacehelm' || w.hat === 'visor') out.push({ id: 'glass', off: (HAT[0] + .001) * H, color: '#1f3b55', cov: c => c.l !== undefined && c.b < (w.hat === 'visor' ? .2 : -.1) && c.l > (w.hat === 'visor' ? .02 : -.75) && c.l < (w.hat === 'visor' ? .32 : .5) });
+  }
   return out;
 }
 
+// [shell thickness ×H, head coverage (l: up the head axis, b: toward the back, in head radii), covers the neck]
+const HATS = {
+  bandana: [.012, c => c.l > .2 - .3 * c.b], hood: [.024, c => !(c.b < -.18 && c.l < .62 && c.l > -1.3), 1], helm: [.02, c => c.l > -.02 || c.b > .3],
+  wizard: [.012, c => c.l > .28], cap: [.012, c => c.l > .32], hardhat: [.024, c => c.l > .24], fedora: [.016, c => c.l > .34],
+  spacehelm: [.042, () => true, 1], visor: [.008, c => c.l > .02 && c.l < .34 && c.b < .9],
+};
 /* ---------- strand specification ---------- */
 const DEG = Math.PI / 180;
 function headGeom(R, F, w) { // head ellipse in world: centre, axis, back unit, radii
