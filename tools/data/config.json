@@ -527,12 +527,181 @@
         ],
         "max": 12,
         "nsfw": true
+      },
+      {
+        "name": "False Knees",
+        "urls": [
+          "https://falseknees.com/rss.xml",
+          "https://falseknees.com/feed.xml"
+        ],
+        "home": "https://falseknees.com/",
+        "scrape": true,
+        "max": 10
+      },
+      {
+        "name": "Achewood",
+        "urls": [
+          "https://achewood.com/rss.php"
+        ],
+        "home": "https://achewood.com/",
+        "scrape": true,
+        "max": 8
+      },
+      {
+        "name": "Moonbeard",
+        "urls": [
+          "https://moonbeard.com/feed/"
+        ],
+        "max": 8
+      },
+      {
+        "name": "War and Peas",
+        "urls": [
+          "https://warandpeas.com/feed/"
+        ],
+        "max": 8
+      },
+      {
+        "name": "Deep Dark Fears",
+        "urls": [
+          "https://deep-dark-fears.tumblr.com/rss"
+        ],
+        "max": 8
+      },
+      {
+        "name": "Zen Pencils",
+        "urls": [
+          "https://zenpencils.com/feed/"
+        ],
+        "max": 6
+      },
+      {
+        "name": "PhD Comics",
+        "urls": [
+          "https://phdcomics.com/gradfeed.php"
+        ],
+        "max": 6
+      },
+      {
+        "name": "Math with Bad Drawings",
+        "urls": [
+          "https://mathwithbaddrawings.com/feed/"
+        ],
+        "max": 6
+      },
+      {
+        "name": "Mr. Lovenstein",
+        "urls": [
+          "https://www.mrlovenstein.com/rss.xml"
+        ],
+        "home": "https://www.mrlovenstein.com/",
+        "max": 8,
+        "nsfw": true
+      },
+      {
+        "name": "Extra Fabulous Comics",
+        "urls": [
+          "https://extrafabulouscomics.com/feed/"
+        ],
+        "max": 8,
+        "nsfw": true
+      },
+      {
+        "name": "Cyanide & Happiness",
+        "urls": [
+          "https://explosm.net/rss.xml",
+          "https://feeds.feedburner.com/Explosm"
+        ],
+        "home": "https://explosm.net/",
+        "max": 8,
+        "nsfw": true
+      },
+      {
+        "name": "Oh Joy Sex Toy",
+        "urls": [
+          "https://www.ohjoysextoy.com/feed/"
+        ],
+        "max": 8,
+        "nsfw": true
       }
     ],
     "xkcdRandom": 40,
-    "comicShare": 0.4
+    "comicShare": 0.4,
+    "classicComics": {
+      "max": 30,
+      "perStrip": 6,
+      "width": 1280,
+      "strips": [
+        {
+          "name": "Little Nemo in Slumberland",
+          "artist": "Winsor McCay",
+          "categories": [
+            "Little Nemo in Slumberland",
+            "Little Nemo"
+          ]
+        },
+        {
+          "name": "Dream of the Rarebit Fiend",
+          "artist": "Winsor McCay",
+          "categories": [
+            "Dream of the Rarebit Fiend"
+          ]
+        },
+        {
+          "name": "Krazy Kat",
+          "artist": "George Herriman",
+          "categories": [
+            "Krazy Kat"
+          ],
+          "before": 1929
+        },
+        {
+          "name": "The Upside Downs",
+          "artist": "Gustave Verbeek",
+          "categories": [
+            "The Upside Downs of Little Lady Lovekins and Old Man Muffaroo",
+            "Gustave Verbeek"
+          ]
+        },
+        {
+          "name": "Little Sammy Sneeze",
+          "artist": "Winsor McCay",
+          "categories": [
+            "Little Sammy Sneeze"
+          ]
+        },
+        {
+          "name": "The Kin-der-Kids",
+          "artist": "Lyonel Feininger",
+          "categories": [
+            "The Kin-der-Kids",
+            "Wee Willie Winkie's World"
+          ]
+        },
+        {
+          "name": "Polly and Her Pals",
+          "artist": "Cliff Sterrett",
+          "categories": [
+            "Polly and Her Pals"
+          ],
+          "before": 1929
+        },
+        {
+          "name": "Gasoline Alley",
+          "artist": "Frank King",
+          "categories": [
+            "Gasoline Alley"
+          ],
+          "before": 1929
+        }
+      ]
+    }
   },
   "videoRegion": "CA",
+  "videoAge": {
+    "min": 5,
+    "max": 20
+  },
   "spriteQueries": [
     "teapot",
     "skull",
@@ -731,7 +900,8 @@
     "poemsFetch": 150,
     "poems": 70,
     "poemMaxLines": 70,
-    "articles": 30
+    "articles": 30,
+    "erotica": 20
   },
   "strips": {
     "share": 0.2,

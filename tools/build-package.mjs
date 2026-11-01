@@ -902,11 +902,14 @@ const isNote = (p) => /^\[?(?:footnote|fn#|illustration|note:|transcriber)/i.tes
 // prose: from the paragraph holding `at`, `n` paragraphs (or through the one holding `to`)
 function eroProse(paras, pk) {
   const ats = [].concat(pk.at);
-  const s = paras.findIndex((p) => ats.some((a) => eroHas(p, a)));
-  if (s < 0) return null;
+  for (let s = 0; s < paras.length; s++) if (ats.some((a) => eroHas(paras[s], a))) { const r = proseRun(paras, s, pk); if (r) return r; }
+  return null;
+}
+function proseRun(paras, s, pk) {
   const run = [];
   for (let i = s; i < paras.length && run.length < (pk.n || 5); i++) {
     if (isNote(paras[i])) continue;
+    if (run.length && /^[^a-z]{1,160}$/.test(paras[i]) && /\b(?:STORY|CHAPTER|BOOK|PART|DAY|LETTER|CANTO|NIGHT|TALE|SONG)\b|^[IVXLC\d]+\.?$/.test(paras[i])) break; // the next chapter or story
     run.push(paras[i]);
     if (pk.to && eroHas(paras[i], pk.to)) break;
   }
@@ -917,8 +920,11 @@ function eroProse(paras, pk) {
 function eroVerse(lines, pk) {
   const ats = [].concat(pk.at);
   const hits = lines.map((l, i) => (ats.some((a) => eroHas(l, a)) ? i : -1)).filter((i) => i >= 0);
-  const s = hits.find((i, k) => !(hits[k + 1] - i <= 4));
-  if (s === undefined) return null;
+  // a contents entry or a title can hold the same words: try each start until one reads through
+  for (const s of hits.filter((i, k) => !(hits[k + 1] - i <= 4))) { const r = verseRun(lines, s, pk); if (r) return r; }
+  return null;
+}
+function verseRun(lines, s, pk) {
   const ind = (l) => l.match(/^\s*/)[0].length, base = ind(lines[s]), out = [];
   let blank = 0, end = -1;
   for (let i = s; i < lines.length && out.length < (pk.max || 90); i++) {
@@ -926,7 +932,7 @@ function eroVerse(lines, pk) {
     if (!raw.trim()) { if (++blank >= 3) break; continue; }
     if (base > 1 && ind(raw) < base) break;
     const text = raw.trim().replace(/\s{2,}\d+$/, '');
-    if (!blank && out.length && ind(raw) > base + 1) out[out.length - 1] += ` ${text}`; // a wrapped long line
+    if (!blank && out.length && ind(raw) > base + 1 && /^[a-z]/.test(text)) out[out.length - 1] += ` ${text}`; // a wrapped long line
     else { if (blank && out.length) out.push(''); out.push(text); }
     blank = 0;
     if (end < 0 && pk.to && eroHas(out[out.length - 1], pk.to)) end = out.length + (pk.plus || 0);
@@ -942,7 +948,7 @@ function eroVerses(text, w, pk) {
   if (!m) return null;
   const start = text.lastIndexOf('1:1', m.index);
   const re = /(?:^|\s)(?:\d+:)?(\d+):(\d+)\s+/g, marks = [];
-  re.lastIndex = start < 0 ? m.index - 200 : start;
+  re.lastIndex = Math.max(0, start < 0 ? m.index - 200 : start - 1);
   let x;
   while ((x = re.exec(text))) {
     const c = +x[1], v = +x[2];
@@ -1051,12 +1057,9 @@ async function buildReads(wiki) {
       }
     } catch (e) { warn(`gutendex ${topic}: ${e.message}`); }
   });
-  await pool(shuffle(books).slice(0, R.books || 30), 3, async (b) => {
+  await pool(shuffle(books).slice(0, QUICK ? 2 : R.books || 30), 3, async (b) => {
     try {
-      let t = await fetchText(b.txt, { timeout: 40000, retries: 1 });
-      t = t.replace(/\r/g, '');
-      const s0 = t.search(/\*\*\* ?START OF [^\n]*\n/i), s1 = t.search(/\*\*\* ?END OF /i);
-      if (s0 >= 0) t = t.slice(t.indexOf('\n', s0) + 1, s1 > s0 ? s1 : undefined);
+      const t = gutBody(await fetchText(b.txt, { timeout: 40000, retries: 1 }));
       const paras = t.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').replace(/_/g, '').trim()).filter(Boolean);
       const good = (p) => p.length > 160 && p.length < 1600 && !/^(chapter|book|part|contents|illustration|\[)/i.test(p) && p.replace(/[^A-Z]/g, '').length < p.length * 0.3;
       const per = R.perBook || 3, start = Math.floor(paras.length * 0.08);
@@ -1071,11 +1074,11 @@ async function buildReads(wiki) {
   });
   // whole poems
   try {
-    const j = await fetchJSON(`https://poetrydb.org/random/${R.poemsFetch || 120}`, { timeout: 30000 });
+    const j = await fetchJSON(`https://poetrydb.org/random/${QUICK ? 20 : R.poemsFetch || 120}`, { timeout: 30000 });
     for (const p of shuffle(j || []).filter((p) => +p.linecount >= 8 && +p.linecount <= (R.poemMaxLines || 70)).slice(0, R.poems || 60)) out.push({ kind: 'poem', title: p.title, author: p.author, lines: p.lines, url: `https://www.google.com/search?q=${encodeURIComponent(`${p.title} ${p.author}`)}`, source: 'PoetryDB' });
   } catch (e) { warn(`poetrydb: ${e.message}`); }
   // long articles: the first five paragraphs of this week's longest Wikipedia picks
-  const long = [...wiki].sort((a, b) => (b.summary?.length || 0) - (a.summary?.length || 0)).slice(0, R.articles || 30);
+  const long = [...wiki].sort((a, b) => (b.summary?.length || 0) - (a.summary?.length || 0)).slice(0, QUICK ? 3 : R.articles || 30);
   await pool(long, 3, async (w) => {
     try {
       const j = await fetchJSON(wq({ action: 'query', prop: 'extracts', explaintext: '1', exsectionformat: 'plain', titles: w.title, redirects: '1' }));
@@ -1084,8 +1087,12 @@ async function buildReads(wiki) {
       if (paras.length >= 4) out.push({ kind: 'article', title: w.title, author: 'Wikipedia', paras: paras.map((p) => clip(cleanExtract(p), 1400)), url: w.url, source: 'Wikipedia' });
     } catch (e) { warn(`long article ${w.title}: ${e.message}`); }
   });
-  report.sources.reads = { novels: out.filter((x) => x.kind === 'novel').length, poems: out.filter((x) => x.kind === 'poem').length, articles: out.filter((x) => x.kind === 'article').length, books: books.length };
-  return shuffle(out).slice(0, n).map((x) => ({ id: `rd${hashStr(`${x.title}${x.paras?.[0] || x.lines?.[0] || ''}`).toString(36)}`, cat: 'read', sub: x.kind, ...x }));
+  // classic erotica: a reserved share, mixed in with the rest (all of it in quick builds, to check every pick)
+  const ero = await buildErotica();
+  const eroN = QUICK ? ero.length : Math.min(ero.length, R.erotica ?? 20);
+  report.sources.reads = { novels: out.filter((x) => x.kind === 'novel').length, poems: out.filter((x) => x.kind === 'poem').length, articles: out.filter((x) => x.kind === 'article').length, books: books.length, erotica: ero.length };
+  const mix = [...shuffle(ero).slice(0, eroN), ...shuffle(out).slice(0, Math.max(0, n - eroN))];
+  return shuffle(mix).map((x) => ({ id: `rd${hashStr(`${x.title}${x.paras?.[0] || x.lines?.[0] || ''}`).toString(36)}`, cat: 'read', sub: x.kind, ...x }));
 }
 
 
@@ -1212,8 +1219,17 @@ function offlineFixtures() {
       url: `https://en.wikipedia.org/wiki/${encodeURIComponent(s.replace(/ /g, '_'))}` }));
   }
   const vids = ['dQw4w9WgXcQ', 'jNQXAC9IVRw', '9bZkp7q19f0', 'kJQP7kiw5Fk'];
-  const video = Array.from({ length: 40 }, (_, i) => ({ id: `v-off-${i}`, cat: 'video', sub: Object.keys(topics.video)[i % 10], vid: vids[i % vids.length], title: `Offline test video ${i}`, channel: 'Test', dur: '0:45', short: true }));
+  const vk = Object.keys(topics.video);
+  const video = Array.from({ length: 40 }, (_, i) => ({ id: `v-off-${i}`, cat: 'video', sub: vk[i % vk.length], vid: vids[i % vids.length], title: `Offline test video ${i}`, channel: 'Test', dur: i % 2 ? '3:12' : '0:45', short: !(i % 2), date: `${2007 + (i % 14)}-0${1 + (i % 9)}-1${i % 10}` }));
   const web = Array.from({ length: 30 }, (_, i) => ({ id: `web-off-${i}`, cat: 'web', sub: ['hn', 'substack', 'reddit'][i % 3], source: ['Hacker News', 'Substack', 'r/occult'][i % 3], title: `Offline test link ${i}`, url: 'https://news.ycombinator.com/', excerpt: 'Placeholder excerpt for layout testing. The real package fills this from the article.', meta: '123 points' }));
+  // comics: a three-panel placeholder strip (works offline); a webcomic, a classic Sunday page, an adult one
+  const strip = (hue, label) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320"><rect width="900" height="320" fill="hsl(${hue},40%,92%)"/>${[0, 1, 2].map((k) => `<rect x="${12 + k * 296}" y="12" width="280" height="296" fill="#fff" stroke="#222" stroke-width="4"/><circle cx="${152 + k * 296}" cy="${150 - k * 12}" r="${40 + k * 14}" fill="hsl(${hue + k * 40},55%,62%)"/>`).join('')}<text x="450" y="292" font-family="serif" font-size="26" text-anchor="middle" fill="#222">${label}</text></svg>`)}`;
+  const comics = [
+    { source: 'Wondermark', title: 'Offline webcomic', excerpt: 'Placeholder alt text for a webcomic.', date: '2026-10-20' },
+    { source: 'Little Nemo in Slumberland', title: 'Offline classic strip', excerpt: 'Winsor McCay · 1905', date: '1905', classic: true },
+    { source: 'Oglaf', title: 'Offline adult comic', excerpt: 'Placeholder for an adult comic (shown only with the adult toggle).', date: '2026-10-18', nsfw: true }
+  ].map((c, i) => ({ id: `web-off-c${i}`, cat: 'web', sub: 'comic', url: 'https://commons.wikimedia.org/', img: strip(30 + i * 110, c.title), ...c }));
+  web.push(...comics);
   const quotes = fallbackQuotes.map(([author, text]) => ({ author, text }));
   return { wiki, video, web, quotes, commons: [], kym: [] };
 }
@@ -1221,43 +1237,49 @@ function offlineFixtures() {
 // ------------------------------------------------------------------ main
 async function main() {
   // helpers and state for the builder modules (memes, power, products, images)
-  const K = { ABBR, ADJ, BROWSER_UA, DECK, GAME_NAMES, KENNEY_NAMES, OFFLINE, OUT, PROC_A, PROC_B, PSYCH_ALGOS, QUESTIONS, ROOT, TAROT_ALT, UA, WIKI_API, args, assignThemes, avgDwell, buildComics, buildGames, buildNews, buildOracle, buildPsych, buildQuotes, buildReads, buildSelfCare, buildSprites, buildStudio, buildTarot, buildTextures, buildThemes, buildVideos, buildVocab, buildWeb, buildWiki, categoryMembers, cats, cleanExtract, clip, commonsImages, commonsSearch, config, decodeEntities, durSec, extracts, fallbackQuotes, fetchJSON, fetchText, fileURLToPath, firstImg, fs, hasTransparentEdges, hashStr, history, historyPath, id, isoDate, isoWeekId, kymMemes, log, memeImageCount, memeText, memeWeights, moreLike, mulberry32, offlineFixtures, ogMeta, parseArgs, parseFeed, parseWikiquote, path, pick, playable, pool, productClassics, productParts, rand, readFeed, readJSON, report, scrapeBlog, seen, selfCare, selfCareFlavors, sentences, shuffle, sleep, stripParens, stripTags, themeDefs, topics, totalPosts, vetSprite, want, warn, wq, writeJSON, ytSearch };
-  const { buildMemes, buildStrips } = memesBuilder(K), { buildPower } = powerBuilder(K), { buildProducts } = productsBuilder(K), { buildBackgrounds, tagSprites } = imagesBuilder(K);
-  let wiki, video, web, quotes, commons, kym, sprites = [], themes = [], news = [], textures = [], backgrounds = [], oracleData = null;
-  if (OFFLINE) ({ wiki, video, web, quotes, commons, kym } = offlineFixtures());
-  else {
-    quotes = await buildQuotes();
-    wiki = await buildWiki();
-    video = await buildVideos();
-    web = await buildWeb();
-    commons = await commonsImages();
-    kym = await kymMemes();
-    sprites = tagSprites(await buildSprites());
-    backgrounds = await buildBackgrounds();
-    themes = await buildThemes();
-    textures = await buildTextures();
-    news = await buildNews();
-    oracleData = await buildTarot();
+  const K = { ABBR, ADJ, BROWSER_UA, DECK, GAME_NAMES, KENNEY_NAMES, OFFLINE, ONLY, OUT, PROC_A, PROC_B, PSYCH_ALGOS, QUESTIONS, QUICK, ROOT, TAROT_ALT, UA, WIKI_API, aiMarked, args, assignThemes, avgDwell, buildComics, buildErotica, buildGames, buildNews, buildOracle, buildPsych, buildQuotes, buildReads, buildSelfCare, buildSprites, buildStudio, buildTarot, buildTextures, buildThemes, buildVideos, buildVocab, buildWeb, buildWiki, categoryMembers, cats, classicStrips, cleanExtract, clip, commonsImages, commonsSearch, config, decodeEntities, durSec, extracts, fallbackQuotes, fetchJSON, fetchText, few, fileURLToPath, firstImg, fs, gutBody, gutendex, hasTransparentEdges, hashStr, history, historyPath, id, isoDate, isoWeekId, kymMemes, log, memeImageCount, memeText, memeWeights, moreLike, mulberry32, need, offlineFixtures, ogMeta, parseArgs, parseFeed, parseWikiquote, path, pick, playable, pool, productClassics, productParts, rand, readFeed, readJSON, report, scrapeBlog, seen, selfCare, selfCareFlavors, sentences, shuffle, sleep, stripParens, stripTags, themeDefs, topics, totalPosts, vetSprite, want, warn, wq, writeJSON, ytAge, ytSearch };
+  // the images builder comes first: products pick theme-matched sprites with its helpers
+  const { buildBackgrounds, tagSprites, moreSprites, matchSprites, spriteGroup } = imagesBuilder(K);
+  K.matchSprites = matchSprites; K.spriteGroup = spriteGroup;
+  const { buildMemes, buildStrips } = memesBuilder(K), { buildPower } = powerBuilder(K), { buildProducts } = productsBuilder(K);
+  let wiki = [], video = [], web = [], quotes = [], commons = [], kym = [], sprites = [], themes = [], news = [], textures = [], backgrounds = [], oracleData = null;
+  // which network sources this build needs (all of them unless --only)
+  const pics = need('game', 'product');
+  if (OFFLINE) {
+    ({ wiki, video, web, quotes, commons, kym } = offlineFixtures());
+    if (pics) { sprites = tagSprites(await moreSprites()); backgrounds = await buildBackgrounds(); }
+  } else {
+    if (need('meme', 'psych')) quotes = await buildQuotes();
+    if (need('wiki', 'meme', 'read')) wiki = await buildWiki();
+    if (need('video')) video = await buildVideos();
+    if (need('web')) web = await buildWeb();
+    if (need('meme')) { commons = await commonsImages(); kym = await kymMemes(); }
+    if (pics) { sprites = tagSprites([...await buildSprites(), ...await moreSprites()]); backgrounds = await buildBackgrounds(); }
+    if (need('game')) { themes = await buildThemes(); textures = await buildTextures(); }
+    if (need('news')) news = await buildNews();
+    if (need('oracle')) oracleData = await buildTarot();
   }
-  const power = await buildPower();
-  const vocab = await buildVocab();
+  const power = need('power') ? await buildPower() : [];
+  const vocab = need('game') ? await buildVocab() : [];
   const games = buildGames();
   assignThemes(games, themes);
-  const posts = {
-    game: games,
-    wiki: shuffle(wiki),
-    video: shuffle(video),
-    meme: await (async () => { const strips = await buildStrips(quotes, commons, Math.round(want.meme * (config.strips?.share ?? 0.2))); return shuffle([...strips, ...buildMemes(quotes, wiki, commons, kym).slice(0, want.meme - strips.length)]); })(),
-    product: buildProducts(),
-    psych: buildPsych(quotes, wiki),
-    selfcare: buildSelfCare(),
-    web: shuffle(web),
-    news,
-    oracle: buildOracle(),
-    power,
-    studio: buildStudio(),
-    read: await buildReads(wiki)
+  const all = {
+    game: () => games,
+    wiki: () => shuffle(wiki),
+    video: () => shuffle(video),
+    meme: async () => { const strips = await buildStrips(quotes, commons, Math.round(want.meme * (config.strips?.share ?? 0.2))); return shuffle([...strips, ...buildMemes(quotes, wiki, commons, kym).slice(0, want.meme - strips.length)]); },
+    product: () => buildProducts(sprites),
+    psych: () => buildPsych(quotes, wiki),
+    selfcare: () => buildSelfCare(),
+    web: () => shuffle(web),
+    news: () => news,
+    oracle: () => buildOracle(),
+    power: () => power,
+    studio: () => buildStudio(),
+    read: () => buildReads(wiki)
   };
+  const posts = {};
+  for (const [k, make] of Object.entries(all)) if (need(k)) posts[k] = await make();
   const counts = Object.fromEntries(Object.entries(posts).map(([k, v]) => [k, v.length]));
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const estHours = Object.entries(counts).reduce((s, [k, n]) => s + (cats[k].pct ? n * cats[k].dwellSec : 0), 0) / 3600;
@@ -1280,7 +1302,7 @@ async function main() {
   if (vocab.length) writeJSON(path.join(dir, 'vocab.json'), vocab);
   const prompt = fs.readFileSync(path.join(ROOT, 'packages/prompt.md'), 'utf8');
   const manifest = {
-    id: pkgId, title: `The Feed · ${pkgId}`, created: new Date().toISOString(), offline: OFFLINE || undefined,
+    id: pkgId, title: `The Feed · ${pkgId}`, created: new Date().toISOString(), offline: OFFLINE || undefined, quick: QUICK || undefined, only: ONLY ? [...ONLY] : undefined,
     total, counts, estHours: +estHours.toFixed(1),
     categories: Object.fromEntries(Object.entries(cats).map(([k, c]) => [k, { label: c.label, pct: c.pct }])),
     topics: {
@@ -1288,13 +1310,17 @@ async function main() {
       video: Object.fromEntries(Object.entries(topics.video).map(([k, t]) => [k, t.label])),
       game: Object.fromEntries(config.gameTypes.map((t) => [t, GAME_NAMES[t] || t])),
       web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' },
+      oracle: { tarot: 'Tarot', iching: 'I Ching', augury: 'Augury', dnd: 'Adventurer', haruspicy: 'Haruspicy', dice: 'Dice', die: 'One die', sigil: 'Sigil', paradigm: 'Paradigm shift', ritual: 'Random ritual' },
+      studio: { prompt: 'Writing prompt', blank: 'Blank page', rhyme: 'Rhyming dictionary', creator: 'Character creator' },
+      read: { novel: 'Novels', poem: 'Poems', article: 'Articles' },
       news: Object.fromEntries(Object.entries(config.news.groups).map(([k, g]) => [k, g.label]))
     },
     files, sprites: sprites.length ? 'sprites.json' : undefined, themes: themes.length ? 'themes.json' : undefined, textures: textures.length ? 'textures.json' : undefined, backgrounds: backgrounds.length ? 'backgrounds.json' : undefined, oracle: oracleData ? 'tarot.json' : undefined, vocab: vocab.length ? 'vocab.json' : undefined, prompt, report
   };
   writeJSON(path.join(dir, 'manifest.json'), manifest, true);
 
-  if (!OFFLINE) {
+  if (!OFFLINE && (QUICK || ONLY)) log('test build (--quick/--only): index.json and history.json left alone');
+  else if (!OFFLINE) {
     index.packages = index.packages.filter((p) => p.id !== pkgId);
     index.packages.push({ id: pkgId, title: manifest.title, created: manifest.created, total, counts, estHours: manifest.estHours });
     index.packages.sort((a, b) => a.created.localeCompare(b.created));
