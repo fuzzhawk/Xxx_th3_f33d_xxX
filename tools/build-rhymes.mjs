@@ -40,7 +40,7 @@ const prons = new Map(); // word -> encoded pronunciations (CMU lists variants a
 for (const [k, v] of Object.entries(dictionary)) {
   const w = k.replace(/\(\d+\)$/, '');
   if (!/^[a-z]+$/.test(w) || !level.has(w) || SLURS.test(w)) continue;
-  const e = encodePron(v);
+  const e = encodePron(v.split('#')[0].trim()); // some entries end in a comment
   if (!analyse(e)) continue;
   const l = prons.get(w) || [];
   if (!l.includes(e)) l.push(e);
