@@ -19,16 +19,17 @@ const GROUPS = [['M', 'N', 'NG'], ['P', 'B'], ['T', 'D'], ['K', 'G'], ['F', 'V']
 const CLS = {}; GROUPS.forEach((g, i) => g.forEach((ph) => { CLS[enc(ph)] = i; }));
 const cls = (c) => CLS[c] ?? c;
 
-// what matters about one pronunciation: syllables, the vowel of the last stressed syllable, the sounds after it, the
-// consonants before it, and the rhyming part (vowel + everything after, stress ignored)
+// what matters about one pronunciation: syllables, the vowel of the last stressed syllable, the sounds after it (and how
+// many vowels are among them), the consonants before it, and the rhyming part (vowel + everything after, stress ignored)
 export function analyse(s) {
   let n = 0, last = -1, any = -1;
   for (let i = 0; i < s.length; i++) if (isVowel(s[i])) { n++; any = i; if (s[i + 1] === '1' || s[i + 1] === '2') last = i; }
   const at = last >= 0 ? last : any;
   if (at < 0) return null;
   let j = at; while (j > 0 && s[j - 1] >= 'a') j--;
-  const key = s.slice(at).replace(/\d/g, '');
-  return { s, n, v: key[0], tail: key.slice(1), key, on: s.slice(j, at) };
+  let key = '', tv = 0;
+  for (let i = at; i < s.length; i++) { const c = s[i]; if (c >= 'A') { key += c; if (i > at && isVowel(c)) tv++; } }
+  return { s, n, v: key[0], tail: key.slice(1), tv, key, on: s.slice(j, at) };
 }
 
 // ---------------------------------------------------------------- the dictionary
@@ -63,6 +64,12 @@ export function lookup(d, text) {
   return null;
 }
 
+// two endings of the same length: 3 if every sound matches or is alike, 2 if only the pattern of vowels and consonants does
+function alike(x, y) {
+  let sc = 3;
+  for (let i = 0; i < x.length; i++) { const a = x[i], b = y[i]; if (a === b) continue; if (isVowel(a) !== isVowel(b)) return 0; if (cls(a) !== cls(b)) sc = 2; }
+  return sc;
+}
 // perfect: the same rhyming part after a different start. near, best first: the same vowel and a similar ending (3), the
 // same vowel and another ending (2), the same ending under another vowel (1.5), the same vowel with a longer or shorter
 // ending (1.2); +0.3 for the same number of syllables
@@ -76,8 +83,7 @@ export function rhymes(d, q) {
     for (const a of q.p) {
       let s = 0;
       if (c.key === a.key) { if (c.on === a.on) continue; best = 9; break; }
-      const dl = Math.abs(c.tail.length - a.tail.length);
-      if (c.v === a.v) s = !dl ? ([...c.tail].every((t, i) => cls(t) === cls(a.tail[i])) ? 3 : 2) : dl === 1 ? 1.2 : 0;
+      if (c.v === a.v) { const dl = c.tail.length - a.tail.length; s = !dl ? alike(c.tail, a.tail) : (dl === 1 || dl === -1) && c.tv === a.tv ? 1.2 : 0; }
       else if (a.tail && c.tail === a.tail) s = 1.5;
       if (s && c.n === a.n) s += 0.3;
       if (s > best) best = s;

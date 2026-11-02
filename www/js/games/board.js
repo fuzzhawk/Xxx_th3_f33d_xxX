@@ -167,7 +167,7 @@ export class Dice extends Game {
   static noAuto = true;
   static noMods = ['mirror', 'wobble', 'swarm', 'glass', 'trails'];
   setup() { this.best = 0; this.cup = { ph: 'idle', k: 0, x: HX, y: HY, a: Math.PI, T: 0.6 }; this.dice = null; this.sweep = []; this.newGame(); }
-  newGame() { this.card = CATS.map(() => null); this.round = 0; this.msg = ''; this.newTurn(); this.total = 0; this.score = 0; }
+  newGame() { this.card = CATS.map(() => null); this.round = 0; this.over = 0; this.msg = ''; this.newTurn(); this.total = 0; this.score = 0; }
   newTurn() {
     // last turn's dice are scooped back under the cup; the new ones wait there, unseen
     this.sweep = (this.dice || []).filter((d) => !d.hid).map((d) => ({ x: d.x, y: d.y, v: d.v, k: 0, sx: d.x, sy: d.y, z: 0, sc: 1, rot: 0 }));
