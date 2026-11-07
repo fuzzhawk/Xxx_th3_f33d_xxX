@@ -165,7 +165,7 @@ export class Monsters extends Game {
   // autopilot: heal when hurt, challenge trainers when strong enough, otherwise hunt where new species live
   plan() {
     const P = this.me, R = this.region, T = R.town, hp = this.team.reduce((s, m) => s + m.hp / m.max, 0) / this.team.length, L = this.team[0];
-    if (!this.team.some((m) => m.hp > 0) || hp < 0.5 || L.hp < L.max * 0.3 || (!this.orbs && this.caught.size < this.dexTotal)) return this.goTo(T.door);
+    if (this.team.some((m) => m.hp <= 0) || hp < 0.5 || L.hp < L.max * 0.3 || (!this.orbs && this.caught.size < this.dexTotal)) return this.goTo(T.door);
     const top = Math.max(...this.team.map((m) => m.lv));
     for (const n of this.npcs) if (n.kind === 'trainer' && n.beaten && this.t > n.rematch) { n.beaten = false; n.lv += 3; for (const m of n.team) { m.lv += 3; m.tier = tierAt(m.sp, m.lv); m.name = formName(m.sp, m.tier); calc(m, true); } }
     const ready = this.encs >= 3 && (this.caught.size >= 3 || this.team.length >= 3 || this.encs >= 8);
@@ -539,7 +539,7 @@ export class Monsters extends Game {
     if (e === 0) return 0;
     let m = (mv.e === a.el ? 1.5 : 1) * e * (crit ? 1.5 : 1) * roll * (phys && a.status === 'brn' ? 0.5 : 1) * (this.mods.glass ? 1.5 : 1);
     if (wx) m *= wx.boost === mv.e ? 1.5 : wx.nerf === mv.e ? 0.5 : 1;
-    return Math.max(1, Math.floor(((((2 * a.lv) / 5 + 2) * mv.p * (mv.hex && d.status ? 2 : 1) * A) / D / 50 + 2) * m));
+    return Math.max(1, Math.floor(((((2 * a.lv) / 5 + 2) * mv.p * (mv.hex && d.status ? 2 : 1) * A) / D / 50 + (mv.hits ? 0.5 : 2)) * m));
   }
   dmg(a, d, mv, crit) { return this.dmgCalc(a, d, mv, crit, this.r(0.85, 1)); }
   est(a, d, mv) { return this.dmgCalc(a, d, mv, false, 0.925) * (mv.hits ? (mv.hits[0] + mv.hits[1]) / 2 : 1) * (mv.a || 1); }
@@ -563,7 +563,7 @@ export class Monsters extends Game {
   decide() {
     const me = this.bs[0].m, foe = this.bs[1].m, bt = this.bt, wild = !bt.tr, f = foe.hp / foe.max;
     const want = wild && this.orbs > 0 && (!this.caught.has(foe.seed) || this.team.length < 3) && bt.orbsUsed < 5;
-    if (!bt.swapped && eff(foe.el, me.el) >= 2 && me.hp / me.max > 0.25) { const i = this.bestBench(), b = this.team[i]; if (b && eff(foe.el, b.el) <= 1 && b.hp / b.max > 0.5) { bt.swapped = 1; return { kind: 'swap', i }; } }
+    if (!bt.swapped && eff(foe.el, me.el) >= 2 && me.hp / me.max > 0.25) { const i = this.bestBench(), b = this.team[i]; if (b && eff(foe.el, b.el) <= 1 && b.hp / b.max > 0.5 && b.lv >= me.lv - 2) { bt.swapped = 1; return { kind: 'swap', i }; } }
     const low = me.hp / me.max < 0.35, bench = this.team.some((m) => m !== me && m.hp > m.max * 0.5);
     if (wild && !bench && low && f > 0.45 && !(want && f < 0.6)) return { kind: 'run' };
     if (wild && !want && bt.turn <= 1 && !bench && eff(foe.el, me.el) >= 2 && eff(me.el, foe.el) <= 1 && foe.lv >= me.lv - 2) return { kind: 'run' };

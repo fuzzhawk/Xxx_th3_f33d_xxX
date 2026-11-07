@@ -1053,7 +1053,7 @@ export class Outland extends Game {
       skin: [accent2.clone().multiplyScalar(0.3), accent2.clone().multiplyScalar(0.7), accent2], glass: [this.colour('#05070a'), this.colour('#1a2a36'), this.colour('#3c5a6e')], plain: grey('#6e6e6e', '#b4b4b4', '#f0f0f0'),
       sand: [this.colour('#7a5430'), this.colour('#c09058'), this.colour('#eccb8c')], snow: [this.colour('#8a9ab0'), this.colour('#d4dee8'), new T.Color('#ffffff')], ice: [this.colour('#1e3a54'), this.colour('#5a8aaa'), this.colour('#d0ecf8')],
       lava: grey('#3a0800', '#e8501a', '#ffe48a'), crystal: grey('#585870', '#b0b0c8', '#ffffff'), fungus: grey('#4a4a4a', '#a8a8a8', '#ffffff'),
-      moss: [this.colour('#1a2410'), this.colour('#3a5020'), this.colour('#6a7a34')], stone: rock.map((c) => c.clone().lerp(new T.Color('#b8b0a0'), 0.3)),
+      moss: [this.colour('#1a2410'), this.colour('#3a5020'), this.colour('#6a7a34')], stone: rock.map((c, i) => c.clone().lerp(new T.Color('#c8bca8'), 0.25 + i * 0.15)),
       water: [this.colour(B.water || '#1a3040').multiplyScalar(0.6), this.colour(B.water || '#2a4a5a'), this.colour(B.water || '#2a4a5a').lerp(new T.Color('#c8dce0'), 0.5)], falls: grey('#7aa0b0', '#c8e4ec', '#ffffff')
     };
     const ramp = (t, c) => { const [a, b, d] = c; return t < 0.5 ? a.clone().lerp(b, t * 2) : b.clone().lerp(d, (t - 0.5) * 2); };
@@ -1123,7 +1123,7 @@ export class Outland extends Game {
             out = q < 0 ? ramp(field('metal', x, y, ph), tones.dark) : a > 0.5 && grime[i] < 0.8 ? c.clone().lerp(accent, 0.12).multiplyScalar(1 - Math.max(0, grime[i] - 0.6)) : paper;
           } else if (kind === 'carve') {
             const hh = hgt(x, y), sh = hh - hgt(x + 1, y + 1);
-            out = ramp(clamp(field('stone', x, y, ph) * 0.45 + 0.2 + hh * 0.25 + sh * 1.6, 0, 1), tones.stone);
+            out = ramp(clamp(field('stone', x, y, ph) * 0.3 + 0.3 + hh * 0.4 + sh * 2.4, 0, 1), tones.stone);
           } else if (kind === 'banner') {
             const cloth = ramp(field('plain', x, y, ph) * 0.5 + 0.3, tones.paint);
             out = (a > 0.5 ? c.clone().lerp(accent, 0.3) : cloth).multiplyScalar(0.82 + 0.18 * Math.sin(x * 0.45));

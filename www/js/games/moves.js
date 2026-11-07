@@ -27,10 +27,10 @@ export const WEATHER = {
 // daze (confusion) chance, flinch chance, wx weather. w: impact word.
 const M = (n, e, k, p, a, L, fx, o = {}) => ({ n, e, k, p, a, L, fx, ...o });
 export const MOVES = [
-  M('Ember Flick', 'fire', 's', 40, 1, 0, 'orb', { st: ['brn', 0.1] }), M('Fox Fire', 'fire', 's', 22, 0.95, 0, 'multi', { hits: [2, 4] }),
+  M('Ember Flick', 'fire', 's', 40, 1, 0, 'orb', { st: ['brn', 0.1] }), M('Fox Fire', 'fire', 's', 15, 0.95, 0, 'multi', { hits: [2, 4] }),
   M('Flame Rush', 'fire', 'p', 85, 0.95, 1, 'rush', { recoil: 0.25 }), M('Will-o-Wisp', 'fire', 't', 0, 0.85, 1, 'hex', { st: ['brn', 1] }),
   M('Blazing Sky', 'fire', 't', 0, 0, 1, 'weather', { wx: 'sun' }), M('Inferno Pillar', 'fire', 's', 105, 0.85, 2, 'pillar', { st: ['brn', 0.2] }),
-  M('Bubble Barrage', 'water', 's', 20, 1, 0, 'multi', { hits: [2, 5] }), M('Tide Lash', 'water', 'p', 60, 1, 0, 'wave'),
+  M('Bubble Barrage', 'water', 's', 15, 1, 0, 'multi', { hits: [2, 5] }), M('Tide Lash', 'water', 'p', 60, 1, 0, 'wave'),
   M('Spring Water', 'water', 't', 0, 0, 1, 'heal', { heal: 0.5 }), M('Rain Prayer', 'water', 't', 0, 0, 1, 'weather', { wx: 'rain' }),
   M('Whirlpool', 'water', 's', 60, 0.95, 1, 'pillar', { foe: { spd: -1 }, fc: 0.5 }), M('Torrent Cannon', 'water', 's', 100, 0.85, 2, 'beam'),
   M('Leaf Blade', 'leaf', 'p', 55, 1, 0, 'slash', { crit: 1 }), M('Seed Drain', 'leaf', 's', 50, 1, 0, 'drain', { drain: 0.5 }),
@@ -44,7 +44,7 @@ export const MOVES = [
   M('Bedrock', 'earth', 't', 0, 0, 1, 'aura', { self: { def: 1, sdf: 1 } }), M('Sandstorm', 'earth', 't', 0, 0, 1, 'weather', { wx: 'sand' }),
   M('Quake Stomp', 'earth', 'p', 90, 1, 2, 'quake'), M('Landslide', 'earth', 'p', 120, 0.85, 2, 'rain', { recoil: 0.33 }),
   M('Pounce', 'beast', 'p', 40, 1, 0, 'rush'), M('Quick Nip', 'beast', 'p', 40, 1, 0, 'rush', { pri: 1 }),
-  M('Fury Swipes', 'beast', 'p', 18, 0.9, 0, 'slash', { hits: [2, 5] }), M('Growl', 'beast', 't', 0, 1, 0, 'roar', { foe: { atk: -1 } }),
+  M('Fury Swipes', 'beast', 'p', 15, 0.9, 0, 'slash', { hits: [2, 5] }), M('Growl', 'beast', 't', 0, 1, 0, 'roar', { foe: { atk: -1 } }),
   M('War Cry', 'beast', 't', 0, 0, 1, 'roar', { self: { atk: 2 } }), M('Body Slam', 'beast', 'p', 85, 1, 1, 'rush', { st: ['par', 0.3] }),
   M('Catnap', 'beast', 't', 0, 0, 1, 'heal', { heal: 1, nap: 1 }), M('Wild Fang', 'beast', 'p', 90, 0.95, 2, 'slash', { crit: 1, flinch: 0.2 }),
   M('Shade Claw', 'shadow', 'p', 60, 1, 0, 'slash', { crit: 1 }), M('Night Orb', 'shadow', 's', 55, 1, 0, 'orb'),
