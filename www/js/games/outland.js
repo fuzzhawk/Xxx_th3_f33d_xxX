@@ -441,7 +441,7 @@ export class Outland extends Game {
     const e = { kind, x, z, y: o.y ?? this.hAt(x, z), vx: 0, vz: 0, vy: 0, yaw: this.r(0, TAU), hp: d.hp * (1 + (this.sector - 1) * 0.12), max: d.hp * (1 + (this.sector - 1) * 0.12), cd: this.r(1, 3), t: this.r(0, 9), awake: !o.idle && kind !== 'crawler', dead: 0, los: false, losT: this.r(0, 0.3), home: o.home || null, phase: this.r(0, TAU), m: null, sz: (d.size || 1) * this.S };
     if (kind === 'bike') { e.y += 1.2; e.orbit = this.r(18, 32) * (this.rng() < 0.5 ? 1 : -1); }
     if (kind === 'ship') Object.assign(e, o);
-    if (kind === 'tower') { e.awake = true; e.spin = 0; }
+    if (kind === 'tower') { e.awake = true; e.spin = 0; e.cd = this.r(8, 14); }
     if (kind === 'sniper' && o.y !== undefined) { e.perch = true; e.y = o.y; }
     this.foes.push(e);
     return e;
@@ -714,7 +714,7 @@ export class Outland extends Game {
       const F = FOES[e.kind];
       if (e.kind === 'tower') {
         e.spin += dt * (e.hit ? 6 : 1.2);
-        if (alive && e.cd <= 0 && dist < 210 && e.los) { e.cd = this.r(7, 11); const lx = tx + (p.veh ? Math.sin(p.veh.yaw) * p.veh.speed * 2 : 0), lz = tz + (p.veh ? Math.cos(p.veh.yaw) * p.veh.speed * 2 : 0); const fl = 2.4, sx = e.x, sy = e.y + 15, sz = e.z, gy = this.hAt(lx, lz), gm = 20 * this.grav; this.shots.push({ k: 'mortar', x: sx, y: sy, z: sz, vx: (lx - sx) / fl, vz: (lz - sz) / fl, vy: (gy - sy + 0.5 * gm * fl * fl) / fl, g: gm, life: 6, dmg: 45, rad: 7, tx: lx, tz: lz }); }
+        if (alive && e.cd <= 0 && dist < 160 && e.los) { e.cd = this.r(7, 11); const lx = tx + (p.veh ? Math.sin(p.veh.yaw) * p.veh.speed * 2 : 0), lz = tz + (p.veh ? Math.cos(p.veh.yaw) * p.veh.speed * 2 : 0); const fl = 2.4, sx = e.x, sy = e.y + 15, sz = e.z, gy = this.hAt(lx, lz), gm = 20 * this.grav; this.shots.push({ k: 'mortar', x: sx, y: sy, z: sz, vx: (lx - sx) / fl, vz: (lz - sz) / fl, vy: (gy - sy + 0.5 * gm * fl * fl) / fl, g: gm, life: 6, dmg: 45, rad: 7, tx: lx, tz: lz }); }
         continue;
       }
       if (e.kind === 'ship') { this.stepShip(e, dt); continue; }

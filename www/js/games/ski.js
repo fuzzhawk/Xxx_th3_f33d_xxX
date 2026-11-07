@@ -47,6 +47,7 @@ export class Ski extends Game {
     this.tod = ['dawn', 'day', 'day', 'golden', 'dusk', 'night'][this.ri(0, 5)];
     this.sky = SKIES[this.tod];
     this.weather = this.rng() < 0.55 ? 'snow' : this.rng() < 0.7 ? 'blossom' : 'clear';
+    this.stats = { crash: 0, rock: 0, bad: 0, flips: 0, lands: 0, jumps: 0, pop: 0, wall: 0, hopSpin: 0, pit: 0, carry: 0, coins: 0, power: 0, bubbles: 0 };
     this.ys = []; this.gaps = []; this.feats = []; this.rocks = []; this.coins = []; this.trees = []; this.marks = [];
     this.cp = [[0, 0.24], [this.r(500, 900), this.slopePick()]]; this.ci = 0; this.baseY = 0; this.genX = -SX;
     this.nextF = 560; this.lastRock = -1e9; this.lastLip = -1e9;
@@ -57,7 +58,6 @@ export class Ski extends Game {
     p.y = this.groundY(p.x); p.ang = this.slope(p.x);
     this.holding = false; this.pressAir = false; this.holdT = 0; this.buffer = 0; this.ap = {};
     this.fx = { boost: 0, shield: 0, magnet: 0 };
-    this.stats = { crash: 0, rock: 0, bad: 0, flips: 0, lands: 0, jumps: 0, pop: 0, wall: 0, hopSpin: 0, pit: 0, carry: 0, coins: 0, power: 0, bubbles: 0 };
     this.combo = 0; this.dist = 0; this.msg = null; this.coinRun = 0; this.cheerQ = 0;
     this.puffs = []; this.trail = []; this.track = [];
     this.camX = p.x - W * 0.3; this.camY = p.y - H * 0.5; this.camB = this.camY; this.dyP = 0;
@@ -374,20 +374,21 @@ export class Ski extends Game {
   fly(dt, g) {
     const p = this.p;
     p.airT += dt;
+    const al = this.airLeft();
     // a backflip needs a fresh hold that began after takeoff, held for a moment, with real airtime still ahead
-    if (this.holding && this.pressAir && this.holdT >= HOLD && !p.flipping && p.airT > 0.1 && this.airLeft().t > 0.55) p.flipping = true;
+    if (this.holding && this.pressAir && this.holdT >= HOLD && !p.flipping && p.airT > 0.1 && al.t > 0.55) p.flipping = true;
     if (p.flipping && !this.holding) p.flipping = false;
     if (p.flipping) p.av += (-FLIP - p.av) * Math.min(1, 9 * dt);
     else {
       // the board settles toward the slope it will land on
       p.av *= Math.exp(-10 * dt);
-      const d = wrapA(this.slope(this.airLeft().x) - p.ang);
-      p.ang += clamp(d * 4 * dt, -4.5 * dt, 4.5 * dt);
+      const d = wrapA(this.slope(al.x) - p.ang), rate = clamp(Math.abs(d) / Math.max(0.2, al.t), 4.5, 8);
+      p.ang += clamp(d * 5 * dt, -rate * dt, rate * dt);
     }
     p.ang += p.av * dt; p.rot += p.av * dt;
     p.vy += g * dt;
-    // a rider who took off early (before a gap's lip) is carried gently across rather than dropped in
-    const gf = this.feats.find((f) => f.g0 != null && p.x > f.g0 - 400 && p.x < f.g1);
+    // a flight that would come down in a gap (an early take-off, or one from an earlier kicker) is carried gently across
+    const gf = this.feats.find((f) => f.g0 != null && p.x < f.g1 && ((al.x > f.g0 - 10 && al.x < f.g1 + 30) || p.x > f.g0));
     if (gf) {
       const fy = this.groundY(gf.g1) - 6 - p.y, disc = p.vy * p.vy + 2 * g * fy;
       if (fy > 0 && disc > 0) { const need = (gf.g1 + 30 - p.x) * g / (Math.sqrt(disc) - p.vy); if (p.vx < need) { p.vx = Math.min(need, p.vx + 500 * dt); this.stats.carry++; } }

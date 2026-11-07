@@ -239,7 +239,7 @@ function genLevel(seed, lv) {
       const w = 2.4, ext = rm.R - 1.6, D = 2.6, yb = r(-2.2, -1.2), bw = 1.2, q = (u0, v0, u1, v1) => ccw([M(u0, v0), M(u1, v0), M(u1, v1), M(u0, v1)]);
       nest(S, [{ p: q(-w, -ext, w, ext), h: h - D, liq: true, tex: { floor: 'liquid' }, light: S.light * 0.7 }]);
       slabs.push({ poly: q(-w - 0.5, yb - bw, w + 0.5, yb + bw), b: h - 0.3, t: h, tex: 'plank', light: S.light });
-      for (const s of [-1, 1]) slabs.push({ poly: q(-w, yb + s * bw - 0.07, w, yb + s * bw + 0.07), b: h - 0.3, t: h + 0.85, tex: 'metal', light: S.light });
+      for (const s of [-1, 1]) slabs.push({ poly: q(-w, yb + s * bw - 0.07, w, yb + s * bw + 0.07), b: h - 0.3, t: h + 0.85, tex: 'metal', light: S.light, rail: true });
       for (let k = 1; k <= 5; k++) slabs.push({ poly: q(-w, ext - k * 0.65, w, ext - (k - 1) * 0.65), b: h - D, t: h - (k * D) / 6, tex: 'step', light: S.light * 0.8 });
       rm.bridge = { x: M(0, yb)[0], y: M(0, yb)[1], z: h };
     }
@@ -389,11 +389,12 @@ class World {
   // navigation: a 0.5-unit grid with up to two walkable heights per cell (the bridge and the canal under it)
   buildNav() {
     const nx = (this.nx = Math.ceil(this.mw / NS)), ny = (this.ny = Math.ceil(this.mh / NS)), N = nx * ny * 2;
-    const nz = (this.nz = new Float32Array(N).fill(NaN)), nd = (this.nd = new Int16Array(N).fill(-1));
+    const nz = (this.nz = new Float32Array(N).fill(NaN)), nd = (this.nd = new Int16Array(N).fill(-1)), top = (this.top = new Float32Array(nx * ny).fill(-99));
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
       const x = (i + 0.5) * NS, y = (j + 0.5) * NS, s = this.sAt(x, y, null);
       if (!s || s.win) continue;
-      const sl = this.slabsAt(x, y).filter((b) => !b.door && inPoly(b.poly, x, y)), zs = [fz(s, x, y), ...sl.map((b) => b.t)].sort((a, b) => a - b);
+      const sl = this.slabsAt(x, y).filter((b) => !b.door && inPoly(b.poly, x, y)), zs = [fz(s, x, y), ...sl.filter((b) => !b.rail).map((b) => b.t)].sort((a, b) => a - b);
+      top[j * nx + i] = zs[zs.length - 1];
       let k = 0, last = -99;
       for (const z of zs) {
         if (k > 1 || z - last < 0.05) continue;
@@ -422,6 +423,7 @@ class World {
           if (zv !== zv || dist[v] >= 0) continue;
           const up = rev ? z - zv : zv - z;
           if (up > STEP + 0.02 || up < -3.2) continue;
+          if (up < -STEP && this.top[(rev ? u : v) >> 1] > (rev ? z : zv) + 0.1) continue;
           if (k >= 4 && !(this.has(ii, j, z) && this.has(i, jj, z))) continue;
           if (nd[v] >= 0 && door && !door(nd[v])) continue;
           dist[v] = du; prev[v] = u; q[t++] = v;
@@ -452,7 +454,7 @@ class World {
       const i = Math.floor((x + ((tx - x) * k) / n) / NS), j = Math.floor((y + ((ty - y) * k) / n) / NS);
       if (i < 0 || j < 0 || i >= this.nx || j >= this.ny) return false;
       const c = (j * this.nx + i) << 1; let ok = false;
-      for (let l = 0; l < 2 && !ok; l++) { const zv = this.nz[c + l]; if (zv === zv && zv - pz <= STEP && pz - zv <= 0.7 && !(door && this.nd[c + l] >= 0 && !door(this.nd[c + l]))) { pz = zv; ok = true; } }
+      for (let l = 0; l < 2 && !ok; l++) { const zv = this.nz[c + l]; if (zv === zv && zv - pz <= STEP && pz - zv <= 0.7 && !(pz - zv > 0.1 && this.top[c >> 1] > zv + 0.1) && !(door && this.nd[c + l] >= 0 && !door(this.nd[c + l]))) { pz = zv; ok = true; } }
       if (!ok) return false;
     }
     return true;
@@ -502,7 +504,7 @@ export class HellMaze extends Game {
     if (fresh) { p.hp = this.maxHp(); p.armor = 0; this.owned = [true, false, false, false, false]; this.ammo = this.arms.map((a) => (a.ammo ? 0 : Infinity)); this.weapon = 0; }
     this.foes = []; this.shots = []; this.items = []; this.deco = []; this.gibs = []; this.gore = []; this.decals = []; this.bolts = []; this.drips = [];
     this.cool = 0; this.flash = 0; this.recoil = 0; this.hurt = 0; this.dead = 0; this.path = []; this.apT = 0; this.lvT = 0; this.flowT = 0; this.flow = null;
-    this.skullOut = null; this.decalDirty = true; this.stuck = { t: 0, x: p.x, y: p.y }; this.secretFound = false;
+    this.skullOut = null; this.decalDirty = true; this.stuck = { t: 0, x: p.x, y: p.y }; this.ban = new Map(); this.goal = -1; this.secretFound = false;
     this.spawnAll(L);
     if (this.gl) this.dropGpu();
     this.say(`LEVEL ${lv + 1} · ${this.mood.name.toUpperCase()}`, 3.5);
@@ -928,7 +930,7 @@ export class HellMaze extends Game {
     const { dist, prev } = wd.bfs(start, false, (k) => this.doorOK(k), 'player');
     const hp = p.hp / this.maxHp(), needKey = !p.keys.has(0) && this.wd.doors.some((s) => s.door.key != null && !s.door.opening);
     let goal = -1, gs = 1e9;
-    const consider = (v, w) => { if (v >= 0 && dist[v] >= 0 && dist[v] * w < gs) { gs = dist[v] * w; goal = v; } };
+    const consider = (v, w) => { if (v >= 0 && dist[v] >= 0 && dist[v] * w < gs && !(this.ban.get(v) > this.t)) { gs = dist[v] * w; goal = v; } };
     for (const it of this.items) {
       if (it.got) continue;
       it.node ??= wd.nodeAt(it.x, it.y, it.z, 2);
@@ -938,6 +940,7 @@ export class HellMaze extends Game {
     }
     if (!this.exitOK()) for (const f of this.foes) if (f.hp > 0) consider(wd.nodeAt(f.x, f.y, f.fly ? f.z - f.hover : f.z, 2), 1.3);
     if (this.exitOK() || goal < 0) consider(wd.nodeAt(this.exitPos.x, this.exitPos.y, this.exitPos.z, 2), this.exitOK() ? 0.5 : 3);
+    this.goal = goal;
     if (goal < 0) return;
     const nodes = [];
     for (let v = goal; v >= 0 && v !== start && nodes.length < 4000; v = prev[v]) nodes.push(v);
@@ -951,7 +954,7 @@ export class HellMaze extends Game {
     if (this.foeT <= 0) { this.foeT = 0.15; this.foe = this.pickFoe(); }
     // stuck: no progress for a while → re-plan and back off
     this.stuck.t += dt;
-    if (this.stuck.t > 1.2) { const moved = Math.hypot(p.x - this.stuck.x, p.y - this.stuck.y); if (moved < 0.35 && !this.foe) { this.path = []; this.apT = 0; this.unstick = 0.5; this.ustr = this.rng() < 0.5 ? -1 : 1; } this.stuck = { t: 0, x: p.x, y: p.y }; }
+    if (this.stuck.t > 1.2) { const moved = Math.hypot(p.x - this.stuck.x, p.y - this.stuck.y); if (moved < 0.35 && !this.foe) { this.path = []; this.apT = 0; this.unstick = 0.5; this.ustr = this.rng() < 0.5 ? -1 : 1; if (this.goal >= 0) this.ban.set(this.goal, this.t + 25); } this.stuck = { t: 0, x: p.x, y: p.y }; }
     if (this.unstick > 0) { this.unstick -= dt; this.inF = -2; this.inS = this.ustr * 2.5; return; }
     const f = this.foe;
     if (f && f.hp > 0) {

@@ -49,7 +49,7 @@ export class Sling extends Game {
       this.stat({ v: [[px, 0], [px + 28, -ph], [px + pw - 28, -ph], [px + pw, 0]] }, 0, 0, 'hill');
       plat = { a: px, x0: px + 30, x1: px + pw - 30, b: px + pw, y: -ph };
     }
-    const pool = ['frames', 'tower', 'stilts', 'bunker', ...(L > 0 ? ['frames', 'tower', 'arch', 'wall'] : []), ...(L > 1 ? ['pyramid', 'arch', 'frames'] : [])];
+    const pool = ['frames', 'tower', 'stilts', 'bunker', ...(L > 0 ? ['frames', 'tower', 'arch', 'bricks'] : []), ...(L > 1 ? ['pyramid', 'arch', 'frames'] : [])];
     const nm = Math.min(5, 2 + ((L + 1) >> 1) + (L > 1 ? this.li(0, 1) : 0));
     for (let k = 0; k < nm && x < 1000; k++) {
       let y = 0, mw = 1080 - x;
@@ -59,7 +59,7 @@ export class Sling extends Game {
         if (x >= plat.x0 && x < plat.x1) { y = plat.y; mw = plat.x1 - x; if (mw < 60) { x = plat.b + 6; y = 0; mw = 1080 - x; } }
         else if (x >= plat.x1 && x < plat.b + 6) { x = plat.b + 6; mw = 1080 - x; }
       }
-      const kind = k === 0 && L > 2 && R() < 0.4 ? 'wall' : pool[this.li(0, pool.length - 1)];
+      const kind = k === 0 && L > 2 && R() < 0.4 ? 'bricks' : pool[this.li(0, pool.length - 1)];
       x = this[kind](x, y, Math.min(mw, 120)) + this.lr(10, 30);
       const top = plat && x >= plat.x0 && x + 18 <= plat.x1;
       if (L > 0 && R() < 0.22 && x < 1040 && (top || !plat || x + 18 < plat.a || x > plat.b)) { this.blk(x + 9, (top ? plat.y : 0) - 9, 18, 18, 'tnt'); x += 26; }
@@ -129,7 +129,7 @@ export class Sling extends Game {
     return x + n * s;
   }
   // a running-bond brick wall in front of whatever comes next
-  wall(x, y, mw) {
+  bricks(x, y, mw) {
     const bw = 24, bh = 12, c = Math.min(this.li(2, 3), Math.floor(mw / bw)), rows = this.li(3, 6), mat = this.m('fill');
     for (let r = 0; r < rows; r++) {
       const cy = y - bh / 2 - r * bh;
@@ -390,11 +390,11 @@ export class Sling extends Game {
     c.save(); c.translate(W / 2 + sx, H - GS + sy); c.scale(z, z); c.translate(-cam.x, 0);
     const h = this.skin.hue;
     // ground and hills
-    c.fillStyle = `hsl(${h + 30},28%,26%)`; c.fillRect(this.wl - 800, 0, this.wr - this.wl + 1600, 400);
-    this.texture(c, 'ground', this.wl - 800, 0, this.wr - this.wl + 1600, 400);
-    c.fillStyle = `hsl(${h + 100},40%,40%)`; c.fillRect(this.wl - 800, 0, this.wr - this.wl + 1600, 5);
+    const vx0 = cam.x - W / 2 / z - 20, vw = W / z + 40;
+    c.fillStyle = this.swatch(c, 'ground'); c.fillRect(vx0, 0, vw, (GS + 20) / z);
+    c.fillStyle = `hsl(${h + 100},40%,40%)`; c.fillRect(vx0, 0, vw, 5);
     for (const b of this.world.bodies) if (b.kind === 'hill') {
-      this.path(c, b.wv); c.fillStyle = `hsl(${h + 25},16%,36%)`; c.fill(); this.texture(c, 'stone', b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY, true);
+      this.path(c, b.wv); c.fillStyle = this.swatch(c, 'hill'); c.fill();
       c.strokeStyle = `hsl(${h + 100},40%,40%)`; c.lineWidth = 5; c.beginPath(); c.moveTo(b.wv[1][0], b.wv[1][1]); c.lineTo(b.wv[2][0], b.wv[2][1]); c.stroke();
     }
     // the shots still to come wait behind the sling
@@ -446,16 +446,17 @@ export class Sling extends Game {
       c.lineTo(W, H); c.fill();
     }
   }
-  pattern(c, k) {
+  // a material swatch (base colour with the theme's texture multiplied in), rendered once and used as a pattern
+  swatch(c, k) {
     if (this.pats[k]) return this.pats[k];
-    const tiles = this.skin.slots.tile || [], im = tiles[{ wood: 0, stone: 1, ground: 2, ice: 1 }[k] % Math.max(1, tiles.length)];
-    if (!ready(im)) return null;
-    try { this.pats[k] = c.createPattern(im, 'repeat'); } catch { this.pats[k] = null; }
-    return this.pats[k];
-  }
-  texture(c, k, x, y, w, h, clip) {
-    const p = this.pattern(c, k); if (!p) return;
-    c.save(); if (clip) c.clip(); c.globalAlpha = 0.3; c.globalCompositeOperation = 'multiply'; c.fillStyle = p; c.fillRect(x, y, w, h); c.restore();
+    const h = this.skin.hue, base = { ground: `hsl(${h + 30},28%,26%)`, hill: `hsl(${h + 25},16%,36%)` }[k] || MAT[k].c;
+    const tiles = this.skin.slots.tile || [], im = tiles[{ wood: 0, stone: 1, ground: 2, hill: 1 }[k] % Math.max(1, tiles.length)];
+    const ok = ready(im), cv = Object.assign(document.createElement('canvas'), { width: 96, height: 96 }), x = cv.getContext('2d');
+    x.fillStyle = base; x.fillRect(0, 0, 96, 96);
+    if (ok) { try { x.globalAlpha = 0.32; x.globalCompositeOperation = 'multiply'; x.fillStyle = x.createPattern(im, 'repeat'); x.fillRect(0, 0, 96, 96); } catch { /* tainted or broken image */ } }
+    const pat = c.createPattern(cv, 'repeat');
+    if (ok || this.t > 4) this.pats[k] = pat;
+    return pat;
   }
   path(c, v) { c.beginPath(); v.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); }
   body(c, b) {
@@ -473,8 +474,7 @@ export class Sling extends Game {
       const ar = Math.min(w / 2 - 14, h * 0.75);
       c.beginPath(); c.moveTo(-w / 2, -h / 2); c.lineTo(w / 2, -h / 2); c.lineTo(w / 2, h / 2); c.lineTo(ar, h / 2); c.arc(0, h / 2, ar, 0, Math.PI, true); c.lineTo(-w / 2, h / 2); c.closePath();
     } else this.path(c, b.v);
-    c.fillStyle = m.c; c.globalAlpha = b.mat === 'glass' ? 0.55 : 1; c.fill(); c.globalAlpha = 1;
-    if (b.mat === 'wood' || b.mat === 'stone') this.texture(c, b.mat, -w, -h, w * 2, h * 2, true);
+    c.fillStyle = b.mat === 'wood' || b.mat === 'stone' ? this.swatch(c, b.mat) : m.c; c.globalAlpha = b.mat === 'glass' ? 0.55 : 1; c.fill(); c.globalAlpha = 1;
     c.strokeStyle = m.c2; c.lineWidth = 1;
     const long = w > h, L = long ? w : h;
     if (b.mat === 'wood' && !b.tri) { c.globalAlpha = 0.35; c.beginPath(); for (const k of [-0.2, 0.18]) { if (long) { c.moveTo(-w / 2 + 3, k * h); c.lineTo(w / 2 - 3, k * h + 0.6); } else { c.moveTo(k * w, -h / 2 + 3); c.lineTo(k * w + 0.6, h / 2 - 3); } } c.stroke(); c.globalAlpha = 1; }

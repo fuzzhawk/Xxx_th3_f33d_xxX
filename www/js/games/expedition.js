@@ -224,7 +224,7 @@ export class Expedition extends Game {
     this.seenT = new Uint8Array(MW * MH); this.mmDirty = 1;
     this.bake();
     this.card = 3.8; this.irisIn = 0.8;
-    this.cam = { x: Math.max(0, Math.min(MW * T - W, h.x - W / 2)), y: Math.max(-40, Math.min(MH * T - H + 34, h.y - H / 2)) };
+    this.cam = { x: Math.max(0, Math.min(MW * T - W, h.x - W / 2)), y: Math.max(-80, Math.min(MH * T - H + 34, h.y - H / 2 - 22)) };
     const R = mulberry32(this.post.seed + n * 31);
     this.clouds = Array.from({ length: 16 }, () => ({ x: R() * (MW * T * 0.5 + W), y: R() * (MH * T * 0.5 + H), s: 0.6 + R() * 0.9, f: R() < 0.5 ? 0.25 : 0.5 }));
     this.vgears = Array.from({ length: 9 }, () => ({ x: R() * (MW * T * 0.5 + W), y: R() * (MH * T * 0.5 + H), r: 30 + R() * 50, sp: (R() - 0.5) * 0.8 }));
@@ -882,7 +882,7 @@ export class Expedition extends Game {
     if (this.minimap) { const k = this.tIdx(h.x, h.y); if (k !== this.lastT) { this.lastT = k; this.reveal(h, 3); } }
     for (const c of this.cshade) { c.x += 9 * dt; if (c.x > MW * T + c.r) c.x = -c.r; }
     // camera
-    const cx = Math.max(0, Math.min(MW * T - W, h.x - W / 2)), cy = Math.max(-40, Math.min(MH * T - H + 34, h.y - H / 2 - 6)), k = Math.min(1, dt * 4);
+    const cx = Math.max(0, Math.min(MW * T - W, h.x - W / 2)), cy = Math.max(-80, Math.min(MH * T - H + 34, h.y - H / 2 - 22)), k = Math.min(1, dt * 4);
     this.cam.x += (cx - this.cam.x) * k; this.cam.y += (cy - this.cam.y) * k;
     // re-bake once the theme's texture photos have loaded
     if (!this.texOK && ready(this.skin.texFor?.(this.n + 2)) && (this.rebakeT = (this.rebakeT || 0) + dt) > 0.5) this.bake();
@@ -1497,7 +1497,7 @@ export class Expedition extends Game {
     let w = Math.max(...lines.map((l) => c.measureText(l).width)) + 12;
     if (name) { c.font = '700 8px ui-monospace, monospace'; w = Math.max(w, c.measureText(name.toUpperCase()).width + 12); }
     const hh = lines.length * lh + (name ? 10 : 0) + 7;
-    const bx = Math.max(cam.x + 4, Math.min(cam.x + W - w - 4, x - w / 2)), by = Math.max(cam.y + 40, y - hh - 7);
+    const bx = Math.max(cam.x + 4, Math.min(cam.x + W - w - 4, x - w / 2)), by = Math.max(cam.y + (this.panelB || 80) + 4, y - hh - 7);
     c.fillStyle = small ? 'rgba(250,246,236,.88)' : 'rgba(252,248,238,.97)'; roundRect(c, bx, by, w, hh, 5); c.fill();
     c.strokeStyle = 'rgba(40,30,20,.55)'; c.lineWidth = 1; c.stroke();
     const tx = Math.max(bx + 6, Math.min(bx + w - 6, x));
@@ -1524,40 +1524,51 @@ export class Expedition extends Game {
     const tg = this.m.steps[this.m.cur]?.tg();
     if (!tg) return;
     const x = tg.x - ox, y = this.headY(tg) - oy - 10 + Math.sin(this.t * 5) * 2.5;
-    if (x > 8 && x < W - 8 && y > 44 && y < H - 36) { Po(c, [[x - 6, y - 7], [x + 6, y - 7], [x, y + 1]], '#ffd84a'); Po(c, [[x - 6, y - 7], [x + 6, y - 7], [x, y - 4]], '#fff2a8'); c.strokeStyle = 'rgba(60,40,0,.6)'; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 6, y - 7); c.lineTo(x + 6, y - 7); c.lineTo(x, y + 1); c.closePath(); c.stroke(); return; }
-    const cx = W / 2, cy = H / 2 + 4, a = Math.atan2(y - cy, x - cx), ex = Math.max(16, Math.min(W - 16, cx + Math.cos(a) * 400)), ey = Math.max(50, Math.min(H - 44, cy + Math.sin(a) * 400));
+    const top = (this.panelB || 80) + 8;
+    if (x > 8 && x < W - 8 && y > top && y < H - 20) { Po(c, [[x - 6, y - 7], [x + 6, y - 7], [x, y + 1]], '#ffd84a'); Po(c, [[x - 6, y - 7], [x + 6, y - 7], [x, y - 4]], '#fff2a8'); c.strokeStyle = 'rgba(60,40,0,.6)'; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 6, y - 7); c.lineTo(x + 6, y - 7); c.lineTo(x, y + 1); c.closePath(); c.stroke(); return; }
+    const cx = W / 2, cy = H / 2 + 4, a = Math.atan2(y - cy, x - cx), ex = Math.max(16, Math.min(W - 16, cx + Math.cos(a) * 400)), ey = Math.max(top + 4, Math.min(H - 50, cy + Math.sin(a) * 400));
     c.save(); c.translate(ex, ey); c.rotate(a); c.fillStyle = 'rgba(10,8,12,.6)'; c.beginPath(); c.arc(0, 0, 10, 0, 7); c.fill();
     Po(c, [[8, 0], [-4, -6], [-1, 0], [-4, 6]], '#ffd84a'); c.restore();
   }
   drawHud(c) {
     const m = this.m, acc = this.col(0), ink = '#f4ead8';
-    c.fillStyle = 'rgba(10,8,12,.68)'; c.fillRect(0, 0, W, 36); c.fillStyle = acc; c.fillRect(0, 36, W, 1);
-    c.textAlign = 'left'; c.textBaseline = 'middle';
-    c.font = '700 8px ui-monospace, monospace'; c.fillStyle = acc; c.fillText(`EXPEDITION ${this.n} · ${this.name.toUpperCase()}`, 8, 10, W - 16);
-    c.font = '700 12px ui-monospace, monospace'; c.fillStyle = ink; c.fillText(`GOAL: ${m.goal}`, 8, 25, W - 16);
-    c.fillStyle = 'rgba(10,8,12,.72)'; c.fillRect(0, H - 32, W, 32); c.fillStyle = acc; c.fillRect(0, H - 33, W, 1);
-    const n = m.steps.length, cur = Math.min(m.cur, n - 1);
-    for (let k = 0; k < n; k++) {
-      const x = 12 + k * 13, y = H - 23;
-      if (k < m.cur) { E(c, x, y, 4.5, 4.5, acc); c.strokeStyle = '#1a1410'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x - 2.2, y); c.lineTo(x - 0.5, y + 2); c.lineTo(x + 2.5, y - 2); c.stroke(); }
-      else { c.strokeStyle = k === m.cur ? ink : 'rgba(244,234,216,.35)'; c.lineWidth = 1.2; c.beginPath(); c.arc(x, y, k === m.cur ? 4 + Math.sin(this.t * 5) * 0.7 : 4, 0, 7); c.stroke(); }
+    // the card's own pills sit on top of the canvas: put the mission panel just under them
+    if (!(this.t - this.hudT < 0.5)) {
+      this.hudT = this.t;
+      try { const el = this.canvas.closest?.('.stage')?.querySelector('.hud'), cr = this.canvas.getBoundingClientRect(); if (el && cr.height) { const r = el.getBoundingClientRect(); this.topY = Math.max(30, Math.min(100, (r.bottom - cr.top) * (H / cr.height) + 4)); } } catch { /* no layout */ }
     }
-    c.font = '700 8px ui-monospace, monospace'; c.fillStyle = acc; c.textAlign = 'left';
-    c.fillText(m.cur >= n ? 'ALL STEPS DONE' : `STEP ${cur + 1} OF ${n}`, 12 + n * 13, H - 23);
-    const st = m.steps[cur], lab = m.cur >= n ? 'Mission complete!' : typeof st.s === 'function' ? st.s() : st.s;
-    c.font = '700 11px ui-monospace, monospace'; c.fillStyle = ink; c.fillText(`▸ ${lab}`, 8, H - 9, W - 92);
+    const y0 = this.topY || 38, ph = 42;
+    c.fillStyle = 'rgba(8,6,10,.35)'; c.fillRect(0, 0, W, y0);
+    c.fillStyle = 'rgba(10,8,12,.76)'; roundRect(c, 4, y0, W - 8, ph, 7); c.fill(); c.strokeStyle = acc; c.lineWidth = 1; c.stroke();
+    this.panelB = y0 + ph;
+    c.textAlign = 'left'; c.textBaseline = 'middle';
+    c.font = '700 8px ui-monospace, monospace'; c.fillStyle = acc; c.fillText(`EXPEDITION ${this.n} · ${this.name.toUpperCase()}`, 12, y0 + 8, W - 24);
+    c.font = '700 11px ui-monospace, monospace'; c.fillStyle = ink; c.fillText(`GOAL: ${m.goal}`, 12, y0 + 20, W - 24);
+    const n = m.steps.length, cur = Math.min(m.cur, n - 1), yy = y0 + 33;
+    for (let k = 0; k < n; k++) {
+      const x = 16 + k * 11;
+      if (k < m.cur) { E(c, x, yy, 4, 4, acc); c.strokeStyle = '#1a1410'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(x - 2, yy); c.lineTo(x - 0.5, yy + 1.8); c.lineTo(x + 2.2, yy - 1.8); c.stroke(); }
+      else { c.strokeStyle = k === m.cur ? ink : 'rgba(244,234,216,.35)'; c.lineWidth = 1.2; c.beginPath(); c.arc(x, yy, k === m.cur ? 3.6 + Math.sin(this.t * 5) * 0.6 : 3.6, 0, 7); c.stroke(); }
+    }
+    const st = m.steps[cur], lab = m.cur >= n ? 'Mission complete!' : `Step ${cur + 1}: ${typeof st.s === 'function' ? st.s() : st.s}`;
+    c.font = '700 10px ui-monospace, monospace'; c.fillStyle = m.cur >= n ? acc : '#ffe9a8'; c.textAlign = 'left'; c.fillText(lab, 14 + n * 11, yy + 0.5, W - 24 - n * 11);
     const h = this.hero;
-    for (let k = 0; k < h.max; k++) this.heart(c, W - 12 - k * 12, H - 24, k < h.hp);
+    for (let k = 0; k < h.max; k++) this.heart(c, W - 12 - k * 12, H - 13, k < h.hp);
     const inv = ['key', 'flame', 'letter', 'treat', 'relic', 'loot', 'part'].filter((k) => this.inv[k] > 0);
-    inv.forEach((k, i) => { const it = k === 'relic' ? this.objs.find((o) => o.kind === 'pedestal')?.item || { k } : { k }; if (k === 'relic' && this.m.id === 'relic') it.img = this.skin.pick('relic' + this.n, 'item'); this.icon(c, k === 'relic' ? { k: 'relic', img: it.img } : { k }, W - 14 - i * 18, H - 9, 0.9); if (k === 'part') this.text(c, `${this.inv.part}`, W - 7 - i * 18, H - 6, 7, ink); });
-    if (this.flash) { const a = Math.min(1, this.flash.t * 2); c.globalAlpha = a; c.font = '700 10px ui-monospace, monospace'; const w = c.measureText(this.flash.s).width + 16; c.fillStyle = 'rgba(30,60,30,.88)'; roundRect(c, W / 2 - w / 2, 44, w, 18, 9); c.fill(); this.text(c, this.flash.s, W / 2, 53, 10, '#d8ffc8'); c.globalAlpha = 1; }
+    inv.forEach((k, i) => {
+      const x = W - 14 - i * 20, y = H - 31;
+      c.fillStyle = 'rgba(10,8,12,.6)'; c.beginPath(); c.arc(x, y, 9, 0, 7); c.fill();
+      this.icon(c, k === 'relic' ? { k, img: this.skin.pick('relic' + this.n, 'item') } : { k }, x, y, 0.85);
+      if (k === 'part') this.text(c, `${this.inv.part}`, x + 7, y + 6, 8, ink);
+    });
+    if (this.flash) { const a = Math.min(1, this.flash.t * 2); c.globalAlpha = a; c.font = '700 10px ui-monospace, monospace'; const w = c.measureText(this.flash.s).width + 16; c.fillStyle = 'rgba(30,60,30,.88)'; roundRect(c, W / 2 - w / 2, this.panelB + 6, w, 18, 9); c.fill(); this.text(c, this.flash.s, W / 2, this.panelB + 15, 10, '#d8ffc8'); c.globalAlpha = 1; }
   }
   heart(c, x, y, full) {
     c.fillStyle = full ? '#e8504a' : 'rgba(255,255,255,.18)';
     c.beginPath(); c.moveTo(x, y + 4); c.bezierCurveTo(x - 6, y, x - 4, y - 4, x, y - 1.5); c.bezierCurveTo(x + 4, y - 4, x + 6, y, x, y + 4); c.fill();
   }
   drawMinimap(c) {
-    const s = 2, w = MW * s, hh = MH * s, X = W - w - 6, Y = 42;
+    const s = 2, w = MW * s, hh = MH * s, X = W - w - 8, Y = (this.panelB || 80) + 6;
     if (this.mmDirty || !this.mm) {
       this.mmDirty = 0; const m = this.mm ||= mk(w, hh), x = m.getContext('2d'); x.clearRect(0, 0, w, hh);
       for (let i = 0; i < MW * MH; i++) if (this.seenT[i]) { const v = this.map[i]; x.fillStyle = v === WALL ? '#5a5060' : walkT(v) ? (v === RUG ? '#e8d8a8' : '#c8bc98') : 'rgba(40,60,90,.7)'; x.fillRect((i % MW) * s, (i / MW | 0) * s, s, s); }
@@ -1595,5 +1606,5 @@ export class Expedition extends Game {
     this.text(c, `Next: ${e.next}`, W / 2, y + 86, 9, 'rgba(246,236,218,.7)');
     c.globalAlpha = 1;
   }
-  hud() { return `${Math.floor(this.score)} · expedition ${this.n}`; }
+  hud() { return `★ ${Math.floor(this.score)}`; }
 }

@@ -16,6 +16,9 @@ Running list of wiring the lead must do before the final push.
 - Sky Fox: done (three.js SNES polygons, 7 environments, 3 bosses); hint set.
 - Grave Merge: done (spirit chains, graveyard scene, merge/evolve moments); `trails` mutator excluded.
 - Feed content: psych 8 physics generators, products with 2–4 matched PNGs (`imgs`), power scale facts + `why` lines; no CSS.
+- Road Racer: done (instant steering, never stuck, explosions/chain blasts, 6 biomes × 5 stages, checkpoints); billboards/signs no longer mirrored (lead); hint updated.
+- Haruspicy: done (burst sacrifice, physics gore, spirit ichor, landing-position readings); liver house names drawn along the spokes (lead).
+- Downhill: done (late-press backflip only, landing tolerance, smooth hill, gap wall fix, parallax/time-of-day); hint updated.
 - Memes: 8 new formats (venn, nobody, placard, wanted, align, flow, graph, triptych), subject-coherent remixes, conversation strips ("A and B on <subject>"); strip volume online depends on Wikiquote subject matches.
 
 ## To do

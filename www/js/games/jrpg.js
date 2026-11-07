@@ -29,7 +29,7 @@ const SK = {
 };
 const ITEMS = { potion: ['Potion', 15], ether: ['Ether', 45], phoenix: ['Phoenix Down', 90], tent: ['Tent', 70] }, IK = Object.keys(ITEMS);
 const GEAR = ['Bronze', 'Iron', 'Steel', 'Silver', 'Mithril', 'Rune', 'Dragon', 'Crystal', 'Star', 'Void', 'Genesis', 'Ultima'];
-const price = (kind, t) => Math.round((kind === 'w' ? 50 : 42) * t ** 1.75);
+const price = (kind, t) => Math.round((kind === 'w' ? 70 : 60) * t ** 1.85);
 const WEAK = { fire: 'ice', water: 'bolt', leaf: 'fire', wind: 'bolt', earth: 'ice', shadow: 'holy', spirit: 'holy', beast: 'fire' };
 const ECOL = { fire: '#ff7a2a', water: '#5ab8ff', leaf: '#7ad04a', wind: '#c8f0e0', earth: '#c8a060', shadow: '#9a5aff', spirit: '#f0d8ff', beast: '#ff5a5a' };
 const BIG = { fire: 'Inferno', water: 'Tidal Wave', leaf: 'Thorn Storm', wind: 'Cyclone', earth: 'Quake', shadow: 'Umbral Nova', spirit: 'Soul Requiem', beast: 'Rampage' };
@@ -545,19 +545,25 @@ export class Jrpg extends Game {
     return { name: (art.name || creatureName(sp)).split(' ')[0], lv, hp, max: hp, atk: 3.5 + lv * 2, def: 2 + lv * 1.3, mag: 3 + lv * 1.8, spd: 3 + lv * 0.5 + this.r(0, 3), xp: Math.round(6 + lv * 5), gp: Math.round((6 + lv * 4) * this.r(0.8, 1.2)), art, el: art.element || 'beast', dead: 0 };
   }
   makeBoss(d, lv) {
-    const bs = this.bossOf(d), fin = d.i === 4, hp = Math.round((14 + lv * 11) * (1.4 + this.party.length) * (fin ? 0.75 : 1));
-    const f = { name: bs.name, lv, hp, max: hp, atk: (3.5 + lv * 2) * 1.2, def: 2 + lv * 1.4, mag: (3 + lv * 1.8) * 1.15, spd: 4 + lv * 0.5, xp: Math.round((6 + lv * 5) * 8), gp: Math.round((6 + lv * 4) * 7), art: bs.art, el: bs.el, boss: true, phase: 1, turns: 0, charge: 0, barrier: 0, special: ['summon', 'drain', 'barrier'][(d.k + (this.post.seed || 1)) % 3], dead: 0 };
+    const bs = this.bossOf(d), fin = d.i === 4, hp = Math.round((14 + lv * 11) * (1.6 + this.party.length * 1.2) * (fin ? 0.75 : 1));
+    const f = { name: bs.name, lv, hp, max: hp, atk: (3.5 + lv * 2) * 1.3, def: 2 + lv * 1.4, mag: (3 + lv * 1.8) * 1.25, spd: 4 + lv * 0.5, xp: Math.round((6 + lv * 5) * 8), gp: Math.round((6 + lv * 4) * 7), art: bs.art, el: bs.el, boss: true, phase: 1, turns: 0, charge: 0, barrier: 0, special: ['summon', 'drain', 'barrier'][(d.k + (this.post.seed || 1)) % 3], dead: 0 };
     if (fin) { const v = this.villain(); Object.assign(f, { name: this.story.vname, form: 'human', actor: v.actor, el: 'shadow', special: 'drain' }); v.actor.face('E'); }
+    f.hp = f.max = bs.hp || (bs.hp = this.bossHp(f, fin ? 3 : d.i ? 4 : 3)); // fixed at the first meeting, so grinding helps
     return f;
+  }
+  // boss HP: the level formula, or enough to last a few rounds against this party, whichever is more
+  bossHp(f, rounds) {
+    const dpr = this.party.reduce((a, h) => a + Math.max(this.estAtk(h, f, 1.2), h.job === 'Black Mage' ? this.magOf(h) * 1.7 * 1.7 - f.def * 0.4 : 0), 0);
+    return Math.round(Math.max(f.max, dpr * rounds));
   }
   // the villain's second form: a towering spirit
   transform(f) {
     const b = this.bt, st = this.story, v = this.villain(), sp = (this.post.seed || 1) * 977 + this.world * 31 + 4242;
-    const art = monster(sp, this.skin.hue + 270, 44, 4), lv = f.lv + 1, hp = Math.round((14 + lv * 11) * (1.4 + this.party.length) * 1.1);
+    const art = monster(sp, this.skin.hue + 270, 44, 4), lv = f.lv + 1, hp = Math.round((14 + lv * 11) * (1.6 + this.party.length * 1.2) * 1.1);
     f.transform = false; f.morph = true;
     this.talk([
       [v, 'Enough! You want to see what the relics have made of me? LOOK!', 'angry'],
-      F(() => { f.morph = false; Object.assign(f, { form: 'beast', art, el: art.element || 'shadow', name: `${st.vname} Unbound`, hp, max: hp, lv, phase: 1, turns: 0, charge: 0, barrier: 0, special: 'summon', dead: 0, mag: f.mag * 1.1, atk: f.atk * 1.1 }); b.flash = 1; b.quake = 0.6; b.order = []; b.msg = `${f.name} rises!`; b.wait = 1; this.burst(96, 176, ECOL[f.el] || '#c070ff', 50, 260); this.emoteParty('surprise', 1.2); }),
+      F(() => { f.morph = false; Object.assign(f, { form: 'beast', art, el: art.element || 'shadow', name: `${st.vname} Unbound`, hp, max: hp, lv, phase: 1, turns: 0, charge: 0, barrier: 0, special: 'summon', dead: 0, mag: f.mag * 1.1, atk: f.atk * 1.1 }); const bs = this.bossOf(this.dg.d); f.hp = f.max = bs.hp2 || (bs.hp2 = this.bossHp(f, 3.5)); b.flash = 1; b.quake = 0.6; b.order = []; b.msg = `${f.name} rises!`; b.wait = 1; this.burst(96, 176, ECOL[f.el] || '#c070ff', 50, 260); this.emoteParty('surprise', 1.2); }),
       [{ name: `${st.vname} Unbound`, art, el: art.element }, 'NOTHING… ENDS… WITHOUT MY SAY!'],
       [this.party[0], 'Hold the line, everyone!', 'angry']
     ]);
@@ -610,7 +616,7 @@ export class Jrpg extends Game {
       return { k: 'gather', more: 1 };
     }
     if (f.turns % [0, 5, 4, 3][f.phase] === 0) { f.charge = 1; b.since = new Set(); return { k: 'gather' }; }
-    if (f.phase >= 2 && f.turns % 3 === 1 && (f.special !== 'summon' || this.alive(b.foes).length < 3) && (f.special !== 'barrier' || !f.barrier)) return { k: f.special };
+    if (f.phase >= 2 && f.turns % (f.special === 'barrier' ? 6 : 3) === 1 && (f.special !== 'summon' || this.alive(b.foes).length < 3) && (f.special !== 'barrier' || !f.barrier)) return { k: f.special };
     if (f.phase >= 2 && this.rng() < 0.25) return { k: 'breath' };
     if (this.rng() < 0.3) return { k: 'zap', t: al[this.ri(0, al.length - 1)] };
     return { k: 'atk', t: this.target(al) };
@@ -687,7 +693,7 @@ export class Jrpg extends Game {
     } else if (ch.k === 'drain') {
       const t = pick(null, herosA), h0 = t.hp; b.msg = `${a.name} drains ${t.name}'s life!`;
       this.hurt(t, a.mag * 1.5 - this.defOf(t) * 0.3, '#c070ff'); this.heal(a, h0 - t.hp);
-    } else if (ch.k === 'barrier') { a.barrier = 3; b.msg = `A barrier shimmers around ${a.name}! Physical blows are weakened.`; b.wait = 1; }
+    } else if (ch.k === 'barrier') { a.barrier = 2; b.msg = `A barrier shimmers around ${a.name}! Physical blows are weakened.`; b.wait = 1; }
   }
   castSpell(a, ch) {
     const b = this.bt, sp = SK[ch.s], herosA = this.alive(this.party);
@@ -965,7 +971,7 @@ export class Jrpg extends Game {
     if ((ratio < 0.45 || mpLow) && this.inv.tent > 0 && !here) return this.useTent();
     let near = here ? { tw: here, n: 0 } : null;
     if (!near) { const r = this.wRoute((i) => this.wm[i] === TOWN); if (r?.length) { const [x, y] = r[r.length - 1]; near = { tw: this.townAt(x, y), n: r.length }; } }
-    if (near && ((((ratio < 0.5 || (mpLow && ratio < 0.85)) && this.gold >= this.innCost())) || (this.wantShop() && near.n < 28))) return go(near.tw);
+    if (near && ((((ratio < 0.5 || (mpLow && ratio < 0.85)) && this.gold >= this.innCost())) || this.wantShop())) return go(near.tw);
     const d = this.dungeons.find((q) => !q.done && !q.locked);
     if (!d) return;
     if (this.avgLv() < d.lv - 0.5 + this.extra) {
