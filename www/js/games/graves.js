@@ -26,7 +26,7 @@ export class Graves extends Game {
     const s = this.post.seed || 1, hue = this.skin.hue || 0;
     this.hues = CHAINS.map((_, k) => (hue + k * 90) % 360);
     this.art = CHAINS.map((ch, k) => ch.names.map((_, t) => monster(s * 13 + k * 7907, this.hues[k], SIZE[t], STIER[t], { plan: ch.plan })));
-    this.cells = Array.from({ length: COLS * ROWS }, () => null);
+    this.cells = Array.from({ length: COLS * ROWS }, () => null); this.fx = [];
     // cobwebbed cells open up when you merge next to them
     for (let i = 0; i < this.cells.length; i++) if (Math.floor(i / COLS) >= 3 && this.rng() < 0.55) this.cells[i] = { web: true };
     this.gens = 0; this.addGen(0); this.addGen(1);
@@ -34,7 +34,7 @@ export class Graves extends Game {
     // customers are Crystal characters: mostly graveyard-gothic fantasy folk
     this.era = s % 4 === 3 ? 'Present day' : 'Fantasy'; this.served = 0;
     this.orders = []; for (let k = 0; k < 3; k++) this.newOrder(k);
-    this.anims = []; this.drag = null; this.thinkT = 1; this.fx = []; this.barV = 0; this.bump = 0; this.reveal = null; this.msg = null;
+    this.anims = []; this.drag = null; this.thinkT = 1; this.barV = 0; this.bump = 0; this.reveal = null; this.msg = null;
     this.seen = new Set(CHAINS.flatMap((_, k) => [k * 10, k * 10 + 1]));
     this.pairs = new Set(); this.pairT = 0;
     this.bats = [{ x: 40, y: 18, v: 22, p: 0 }, { x: 250, y: 30, v: -16, p: 2 }];

@@ -87,19 +87,18 @@ export class Region {
     for (let yy = -1; yy <= 10; yy++) for (let xx = -1; xx <= 12; xx++) this.set(X + xx, Y + yy, yy < 0 || xx < 0 || yy > 9 || xx > 11 ? (this.at(X + xx, Y + yy) === WATER ? GR : this.at(X + xx, Y + yy) === TREE ? TREE : GR) : GR);
     const fill = (x0, y0, w, h, t) => { for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) this.set(X + x0 + xx, Y + y0 + yy, t); };
     fill(0, 4, 12, 1, PATH); fill(5, 4, 1, 6, PATH);
-    fill(1, 2, 3, 2, BUILD); this.set(X + 2, Y + 3, DOOR); fill(2, 4, 1, 1, PATH);
+    fill(1, 1, 3, 2, BUILD); this.set(X + 2, Y + 2, DOOR); this.set(X + 2, Y + 3, PATH); this.set(X + 1, Y + 3, BUILD); this.set(X + 3, Y + 3, BUILD);
     fill(7, 2, 3, 2, BUILD); fill(8, 4, 1, 1, PATH);
     fill(8, 6, 3, 2, BUILD); fill(9, 8, 1, 1, PATH); fill(6, 8, 3, 1, PATH);
     fill(1, 6, 3, 3, FLOWER); fill(2, 7, 1, 1, ROCK);
     for (let xx = 0; xx < 12; xx++) if (xx !== 5) this.set(X + xx, Y, FENCE);
     for (let yy = 0; yy < 10; yy++) if (yy !== 4) { this.set(X, Y + yy, FENCE); this.set(X + 11, Y + yy, FENCE); }
-    this.set(X + 4, Y + 9, BUILD); this.set(X + 6, Y + 9, BUILD); this.set(X + 5, Y, PATH); fill(5, 1, 1, 3, PATH);
-    this.set(X + 1, Y + 1, BUILD); this.set(X + 3, Y + 1, BUILD); // lanterns flank the shrine roof line
-    T.door = [X + 2, Y + 3]; T.step = [X + 2, Y + 4];
+    this.set(X + 4, Y + 9, BUILD); this.set(X + 6, Y + 9, BUILD); fill(5, 0, 1, 4, PATH);
+    T.door = [X + 2, Y + 2]; T.step = [X + 2, Y + 3];
     T.exits = [[X - 1, Y + 4], [X + 12, Y + 4], [X + 5, Y + 10], [X + 5, Y - 1]];
-    T.objs = [{ k: 'shrine', x: X + 1, y: Y + 3, w: 3 }, { k: 'house', x: X + 7, y: Y + 3, w: 3, roof: 0 }, { k: 'house', x: X + 8, y: Y + 7, w: 3, roof: 1 },
-      { k: 'torii', x: X + 4, y: Y + 9, w: 3 }, { k: 'lantern', x: X + 1, y: Y + 1, w: 1 }, { k: 'lantern', x: X + 3, y: Y + 1, w: 1 }];
-    T.lights = [[X + 1.5, Y + 1.3], [X + 3.5, Y + 1.3], [X + 7.5, Y + 3], [X + 9.5, Y + 3], [X + 8.5, Y + 7], [X + 10.5, Y + 7], [X + 2.5, Y + 3.2]];
+    T.objs = [{ k: 'shrine', x: X + 1, y: Y + 2, w: 3 }, { k: 'house', x: X + 7, y: Y + 3, w: 3, roof: 0 }, { k: 'house', x: X + 8, y: Y + 7, w: 3, roof: 1 },
+      { k: 'torii', x: X + 4, y: Y + 9, w: 3 }, { k: 'lantern', x: X + 1, y: Y + 3, w: 1 }, { k: 'lantern', x: X + 3, y: Y + 3, w: 1 }];
+    T.lights = [[X + 1.5, Y + 3.1], [X + 3.5, Y + 3.1], [X + 7.6, Y + 3.2], [X + 9.4, Y + 3.2], [X + 8.6, Y + 7.2], [X + 10.4, Y + 7.2], [X + 2.5, Y + 2.3]];
     T.free = [];
     for (let yy = 1; yy < 9; yy++) for (let xx = 1; xx < 11; xx++) if (open(this.at(X + xx, Y + yy)) && this.at(X + xx, Y + yy) !== DOOR) T.free.push([X + xx, Y + yy]);
   }
