@@ -167,7 +167,8 @@ export class Monsters extends Game {
     if (!this.team.some((m) => m.hp > 0) || hp < 0.5 || L.hp < L.max * 0.3 || (!this.orbs && this.caught.size < this.dexTotal)) return this.goTo(T.door);
     const top = Math.max(...this.team.map((m) => m.lv));
     for (const n of this.npcs) if (n.kind === 'trainer' && n.beaten && this.t > n.rematch) { n.beaten = false; n.lv += 3; for (const m of n.team) { m.lv += 3; m.tier = tierAt(m.sp, m.lv); m.name = formName(m.sp, m.tier); calc(m, true); } }
-    const tr = this.npcs.find((n) => n.kind === 'trainer' && !n.beaten && top >= n.lv - 1 && hp > 0.7);
+    const ready = this.encs >= 3 && (this.caught.size >= 3 || this.team.length >= 3 || this.encs >= 8);
+    const tr = ready && this.npcs.find((n) => n.kind === 'trainer' && !n.beaten && top >= n.lv - 1 && hp > 0.7);
     if (tr) {
       let best = null;
       for (let d = 4; d >= 1; d--) { const x = tr.x + tr.face[0] * d, y = tr.y + tr.face[1] * d; if (!this.free(x, y)) { best = null; continue; } const p = this.path(P, x, y); if (p && (!best || p.length < best.length)) best = p; }

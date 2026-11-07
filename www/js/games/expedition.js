@@ -117,7 +117,7 @@ function patTile(kind, c1, c2, R) {
 }
 // 64×64 tileable layers for water ripples and lava
 function layerCv(R, kind, col) {
-  const n = 64, N = noiseMap(R, n, 3, 4), cv = mk(n, n), x = cv.getContext('2d'), im = x.createImageData(n, n), c = hx(col);
+  const n = 64, N = noiseMap(R, n, 3, 4), cv = mk(n, n), x = cv.getContext('2d'), im = x.createImageData(n, n), c = hx(col || "#000000");
   for (let i = 0; i < n * n; i++) {
     const v = N[i];
     if (kind === 'lava') { const t = Math.max(0, Math.min(1, (v - 0.3) * 2.2)), hot = Math.abs(v - 0.55) < 0.022; im.data.set(hot ? [255, 196, 90, 255] : [90 + t * 165, 14 + t * 90, 4 + t * 10, 255], i * 4); }

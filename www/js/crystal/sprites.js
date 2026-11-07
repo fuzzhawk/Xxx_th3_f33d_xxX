@@ -15,12 +15,16 @@ const ANIM_NAMES = Object.keys(S.animations);
 const ALL_DIRS = S.directions.slice();
 
 let worker = null, nextId = 1, busy = false;
-const pending = new Map(), queue = [];
+const pending = new Map(), queue = [], pngs = new Map();
 function getWorker() {
   if (worker) return worker;
   worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-  worker.onmessage = (e) => { const j = pending.get(e.data.id); pending.delete(e.data.id); busy = false; j?.(e.data); pump(); };
-  worker.onerror = () => { busy = false; for (const j of pending.values()) j({ error: 'worker failed' }); pending.clear(); };
+  worker.onmessage = (e) => {
+    if ('blob' in e.data) { pngs.get(e.data.id)?.(e.data.blob); pngs.delete(e.data.id); return; }
+    if (e.data.png) e.data.blob = new Promise((res) => pngs.set(e.data.id, res));
+    const j = pending.get(e.data.id); pending.delete(e.data.id); busy = false; j?.(e.data); pump();
+  };
+  worker.onerror = () => { busy = false; for (const j of pending.values()) j({ error: 'worker failed' }); pending.clear(); for (const f of pngs.values()) f(null); pngs.clear(); };
   return worker;
 }
 function pump() {
@@ -50,11 +54,16 @@ export function crystalSheet(seed, opts = {}) {
   const sheet = { cv, meta: layout(dirs), char: opts.char || null, ok: false, seed };
   sheet.ready = (async () => {
     if (opts.cache !== false) try { const rec = await idbGet('kv', key); if (rec?.blob) { const bm = await createImageBitmap(rec.blob); cv.width = bm.width; cv.height = bm.height; cv.getContext('2d').drawImage(bm, 0, 0); sheet.char = rec.char; sheet.ok = true; return sheet; } } catch { /* no cache */ }
-    const r = await bake({ seed, era, char: opts.char || personaToCrystal(personaFor(seed, era || undefined)), dirs });
+    const r = await bake({ seed, era, char: opts.char || personaToCrystal(personaFor(seed, era || undefined)), dirs, png: opts.cache !== false });
     if (r.error) { console.warn('crystal:', r.error); return sheet; }
     cv.width = r.w; cv.height = r.h; cv.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(r.data.buffer), r.w, r.h), 0, 0);
     sheet.meta = r.meta; sheet.char = r.char; sheet.ok = true;
-    if (opts.cache !== false) cv.toBlob((blob) => blob && idbSet('kv', key, { blob, char: r.char }).catch(() => {}), 'image/png');
+    if (opts.cache !== false) {
+      const save = (blob) => blob && idbSet('kv', key, { blob, char: r.char }).catch(() => {});
+      // no OffscreenCanvas in the worker: encode here, but only when the page is idle
+      if (r.blob) r.blob.then(save);
+      else (window.requestIdleCallback || ((f) => setTimeout(f, 400)))(() => cv.toBlob(save, 'image/png'), { timeout: 5000 });
+    }
     return sheet;
   })();
   if (opts.cache !== false) mem.set(key, sheet);
