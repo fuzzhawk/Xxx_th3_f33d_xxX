@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-07T09:53:19.464Z",
+  "generatedAt": "2026-11-07T23:08:54.618Z",
   "package": "2026-W43",
   "mix": {
     "game": 51,
@@ -23,16 +23,16 @@
     }
   },
   "usage7d": {
-    "hours": 4.8,
-    "posts": 2156,
-    "sessions": 69,
-    "skips": 453,
+    "hours": 5,
+    "posts": 2183,
+    "sessions": 79,
+    "skips": 464,
     "selfcareDone": 1,
     "byHour": [
       31,
       2,
       10,
-      0,
+      2,
       0,
       0,
       10,
@@ -41,8 +41,8 @@
       3,
       8,
       9,
-      6,
-      71,
+      16,
+      74,
       4,
       1,
       20,
@@ -63,7 +63,7 @@
     },
     "wiki": {
       "total": 1197,
-      "viewed": 869,
+      "viewed": 885,
       "avgDwellSec": 5.5
     },
     "video": {
@@ -93,12 +93,12 @@
     },
     "web": {
       "total": 260,
-      "viewed": 159,
-      "avgDwellSec": 9.2
+      "viewed": 162,
+      "avgDwellSec": 9.9
     },
     "oracle": {
       "total": 156,
-      "viewed": 95,
+      "viewed": 98,
       "avgDwellSec": 5.2
     },
     "power": {
@@ -108,13 +108,13 @@
     },
     "read": {
       "total": 152,
-      "viewed": 129,
-      "avgDwellSec": 8.2
+      "viewed": 132,
+      "avgDwellSec": 18.2
     },
     "studio": {
       "total": 104,
-      "viewed": 60,
-      "avgDwellSec": 8.1
+      "viewed": 62,
+      "avgDwellSec": 7.7
     },
     "news": {
       "total": 91,
@@ -123,6 +123,41 @@
     }
   },
   "favorites": [
+    {
+      "id": "web6n1v6m",
+      "cat": "web",
+      "sub": "comic",
+      "label": "#1590; Breaking the Third Wall",
+      "url": "https://wondermark.com/c/1590/"
+    },
+    {
+      "id": "rd1bx4mae",
+      "cat": "read",
+      "sub": "poem",
+      "label": "The Coliseum",
+      "url": "https://www.google.com/search?q=The%20Coliseum%20Edgar%20Allan%20Poe"
+    },
+    {
+      "id": "w2442961",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "The Spooklight",
+      "url": "https://en.wikipedia.org/wiki/The_Spooklight"
+    },
+    {
+      "id": "webfbczw3",
+      "cat": "web",
+      "sub": "hn",
+      "label": "A PDF zine readable in any plain text editor, and it's also an MP3 [pdf]",
+      "url": "http://lab6.com/1"
+    },
+    {
+      "id": "w30403",
+      "cat": "wiki",
+      "sub": "science",
+      "label": "Turing machine",
+      "url": "https://en.wikipedia.org/wiki/Turing_machine"
+    },
     {
       "id": "w47506143",
       "cat": "wiki",
