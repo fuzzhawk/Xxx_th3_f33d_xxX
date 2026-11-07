@@ -5,7 +5,7 @@ import { Game, W, H, drawFit, ready, roundRect } from './engine.js';
 import { monster, creatureName, item as itemArt } from './creature.js';
 import { Actor, dirOf } from '../crystal/sprites.js';
 
-const G = 46, TW = 16, TH = 8, WH = 18, CY = 212, LIGHT = 7, HS = 3.3, COST = 12, PY = 362;
+const G = 54, TW = 16, TH = 8, WH = 18, CY = 212, LIGHT = 8, HS = 3.3, COST = 12, PY = 362;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 const RAR = ['#e6dfd2', '#7d8cff', '#ffe04a', '#d9a952'];
 const SLOTS = ['weapon', 'armor', 'helm', 'shield', 'ring'];
@@ -65,30 +65,41 @@ export class Hack extends Game {
     for (let tries = 0; tries < 20; tries++) {
       m = this.map = new Uint8Array(G * G); this.rooms = [];
       if (cave) {
-        let a = Array.from({ length: G * G }, () => this.rng() < 0.45);
-        for (let it = 0; it < 5; it++) {
+        let a = Array.from({ length: G * G }, () => this.rng() < 0.41);
+        for (let it = 0; it < 4; it++) {
           const b = a.slice();
           for (let y = 1; y < G - 1; y++) for (let x = 1; x < G - 1; x++) { let n = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && a[(y + dy) * G + x + dx]) n++; b[y * G + x] = n >= 5 || (n <= 1 && it < 2); }
           a = b;
         }
+        // open the passages up: widen every cave tunnel by a tile, then scatter a few rock pillars
+        { const b = a.slice(); for (let y = 1; y < G - 1; y++) for (let x = 1; x < G - 1; x++) if (a[y * G + x] && (!a[y * G + x - 1] || !a[y * G + x + 1] || !a[(y - 1) * G + x] || !a[(y + 1) * G + x]) && this.rng() < 0.85) { for (const [dx, dy] of DIRS) b[(y + dy) * G + x + dx] = false; } a = b; }
         for (let y = 1; y < G - 1; y++) for (let x = 1; x < G - 1; x++) m[y * G + x] = a[y * G + x] ? 0 : 1;
       } else {
         const rs = this.rooms;
-        for (let k = 0; k < 80 && rs.length < 11; k++) {
-          const w = this.ri(4, 8), h = this.ri(4, 8), x = this.ri(2, G - w - 3), y = this.ri(2, G - h - 3);
-          if (rs.some((r) => x < r.x + r.w + 2 && x + w + 2 > r.x && y < r.y + r.h + 2 && y + h + 2 > r.y)) continue;
-          rs.push({ x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1) });
+        for (let k = 0; k < 160 && rs.length < 9; k++) {
+          const big = rs.length < 3 || this.rng() < 0.35, w = this.ri(big ? 10 : 6, big ? 15 : 10), h = this.ri(big ? 9 : 6, big ? 13 : 10), x = this.ri(2, G - w - 3), y = this.ri(2, G - h - 3);
+          if (rs.some((r) => x < r.x + r.w + 3 && x + w + 3 > r.x && y < r.y + r.h + 3 && y + h + 3 > r.y)) continue;
+          rs.push({ x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1), kind: this.pick(['hall', 'court', 'cavern', 'plain']) });
         }
-        for (const r of rs) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) m[y * G + x] = 1;
+        for (const r of rs) {
+          const ell = r.kind === 'cavern' || (r.kind === 'court' && this.rng() < 0.5);
+          for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) {
+            const ex = (x + 0.5 - r.x - r.w / 2) / (r.w / 2), ey = (y + 0.5 - r.y - r.h / 2) / (r.h / 2);
+            if (ell && ex * ex + ey * ey > 1.05) continue;
+            m[y * G + x] = 1;
+          }
+          if (r.w < 8 || r.h < 8) continue;
+          if (r.kind === 'hall') for (let py = r.y + 2; py < r.y + r.h - 2; py += 3) for (let px = r.x + 2; px < r.x + r.w - 2; px += 3) { if (px === r.cx || py === r.cy) continue; m[py * G + px] = 0; }
+          else if (r.kind === 'court') for (const [px, py] of [[-2, -2], [2, 2], [-2, 2], [2, -2]]) m[(r.cy + py) * G + r.cx + px] = 0;
+          else for (let k = 0; k < r.w * r.h * 0.03; k++) { const px = this.ri(r.x + 2, r.x + r.w - 3), py = this.ri(r.y + 2, r.y + r.h - 3); if (m[py * G + px] && !DIRS.some(([dx, dy]) => !m[(py + dy) * G + px + dx])) m[py * G + px] = 0; } // debris
+        }
         const dig = (a, b) => {
-          const wide = this.rng() < 0.3, hor = this.rng() < 0.5;
-          const run = (x0, y0, x1, y1) => { for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) { m[y * G + x] = 1; if (wide) m[(y + (x0 === x1 ? 0 : 1)) * G + x + (x0 === x1 ? 1 : 0)] = 1; } };
+          const wd = this.ri(1, 2), hor = this.rng() < 0.5;
+          const run = (x0, y0, x1, y1) => { for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let o = -wd; o <= wd; o++) { const xx = x + (x0 === x1 ? o : 0), yy = y + (y0 === y1 ? o : 0); if (xx > 1 && yy > 1 && xx < G - 2 && yy < G - 2) m[yy * G + xx] = 1; } };
           if (hor) { run(a.cx, a.cy, b.cx, a.cy); run(b.cx, a.cy, b.cx, b.cy); } else { run(a.cx, a.cy, a.cx, b.cy); run(a.cx, b.cy, b.cx, b.cy); }
         };
         for (let i = 1; i < rs.length; i++) { let best = 0, bd = 1e9; for (let j = 0; j < i; j++) { const dd = Math.abs(rs[i].cx - rs[j].cx) + Math.abs(rs[i].cy - rs[j].cy); if (dd < bd) { bd = dd; best = j; } } dig(rs[i], rs[best]); }
         for (let k = 0; k < 2 && rs.length > 3; k++) dig(this.pick(rs), this.pick(rs));
-        // pillars in the bigger halls
-        for (const r of rs) if (r.w >= 7 && r.h >= 7 && this.rng() < 0.6) for (const [px, py] of [[2, 2], [r.w - 3, 2], [2, r.h - 3], [r.w - 3, r.h - 3]]) m[(r.y + py) * G + r.x + px] = 0;
       }
       for (let i = 0; i < G; i++) m[i] = m[(G - 1) * G + i] = m[i * G] = m[i * G + G - 1] = 0;
       // keep the largest connected region
@@ -97,7 +108,7 @@ export class Hack extends Game {
       let best = null;
       const seen = new Uint8Array(G * G);
       for (const f of floors) { if (seen[f]) continue; const D = this.flood(f), reg = floors.filter((i) => D[i] >= 0); for (const i of reg) seen[i] = 1; if (!best || reg.length > best.length) best = reg; }
-      if (best.length < 260) continue;
+      if (best.length < 520) continue;
       const keep = new Uint8Array(G * G); for (const i of best) keep[i] = 1;
       for (let i = 0; i < G * G; i++) if (!keep[i]) m[i] = 0;
       this.floors = best;
@@ -110,13 +121,13 @@ export class Hack extends Game {
     this.stairs = st; m[st] = 2;
     this.edge = new Uint8Array(G * G);
     for (let y = 1; y < G - 1; y++) for (let x = 1; x < G - 1; x++) { const i = y * G + x; if (!m[i] && DIRS.some(([dx, dy]) => m[i + dx + dy * G])) this.edge[i] = 1; }
-    this.seen = new Uint8Array(G * G); this.vis = new Uint8Array(G * G);
+    this.seen = new Uint8Array(G * G); this.vis = new Uint8Array(G * G); this.lit = new Float32Array(G * G); this.rv = new Float32Array(G * G);
     this.loot = []; this.bolts = []; this.fx = []; this.blood = []; this.mobs = [];
     const sd = (this.post.seed | 0) + d * 7919;
     this.kinds = [{ hp: 1, dmg: 1, sp: 1.55, sz: 1 }, { hp: 1.7, dmg: 1.35, sp: 1.1, sz: 1.2 }, { hp: 0.6, dmg: 0.75, sp: 2.2, sz: 0.8 }].map((b, k) => ({ ...b, name: creatureName(sd + k * 131),
       art: (d + k) % 3 === 0 ? this.skin.creatures[(d * 2 + k) % 6] : monster(sd + k * 131, this.skin.hue + k * 90 + d * 37, 16 + k * 3, Math.min(4, d >> 1), { tex: this.skin.texFor?.(k + d * 3) }) }));
-    const far = this.floors.filter((i) => D[i] > 9 && m[i] === 1);
-    const nPacks = 6 + Math.min(7, d) + (this.mods.swarm ? 4 : 0);
+    const far = this.floors.filter((i) => D[i] > 10 && m[i] === 1);
+    const nPacks = 8 + Math.min(7, d) + (this.mods.swarm ? 4 : 0);
     for (let p = 0; p < nPacks && far.length; p++) {
       const c = this.pick(far), kind = this.ri(0, 2), champ = p === 0 || (d > 3 && p === 1), n = this.ri(2, 3 + Math.min(3, d >> 1)) + (champ ? 1 : 0);
       for (let k = 0; k < n; k++) {
@@ -459,14 +470,18 @@ export class Hack extends Game {
     this.camX += (h.x - this.camX) * 0.12; this.camY += (h.y - this.camY) * 0.12;
     this.ox = W / 2 - (this.camX - this.camY) * TW; this.oy = CY - (this.camX + this.camY) * TH;
     c.fillStyle = '#050403'; c.fillRect(0, 0, W, H);
+    const fdt = Math.min(0.1, Math.max(0, this.t - (this._ft ?? this.t))); this._ft = this.t;
+    const rv = this.rv, lit = this.lit, vis = this.vis, kl = Math.min(1, fdt * 7), kr = fdt / 0.45;
+    for (let i = 0; i < G * G; i++) { const lt = lit[i], vv = vis[i]; if (lt !== vv) lit[i] = Math.abs(vv - lt) < 0.01 ? vv : lt + (vv - lt) * kl; if (this.seen[i] && rv[i] < 1) rv[i] = Math.min(1, rv[i] + kr); }
     const cs = this.camX + this.camY, cd = this.camX - this.camY, tiles = [];
     for (let ty = Math.floor(this.camY) - 24; ty <= this.camY + 24; ty++) for (let tx = Math.floor(this.camX) - 24; tx <= this.camX + 24; tx++) {
       if (tx < 0 || ty < 0 || tx >= G || ty >= G || Math.abs(tx + ty + 1 - cs) > 28 || Math.abs(tx - ty - cd) > 13) continue;
-      const i = ty * G + tx; if (this.seen[i] && (m[i] || this.edge[i])) tiles.push(i);
+      const i = ty * G + tx; if (rv[i] > 0.01 && (m[i] || this.edge[i])) tiles.push(i);
     }
     // floor: one iso-skewed photo pattern over every explored floor diamond
     const fp = this.pat(this.floorTex), dia = (i) => { const tx = i % G, ty = (i / G) | 0, [ax, ay] = this.P(tx, ty); c.moveTo(ax, ay); c.lineTo(ax + TW, ay + TH); c.lineTo(ax, ay + TH * 2); c.lineTo(ax - TW, ay + TH); c.closePath(); };
-    c.beginPath(); for (const i of tiles) if (m[i]) dia(i);
+    const part = [];
+    c.beginPath(); for (const i of tiles) if (m[i]) { if (rv[i] < 0.99) part.push(i); else dia(i); }
     c.fillStyle = this.pal.bg2; c.fill();
     if (fp) {
       const k = 4 / ((this.floorTex.naturalWidth || this.floorTex.width) || 64);
@@ -475,14 +490,21 @@ export class Hack extends Game {
     }
     c.fillStyle = 'rgba(10,6,4,.28)'; c.fill();
     c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 0.6; c.stroke();
+    // tiles still fading in, one by one
+    for (const i of part) {
+      c.globalAlpha = rv[i] * rv[i] * (3 - 2 * rv[i]); c.beginPath(); dia(i); c.fillStyle = this.pal.bg2; c.fill();
+      if (fp) { c.globalAlpha *= 0.7; c.fillStyle = fp; c.fill(); c.globalAlpha = rv[i]; }
+      c.fillStyle = 'rgba(10,6,4,.28)'; c.fill();
+    }
+    c.globalAlpha = 1;
     // stairs down
-    if (this.seen[this.stairs]) {
+    if (rv[this.stairs] > 0.5) {
       const sx0 = this.stairs % G, sy0 = (this.stairs / G) | 0;
       for (let k = 0; k < 4; k++) { const [ax, ay] = this.P(sx0 + k * 0.12, sy0 + k * 0.12), s = 1 - k * 0.24; this.poly(c, [ax, ay, ax + TW * s, ay + TH * s, ax, ay + TH * 2 * s, ax - TW * s, ay + TH * s]); c.fillStyle = `rgba(0,0,0,${0.4 + k * 0.18})`; c.fill(); c.strokeStyle = 'rgba(255,230,190,.25)'; c.stroke(); }
     }
     for (const b of this.blood) { const [sx, sy] = this.P(b.x, b.y); c.fillStyle = 'rgba(90,6,6,.55)'; c.beginPath(); c.ellipse(sx, sy, b.r * TW, b.r * TH, 0, 0, 7); c.fill(); }
     if (this.mark && (this.mark.t -= 1 / 60) > 0) { const [sx, sy] = this.P(this.mark.x, this.mark.y); c.strokeStyle = RAR[2]; c.globalAlpha = this.mark.t * 2; c.beginPath(); c.ellipse(sx, sy, 10, 5, 0, 0, 7); c.stroke(); c.globalAlpha = 1; }
-    for (const l of this.loot) if (this.seen[this.tileOf(l)]) this.drawLoot(c, l);
+    for (const l of this.loot) if (rv[this.tileOf(l)] > 0.9) this.drawLoot(c, l);
     // walls and creatures, back to front
     const [hsx, hsy] = this.P(h.x, h.y), objs = [];
     for (const i of tiles) if (!m[i]) objs.push([i % G + ((i / G) | 0) + 1.4, 0, i]);
@@ -496,8 +518,8 @@ export class Hack extends Game {
       if (kind === 0) {
         const i = o, tx = i % G, ty = (i / G) | 0, [ax, ay] = this.P(tx, ty), bx = ax + TW, by = ay + TH, cx = ax, cy = ay + TH * 2, dx = ax - TW, dy = ay + TH;
         const fade = dep > h.x + h.y + 0.3 && Math.abs(ax - hsx) < 34 && ay - hsy > -30 && ay - hsy < 30;
-        c.globalAlpha = fade ? 0.35 : 1;
-        const face = (pts, shade) => { this.poly(c, pts); c.fillStyle = this.pal.bg2; c.fill(); if (wp) { c.fillStyle = wp; c.fill(); } c.fillStyle = `rgba(0,0,0,${shade + (this.vis[i] ? 0 : 0.35)})`; c.fill(); };
+        c.globalAlpha = (fade ? 0.35 : 1) * rv[i];
+        const face = (pts, shade) => { this.poly(c, pts); c.fillStyle = this.pal.bg2; c.fill(); if (wp) { c.fillStyle = wp; c.fill(); } c.fillStyle = `rgba(0,0,0,${shade})`; c.fill(); };
         if (m[i + G]) face([dx, dy - WH, cx, cy - WH, cx, cy, dx, dy], 0.32);
         if (m[i + 1]) face([cx, cy - WH, bx, by - WH, bx, by, cx, cy], 0.55);
         face([ax, ay - WH, bx, by - WH, cx, cy - WH, dx, dy - WH], 0.05);
@@ -508,11 +530,9 @@ export class Hack extends Game {
       else { const [sx, sy] = this.P(o.x, o.y); const g = c.createRadialGradient(sx, sy - 10, 1, sx, sy - 10, 10); g.addColorStop(0, '#fff6c0'); g.addColorStop(0.4, this.col(0)); g.addColorStop(1, 'rgba(255,80,0,0)'); c.fillStyle = g; c.fillRect(sx - 10, sy - 20, 20, 20); }
     }
     for (const f of this.fx) { const [sx, sy] = this.P(f.x, f.y), k = 1 - f.t / 0.4; c.globalAlpha = f.t * 2; c.fillStyle = this.col(0); c.beginPath(); c.ellipse(sx, sy, 1.6 * TW * k + 4, 1.6 * TH * k + 2, 0, 0, 7); c.fill(); c.globalAlpha = 1; }
-    // darkness beyond the torch
+    // fog of war: a low-res visibility map (light falloff, line of sight, explored memory) smoothed by upscaling
     const R = LIGHT * TW * 1.15 + Math.sin(this.t * 9) * 3 + Math.sin(this.t * 23) * 2;
-    const g = c.createRadialGradient(hsx, hsy - 8, 10, hsx, hsy - 8, R);
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.55, 'rgba(0,0,0,.12)'); g.addColorStop(1, 'rgba(3,2,1,.9)');
-    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    this.fog(c, h);
     const wg = c.createRadialGradient(hsx, hsy - 8, 0, hsx, hsy - 8, R * 0.7); wg.addColorStop(0, 'rgba(255,150,60,.12)'); wg.addColorStop(1, 'rgba(255,150,60,0)'); c.globalCompositeOperation = 'lighter'; c.fillStyle = wg; c.fillRect(hsx - R, hsy - R, R * 2, R * 2); c.globalCompositeOperation = 'source-over';
     // loot labels, names, damage numbers
     c.font = '700 8px ui-monospace, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -526,6 +546,27 @@ export class Hack extends Game {
     for (const p of this.pops) { const [sx, sy] = this.P(p.x, p.y); c.globalAlpha = Math.min(1, p.t * 2); this.text(c, p.s, sx, sy - 34, 9, p.c); }
     c.globalAlpha = 1;
     this.drawUI(c);
+  }
+  fog(c, h) {
+    const FW = 90, FH = 91, F = this.fc ||= (() => { const mk = () => { const k = document.createElement('canvas'); k.width = FW; k.height = FH; return k; }, a = mk(), b = mk(); return { a, b, ca: a.getContext('2d'), cb: b.getContext('2d'), ia: new ImageData(FW, FH), ib: new ImageData(FW, FH) }; })();
+    const da = F.ia.data, db = F.ib.data, rv = this.rv, lit = this.lit, m = this.map, tm = this.t;
+    const smp = (A, x, y) => { x -= 0.5; y -= 0.5; const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0; if (x0 < 0 || y0 < 0 || x0 >= G - 1 || y0 >= G - 1) return 0; const i = y0 * G + x0; return (A[i] * (1 - fx) + A[i + 1] * fx) * (1 - fy) + (A[i + G] * (1 - fx) + A[i + G + 1] * fx) * fy; };
+    const L2 = (LIGHT + 0.6) ** 2;
+    for (let py = 0; py < FH; py++) for (let px = 0; px < FW; px++) {
+      const sx = px * 4 + 2, sy = py * 4 + 2 + WH * 0.5, u = (sx - this.ox) / TW, v = (sy - this.oy) / TH, wx = (u + v) / 2, wy = (v - u) / 2;
+      const ex = smp(rv, wx, wy), lt = smp(lit, wx, wy), d2 = (wx - h.x) ** 2 + (wy - h.y) ** 2;
+      let rad = 1 - d2 / L2; rad = rad <= 0 ? 0 : Math.min(1, rad * 1.7); rad = rad * rad * (3 - 2 * rad);
+      const br = Math.min(1, lt * 1.15) * rad, k = (py * FW + px) * 4;
+      const un = 0.95 + Math.sin(tm * 0.7 + wx * 0.9 + wy * 0.6) * 0.03;
+      let a = un + (0.6 - un) * ex;
+      a = a * (1 - br) + 0.04 * br;
+      da[k] = 6; da[k + 1] = 4; da[k + 2] = 9; da[k + 3] = a * 255;
+      db[k] = db[k + 1] = db[k + 2] = 128; db[k + 3] = ex * (1 - br) * 215;
+    }
+    F.ca.putImageData(F.ia, 0, 0); F.cb.putImageData(F.ib, 0, 0);
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+    c.globalCompositeOperation = 'saturation'; c.drawImage(F.b, 0, 0, W, FH * 4);
+    c.globalCompositeOperation = 'source-over'; c.drawImage(F.a, 0, 0, W, FH * 4);
   }
   drawLoot(c, l) {
     const [sx, sy0] = this.P(l.x, l.y), sy = sy0 - 4 + Math.sin(this.t * 3 + l.ph) * 1.2;

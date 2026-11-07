@@ -1,12 +1,14 @@
 // Oracle posts: dice, I Ching (three-coin method), augury with sacred chickens,
-// haruspicy on a sheep's liver, and tarot with scans of old decks from Wikimedia
-// Commons. Each cast is random; the canvas animates it and the reading appears below.
-import { el } from './util.js';
+// haruspicy on a sheep's liver, tarot with scans of old decks from Wikimedia
+// Commons, and chaos magic (chaos.js). Each cast is random; the canvas animates it and the
+// reading appears below: what fell, how it bears on the question, and something to do.
+import { el, toast } from './util.js';
 import { img, ready, getTextures } from './games/assets.js';
 import { themePalette } from './games/creature.js';
-import { HEX, hexNumber, DECK, AUGURY, DICE3, QUESTIONS } from './oracle-data.js';
+import { HEX, TRI, hexNumber, DECK, SUITS, AUGURY, DICE3, QUESTIONS, VERDICT, ADVICE, LENS, DIE_ROLE, qKind, verdictOf, cardTone, hexTone } from './oracle-data.js';
+import { CHAOS, CTA, castChaos, drawChaos, chaosUI } from './chaos.js';
 import { Haruspex } from './haruspex.js';
-import { rollCharacter, sheet, sheetText, drawCharacter } from './dnd.js';
+import { rollCharacter, sheet, sheetText, drawCharacter, saveAsHero } from './dnd.js';
 
 let tarotImgs = {};
 export function setOracle(data) { tarotImgs = data?.tarot || {}; }
@@ -14,24 +16,35 @@ export function setOracle(data) { tarotImgs = data?.tarot || {}; }
 const W = 360, H = 300;
 const rnd = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
 const pick = (a) => a[Math.floor(rnd() * a.length)];
-const LABEL = { dice: 'Dice', die: 'One die', iching: 'I Ching', augury: 'Augury', haruspicy: 'Haruspicy', tarot: 'Tarot', dnd: 'Character' };
+const LABEL = { dice: 'Dice', die: 'One die', iching: 'I Ching', augury: 'Augury', haruspicy: 'Haruspicy', tarot: 'Tarot', dnd: 'Character', sigil: 'Sigil', paradigm: 'Paradigm shift', ritual: 'Random ritual' };
 const D20 = ['A natural 1. Stay in bed; the universe has your number.', 'Something will break. Let it be something cheap.', 'A detour, then a worse detour.', 'Ask for help before you need it.', 'Proceed with snacks and caution.', 'Middling luck. Bring a towel.', 'An old friend, or an old debt, comes calling.', 'Fine, if you keep it small.', 'The answer is in your pocket.', 'A coin flip in a trench coat.', 'Slightly in your favour.', 'Someone is rooting for you quietly.', 'Unlucky number, lucky result.', 'Yes, but read the small print.', 'The door is unlocked. Push.', 'Momentum is on your side.', 'Go now, before you think about it.', 'Strong yes. Dress for it.', 'Nearly perfect. Take it.', 'A natural 20. Whatever it is: do it, and narrate it out loud.'];
 const dieLine = (n, v) => (n === 20 ? D20[v - 1] : v === 1 ? 'The lowest face. Retreat and regroup.' : v === n ? 'The highest face. Fortune is loud today.' : v / n < 0.34 ? 'Low. Keep expectations modest.' : v / n < 0.67 ? 'Middling. It depends on you, annoyingly.' : 'High. The odds lean your way.');
 function download(name, text) { const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: name }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+// the closing lines of a reading: how the omen bears on the question, and something concrete to do
+function wrap(src, q, score, facts) {
+  const v = verdictOf(score);
+  return [...facts, `Asked “${q}”, ${src} ${pick(VERDICT[v])}.`, `Do this: ${pick(ADVICE[v])}`];
+}
 export const oracleLabel = (sub) => LABEL[sub] || 'Oracle';
 
 export function oracleMedia(p) {
   const canvas = el('canvas.oracle-cv');
   const reading = el('div.oracle-reading');
-  const q = el('div.oracle-q', `“${p.question || pick(QUESTIONS)}”`);
-  const btn = el('button.btn.primary', 'Cast');
+  let question = p.question || pick(QUESTIONS);
+  const qt = el('span', `“${question}”`);
+  const q = el('div.oracle-q', qt, el('button.qshuffle', { type: 'button', 'aria-label': 'Ask another question', title: 'Another question', onclick: (e) => { e.stopPropagation(); question = pick(QUESTIONS); qt.textContent = `“${question}”`; o.question = question; } }, '↻'));
+  const chaos = CHAOS.includes(p.sub);
+  const btn = el('button.btn.primary', CTA[p.sub]?.[0] || 'Cast');
   const media = el('div.media.oracle', canvas);
   const row = el('div.btnrow', btn);
-  const body = el('div.oracle-body', p.sub === 'dnd' ? null : q, reading, row);
-  const o = new Oracle(canvas, p, reading);
+  const o = new Oracle(canvas, p, reading); o.question = question;
+  const cx = chaos ? chaosUI(o, p) : null;
+  if (cx) row.append(...cx.btns);
+  const body = el('div.oracle-body', p.sub === 'dnd' || p.sub === 'sigil' ? null : q, cx?.top, reading, row);
   if (p.sub === 'die') { btn.remove(); for (const n of [4, 6, 8, 10, 12, 20, 100]) row.append(el('button.btn', { onclick: (e) => { e.stopPropagation(); o.sides = n; o.cast(); } }, `d${n}`)); }
-  if (p.sub === 'dnd') { btn.textContent = 'Roll a character'; row.append(el('button.btn', { onclick: (e) => { e.stopPropagation(); if (o.ch) download(`${o.ch.name.replace(/\W+/g, '_')}.txt`, sheetText(o.ch)); } }, 'Save sheet')); }
-  const label = () => { btn.textContent = o.hx ? o.hx.label() : p.sub === 'dnd' ? 'Roll another' : 'Cast again'; };
+  if (p.sub === 'dnd') { btn.textContent = 'Roll a character'; row.append(el('button.btn', { onclick: (e) => { e.stopPropagation(); if (o.ch) download(`${o.ch.name.replace(/\W+/g, '_')}.txt`, sheetText(o.ch)); } }, 'Save sheet'), el('button.btn', { onclick: (e) => { e.stopPropagation(); if (!o.ch) { toast('Roll a character first'); return; } saveAsHero(o.ch); toast(`${o.ch.name} is your hero now`); } }, 'Make my hero')); }
+  const label = () => { btn.textContent = o.hx ? o.hx.label() : p.sub === 'dnd' ? 'Roll another' : CTA[p.sub]?.[1] || 'Cast again'; };
+  o.onCast = label;
   if (o.hx) btn.textContent = 'Bring a beast';
   btn.onclick = (e) => { e.stopPropagation(); if (o.hx?.state === 'altar') o.hx.sacrifice(); else o.cast(); label(); };
   canvas.addEventListener('click', (e) => { if (!o.hx) return; const r = canvas.getBoundingClientRect(); if (o.hx.tap((e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H)) { e.stopPropagation(); label(); } });
@@ -51,7 +64,7 @@ class Oracle {
     const dpr = Math.min(2, devicePixelRatio || 1), cw = this.c.clientWidth || 360;
     this.c.width = Math.round(cw * dpr); this.c.height = Math.round(cw * H / W * dpr); this.k = this.c.width / W;
     this.running = true; this.last = performance.now();
-    const loop = (now) => { if (!this.running) return; const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; this.t += dt; if (this.anim) this.anim.t += dt; this.draw(); this.raf = requestAnimationFrame(loop); };
+    const loop = (now) => { if (!this.running) return; const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; this.t += dt; this.dt = dt; if (this.anim) this.anim.t += dt; this.draw(); this.raf = requestAnimationFrame(loop); };
     this.raf = requestAnimationFrame(loop);
   }
   stop() { this.running = false; cancelAnimationFrame(this.raf); }
@@ -63,7 +76,8 @@ class Oracle {
     if (s === 'die') {
       const n = this.sides || 20, v = 1 + Math.floor(rnd() * n);
       this.anim = { t: 0, n, v, spin: rnd() * 7 };
-      this.after(1.1, () => this.say(`d${n}: ${v}`, [dieLine(n, v)]));
+      const q = this.question, tone = (v / n - 0.5) * 4, ex = v === n ? ' The highest face there is.' : v === 1 ? ' The lowest face there is.' : '';
+      this.after(1.1, () => this.say(`d${n}: ${v}`, wrap(`the d${n}`, q, tone, [`${dieLine(n, v)}${ex}`, `${LENS[qKind(q)]}, a ${v} on a die of ${n} sits at ${Math.round(v / n * 100)}% of the way up the scale: ${v / n > 0.66 ? 'closer to the ceiling than the floor' : v / n > 0.33 ? 'in the awkward middle, where it is up to you' : 'nearer the floor than you would like'}.`])));
     } else if (s === 'dnd') {
       const ch = rollCharacter(rnd); this.ch = ch;
       this.anim = { t: 0, ch };
@@ -71,7 +85,13 @@ class Oracle {
     } else if (s === 'dice') {
       const dice = [1, 2, 3].map(() => 1 + Math.floor(rnd() * 6));
       this.anim = { t: 0, dice, seeds: dice.map(() => rnd()) };
-      this.after(1.4, () => { const sum = dice.reduce((a, b) => a + b, 0); this.say(`${dice.join(' · ')} = ${sum}`, [DICE3[sum]]); });
+      const q = this.question;
+      this.after(1.4, () => {
+        const sum = dice.reduce((a, b) => a + b, 0), same = new Set(dice).size;
+        const roles = DIE_ROLE.map(([who, ph], i) => `${who} ${ph[dice[i] - 1]} (${dice[i]})`).join('; ');
+        const echo = same === 1 ? ' Triples: the omen is shouting.' : same === 2 ? ' A pair: something repeats, so look for the pattern.' : '';
+        this.say(`${dice.join(' · ')} = ${sum}`, wrap('the dice', q, (sum - 10.5) / 3, [DICE3[sum], `Read as you, the others and luck: ${roles}.${echo}`]));
+      });
     } else if (s === 'iching') {
       const tosses = Array.from({ length: 6 }, () => [0, 1, 2].map(() => (rnd() < 0.5 ? 3 : 2)));
       const vals = tosses.map((c) => c.reduce((a, b) => a + b, 0)); // 6 old yin, 7 young yang, 8 young yin, 9 old yang
@@ -79,17 +99,25 @@ class Oracle {
       const n = hexNumber(lines), m = hexNumber(moved), changing = vals.map((v, i) => (v === 6 || v === 9 ? i + 1 : 0)).filter(Boolean);
       this.anim = { t: 0, tosses, vals, n, m: changing.length ? m : 0 };
       this.after(6 * 0.55 + 0.4, () => {
-        const [py, en, gloss] = HEX[n];
-        const lines2 = [gloss];
-        if (changing.length) { const [py2, en2, g2] = HEX[m]; lines2.push(`Changing line${changing.length > 1 ? 's' : ''} ${changing.join(', ')}. It becomes ${m}. ${en2} (${py2}): ${g2}`); }
-        this.say(`${n}. ${en} · ${py}`, lines2);
+        const [py, en, gloss] = HEX[n], q = this.question, tri = (a) => TRI.find((t) => t.bits === (a[0] ? 1 : 0) + (a[1] ? 2 : 0) + (a[2] ? 4 : 0));
+        const lo = tri(lines.slice(0, 3)), up = tri(lines.slice(3));
+        const facts = [`${gloss}`, `The image is ${up.name} ${lo.glyph === up.glyph ? 'doubled' : `over ${lo.name}`}: ${up.glyph}${lo.glyph}.`];
+        let score = hexTone(n);
+        if (changing.length) { const [py2, en2, g2] = HEX[m]; score = (score + hexTone(m)) / 2; facts.push(`Line${changing.length > 1 ? 's' : ''} ${changing.join(' and ')} ${changing.length > 1 ? 'are' : 'is'} changing, so the situation is not settled: it is moving towards ${m}. ${en2} (${py2}). ${g2}`); }
+        else facts.push('No line is changing, so the picture is stable: this is how things stand, not where they are heading.');
+        facts.push(`${LENS[qKind(q)]}, the hexagram’s advice is its first sentence: ${gloss.split('. ')[0].replace(/\.$/, '')}.`);
+        this.say(`${n}. ${en} · ${py}`, wrap('the hexagram', q, score, facts));
       });
     } else if (s === 'augury') {
       const r = rnd(), o = AUGURY[r < 0.18 ? 0 : r < 0.5 ? 1 : r < 0.75 ? 2 : r < 0.92 ? 3 : 4];
       const hens = Array.from({ length: 3 + Math.floor(rnd() * 3) }, (_, i) => ({ x: 70 + i * 55 + rnd() * 20, y: 200 + rnd() * 50, dir: rnd() < 0.5 ? -1 : 1, hue: [30, 15, 45, 0, 350][i % 5], ph: rnd() * 7 }));
       const grain = Array.from({ length: 70 }, () => ({ x: 60 + rnd() * 240, y: 190 + rnd() * 70, gone: false }));
       this.anim = { t: 0, o, hens, grain };
-      this.after(4, () => this.say(o.title, [o.text]));
+      const q = this.question, tone = { solistimum: 2, eat: 1, peck: -0.5, refuse: -1.2, flee: -2 }[o.key], hungry = hens.length;
+      this.after(4, () => this.say(o.title, wrap('the sacred chickens', q, tone, [o.text, `${hungry} hens were let out of the coop to the grain; ${o.eat > 0.6 ? 'most of them fell on it' : o.eat > 0 ? 'only a few showed interest' : 'none of them wanted it'}. The Romans took this as a plain yes or no for the day, and never argued with the chickens.`])));
+    } else if (CHAOS.includes(s)) {
+      const r = castChaos(s, this); this.anim = r.anim;
+      this.after(r.delay, () => this.say(r.title, r.lines));
     } else if (s === 'haruspicy') {
       this.hx.bring();
     } else {
@@ -97,7 +125,13 @@ class Oracle {
       const cards = Array.from({ length: n }, () => { let c; do c = pick(DECK); while (used.has(c.id)); used.add(c.id); const imgs = tarotImgs[c.id] || []; return { c, rev: rnd() < 0.3, i: imgs.length ? img(pick(imgs)) : null }; });
       this.anim = { t: 0, cards };
       const pos = n === 3 ? ['Past', 'Present', 'Future'] : [''];
-      this.after(0.9 + n * 0.6, () => this.say(cards.map((x) => `${x.c.name}${x.rev ? ' (reversed)' : ''}`).join(' · '), cards.map((x, k) => `${pos[k] ? `${pos[k]}: ` : ''}${x.c.name}${x.rev ? ', reversed' : ''} — ${x.rev ? x.c.rev : x.c.up}.`)));
+      const q = this.question, wts = n === 3 ? [0.5, 0.8, 1.2] : [1.5], score = cards.reduce((a, x, k) => a + cardTone(x.c) * (x.rev ? -0.5 : 1) * wts[k], 0) / (n === 3 ? 1.5 : 1);
+      const mean = (x) => (x.rev ? x.c.rev : x.c.up);
+      this.after(0.9 + n * 0.6, () => {
+        const facts = cards.map((x, k) => `${pos[k] ? `${pos[k]}: ` : ''}${x.c.name}${x.rev ? ', reversed' : ''} — ${mean(x)}. ${x.c.major ? 'A major arcana card: it speaks to the shape of the whole situation.' : `A ${SUITS.find((s) => s.id === x.c.suit).name.toLowerCase()} card, so it concerns ${SUITS.find((s) => s.id === x.c.suit).of}.`}`);
+        facts.push(n === 3 ? `The story runs from ${mean(cards[0])}, through ${mean(cards[1])}, towards ${mean(cards[2])}.` : `${LENS[qKind(q)]}, the card is about ${mean(cards[0])}.`);
+        this.say(cards.map((x) => `${x.c.name}${x.rev ? ' (reversed)' : ''}`).join(' · '), wrap('the cards', q, score, facts));
+      });
     }
   }
   after(s, fn) { clearTimeout(this.timer); this.timer = setTimeout(fn, s * 1000); }
@@ -116,13 +150,14 @@ class Oracle {
     else if (s === 'dice') this.drawDice(c, a);
     else if (s === 'iching') this.drawIChing(c, a);
     else if (s === 'augury') this.drawAugury(c, a);
+    else if (CHAOS.includes(s)) drawChaos(c, a, this);
     else this.drawTarot(c, a);
   }
   idle(c) {
     c.fillStyle = this.pal.ink; c.globalAlpha = 0.6 + Math.sin(this.t * 2) * 0.2;
     c.font = '600 46px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillText({ die: '⚅', dnd: '⚔', dice: '⚄', iching: '☯', augury: '𓅬', haruspicy: '⛤', tarot: '🂠' }[this.p.sub] || '✶', W / 2, H / 2 - 10);
-    c.font = '600 13px ui-monospace, monospace'; c.fillText('tap Cast', W / 2, H / 2 + 40); c.globalAlpha = 1;
+    c.fillText({ die: '⚅', dnd: '⚔', dice: '⚄', iching: '☯', augury: '𓅬', haruspicy: '⛤', tarot: '🂠', paradigm: '☉', ritual: '⛧' }[this.p.sub] || '✶', W / 2, H / 2 - 10);
+    c.font = '600 13px ui-monospace, monospace'; c.fillText(this.p.sub === 'sigil' ? 'state an intent, then draw' : 'tap Cast', W / 2, H / 2 + 40); c.globalAlpha = 1;
   }
   // ---- dice
   drawDice(c, a) {

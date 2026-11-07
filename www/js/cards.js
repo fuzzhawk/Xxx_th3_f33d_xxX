@@ -17,6 +17,7 @@ import * as stats from './stats.js';
 import { oracleMedia, oracleLabel } from './oracle.js';
 import { powerBody } from './power.js';
 import { writingBody, creatorMedia } from './studio.js';
+import { rhymeBody } from './rhymes.js';
 import { readBody } from './reads.js';
 
 const TOPIC_COLOR = {
@@ -41,8 +42,8 @@ const handleFor = (post, ctx) => {
     case 'selfcare': return ['self.care', post.title];
     case 'web': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'web', `${post.sub === 'comic' ? 'Comic' : post.sub === 'hn' ? 'Hacker News' : post.source || 'Web'}${post.date ? ` · ${post.date}` : ''}`];
     case 'news': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'news', `${ctx.topics?.news?.[post.sub] || 'News'}${post.date ? ` · ${post.date}` : ''}`];
-    case 'oracle': return ['the.oracle', `${oracleLabel(post.sub)} · ask, then cast`];
-    case 'studio': return ['the.studio', post.sub === 'creator' ? 'Character creator · you star in the games' : post.sub === 'blank' ? 'A blank page · tap ✈ to download' : 'Writing prompt · tap ✈ to download'];
+    case 'oracle': return ['the.oracle', post.sub === 'sigil' ? 'Sigil maker · chaos magic' : post.sub === 'paradigm' ? 'Paradigm shift · chaos magic' : post.sub === 'ritual' ? 'Random ritual · chaos magic' : `${oracleLabel(post.sub)} · ask, then cast`];
+    case 'studio': return ['the.studio', post.sub === 'creator' ? 'Character creator · you star in the games' : post.sub === 'blank' ? 'A blank page · tap ✈ to download' : post.sub === 'rhyme' ? 'Rhyming dictionary · tap ✈ to download' : 'Writing prompt · tap ✈ to download'];
     case 'read': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'longread', `${post.kind === 'poem' ? 'Poem' : post.kind === 'novel' ? 'From a novel' : 'Long read'}${post.author ? ` · ${post.author}` : ''}`];
     case 'power': return ['power.scale', post.sub === 'tier' ? 'Tier list · binding in no jurisdiction' : 'Who would win?'];
     default: return [post.cat, ''];
@@ -392,6 +393,11 @@ function studio(p, ctx) {
     const o = creatorMedia();
     const card = post('studio', p, ctx, { media: o.media, body: o.body, mediaInteractive: true });
     card._activate = o.activate; card._deactivate = o.deactivate; card._heavy = true;
+    return card;
+  }
+  if (p.sub === 'rhyme') {
+    const r = rhymeBody(p), card = post('studio', p, ctx, { body: r.body, ext: r.send });
+    card._activate = r.activate; card._heavy = true;
     return card;
   }
   const w = writingBody(p);
