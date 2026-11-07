@@ -40,11 +40,21 @@ export const GAME_NAMES = {
   starfox: 'Sky Fox', expedition: 'Expeditions', ski: 'Downhill', graves: 'Grave Merge', survivors: 'Cave Horde', robotron: 'Robo Arena', crokinole: 'Crokinole',
   wordle: 'Five Letters', bee: 'Spelling Hive', wordsearch: 'Word Search', wheel: 'Letter Wheel', hangman: 'Hangman', vocab: 'Vocab Quiz', ladder: 'Word Ladder', t2048: '2048', arrows: 'Arrow Escape', jrpg: 'Crystal Quest', hack: 'Crypt Hack'
 };
+// game keys in older packages, and the game that replaced each one
+export const GAME_ALIAS = { mystery: ['expedition', 'Manor Mystery'], stacker: ['tetris', 'Stacker'], necro: ['graves', 'Necromancer'], golf: ['peggle', 'Bounce Golf'] };
+export function upgradeGamePost(p) {
+  const a = p.cat === 'game' && GAME_ALIAS[p.sub];
+  if (!a) return p;
+  p.sub = a[0];
+  if (p.title) p.title = p.title.replace(a[1], GAME_NAMES[a[0]]);
+  if (p.theme?.name) p.theme.name = p.theme.name.replace(a[1], GAME_NAMES[a[0]]);
+  return p;
+}
 export const GAME_HINT = {
   plinko: 'tap to drop a ball', breakout: 'drag to move the paddle', merge: 'drag to aim, release to drop · two alike merge (on the planet, aim around the core)', dash: 'tap to jump (twice to double-jump)',
   flappy: 'tap to flap', tetris: 'tap beside the piece to move, tap the piece to turn, drag to slide, swipe down to drop, swipe up to hold · every full line is lifted out as a saying', pong: 'drag to move your paddle', peggle: 'aim, release to shoot', juggle: 'tap the balls to keep them up',
   platformer: 'tap to jump, twice to double-jump · ladders, pads and springs work by themselves · grab power-ups', racer: 'hold left or right to steer, tap to change lane · pass the gates for extra time', raycast: 'drag sideways to turn, up/down to walk · tap to fire, hold to keep firing · tap the weapon bar to switch · find the key, reach the glowing exit',
-  rocks: 'tap to shoot, hold to thrust toward your finger', sling: 'drag down and release to fire upward',
+  rocks: 'tap to shoot, hold to thrust toward your finger', sling: 'drag back from the sling and let go · tap in flight for the shot\'s trick · drag the sky to look around',
   chess: 'tap a white piece, then its destination', dice: 'tap the cup or ROLL to shake, tap dice to hold, tap a row to score',
   cards: 'tap up to five cards, then play or discard', monsters: 'tap a move', fighter: '◀ ▶ walk (hold away to block) · ▲ jump · ▼ crouch for sweeps and uppercuts · P K S attack · land hits to chain combos, fill the meter for an ULTRA · on autopilot, bet on the fight',
   starfox: 'drag anywhere to steer, lasers fire while you hold · double-tap to barrel roll, ✸ drops a bomb · fly through rings, beat the boss',
@@ -53,7 +63,7 @@ export const GAME_HINT = {
   crokinole: 'touch near the bottom arc to place, drag back and release to flick · hit their discs or lose yours',
   survivors: 'drag anywhere to walk · weapons fire by themselves · tap an upgrade on level up',
   graves: 'tap a grave to raise, drag two alike together to merge, drag or tap to fill orders',
-  expedition: 'tap to walk, tap people and things to interact · finish the mission',
+  expedition: 'tap to walk · tap people and things to use them · follow the goal at the top',
   wordle: 'type a five-letter word, six tries', bee: 'tap letters to make words with the centre letter', wordsearch: 'drag across letters to circle a word',
   wheel: 'drag through the letters to spell words', hangman: 'tap letters; the clue is the definition', vocab: 'tap the right meaning before time runs out', ladder: 'change one letter at a time to reach the target word',
   t2048: 'swipe to slide the tiles; matching numbers merge', arrows: 'tap an arrow to send it flying; if something is in its way you lose a heart',

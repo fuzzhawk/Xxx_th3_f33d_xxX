@@ -119,7 +119,7 @@ export class Sling extends Game {
   tower(x, y, mw) {
     const w = Math.min(mw, this.lr(38, 50)), n = this.li(2, Math.min(6, 3 + (this.levelN >> 1)));
     for (let k = 0; k < n; k++) y = this.storey(x, y, w, this.lr(28, 36));
-    if (this.R() < 0.6) this.blk(x + w / 2, y - 15, w + 6, 30, this.m('fill'), { tri: true }); else this.spots.push({ x: x + w / 2, y, w, h: 40, top: 1 });
+    if (this.R() < 0.6) this.blk(x + w / 2, y - 15, w + 6, 30, this.m('fill'), { tri: true, flag: this.li(0, 5) }); else this.spots.push({ x: x + w / 2, y, w, h: 40, top: 1 });
     return x + w;
   }
   pyramid(x, y, mw) {
@@ -484,6 +484,7 @@ export class Sling extends Game {
     else if (b.mat === 'tnt') { c.fillStyle = m.c2; c.fillRect(-w / 2, -h / 2 + 3, w, 2); c.fillRect(-w / 2, h / 2 - 5, w, 2); c.fillStyle = '#ffe9a8'; c.font = '700 6px ui-monospace, monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('TNT', 0, 0.5); }
     if (b.arch) { const ar = Math.min(w / 2 - 14, h * 0.75); c.beginPath(); c.moveTo(-w / 2, -h / 2); c.lineTo(w / 2, -h / 2); c.lineTo(w / 2, h / 2); c.lineTo(ar, h / 2); c.arc(0, h / 2, ar, 0, Math.PI, true); c.lineTo(-w / 2, h / 2); c.closePath(); } else this.path(c, b.v);
     c.lineWidth = 1.3; c.strokeStyle = m.c2; c.stroke();
+    if (b.flag != null) { const [ax, ay] = b.v.reduce((p, q) => (q[1] < p[1] ? q : p)), f = Math.sin(this.t * 6 + b.id) * 2; c.strokeStyle = '#3a2a1a'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax, ay - 14); c.stroke(); c.fillStyle = this.col(b.flag); c.beginPath(); c.moveTo(ax, ay - 14); c.lineTo(ax + 11, ay - 11 + f); c.lineTo(ax, ay - 8); c.fill(); }
     // cracks as it takes damage
     if (b.dmg > b.hp * 0.3) {
       b.cracks ||= Array.from({ length: 3 }, () => { let x = this.r(-w / 2, w / 2) * 0.8, y = this.r(-h / 2, h / 2) * 0.8; return Array.from({ length: 4 }, () => [x += this.r(-L, L) * 0.18, y += this.r(-L, L) * 0.18]); });

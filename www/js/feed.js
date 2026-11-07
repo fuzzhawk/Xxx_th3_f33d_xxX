@@ -1,7 +1,7 @@
 import { el, weightedPick, fmtDur } from './util.js';
 import { settings, saveSettings, pctFor, subWeight, seenSet, markSeen, resetSeen, CATS, CAT_LABEL } from './state.js';
 import { renderCard, notice } from './cards.js';
-import { GAMES, GAME_NAMES } from './games/all.js';
+import { GAMES, GAME_NAMES, upgradeGamePost } from './games/all.js';
 import * as stats from './stats.js';
 
 // Activates heavy cards when they are mostly visible, tears them down when they
@@ -64,6 +64,8 @@ export class Feed {
 
   load(pkg) {
     this.pkg = pkg;
+    const games = pkg.posts?.game;
+    for (const p of (Array.isArray(games) ? games : games?.posts) || []) upgradeGamePost(p);
     this.ctx = { pkgId: pkg.manifest.id, topics: pkg.manifest.topics };
     this.rebuildPools();
     this.emitted = Object.fromEntries(CATS.map((c) => [c, 0]));

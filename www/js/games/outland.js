@@ -910,7 +910,7 @@ export class Outland extends Game {
       const rate = (p.zoom ? 1.6 : 3.2) * dt, jy = angTo(p.yaw, wantYaw), jp = wantPitch - p.pitch;
       p.yaw += clamp(jy, -rate, rate) + Math.sin(this.t * 1.7) * 0.0015; p.pitch += clamp(jp, -rate, rate);
       const err = Math.hypot(jy, jp), tol = p.veh ? 0.06 : p.w === 1 ? 0.012 : p.w === 2 ? 0.05 : Math.max(0.02, 1.2 / Math.max(4, d));
-      if (err < tol && (tgt.los || tgt.kind === 'tower') && p.swap <= 0) I.fire = true;
+      if (err < tol && (tgt.los || tgt.kind === 'tower') && p.swap <= 0) { if (p.veh || this.arms[p.w].auto) I.fire = true; else if (p.cool <= 0 && p.reload <= 0) I.tapShot = true; } // single-shot guns need a fresh pull each time
       if (this.ammo[p.w].mag === 0 && !p.veh) this.reload();
     } else if (!p.veh) {
       p.pitch = lerp(p.pitch, 0, dt * 2);

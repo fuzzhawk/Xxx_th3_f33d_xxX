@@ -59,8 +59,9 @@ export class Monsters extends Game {
     this.pool = [];
     for (const el of [...els, null]) this.pool.push(find(el, [this.starter, ...this.pool]));
     const P = this.pool, n = P.length;
-    this.zones = this.region.zones.map((z, k) => ({ ...z, sp: [P[(k * 2) % n], P[(k * 2 + 1) % n], P[(k * 2 + 5) % n]], lv: 3 + Math.floor(z.dist / 6) }));
-    if (!this.zones.length) this.zones = [{ id: 0, tiles: [], mid: this.region.town.step, dist: 6, sp: P.slice(0, 3), lv: 4 }];
+    const cnt = clamp(Math.ceil(n / Math.max(1, this.region.zones.length)) + 1, 3, 5);
+    this.zones = this.region.zones.map((z, k) => ({ ...z, sp: Array.from({ length: cnt }, (_, j) => P[(k * (cnt - 1) + j) % n]), lv: 3 + Math.floor(z.dist / 6) }));
+    if (!this.zones.length) this.zones = [{ id: 0, tiles: [], mid: this.region.town.step, dist: 6, sp: P.slice(0, 5), lv: 4 }];
     this.dexTotal = new Set([this.starter, ...this.zones.flatMap((z) => z.sp)]).size;
   }
   walker(x, y, dir, sheet) { const w = { x, y, px: 0, py: 0, mv: null, path: [], actor: new Actor(sheet, { mode: 'four', dir, walkSpeed: 4, runSpeed: 115, walkStride: 7, runStride: 11 }) }; this.place(w); return w; }
@@ -214,7 +215,9 @@ export class Monsters extends Game {
     for (const m of n.team) { m.hp = m.max; m.status = null; }
   }
   *wild() {
-    const z = this.zoneAt(this.me.x, this.me.y), roll = this.rng(), sd = z.sp[roll < 0.5 ? 0 : roll < 0.85 ? 1 : 2];
+    const z = this.zoneAt(this.me.x, this.me.y), L = z.sp.length; let roll = this.rng() * ((L * (L + 1)) / 2), j = 0;
+    while (roll >= L - j && j < L - 1) roll -= L - j++;
+    const sd = z.sp[j];
     const beaten = this.npcs.filter((n) => n.beaten).length, lv = Math.max(2, z.lv + this.ri(-1, 1) + Math.floor(beaten * 0.7));
     this.me.actor.emote('surprise', 0.6);
     yield* this.battle([makeMon(sd, lv)], null);
@@ -561,8 +564,11 @@ export class Monsters extends Game {
     const me = this.bs[0].m, foe = this.bs[1].m, bt = this.bt, wild = !bt.tr, f = foe.hp / foe.max;
     const want = wild && this.orbs > 0 && (!this.caught.has(foe.seed) || this.team.length < 3) && bt.orbsUsed < 5;
     if (!bt.swapped && eff(foe.el, me.el) >= 2 && me.hp / me.max > 0.25) { const i = this.bestBench(), b = this.team[i]; if (b && eff(foe.el, b.el) <= 1 && b.hp / b.max > 0.5) { bt.swapped = 1; return { kind: 'swap', i }; } }
+    const low = me.hp / me.max < 0.35, bench = this.team.some((m) => m !== me && m.hp > m.max * 0.5);
+    if (wild && !bench && low && f > 0.45 && !(want && f < 0.6)) return { kind: 'run' };
+    if (wild && !want && bt.turn <= 1 && !bench && eff(foe.el, me.el) >= 2 && eff(me.el, foe.el) <= 1 && foe.lv >= me.lv - 2) return { kind: 'run' };
     if (want) {
-      if (f <= 0.3 || (foe.status === 'slp' && f <= 0.6) || (me.hp / me.max < 0.3 && f < 0.7)) return { kind: 'orb' };
+      if (f <= 0.3 || (foe.status === 'slp' && f <= 0.6) || (low && f < 0.7)) return { kind: 'orb' };
       const st = me.moves.find((m) => m.st && m.st[1] >= 1 && (m.st[0] === 'slp' || m.st[0] === 'par') && this.canStatus(foe, m.st[0]));
       if (st && f <= 0.8 && this.rng() < 0.75) return { kind: 'move', mv: st };
       let best = null, bd = -1;
@@ -571,7 +577,6 @@ export class Monsters extends Game {
       if (f <= 0.55) return { kind: 'orb' };
     }
     if (me.gauge >= 1) return { kind: 'move', mv: ultFor(me) };
-    if (wild && me.hp / me.max < 0.2 && !me.moves.some((m) => m.heal) && !this.team.some((m) => m !== me && m.hp > m.max * 0.5)) return { kind: 'run' };
     return { kind: 'move', mv: this.bestMove(me, foe, 12) };
   }
   // the autopilot moves a cursor through the menus like a player would
@@ -780,7 +785,7 @@ export class Monsters extends Game {
     c.restore();
     if (fx.impact > 0) this.drawImpact(c);
     else { this.drawHud(c, 1); this.drawHud(c, 0); this.drawMenu(c); }
-    fx.draw(c, 'top'); fx.drawFlash(c);
+    fx.draw(c, 'top'); if (fx.impact <= 0) fx.drawFlash(c);
     if (this.card) this.drawCard(c);
   }
   drawSide(c, s, flat) {

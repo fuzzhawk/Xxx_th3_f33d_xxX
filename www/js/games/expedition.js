@@ -1597,7 +1597,7 @@ export class Expedition extends Game {
   }
   drawEnd(c) {
     const e = this.ending; if (e.t < 1.2) return;
-    const a = Math.min(1, (e.t - 1.2) * 3), y = 150, acc = this.col(0);
+    const a = Math.min(1, (e.t - 1.2) * 3), y = 262, acc = this.col(0);
     c.globalAlpha = a; c.fillStyle = 'rgba(8,6,10,.8)'; roundRect(c, 24, y - 6, W - 48, 104, 10); c.fill(); c.strokeStyle = acc; c.lineWidth = 1.5; c.stroke();
     this.text(c, '★ MISSION COMPLETE ★', W / 2, y + 12, 12, acc);
     c.font = '700 11px ui-monospace, monospace'; c.textAlign = 'center'; c.fillStyle = '#f6ecda';
