@@ -56,7 +56,7 @@ export const GAME_HINT = {
   platformer: 'tap to jump, twice to double-jump · ladders, pads and springs work by themselves · grab power-ups', racer: 'hold left or right to steer, tap to change lane · pass the gates for extra time', raycast: 'drag sideways to turn, up/down to walk · tap to fire, hold to keep firing · tap the weapon bar to switch · find the key, reach the glowing exit',
   rocks: 'tap to shoot, hold to thrust toward your finger', sling: 'drag back from the sling and let go · tap in flight for the shot\'s trick · drag the sky to look around',
   chess: 'tap a white piece, then its destination', dice: 'tap the cup or ROLL to shake, tap dice to hold, tap a row to score',
-  cards: 'tap up to five cards, then play or discard', monsters: 'tap a move', fighter: '◀ ▶ walk (hold away to block) · ▲ jump · ▼ crouch for sweeps and uppercuts · P K S attack · land hits to chain combos, fill the meter for an ULTRA · on autopilot, bet on the fight',
+  cards: 'tap up to five cards, then play or discard', monsters: 'tap the map to walk · tall grass hides wild spirits · weaken one, then throw an ORB · 必殺 when the SP gauge is full', fighter: '◀ ▶ walk (hold away to block) · ▲ jump · ▼ crouch for sweeps and uppercuts · P K S attack · land hits to chain combos, fill the meter for an ULTRA · on autopilot, bet on the fight',
   starfox: 'drag anywhere to steer, lasers fire while you hold · double-tap to barrel roll, ✸ drops a bomb · fly through rings, beat the boss',
   ski: 'tap to jump · tap, then press and hold in the air to backflip · land along the slope',
   robotron: 'left thumb moves, right thumb shoots (one thumb auto-aims) · rescue the humans',
