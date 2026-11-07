@@ -626,7 +626,8 @@ async function classicStrips(c) {
       const when = stripTags(md.DateTimeOriginal?.value || '');
       const year = +((when.match(/\b(1[89]\d\d)\b/) || name.match(/\b(1[89]\d\d)\b/) || [])[1] || 0);
       if (s.before && (!year || year >= s.before)) continue;
-      const desc = stripTags(md.ImageDescription?.value || '');
+      // (Commons maintenance notices such as "should be transcribed" are not descriptions)
+      const desc = stripTags(md.ImageDescription?.value || '').replace(/\s*The text in this image should be transcribed[\s\S]*$|\s*Replace this template[\s\S]*$/i, '').trim();
       got.push({ source: s.name, sub: 'comic', classic: true, title: clip(stripTags(md.ObjectName?.value || '') || name, 90), url: ii.descriptionurl, img: ii.thumburl,
         excerpt: clip([s.artist, when || year || ''].filter(Boolean).join(' · ') + (desc && desc.length < 400 ? ` — ${desc}` : ''), 200), date: isoDate(/^\d{4}-\d\d-\d\d/.test(when) ? when.slice(0, 10) : '') || (year ? String(year) : '') });
     }

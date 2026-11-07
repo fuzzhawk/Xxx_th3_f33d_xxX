@@ -364,6 +364,8 @@ function web(p, ctx) {
   return card;
 }
 function comic(p, ctx) {
+  // older packages carry Commons maintenance notices in classic strips' descriptions
+  if (p.excerpt) p = { ...p, excerpt: p.excerpt.replace(/\s*—?\s*The text in this image should be transcribed[\s\S]*$/i, '') };
   const img = el('img', { alt: p.title, loading: 'lazy' });
   const media = el('div.media', img);
   setImg(img, p.img, () => { img.remove(); media.prepend(el('div.noimg', '✎')); });
