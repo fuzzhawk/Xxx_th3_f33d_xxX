@@ -200,17 +200,23 @@ export class Racer extends Game {
   up() { this.steer = 0; }
   tap() {}
   autopilot(dt) {
-    const look = 2600 + this.speed * 0.35, pz = this.pos + this.pz;
+    const look = 3500 + this.speed * 0.5, pz = this.pos + this.pz;
     if ((this.apT -= dt) <= 0) {
       this.apT = 0.05;
       const cost = (x) => {
         let c = Math.abs(x - this.px) * 0.8 + Math.abs(x) * 0.25;
-        for (const e of this.ents) { const dz = e.z - pz; if (e.dead || dz < -150 || dz > look) continue; if (Math.abs(e.off - x) < e.hw + 0.2 + (e.t === 'truck' || e.t === 'barrel' ? 0.12 : 0)) c += 6 + (1 - dz / look) * 30; }
+        const lo = Math.min(x, this.px), hi = Math.max(x, this.px);
+        for (const e of this.ents) {
+          const dz = e.z - pz; if (e.dead || dz < -150 || dz > look) continue;
+          const m = e.hw + 0.18 + (e.t === 'truck' || e.t === 'barrel' ? 0.12 : 0);
+          if (Math.abs(e.off - x) < m) c += 8 + (1 - dz / look) * 30;
+          else if (e.off > lo - m && e.off < hi + m && dz < look * 0.7) c += 12;
+        }
         for (const f of this.fx) { const dz = f.z - pz; if (f.age < 1 && dz > -200 && dz < look && Math.abs(f.off - x) < 0.5) c += 25; }
         return c;
       };
       let best = this.apX, bc = cost(best) - 2;
-      for (const x of [-0.7, -0.35, 0, 0.35, 0.7]) { const v = cost(x); if (v < bc) { bc = v; best = x; } }
+      for (let x = -0.75; x < 0.76; x += 0.15) { const v = cost(x); if (v < bc) { bc = v; best = x; } }
       this.apX = best;
     }
     const s = this.seg(this.pos + 1200), sp = this.speed / this.max, r = this.rate();
@@ -278,11 +284,11 @@ export class Racer extends Game {
     const pz = this.pos + this.pz;
     while (this.nextZ < this.pos + 24000) {
       const z = this.nextZ, S = this.stages[this.seg(z).st];
-      this.nextZ += this.r(1800, 4200) / S.B.traf;
-      const roll = this.rng(), t = roll < 0.6 ? 'car' : roll < 0.72 ? 'truck' : roll < 0.87 ? 'barrel' : 'rock';
-      const lanes = [-0.62, 0, 0.62].filter((l) => !this.ents.some((e) => Math.abs(e.z - z) < 2500 && Math.abs(e.off - l) < 0.3));
+      this.nextZ += this.r(3200, 6500) / S.B.traf;
+      const roll = this.rng(), t = roll < 0.6 ? 'car' : roll < 0.72 ? 'truck' : roll < 0.84 ? 'barrel' : 'rock';
+      const lanes = [-0.62, 0, 0.62].filter((l) => !this.ents.some((e) => Math.abs(e.z - z) < 4000 && Math.abs(e.off - l) < 0.3));
       if (lanes.length < 2) continue;
-      const e = { t, z, off: lanes[this.ri(0, lanes.length - 1)] + this.r(-0.06, 0.06), v: 0, hw: 0.17, ww: 700 };
+      const e = { t, z, off: lanes[this.ri(0, lanes.length - 1)] + this.r(-0.06, 0.06), v: 0, hw: 0.16, ww: 700 };
       if (t === 'car') { e.v = this.r(3500, 7800); if (this.traf.length && this.rng() < 0.5) e.img = this.traf[this.ri(0, this.traf.length - 1)]; else e.spr = this.tSpr.car[this.ri(0, 2)]; } else if (t === 'truck') { e.v = this.r(3000, 4400); e.hw = 0.27; e.ww = 1100; e.spr = this.tSpr.truck; } else if (t === 'barrel') { e.hw = 0.1; e.ww = 380; e.spr = this.tSpr.barrel; } else { e.hw = 0.12; e.ww = 600; e.spr = this.tSpr.rock; }
       e.v0 = e.v; this.ents.push(e);
     }
@@ -297,7 +303,7 @@ export class Racer extends Game {
         for (const o of this.ents) if (!o.v && !o.dead && o.t !== 'rock' + 'x' && Math.abs(o.z - e.z) < 160 && Math.abs(o.off - e.off) < e.hw + o.hw) { this.explode(e); if (o.t === 'barrel') this.explode(o); else o.dead = true; break; }
       }
       const dz = e.z - pz;
-      if (!e.dead && this.hurt <= 0 && Math.abs(dz) < 140 && Math.abs(e.off - this.px) < e.hw + 0.15) this.crash(e);
+      if (!e.dead && this.hurt <= 0 && Math.abs(dz) < 140 && Math.abs(e.off - this.px) < e.hw + 0.12) this.crash(e);
     }
     this.ents = this.ents.filter((e) => !e.dead && e.z > this.pos - 1500);
   }

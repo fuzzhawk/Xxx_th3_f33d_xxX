@@ -21,16 +21,16 @@ export function powerBody(p) {
 
 function versus(p) {
   const [a, b] = [p.a, p.b];
-  const side = (e, k) => el(`div.pw-side${p.winner === k ? '.win' : ''}`, face(e), wikiLink(e), el('span.pw-kind', KIND[e.k] || e.k), el('div.pw-level', el('b', fmt(e.pw)), el('small', p.unit)));
+  const side = (e, k) => el(`div.pw-side${p.winner === k ? '.win' : ''}`, face(e), wikiLink(e), el('span.pw-kind', KIND[e.k] || e.k), e.f ? el('small.pw-fact', { style: { color: 'var(--muted, #9a8f80)', fontStyle: 'italic', fontSize: '11px' } }, `${e.f}${e.age ? ` · ${e.age > 99 ? e.age.toLocaleString() : e.age} yrs ago` : ''}`) : null, el('div.pw-level', el('b', fmt(e.pw)), el('small', p.unit)));
   const bar = (side, v) => { const i = el('i'); i.style.setProperty('--v', v / 10); return el(`div.pw-bar.${side}`, i); };
   const stats = el('div.pw-stats', ...Object.keys(a.s).map((name) => el('div.pw-row', bar('l', a.s[name]), el('span', name), bar('r', b.s[name]))));
   const box = el('div.pw', el('div.pw-vs', side(a, 0), el('div.pw-mid', 'VS'), side(b, 1)), stats,
-    el('div.pw-verdict', el('b', p.how), el('small', p.verdict)),
+    el('div.pw-verdict', el('b', p.how), p.why ? el('small', { style: { display: 'block', margin: '4px 0' } }, p.why) : null, el('small', p.verdict)),
     el('div.pw-blurbs', el('p', a.b), el('p', b.b)));
   return box;
 }
 
 function tier(p) {
-  const rows = p.ents.map((e, i) => el('div.pw-tr', el(`span.pw-t.t${i}`, p.tiers[i]), face(e, '.sm'), el('div.pw-tn', wikiLink(e), el('small', `${KIND[e.k] || e.k} · ${fmt(e.pw)} ${p.unit}`))));
+  const rows = p.ents.map((e, i) => el('div.pw-tr', el(`span.pw-t.t${i}`, p.tiers[i]), face(e, '.sm'), el('div.pw-tn', wikiLink(e), el('small', `${KIND[e.k] || e.k} · ${fmt(e.pw)} ${p.unit}${e.f ? ` · ${e.f}` : ''}`))));
   return el('div.pw.pw-tierlist', el('h3', p.title), ...rows, el('small.pw-foot', 'Rankings final. Complaints to the sacred chickens.'));
 }

@@ -35,7 +35,7 @@ function composeImgs(imgs, R, style, id) {
   out += `<ellipse cx="200" cy="330" rx="${70 + R() * 20}" ry="9" fill="#000" opacity=".3"/><g ${sh}>${im(hero, 200, 252, 150 + R() * 30, (R() - 0.5) * 16)}</g></g>`;
   const ch = CHANNELS[Math.floor(R() * CHANNELS.length)], bx = side < 0 ? 14 : 262;
   out += `<g transform="rotate(${side * -4} ${bx + 62} 372)"><rect x="${bx}" y="358" width="124" height="28" rx="4" fill="#111" stroke="#fff" stroke-width="1.5"/><text x="${bx + 62}" y="368" text-anchor="middle" font-family="ui-monospace, monospace" font-size="7.5" fill="#ffd400">AS SEEN ON</text><text x="${bx + 62}" y="380" text-anchor="middle" font-family="'Arial Black', Impact, sans-serif" font-size="11" fill="#fff">${esc(ch)}</text></g>`;
-  if (R() < 0.6) out += `<g transform="rotate(${12 + R() * 8} 40 70)"><circle cx="40" cy="${style === 'vhs' ? 300 : 70}" r="25" fill="#d7263d" stroke="#fff" stroke-width="2"/><text x="40" y="${style === 'vhs' ? 305 : 75}" text-anchor="middle" font-family="'Arial Black', Impact, sans-serif" font-size="13" fill="#fff">${['NEW', '-50%', 'WOW', 'FREE', 'x2'][Math.floor(R() * 5)]}</text></g>`;
+  if (R() < 0.6) out += `<g transform="rotate(${12 + R() * 8} 40 ${style === 'vhs' ? 300 : 70})"><circle cx="40" cy="${style === 'vhs' ? 300 : 70}" r="25" fill="#d7263d" stroke="#fff" stroke-width="2"/><text x="40" y="${style === 'vhs' ? 305 : 75}" text-anchor="middle" font-family="'Arial Black', Impact, sans-serif" font-size="13" fill="#fff">${['NEW', '-50%', 'WOW', 'FREE', 'x2'][Math.floor(R() * 5)]}</text></g>`;
   return out;
 }
 

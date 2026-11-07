@@ -3,7 +3,8 @@
 import { el } from './util.js';
 
 export function readBody(p) {
-  const kicker = el('div.kicker', p.kind === 'poem' ? 'Poem' : p.kind === 'novel' ? `From ${p.book || 'a novel'}` : 'Long read');
+  const kind = p.kind === 'poem' ? (p.erotica ? `From ${p.book || 'a book of verse'}` : 'Poem') : p.kind === 'novel' ? `From ${p.book || 'a novel'}` : 'Long read';
+  const kicker = el('div.kicker', p.erotica ? `Classic erotica · ${kind}` : kind);
   const head = el('h3', p.title), by = p.author ? el('div.read-by', p.author + (p.year ? ` · ${p.year}` : '')) : null;
   let first, rest;
   if (p.kind === 'poem') {

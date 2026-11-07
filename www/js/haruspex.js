@@ -79,7 +79,7 @@ export class Haruspex {
     // gore
     const blood = an.blood || '#8a1018', spirit = !!an.spirit, bright = an.glow || blood;
     const add = (p) => { if (this.P.length < 320) this.P.push(p); };
-    for (let i = 0; i < 110; i++) { const a = rnd() * 7, sp = 120 + rnd() * 420; add({ k: 'drop', x: O[0], y: O[1], vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 140, r: 1.5 + rnd() * 3.5, col: spirit && rnd() < 0.5 ? bright : blood, glow: spirit, fy: 110 + rnd() * 160 }); }
+    for (let i = 0; i < 70; i++) { const a = rnd() * 7, sp = 120 + rnd() * 420; add({ k: 'drop', x: O[0], y: O[1], vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 140, r: 1.5 + rnd() * 3.5, col: spirit && rnd() < 0.5 ? bright : blood, glow: spirit, fy: 110 + rnd() * 160 }); }
     const parts = [an.flesh, an.hide, an.fur, an.flesh];
     for (let i = 0; i < 30; i++) { const a = rnd() * 7, sp = 140 + rnd() * 340; add({ k: 'chunk', x: O[0], y: O[1], vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 200, r: 3 + rnd() * 4, col: parts[i % 4] || blood, rot: rnd() * 7, vr: (rnd() - 0.5) * 20, fy: 120 + rnd() * 150, bn: 0, glow: spirit }); }
     for (let i = 0; i < 7; i++) { const a = rnd() * 7, sp = 160 + rnd() * 260; add({ k: 'rope', x: O[0], y: O[1], vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 220, r: 6 + rnd() * 5, col: find('gut').col, rot: rnd() * 7, vr: (rnd() - 0.5) * 14, fy: 130 + rnd() * 130, bn: 0 }); }
@@ -99,12 +99,12 @@ export class Haruspex {
     if (near(lv) === ht) L.push('The liver fell hard against the heart: what you want and what you feel are leaning on each other.');
     const gl = B('gall'), st = B('stomach');
     if (near(gl) === st) L.push(`The gall bladder${e.gall.k === 'burst' ? ' burst' : ' came to rest'} beside the stomach: a bitter word will have to be swallowed.`);
-    const side = (f) => this.bodies.filter((b) => b.k && b.k !== 'gut' && !b.missing && f(b.x) && (b.k === 'extra' || (e[b.k] && e[b.k].k !== OK[b.k]))).map(name);
+    const side = (f) => this.bodies.filter((b) => b.k && b.k !== 'gut' && !b.missing && f(b.x) && (b.k === 'extra' || (e[b.k] && e[b.k].k !== OK[b.k]))).map((b) => `${name(b)} (${b.k === 'extra' ? 'a glowing oddity' : e[b.k].s})`);
     const left = side((x) => x < W / 2 - 30), right = side((x) => x > W / 2 + 30);
     if (left.length) L.push(`On the hostile left lay ${left.join(' and ')}: expect resistance from that quarter.`);
     if (right.length) L.push(`On the familiar right lay ${right.join(' and ')}: help comes from that quarter.`);
     const ex = B('extra');
-    if (ex) L.push(`The creature’s own organ, ${name(ex)}, landed ${ex.where}${an.spirit ? ' and gave off a faint light' : ''}.`);
+    if (ex) L.push(`The creature’s own organ, ${name(ex)}, landed ${ex.where === 'the middle' ? 'in the middle' : ex.where}${an.spirit ? ' and gave off a faint light' : ''}.`);
     if (an.spirit) L.push('Spirit ichor stains the cloth. It will glow until morning; the omens of a spirit are not shy.');
     L.push('Tap an organ for its reading.');
     this.o.say(`The exta of ${this.beast.name}`, L);
@@ -145,7 +145,7 @@ export class Haruspex {
         p.vy += G * h; p.x += p.vx * h; p.y += p.vy * h;
         if (p.rot !== undefined) p.rot += p.vr * h;
         if (p.y >= p.fy && p.vy > 0) {
-          if (p.k === 'drop') { this.splat(p.x, p.fy, p.r * (1.2 + rnd() * 1.6), p.col, p.glow); p.dead = true; }
+          if (p.k === 'drop') { this.splat(p.x, p.fy, p.r * (0.8 + rnd() * 1.0), p.col, p.glow); p.dead = true; }
           else if (++p.bn > 2) { this.stamp(p); p.dead = true; } else { p.y = p.fy; p.vy *= -0.45; p.vx *= 0.6; p.vr *= 0.5; this.splat(p.x, p.fy, 3, an.blood || '#8a1018', spirit); }
         }
       }
@@ -156,7 +156,7 @@ export class Haruspex {
   }
   splat(x, y, r, col, glow) {
     const sc = this.stain.getContext('2d'), rnd = this.o.rnd;
-    sc.save(); sc.scale(2, 2); sc.globalAlpha = 0.9;
+    sc.save(); sc.scale(2, 2); sc.globalAlpha = 0.7;
     if (glow) { sc.shadowColor = col; sc.shadowBlur = 8; }
     sc.fillStyle = col; sc.beginPath(); sc.ellipse(x, y, r * 1.4, r * 0.7, 0, 0, 7); sc.fill();
     for (let i = 0; i < 2 + (r > 5 ? 4 : 0); i++) { const a = rnd() * 7, d = r * (1.2 + rnd() * 1.6); sc.beginPath(); sc.ellipse(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.5, 1 + rnd() * r * 0.3, (1 + rnd() * r * 0.3) * 0.6, 0, 0, 7); sc.fill(); }
@@ -212,8 +212,9 @@ export class Haruspex {
       c.save(); c.translate(b.x, b.y); c.rotate(b.rot || 0);
       if (b.half) {
         const q = b.rest ? 1 : Math.min(1, b.tt / b.T), sc = 0.94 - 0.54 * q, sx = b.half < 0 ? 0 : iw / 2;
-        c.scale(1 + b.sq * 0.2, 1 - b.sq * 0.2); c.drawImage(im, sx, 0, iw / 2, ih, -40 * sc * 2 / 2 * 1, -75 * sc * 1, iw / 2 * (150 / iw) * sc, 150 * sc);
-        c.fillStyle = an.flesh || '#c04050'; c.fillRect(b.half < 0 ? 75 * sc * 0.5 - 3 : -75 * sc * 0.5 - 40 * sc * 0 - 3 + 0, -75 * sc, 6, 150 * sc);
+        const u = 150 / iw * sc, w = iw / 2 * u, h = ih * u;
+        c.scale(1 + b.sq * 0.2, 1 - b.sq * 0.2); c.drawImage(im, sx, 0, iw / 2, ih, -w / 2, -h / 2, w, h);
+        c.fillStyle = an.flesh || '#c04050'; c.fillRect(b.half < 0 ? w / 2 - 3 : -w / 2 - 3, -h / 2, 6, h);
       } else if (b.missing) { c.strokeStyle = 'rgba(80,30,20,.45)'; c.setLineDash([3, 3]); c.lineWidth = 2; c.beginPath(); c.arc(0, 0, 16, 0, 7); c.stroke(); c.setLineDash([]); }
       else { c.scale(1 + b.sq * 0.3, 1 - b.sq * 0.3); const lit = this.picked === b; if (lit) { c.shadowColor = 'rgba(255,200,120,.95)'; c.shadowBlur = 16; } else if (an.spirit || b.glow) { c.shadowColor = an.glow || b.col; c.shadowBlur = 8 + Math.sin(this.o.t * 4) * 3; } this.organ(c, b, t); }
       c.restore();

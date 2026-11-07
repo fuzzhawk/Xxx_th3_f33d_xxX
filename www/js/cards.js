@@ -34,7 +34,7 @@ export function labelOf(post) {
 const handleFor = (post, ctx) => {
   switch (post.cat) {
     case 'wiki': return [`wiki.${post.sub}`, `${ctx.topics?.wiki?.[post.sub] || post.sub} · Wikipedia`];
-    case 'video': return [post.channel ? post.channel.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'tube' : `tube.${post.sub}`, `${ctx.topics?.video?.[post.sub] || 'Video'}${post.dur ? ` · ${post.dur}` : ''}`];
+    case 'video': return [post.channel ? post.channel.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'tube' : `tube.${post.sub}`, `${ctx.topics?.video?.[post.sub] || 'Video'}${post.dur ? ` · ${post.dur}` : ''}${/^\d{4}/.test(post.date || '') ? ` · ${post.date.slice(0, 4)}` : ''}`];
     case 'game': return ['arcade', `${ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
     case 'meme': return [post.sub === 'kym' ? 'knowyourmeme' : 'meme.lord', post.sub === 'kym' ? 'Know Your Meme' : 'remix'];
     case 'product': return ['infomercial.tv', 'Sponsored · not available in stores'];
@@ -367,6 +367,19 @@ function comic(p, ctx) {
   const img = el('img', { alt: p.title, loading: 'lazy' });
   const media = el('div.media', img);
   setImg(img, p.img, () => { img.remove(); media.prepend(el('div.noimg', '✎')); });
+  // classic Sunday pages are dense scans: tap for a full-size, scrollable view
+  if (p.classic) {
+    media.classList.add('zoomable');
+    img.addEventListener('click', (e) => {
+      if (!img.src) return;
+      e.stopPropagation();
+      const big = el('img', { alt: p.title, src: /\/\d+px-[^/]+$/.test(p.img || '') && /^https?:/.test(img.src) ? p.img.replace(/\/(\d+)px-/, '/1600px-') : img.src });
+      big.onerror = () => { if (big.src !== img.src) big.src = img.src; };
+      const view = el('div.zoomview', big, el('div.zoom-x', '✕'));
+      view.onclick = () => view.remove();
+      document.body.append(view);
+    });
+  }
   if (p.nsfw && settings.blurNsfw) {
     const veil = el('div.nsfw-veil', 'Adult comic · tap to show');
     veil.onclick = (e) => { e.stopPropagation(); veil.remove(); };

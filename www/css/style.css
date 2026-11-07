@@ -437,3 +437,9 @@ details.subw[open] summary::after { transform: rotate(90deg); }
 @keyframes bootdeal { 0% { transform: translateY(30px) rotate(-8deg) scale(.9); opacity: 0; } 18% { opacity: 1; transform: translateY(0) rotate(0) scale(1); } 66% { opacity: 1; transform: translateY(0) rotate(0) scale(1); } 100% { opacity: 0; transform: translateY(-46px) rotate(6deg) scale(.96); } }
 @keyframes bootshine { to { background-position: -300% 0; } }
 @media (prefers-reduced-motion: reduce) { .boot-cards i, .boot-mark .dot { animation: none; } }
+
+/* classic comic pages: tap for a full-size view */
+.media.zoomable img { cursor: zoom-in; }
+.zoomview { position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,.93); overflow: auto; -webkit-overflow-scrolling: touch; display: flex; align-items: flex-start; justify-content: center; }
+.zoomview img { width: 180%; max-width: 1600px; height: auto; margin: auto; }
+.zoomview .zoom-x { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 14px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.15); color: #fff; display: grid; place-items: center; font-size: 18px; }
