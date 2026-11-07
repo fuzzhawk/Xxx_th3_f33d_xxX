@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-07T09:49:49.823Z",
+  "generatedAt": "2026-11-07T09:53:19.464Z",
   "package": "2026-W43",
   "mix": {
     "game": 51,
@@ -23,15 +23,15 @@
     }
   },
   "usage7d": {
-    "hours": 4.7,
-    "posts": 2117,
+    "hours": 4.8,
+    "posts": 2156,
     "sessions": 69,
-    "skips": 439,
+    "skips": 453,
     "selfcareDone": 1,
     "byHour": [
       31,
       2,
-      7,
+      10,
       0,
       0,
       0,
@@ -63,8 +63,8 @@
     },
     "wiki": {
       "total": 1197,
-      "viewed": 845,
-      "avgDwellSec": 5.6
+      "viewed": 869,
+      "avgDwellSec": 5.5
     },
     "video": {
       "total": 750,
@@ -93,13 +93,13 @@
     },
     "web": {
       "total": 260,
-      "viewed": 153,
+      "viewed": 159,
       "avgDwellSec": 9.2
     },
     "oracle": {
       "total": 156,
-      "viewed": 92,
-      "avgDwellSec": 5.4
+      "viewed": 95,
+      "avgDwellSec": 5.2
     },
     "power": {
       "total": 104,
@@ -108,13 +108,13 @@
     },
     "read": {
       "total": 152,
-      "viewed": 125,
-      "avgDwellSec": 8.5
+      "viewed": 129,
+      "avgDwellSec": 8.2
     },
     "studio": {
       "total": 104,
-      "viewed": 58,
-      "avgDwellSec": 8.5
+      "viewed": 60,
+      "avgDwellSec": 8.1
     },
     "news": {
       "total": 91,
@@ -123,6 +123,13 @@
     }
   },
   "favorites": [
+    {
+      "id": "w47506143",
+      "cat": "wiki",
+      "sub": "history",
+      "label": "User revolt",
+      "url": "https://en.wikipedia.org/wiki/User_revolt"
+    },
     {
       "id": "rdixqlmv",
       "cat": "read",
