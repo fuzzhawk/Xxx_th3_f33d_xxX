@@ -120,7 +120,7 @@ function layerCv(R, kind, col) {
   const n = 64, N = noiseMap(R, n, 3, 4), cv = mk(n, n), x = cv.getContext('2d'), im = x.createImageData(n, n), c = hx(col);
   for (let i = 0; i < n * n; i++) {
     const v = N[i];
-    if (kind === 'lava') { const t = Math.max(0, Math.min(1, (v - 0.3) * 2.2)), hot = Math.abs(v - 0.55) < 0.035; im.data.set(hot ? [255, 226, 120, 255] : [90 + t * 165, 14 + t * 90, 4 + t * 10, 255], i * 4); }
+    if (kind === 'lava') { const t = Math.max(0, Math.min(1, (v - 0.3) * 2.2)), hot = Math.abs(v - 0.55) < 0.022; im.data.set(hot ? [255, 196, 90, 255] : [90 + t * 165, 14 + t * 90, 4 + t * 10, 255], i * 4); }
     else { const a = Math.max(0, Math.min(1, (Math.abs(v - 0.5) < 0.03 ? 0.75 : 0) + (v - 0.66) * 2)); im.data.set([c[0], c[1], c[2], a * 255], i * 4); }
   }
   x.putImageData(im, 0, 0);
