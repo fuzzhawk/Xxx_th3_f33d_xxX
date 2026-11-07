@@ -489,17 +489,16 @@ export class Psych {
       for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
         const p = pts[j * cols + i];
         if (p.pin) continue;
-        const gust = 0.55 + 0.45 * Math.sin(t * 0.6 + 1) + 0.5 * Math.sin(t * 1.7 + j * 0.35 + i * 0.12), wx = (gust + 0.2) * 900 * s, wy = Math.sin(t * 2.3 + i * 0.5 + j * 0.2) * 260 * s;
+        const gust = 0.55 + 0.45 * Math.sin(t * 0.6 + 1) + 0.5 * Math.sin(t * 1.7 + j * 0.35 + i * 0.12), wx = (gust + 0.1) * 380 * s, wy = Math.sin(t * 2.3 + i * 0.5 + j * 0.2) * 260 * s;
         const vx = (p.x - p.px) * 0.992, vy = (p.y - p.py) * 0.992;
-        p.px = p.x; p.py = p.y; p.x += vx + wx * d2 * d2; p.y += vy + (520 * s + wy) * d2 * d2;
+        p.px = p.x; p.py = p.y; p.x += vx + wx * d2 * d2; p.y += vy + (1100 * s + wy) * d2 * d2;
       }
       for (let it = 0; it < 7; it++) for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
         const a = pts[j * cols + i];
         for (const [di, dj] of [[1, 0], [0, 1]]) {
           if (i + di >= cols || j + dj >= rows) continue;
-          const b = pts[(j + dj) * cols + i + di], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, f = (d - sp) / d * 0.5;
-          if (!a.pin) { a.x += dx * f; a.y += dy * f; } else if (!b.pin) { b.x -= dx * f * 2; b.y -= dy * f * 2; }
-          if (!b.pin) { if (!a.pin) { b.x -= dx * f; b.y -= dy * f; } }
+          const b = pts[(j + dj) * cols + i + di], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, f = (d - sp) / d, fa = a.pin ? 0 : b.pin ? 1 : 0.5, fb = b.pin ? 0 : a.pin ? 1 : 0.5;
+          a.x += dx * f * fa; a.y += dy * f * fa; b.x -= dx * f * fb; b.y -= dy * f * fb;
         }
         if (a.pin) { a.x = a.x0; a.y = a.y0; }
       }

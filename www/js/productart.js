@@ -21,13 +21,32 @@ function wrap(name, max = 14) {
   return lines.slice(0, 3);
 }
 
+const CHANNELS = ['QVC-ish', 'Channel 9¾', 'TeleShop', 'Cable 3', 'Late Night Mart', 'WTF-TV', 'Public Access', 'The Home Network', 'ShopWatch', 'Ch. 67'];
+// the made-up product shot: a hero PNG, smaller floating props, "as seen on" badges
+function composeImgs(imgs, R, style, id) {
+  const im = (src, x, y, s, rot, extra = '') => `<image href="${esc(src)}" x="${(x - s / 2).toFixed(1)}" y="${(y - s / 2).toFixed(1)}" width="${s.toFixed(1)}" height="${s.toFixed(1)}" preserveAspectRatio="xMidYMid meet" transform="rotate(${rot.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})" ${extra}/>`;
+  const look = style === 'blueprint' ? 'style="filter:grayscale(1) brightness(2.2) contrast(.8)"' : style === 'vhs' ? 'style="filter:saturate(1.5) contrast(1.1)"' : '';
+  const sh = `filter="url(#${id}ds)"`;
+  let out = `<defs><filter id="${id}ds" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="3" dy="6" stdDeviation="${3 + R() * 3}" flood-color="#000" flood-opacity=".5"/></filter></defs><g ${look}>`;
+  const [hero, ...props] = imgs, side = R() < 0.5 ? -1 : 1;
+  const spots = [[70, 175], [335, 190], [60, 345], [345, 345], [200, 372], [330, 120], [70, 120]].sort(() => R() - 0.5);
+  props.forEach((src, i) => { const [x, y] = spots[i], s = 52 + R() * 34; out += `<g ${sh} opacity=".95">${im(src, x, y, s, (R() - 0.5) * 70)}</g>`; });
+  if (R() < 0.5 && props.length) { const src = props[0], s = 40 + R() * 20; out += `<g ${sh}>${im(src, 200 + side * (95 + R() * 20), 330 - R() * 15, s, side * 20)}</g>`; }
+  out += `<ellipse cx="200" cy="330" rx="${70 + R() * 20}" ry="9" fill="#000" opacity=".3"/><g ${sh}>${im(hero, 200, 252, 150 + R() * 30, (R() - 0.5) * 16)}</g></g>`;
+  const ch = CHANNELS[Math.floor(R() * CHANNELS.length)], bx = side < 0 ? 14 : 262;
+  out += `<g transform="rotate(${side * -4} ${bx + 62} 372)"><rect x="${bx}" y="358" width="124" height="28" rx="4" fill="#111" stroke="#fff" stroke-width="1.5"/><text x="${bx + 62}" y="368" text-anchor="middle" font-family="ui-monospace, monospace" font-size="7.5" fill="#ffd400">AS SEEN ON</text><text x="${bx + 62}" y="380" text-anchor="middle" font-family="'Arial Black', Impact, sans-serif" font-size="11" fill="#fff">${esc(ch)}</text></g>`;
+  if (R() < 0.6) out += `<g transform="rotate(${12 + R() * 8} 40 70)"><circle cx="40" cy="${style === 'vhs' ? 300 : 70}" r="25" fill="#d7263d" stroke="#fff" stroke-width="2"/><text x="40" y="${style === 'vhs' ? 305 : 75}" text-anchor="middle" font-family="'Arial Black', Impact, sans-serif" font-size="13" fill="#fff">${['NEW', '-50%', 'WOW', 'FREE', 'x2'][Math.floor(R() * 5)]}</text></g>`;
+  return out;
+}
+
 export function productSVG(p) {
   const R = mulberry32(p.art?.seed || 1);
   const style = p.art?.style || 'sunset';
   const id = `p${(p.art?.seed || 1).toString(36)}`;
   const lines = wrap(p.name.replace(/^The /, ''));
   const burst = BURSTS[Math.floor(R() * BURSTS.length)];
-  const glyph = esc(p.glyph || '✦');
+  const imgs = Array.isArray(p.imgs) ? p.imgs.filter((u) => typeof u === 'string' && u).slice(0, 4) : [];
+  const glyph = imgs.length >= 2 ? '' : esc(p.glyph || '✦');
   const nameText = (fill, stroke, y0, size = 34, font = "Impact, 'Arial Black', sans-serif", extra = '') =>
     lines.map((l, i) => `<text x="200" y="${y0 + i * (size + 4)}" text-anchor="middle" font-family="${font}" font-size="${l.length > 12 ? size * 0.82 : size}" font-weight="900" fill="${fill}" stroke="${stroke}" stroke-width="${stroke === 'none' ? 0 : 2}" paint-order="stroke" letter-spacing="1" ${extra}>${esc(l)}</text>`).join('');
   let body = '';
@@ -95,5 +114,6 @@ export function productSVG(p) {
       ${nameText('#fff', 'none', 60, 30, 'ui-monospace, monospace')}
       <text x="380" y="385" text-anchor="end" font-family="ui-monospace, monospace" font-size="10" fill="#fff" opacity=".8">PAT. PENDING · DO NOT BUILD</text>`;
   }
+  if (imgs.length >= 2) body += composeImgs(imgs, R, style, id);
   return `<svg class="art" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(p.name)} promo">${body}</svg>`;
 }

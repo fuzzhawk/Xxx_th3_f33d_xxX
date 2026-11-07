@@ -107,7 +107,7 @@ export class Region {
   carveTo(a, reach) { const p = this.route_(a, (x, y) => reach[y * N + x] >= 0); if (p) for (const [x, y] of p) this.lay(x, y); }
   lay(x, y) { const t = this.at(x, y); if (t === WATER) this.set(x, y, BRIDGE); else if (t !== BUILD && t !== DOOR && t !== FENCE && t !== BRIDGE) this.set(x, y, t === TALL && hh(x, y, 5) < 0.35 ? TALL : PATH); }
   route_(a, done) {
-    const cost = [1.4, 2.6, 1, 9, 5, 1.4, 1.2, 1, 1e9, 1e9, 6, 1e9], dist = new Float32Array(N * N).fill(1e9), prev = new Int32Array(N * N).fill(-1);
+    const cost = [1.4, 2.6, 1, 9, 5, 1.4, 1.2, 1, 1e9, 1e9, 6, 1e9], dist = new Float64Array(N * N).fill(1e9), prev = new Int32Array(N * N).fill(-1);
     const q = [[0, a[1] * N + a[0]]]; if (a[0] < 0 || a[1] < 0 || a[0] >= N || a[1] >= N) return null; dist[q[0][1]] = 0;
     while (q.length) {
       let bi = 0; for (let k = 1; k < q.length; k++) if (q[k][0] < q[bi][0]) bi = k;

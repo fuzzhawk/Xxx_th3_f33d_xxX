@@ -70,7 +70,7 @@ export class Graves extends Game {
     if (this.fx.length > 140) this.fx.splice(0, this.fx.length - 140);
   }
   float(s, x, y, col = '#fff', size = 11, life = 1) { this.fx.push({ k: 'text', s, x, y, col, size, life, max: life }); }
-  coinsFly(x, y, n) { for (let i = 0; i < n; i++) this.fx.push({ k: 'coin', x0: x + this.r(-8, 8), y0: y + this.r(-6, 6), tx: 266, ty: 26, t: -i * 0.07, dur: 0.65 }); }
+  coinsFly(x, y, n) { for (let i = 0; i < n; i++) this.fx.push({ k: 'coin', x0: x + this.r(-8, 8), y0: y + this.r(-6, 6), tx: 276, ty: 26, t: -i * 0.07, dur: 0.65 }); }
   // ---------------------------------------------------------------- rules
   // tapping a generator raises its first tier into the nearest empty cell
   tapGen(i) {
@@ -428,7 +428,7 @@ export class Graves extends Game {
   }
   header(c) {
     // level badge and xp bar
-    const bx = 188, bw = W - 8 - bx, ph = this.barV;
+    const bx = 214, bw = W - 8 - bx, ph = this.barV;
     c.fillStyle = 'rgba(8,6,20,.7)'; roundRect(c, bx, 5, bw, 10, 5); c.fill();
     const g = c.createLinearGradient(bx, 0, bx + bw, 0); g.addColorStop(0, '#8a6bff'); g.addColorStop(1, GOLD);
     if (ph > 0.01) { c.fillStyle = g; roundRect(c, bx + 1, 6, Math.max(8, (bw - 2) * Math.min(1, ph)), 8, 4); c.fill(); c.fillStyle = 'rgba(255,255,255,.28)'; roundRect(c, bx + 2, 7, Math.max(6, (bw - 4) * Math.min(1, ph)), 2.4, 1.2); c.fill(); }
@@ -439,12 +439,12 @@ export class Graves extends Game {
     c.font = `900 11px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#4a2a04'; c.fillText(this.lvl, bx - 4, 10.5);
     // energy and coins
     const ey = 26;
-    c.fillStyle = 'rgba(8,6,20,.7)'; roundRect(c, 158, ey - 6, 84, 12, 6); c.fill();
-    const ef = Math.min(1, this.energy / 40); c.fillStyle = this.energy < 4 ? '#ff7a5a' : '#ffd24a'; roundRect(c, 172, ey - 3, Math.max(2, 64 * ef), 6, 3); c.fill();
-    this.bolt(c, 166, ey, 0.9); this.txt(c, `${this.energy}`, 238, ey + 0.5, 8, '#fff', 'right');
+    c.fillStyle = 'rgba(8,6,20,.7)'; roundRect(c, 184, ey - 6, 76, 12, 6); c.fill();
+    const ef = Math.min(1, this.energy / 40); c.fillStyle = this.energy < 4 ? '#ff7a5a' : '#ffd24a'; roundRect(c, 197, ey - 3, Math.max(2, 46 * ef), 6, 3); c.fill();
+    this.bolt(c, 191, ey, 0.9); this.txt(c, `${this.energy}`, 256, ey + 0.5, 8, '#fff', 'right');
     const bs = 1 + this.bump * 1.4;
-    c.fillStyle = 'rgba(8,6,20,.7)'; roundRect(c, 256, ey - 6, 98, 12, 6); c.fill();
-    this.coin(c, 266, ey, 5.6 * bs); this.txt(c, `${this.coins}`, 348, ey + 0.5, 9, GOLD, 'right');
+    c.fillStyle = 'rgba(8,6,20,.7)'; roundRect(c, 266, ey - 6, 88, 12, 6); c.fill();
+    this.coin(c, 276, ey, 5.6 * bs); this.txt(c, `${this.coins}`, 348, ey + 0.5, 9, GOLD, 'right');
   }
   draw(c) {
     c.drawImage(this.bg, 0, 0, W, H);
