@@ -6,6 +6,7 @@ Running list of wiring the lead must do before the final push.
 - Hints: merge, tetris, starfox, dice, platformer (games/all.js).
 - Video year in the card header (`p.date`), "Classic erotica" kicker in reads.js, tap-to-zoom for classic comic pages (`.zoomview` in style.css).
 - Builder CI: video upload dates now come from the watch page's meta tags even behind YouTube's bot check (run 4: 46/46 dated, all 5–20 years old); short-form search ages ("15y ago") parsed; erotica works pinned to known Gutenberg ids.
+- Builder CI run 6 (memes/power/products): 5 strips + 21 remixes in a quick build, power facts present, 24 background groups / 570 images; memes fall back to any topic for related facts (quick builds crashed). Product `imgs` are now indexes into sprites.json (`propSrc(i)` in assets.js) instead of copied data URIs.
 - Package backgrounds → Skin (`skin.bgSet`, 50% of games), loading animation, wiki topic colours.
 
 ## Notes from finished packages
@@ -24,5 +25,4 @@ Running list of wiring the lead must do before the final push.
 ## To do
 - cards.js studio `rhyme` routing and oracle captions: delegated to the Oracle + Rhymes agent (check its report).
 - Link any `www/css/<package>.css` files agents create.
-- Builder CI re-run after the builder and images fixes (set tools/builder-test.args).
 - Final: full harness pass over every game type, app smoke test, merge into claude/repo-access-mobile-a25dht, bump packages/request.json.
