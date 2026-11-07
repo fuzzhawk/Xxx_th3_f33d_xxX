@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-02T04:18:12.727Z",
+  "generatedAt": "2026-11-07T08:00:01.186Z",
   "package": "2026-W43",
   "mix": {
     "game": 51,
@@ -23,106 +23,272 @@
     }
   },
   "usage7d": {
-    "hours": 2.6,
-    "posts": 1327,
-    "sessions": 47,
-    "skips": 392,
-    "selfcareDone": 0,
+    "hours": 4.6,
+    "posts": 2018,
+    "sessions": 67,
+    "skips": 426,
+    "selfcareDone": 1,
     "byHour": [
+      31,
+      1,
       0,
       0,
       0,
       0,
-      17,
-      0,
-      0,
-      0,
-      0,
-      13,
+      10,
       0,
       7,
-      24,
-      28,
-      4,
-      9,
-      2,
-      12,
-      2,
-      4,
-      0,
+      3,
       8,
-      23,
-      1
+      9,
+      6,
+      71,
+      4,
+      1,
+      20,
+      17,
+      11,
+      25,
+      2,
+      22,
+      11,
+      17
     ]
   },
   "perCategory": {
     "game": {
       "total": 1040,
-      "viewed": 516,
-      "avgDwellSec": 16.6
+      "viewed": 1040,
+      "avgDwellSec": 17
     },
     "wiki": {
       "total": 1197,
-      "viewed": 352,
-      "avgDwellSec": 5.2
+      "viewed": 782,
+      "avgDwellSec": 5.7
     },
     "video": {
       "total": 750,
-      "viewed": 271,
-      "avgDwellSec": 7.8
+      "viewed": 750,
+      "avgDwellSec": 8
     },
     "meme": {
       "total": 520,
-      "viewed": 502,
-      "avgDwellSec": 4.5
+      "viewed": 520,
+      "avgDwellSec": 3.4
     },
     "product": {
       "total": 208,
       "viewed": 208,
-      "avgDwellSec": 4
+      "avgDwellSec": 0
     },
     "psych": {
       "total": 208,
       "viewed": 208,
-      "avgDwellSec": 3
+      "avgDwellSec": 0
     },
     "selfcare": {
       "total": 260,
-      "viewed": 85,
-      "avgDwellSec": 14.3
+      "viewed": 260,
+      "avgDwellSec": 5.2
     },
     "web": {
       "total": 260,
-      "viewed": 75,
-      "avgDwellSec": 6.4
+      "viewed": 140,
+      "avgDwellSec": 9.1
     },
     "oracle": {
       "total": 156,
-      "viewed": 46,
-      "avgDwellSec": 3.3
+      "viewed": 84,
+      "avgDwellSec": 6.1
     },
     "power": {
       "total": 104,
-      "viewed": 99,
-      "avgDwellSec": 3.8
+      "viewed": 104,
+      "avgDwellSec": 2.9
     },
     "read": {
       "total": 152,
-      "viewed": 60,
-      "avgDwellSec": 6
+      "viewed": 114,
+      "avgDwellSec": 9.2
     },
     "studio": {
       "total": 104,
-      "viewed": 30,
-      "avgDwellSec": 11.5
+      "viewed": 54,
+      "avgDwellSec": 9.6
     },
     "news": {
       "total": 91,
-      "viewed": 72,
-      "avgDwellSec": 6.4
+      "viewed": 91,
+      "avgDwellSec": 4.7
     }
   },
   "favorites": [
+    {
+      "id": "rd1y6xirw",
+      "cat": "read",
+      "sub": "poem",
+      "label": "The Moon Maiden's Song",
+      "url": "https://www.google.com/search?q=The%20Moon%20Maiden's%20Song%20Ernest%20Dowson"
+    },
+    {
+      "id": "rduys8y9",
+      "cat": "read",
+      "sub": "poem",
+      "label": "In Memoriam A.H.H.: 3. O Sorrow, cruel fellowship",
+      "url": "https://www.google.com/search?q=In%20Memoriam%20A.H.H.%3A%203.%20O%20Sorrow%2C%20cruel%20fellowship%20Lord%20Alfred%20Tennyson"
+    },
+    {
+      "id": "w1860469",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Oomancy",
+      "url": "https://en.wikipedia.org/wiki/Oomancy"
+    },
+    {
+      "id": "w2923417",
+      "cat": "wiki",
+      "sub": "science",
+      "label": "Interprime",
+      "url": "https://en.wikipedia.org/wiki/Interprime"
+    },
+    {
+      "id": "w14538879",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Yom hillula",
+      "url": "https://en.wikipedia.org/wiki/Yom_hillula"
+    },
+    {
+      "id": "w72705",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "Out-of-place artifact",
+      "url": "https://en.wikipedia.org/wiki/Out-of-place_artifact"
+    },
+    {
+      "id": "rd6u45wk",
+      "cat": "read",
+      "sub": "novel",
+      "label": "The lesser Key of Solomon, Goetia, the book of evil spirits ",
+      "url": "https://www.gutenberg.org/ebooks/72679"
+    },
+    {
+      "id": "w226497",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "The Haçienda",
+      "url": "https://en.wikipedia.org/wiki/The_Ha%C3%A7ienda"
+    },
+    {
+      "id": "rd104wlga",
+      "cat": "read",
+      "sub": "poem",
+      "label": "Life",
+      "url": "https://www.google.com/search?q=Life%20Charlotte%20Bronte"
+    },
+    {
+      "id": "w21442",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Necronomicon",
+      "url": "https://en.wikipedia.org/wiki/Necronomicon"
+    },
+    {
+      "id": "w33599991",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Riot grrrl",
+      "url": "https://en.wikipedia.org/wiki/Riot_grrrl"
+    },
+    {
+      "id": "w515395",
+      "cat": "wiki",
+      "sub": "history",
+      "label": "Göbekli Tepe",
+      "url": "https://en.wikipedia.org/wiki/G%C3%B6bekli_Tepe"
+    },
+    {
+      "id": "w46064",
+      "cat": "wiki",
+      "sub": "literature",
+      "label": "Story of O",
+      "url": "https://en.wikipedia.org/wiki/Story_of_O"
+    },
+    {
+      "id": "rdj9lw7m",
+      "cat": "read",
+      "sub": "novel",
+      "label": "Meditations",
+      "url": "https://www.gutenberg.org/ebooks/2680"
+    },
+    {
+      "id": "web18yiyty",
+      "cat": "web",
+      "sub": "site",
+      "label": "Storefront Church – Blue Movie",
+      "url": "https://thequietus.com/quietus-reviews/storefront-church-blue-movie-review/"
+    },
+    {
+      "id": "web1tjevt5",
+      "cat": "web",
+      "sub": "comic",
+      "label": "They’re going to kill us all to build a beach resort",
+      "url": "https://catandgirl.com/theyre-going-to-kill-us-all-to-build-a-beach-resort/"
+    },
+    {
+      "id": "rda944er",
+      "cat": "read",
+      "sub": "novel",
+      "label": "The Satires of Juvenal, Persius, Sulpicia, and Lucilius",
+      "url": "https://www.gutenberg.org/ebooks/50657"
+    },
+    {
+      "id": "w43304976",
+      "cat": "wiki",
+      "sub": "transgressive",
+      "label": "Megumi Igarashi",
+      "url": "https://en.wikipedia.org/wiki/Megumi_Igarashi"
+    },
+    {
+      "id": "w577026",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Boredoms",
+      "url": "https://en.wikipedia.org/wiki/Boredoms"
+    },
+    {
+      "id": "gn2yv5w",
+      "cat": "game",
+      "sub": "survivors",
+      "label": "Flint Cave Horde"
+    },
+    {
+      "id": "w210019",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Edward Kelley",
+      "url": "https://en.wikipedia.org/wiki/Edward_Kelley"
+    },
+    {
+      "id": "w84098688",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Zadanfarrukh Andarzgar",
+      "url": "https://en.wikipedia.org/wiki/Zadanfarrukh_Andarzgar"
+    },
+    {
+      "id": "gi5xcjz",
+      "cat": "game",
+      "sub": "ski",
+      "label": "Basalt Downhill"
+    },
+    {
+      "id": "vxhHUGAfuysM",
+      "cat": "video",
+      "sub": "literature",
+      "label": "Thanksgiving Prayer - By William S Burroughs Read by JC Denton (AI Reading)",
+      "vid": "xhHUGAfuysM"
+    },
     {
       "id": "w26056",
       "cat": "wiki",
