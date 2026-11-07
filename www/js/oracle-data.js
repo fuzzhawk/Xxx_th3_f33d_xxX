@@ -265,4 +265,11 @@ export const RANK_TONE = [1.5, 0, 1, 0, -1.5, 1, -0.5, 0.5, 0, -1, 0.5, 0.5, 1, 
 export const SUIT_TONE = { W: 0.2, C: 0.2, S: -0.4, P: 0.1 };
 export const cardTone = (c) => (c.major ? MAJOR_TONE[c.num] : RANK_TONE[c.num - 1] + SUIT_TONE[c.suit]);
 // I Ching: + favourable, - hard, ~ wait, 0 mixed (hexagrams 1–64)
-export const HEX_TONE = '+0~~~-0+' + '~0+-++++' + '+0+00 0-'.replace(/ /g, '') + '+0+0-0--'.replace(/ /g, '').slice(0) ;
+export const HEX_TONE = ' ' + '+0~~~-0+' + '~0+-++++' + '+0+000-+' + '0+0--0++' + '~0+-+~-+' + '0+0-++-0' + '0+0~+-+~' + '++00+~0~'; // indexed by hexagram number
+export const hexTone = (n) => ({ '+': 1.5, '-': -1.5, '~': -0.5, 0: 0 })[HEX_TONE[n]] ?? 0;
+// the three dice stand for you, the others, and luck: what each face says
+export const DIE_ROLE = [
+  ['You', ['are barely in the room', 'are low on fuel', 'are steady enough', 'are in decent form', 'are sharp and ready', 'are at full strength']],
+  ['The others', ['are against it', 'are distracted', 'are neutral', 'are mildly helpful', 'are well-disposed', 'are firmly on your side']],
+  ['Luck', ['is looking away', 'is thin', 'is unremarkable', 'is turning your way', 'is generous', 'is showing off']]
+];

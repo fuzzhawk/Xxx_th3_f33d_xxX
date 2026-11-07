@@ -100,9 +100,9 @@ const SUF = { fire: ['flare', 'blaze', 'pyre'], water: ['tide', 'surge', 'kai'],
   spirit: ['lume', 'sei', 'kami'], earth: ['rock', 'titan', 'gaia'], beast: ['fang', 'maw', 'king'] };
 export function formName(sp, tier) {
   if (sp.names[tier]) return sp.names[tier];
-  const g = genome(sp.seed, 0, tier), prev = formName(sp, tier - 1);
-  const n = g.name !== sp.names[0] && !sp.names.includes(g.name) ? g.name : (sp.names[0].slice(0, 6) + SUF[sp.el][tier - 1]);
-  return (sp.names[tier] = n[0].toUpperCase() + n.slice(1, 11), prev && sp.names[tier]);
+  const g = genome(sp.seed, 0, tier);
+  const n = !sp.names.includes(g.name) ? g.name : sp.names[0].slice(0, 6) + SUF[sp.el][tier - 1];
+  return (sp.names[tier] = n[0].toUpperCase() + n.slice(1, 11));
 }
 export const tierAt = (sp, lv) => sp.evo.filter((v) => lv >= v).length;
 // a creature: a species at a level
