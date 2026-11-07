@@ -50,7 +50,7 @@ export class Sling extends Game {
       plat = { a: px, x0: px + 30, x1: px + pw - 30, b: px + pw, y: -ph };
     }
     const pool = ['frames', 'tower', 'stilts', 'bunker', ...(L > 0 ? ['frames', 'tower', 'arch', 'wall'] : []), ...(L > 1 ? ['pyramid', 'arch', 'frames'] : [])];
-    const nm = Math.min(5, 2 + (L >> 1) + (L > 1 ? this.li(0, 1) : 0));
+    const nm = Math.min(5, 2 + ((L + 1) >> 1) + (L > 1 ? this.li(0, 1) : 0));
     for (let k = 0; k < nm && x < 1000; k++) {
       let y = 0, mw = 1080 - x;
       if (plat) {
@@ -165,7 +165,7 @@ export class Sling extends Game {
     if (this.R() < 0.5) this.spots.push({ x: x + 14 + gap / 2, y: y - 32, w: gap + 26, h: 40, top: 1 });
     return x + gap + 28;
   }
-  fitZ() { return clamp((W * 0.9) / (this.x1 - this.x0 + 90), 0.42, 0.72); }
+  fitZ() { return clamp((W * 0.9) / (this.x1 - this.x0 + 90), 0.45, 0.88); }
   targets() { return this.world.bodies.filter((b) => b.target); }
 
   // ---------------------------------------------------------------- damage
@@ -369,15 +369,15 @@ export class Sling extends Game {
     this.camera(dt);
   }
   camera(dt) {
-    const c = this.cam, mid = (this.x0 + this.x1) / 2, fz = this.fitZ(), az = 0.62, aim = (W / 2 - 66) / az;
+    const c = this.cam, mid = (this.x0 + this.x1) / 2, fz = this.fitZ(), az = 0.74, aim = (W / 2 - 66) / az;
     let tx = aim, tz = az, k = 2.4;
     const st = this.state, b = this.lead;
     if (st === 'intro') { if (this.stT < 1.3) { tx = mid; tz = fz; } }
     else if (st === 'aim' && this.manual) { tx = this.manual.x; tz = c.z; k = 12; }
     else if (st === 'fly' && b) {
-      tx = b.x + clamp(b.vx * 0.25, -40, 150); tz = clamp((H - GS - 50) / Math.max(1, 40 - b.y), 0.36, az); k = 5;
-      if (b.hitT) { tx = Math.max(tx, (this.focus ?? b.x) - 40); tz = Math.min(tz, Math.max(fz, 0.5)); }
-    } else if (st === 'settle' || st === 'clear' || st === 'fail') { tx = st === 'settle' && this.focus != null ? (this.focus + mid) / 2 : mid; tz = Math.max(fz, 0.5); }
+      tx = b.x + clamp(b.vx * 0.25, -40, 150); tz = clamp((H - GS - 60) / Math.max(1, 40 - b.y), 0.36, az); k = 5;
+      if (b.hitT) { tx = Math.max(tx, (this.focus ?? b.x) - 40); tz = Math.min(tz, Math.max(fz, 0.6)); }
+    } else if (st === 'settle' || st === 'clear' || st === 'fail') { tx = st === 'settle' && this.focus != null ? (this.focus + mid) / 2 : mid; tz = Math.max(fz, 0.6); }
     c.x += (tx - c.x) * Math.min(1, dt * k); c.z += (tz - c.z) * Math.min(1, dt * 2.5);
     const half = W / 2 / c.z;
     c.x = this.wr - this.wl < half * 2 ? (this.wl + this.wr) / 2 : clamp(c.x, this.wl + half, this.wr - half);
@@ -515,9 +515,9 @@ export class Sling extends Game {
   }
   overlay(c) {
     const st = this.state;
-    if (st === 'intro') { const a = Math.min(1, (2.6 - this.stT) * 2); this.label(c, `LEVEL ${this.levelN + 1}`, W / 2, 70, 22, a); this.label(c, `${this.total} spirits · ${this.queue.length} shots`, W / 2, 96, 11, a); }
-    else if (st === 'clear') { this.label(c, 'CASTLE CLEARED', W / 2, 80, 20); if (this.bonus) this.label(c, `+${this.bonus} for unused shots`, W / 2, 106, 11); }
-    else if (st === 'fail') this.label(c, 'OUT OF SHOTS', W / 2, 80, 20);
+    if (st === 'intro') { const a = Math.min(1, (2.6 - this.stT) * 2); this.label(c, `LEVEL ${this.levelN + 1}`, W / 2, 128, 22, a); this.label(c, `${this.total} spirits · ${this.queue.length} shots`, W / 2, 154, 11, a); }
+    else if (st === 'clear') { this.label(c, 'CASTLE CLEARED', W / 2, 128, 20); if (this.bonus) this.label(c, `+${this.bonus} for unused shots`, W / 2, 154, 11); }
+    else if (st === 'fail') this.label(c, 'OUT OF SHOTS', W / 2, 128, 20);
     else if (st === 'aim' && !this.auto && this.queue.length) {
       const tip = SHOT[this.queue[0]].tip;
       this.label(c, tip ? `${this.queue[0].toUpperCase()} · tap in flight to ${tip.toLowerCase()}` : 'drag back from the sling', W / 2, H - 16, 10);

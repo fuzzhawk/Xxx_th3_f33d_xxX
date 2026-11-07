@@ -383,9 +383,9 @@ export class Ski extends Game {
     p.ang += p.av * dt; p.rot += p.av * dt;
     p.vy += g * dt;
     // a rider who took off early (before a gap's lip) is carried gently across rather than dropped in
-    const gf = this.feats.find((f) => f.g0 != null && p.x > f.g0 - 160 && p.x < f.g1);
+    const gf = this.feats.find((f) => f.g0 != null && p.x > f.g0 - 400 && p.x < f.g1);
     if (gf) {
-      const fy = this.groundY(gf.g1 + 8) - p.y, disc = p.vy * p.vy + 2 * g * fy;
+      const fy = this.groundY(gf.g1) - 6 - p.y, disc = p.vy * p.vy + 2 * g * fy;
       if (fy > 0 && disc > 0) { const need = (gf.g1 + 30 - p.x) * g / (Math.sqrt(disc) - p.vy); if (p.vx < need) { p.vx = Math.min(need, p.vx + 500 * dt); this.stats.carry++; } }
     }
     const nx = p.x + p.vx * dt, ny = p.y + p.vy * dt;

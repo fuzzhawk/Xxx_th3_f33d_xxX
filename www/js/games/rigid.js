@@ -34,7 +34,7 @@ export class Body {
     Object.assign(this, o.data || {});
     this.sync();
   }
-  wake() { if (this.invM) { this.awake = true; this.sleepT = 0; } }
+  wake() { if (this.invM && !this.awake) { this.awake = true; this.sleepT = 0; } }
   sync() {
     if (this.r) { this.minX = this.x - this.r; this.maxX = this.x + this.r; this.minY = this.y - this.r; this.maxY = this.y + this.r; return; }
     const c = Math.cos(this.a), s = Math.sin(this.a);

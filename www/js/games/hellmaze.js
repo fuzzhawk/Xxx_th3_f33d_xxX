@@ -1013,7 +1013,7 @@ export class HellMaze extends Game {
         const px = photoPx(photo), x = cv.getContext('2d'), im = x.createImageData(64, 64), d = im.data, pat = PAT[kind];
         for (let y = 0; y < 64; y++) for (let xx = 0; xx < 64; xx++) {
           const i = (y * 64 + xx) * 4, L = px ? (px[i] * 0.3 + px[i + 1] * 0.55 + px[i + 2] * 0.15) / 255 : 0.42 + hsh(xx >> 2, y >> 2) * 0.22;
-          const v = (0.32 + 0.9 * L) * pat(xx, y, hsh), b = (BAYER[(y & 3) * 4 + (xx & 3)] / 16 - 0.5) * 0.09;
+          const v = (0.52 + 0.55 * L) * pat(xx, y, hsh), b = (BAYER[(y & 3) * 4 + (xx & 3)] / 16 - 0.5) * 0.09;
           for (let c = 0; c < 3; c++) d[i + c] = clamp(Math.round((tint[c] * v * 1.45 + b) * 7) / 7, 0, 1) * 255;
           d[i + 3] = 255;
         }
@@ -1343,7 +1343,7 @@ export class HellMaze extends Game {
     c.globalAlpha = 1;
     if (this.dead > 0) { c.fillStyle = `rgba(120,0,0,${clamp(0.75 - this.dead * 0.3, 0, 0.75)})`; c.fillRect(0, 0, W, VH); }
     if (this.pickT && this.t - this.pickT < 0.15) { c.fillStyle = 'rgba(255,230,140,.2)'; c.fillRect(0, 0, W, VH); }
-    this.msgs.forEach((m, i) => { c.globalAlpha = Math.min(1, m.t * 2); this.text(c, m.text, W / 2 + 1, 23 + i * 16, 12, '#000'); this.text(c, m.text, W / 2, 22 + i * 16, 12, '#ffe2a8'); });
+    this.msgs.forEach((m, i) => { c.globalAlpha = Math.min(1, m.t * 2); this.text(c, m.text, W / 2 + 1, 63 + i * 16, 12, '#000'); this.text(c, m.text, W / 2, 62 + i * 16, 12, '#ffe2a8'); });
     c.globalAlpha = 1;
     const wd = this.wd, s = 74 / Math.max(wd.mw, wd.mh), ox = W - 80, oy = 34, p = this.p;
     c.save(); c.globalAlpha = 0.75; c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(ox - 3, oy - 3, wd.mw * s + 6, wd.mh * s + 6);

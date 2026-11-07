@@ -554,10 +554,10 @@ export class Jrpg extends Game {
   transform(f) {
     const b = this.bt, st = this.story, v = this.villain(), sp = (this.post.seed || 1) * 977 + this.world * 31 + 4242;
     const art = monster(sp, this.skin.hue + 270, 44, 4), lv = f.lv + 1, hp = Math.round((14 + lv * 11) * (1.4 + this.party.length) * 1.1);
-    f.transform = false;
+    f.transform = false; f.morph = true;
     this.talk([
       [v, 'Enough! You want to see what the relics have made of me? LOOK!', 'angry'],
-      F(() => { Object.assign(f, { form: 'beast', art, el: art.element || 'shadow', name: `${st.vname} Unbound`, hp, max: hp, lv, phase: 1, turns: 0, charge: 0, barrier: 0, special: 'summon', dead: 0, mag: f.mag * 1.1, atk: f.atk * 1.1 }); b.flash = 1; b.quake = 0.6; b.order = []; b.msg = `${f.name} rises!`; b.wait = 1; this.burst(96, 176, ECOL[f.el] || '#c070ff', 50, 260); this.emoteParty('surprise', 1.2); }),
+      F(() => { f.morph = false; Object.assign(f, { form: 'beast', art, el: art.element || 'shadow', name: `${st.vname} Unbound`, hp, max: hp, lv, phase: 1, turns: 0, charge: 0, barrier: 0, special: 'summon', dead: 0, mag: f.mag * 1.1, atk: f.atk * 1.1 }); b.flash = 1; b.quake = 0.6; b.order = []; b.msg = `${f.name} rises!`; b.wait = 1; this.burst(96, 176, ECOL[f.el] || '#c070ff', 50, 260); this.emoteParty('surprise', 1.2); }),
       [{ name: `${st.vname} Unbound`, art, el: art.element }, 'NOTHING… ENDS… WITHOUT MY SAY!'],
       [this.party[0], 'Hold the line, everyone!', 'angry']
     ]);
@@ -661,7 +661,7 @@ export class Jrpg extends Game {
   resolve(a, ch) {
     const b = this.bt, foesA = this.alive(b.foes), herosA = this.alive(this.party), enemies = a.hero ? foesA : herosA;
     const pick = (t, pool) => (t && t.hp > 0 ? t : pool[this.ri(0, pool.length - 1)]);
-    if (ch.k === 'spell') return this.cast(a, ch);
+    if (ch.k === 'spell') return this.castSpell(a, ch);
     if (ch.k === 'item') return this.useItem(a, ch);
     if (ch.k === 'defend') { a.guard = true; b.msg = `${a.name} braces for impact.`; a.actor.emote('nod', 0.6); b.wait = 0.5; return; }
     if (ch.k === 'run') {
@@ -689,7 +689,7 @@ export class Jrpg extends Game {
       this.hurt(t, a.mag * 1.5 - this.defOf(t) * 0.3, '#c070ff'); this.heal(a, h0 - t.hp);
     } else if (ch.k === 'barrier') { a.barrier = 3; b.msg = `A barrier shimmers around ${a.name}! Physical blows are weakened.`; b.wait = 1; }
   }
-  cast(a, ch) {
+  castSpell(a, ch) {
     const b = this.bt, sp = SK[ch.s], herosA = this.alive(this.party);
     a.mp -= sp.mp; b.msg = `${a.name}: ${ch.s}!`;
     const [hx, hy] = this.heroPos(a.k); this.burst(hx + a.bo - 14, hy - 6, sp.col, 10, 70);
@@ -1302,11 +1302,11 @@ export class Jrpg extends Game {
     if (!dun && tt !== FOREST) { c.fillStyle = 'hsl(28,12%,22%)'; c.beginPath(); c.moveTo(0, 152); for (let k = 0; k <= 8; k++) c.lineTo(k * 45, 152 - 20 - ((k * 37) % 30)); c.lineTo(W, 152); c.fill(); }
     // foes
     for (const f of b.foes) {
-      if (f.hp <= 0 && f.dead > 0.6 && !f.transform) continue;
+      if (f.hp <= 0 && f.dead > 0.6 && !f.transform && !f.morph) continue;
       const [x, y] = this.foePos(f), big = f.boss, sz = big ? 150 : 58, col = ECOL[f.el] || '#c070ff';
       let dx = 0; if (b.anim?.u === f) dx = Math.sin((0.5 - b.anim.t) / 0.5 * Math.PI) * 18;
       if (b.shake?.u === f) dx += Math.sin(this.t * 80) * 3;
-      c.globalAlpha = f.hp <= 0 && !f.transform ? Math.max(0, 1 - f.dead / 0.6) : 1;
+      c.globalAlpha = f.hp <= 0 && !f.transform && !f.morph ? Math.max(0, 1 - f.dead / 0.6) : 1;
       if (f.charge) { const r = 60 + Math.sin(this.t * 8) * 8, gl = c.createRadialGradient(x, y, 10, x, y, r + 30); gl.addColorStop(0, `${col}aa`); gl.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = gl; c.fillRect(x - r - 30, y - r - 30, (r + 30) * 2, (r + 30) * 2); }
       c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x, y + (big ? 62 : sz * 0.42), big ? 50 : sz * 0.32, big ? 9 : sz * 0.08, 0, 0, 7); c.fill();
       if (f.form === 'human') f.actor.draw(c, x + dx, y + 62, 3.2);
@@ -1322,7 +1322,7 @@ export class Jrpg extends Game {
     }
     // the boss's name, HP and phase
     const boss = b.boss && b.foes[0];
-    if (boss && (boss.hp > 0 || boss.transform)) {
+    if (boss && (boss.hp > 0 || boss.transform || boss.morph)) {
       this.text(c, boss.name, 8, 92, 10, this.pal.ink, 'left');
       c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(8, 100, 168, 5); c.fillStyle = boss.phase >= 3 ? '#ff4a6a' : boss.phase === 2 ? '#ff9a3a' : '#e04a3a'; c.fillRect(8, 100, 168 * boss.hp / boss.max, 5);
       for (let k = 0; k < 3; k++) { c.fillStyle = k < boss.phase ? this.col(1) : 'rgba(255,255,255,.2)'; c.fillRect(180 + k * 7, 99, 5, 7); }
@@ -1333,7 +1333,7 @@ export class Jrpg extends Game {
       c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x + dx, y + 22, 13, 3.5, 0, 0, 7); c.fill();
       if (h.pro > 0 && h.hp > 0) { c.strokeStyle = 'rgba(154,208,255,.45)'; c.lineWidth = 1.5; c.beginPath(); c.ellipse(x + dx, y - 6, 18, 30, 0, 0, 7); c.stroke(); }
       h.actor.draw(c, x + dx, y + 22, BSC, { alpha: h.hp <= 0 ? 0.8 : 1 });
-      if (h.guard && h.hp > 0) this.text(c, '⛨', x + dx - 20, y - 26, 12, '#c0c8d8');
+      if (h.guard && h.hp > 0) { const sx = x + dx - 20, sy = y - 26; c.fillStyle = '#c0c8d8'; c.beginPath(); c.moveTo(sx - 5, sy - 6); c.lineTo(sx + 5, sy - 6); c.lineTo(sx + 4, sy + 1); c.lineTo(sx, sy + 6); c.lineTo(sx - 4, sy + 1); c.closePath(); c.fill(); }
     }
     if (b.flash > 0) { c.fillStyle = `rgba(255,255,255,${Math.min(0.7, b.flash)})`; c.fillRect(-6, 56, W + 12, 244); }
     c.restore();

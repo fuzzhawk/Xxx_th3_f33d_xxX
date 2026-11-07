@@ -296,8 +296,12 @@ export class Haruspex {
     c.strokeStyle = 'rgba(255,220,200,.25)'; c.lineWidth = 2;
     for (let i = 0; i < 16; i++) { const an = (i / 16) * Math.PI * 2; c.beginPath(); c.moveTo(Math.cos(an) * 50, Math.sin(an) * 34); c.lineTo(Math.cos(an) * 200, Math.sin(an) * 140); c.stroke(); }
     c.beginPath(); c.ellipse(0, 0, 50, 34, 0, 0, 7); c.stroke();
-    c.fillStyle = 'rgba(255,240,220,.6)'; c.font = '600 19px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    LIVER.forEach(([name], i) => { const an = ((i + 0.5) / 16) * Math.PI * 2; c.fillText(name, Math.cos(an) * 95, Math.sin(an) * 64); });
+    // house names run along the spokes so neighbours never overlap
+    c.fillStyle = 'rgba(255,240,220,.6)'; c.font = '600 13px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    LIVER.forEach(([name], i) => {
+      const an = ((i + 0.5) / 16) * Math.PI * 2, x = Math.cos(an) * 88, y = Math.sin(an) * 60, rot = Math.atan2(y, x);
+      c.save(); c.translate(x, y); c.rotate(Math.cos(rot) < 0 ? rot + Math.PI : rot); c.fillText(name, 0, 0); c.restore();
+    });
     for (const m of e.marks) {
       const an = ((m.region + 0.3 + m.u * 0.4) / 16) * Math.PI * 2, r = 0.55 + m.v * 0.35, x = Math.cos(an) * 110 * r, y = Math.sin(an) * 75 * r, k = m.mark;
       c.fillStyle = ['rgba(255,235,200,.75)', 'rgba(20,0,0,.8)', 'rgba(200,90,70,.9)', 'rgba(20,0,0,.8)', 'rgba(255,255,255,.5)', 'rgba(60,10,10,.7)', 'rgba(120,20,60,.9)', 'rgba(240,230,200,.9)'][k];
