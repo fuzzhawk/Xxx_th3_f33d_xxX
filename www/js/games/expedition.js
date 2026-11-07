@@ -1227,7 +1227,7 @@ export class Expedition extends Game {
         c.fillStyle = P.vc[0]; c.fillRect(0, 0, W, H);
         const bg = this.skin.bgSet?.[1] || this.skin.bg;
         if (P.void === 'water' && ready(bg)) { const s = Math.max(W / (bg.naturalWidth || bg.width), H / (bg.naturalHeight || bg.height)) * 1.3; c.globalAlpha = 0.12; c.save(); c.translate(-(cx * 0.2) % 60 - 30, H - (cy * 0.2) % 60 + 30); c.scale(s, -s); c.drawImage(bg, 0, 0); c.restore(); c.globalAlpha = 1; }
-        if (P.void === 'lava') { this.patScroll(c, -cx + t * 3, -cy + t * 2, 1); c.globalCompositeOperation = 'lighter'; this.patScroll(c, -cx - t * 5 + 20, -cy + 30, 0.25 + Math.sin(t * 2) * 0.1); c.globalCompositeOperation = 'source-over'; }
+        if (P.void === 'lava') { this.patScroll(c, -cx + t * 3, -cy + t * 2, 1); c.globalCompositeOperation = 'lighter'; this.patScroll(c, -cx - t * 5 + 20, -cy + 30, 0.14 + Math.sin(t * 2) * 0.07); c.globalCompositeOperation = 'source-over'; }
         else { this.patScroll(c, -cx + t * 7, -cy + t * 3, 0.5); this.patScroll(c, -cx - t * 5 + 30, -cy - t * 4 + 30, 0.3); }
         break;
       }
