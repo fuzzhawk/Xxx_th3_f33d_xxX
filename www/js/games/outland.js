@@ -56,9 +56,9 @@ const BIOME_KEYS = Object.keys(BIOMES);
 const TOD = {
   base: {}, day: { el: 0.8 },
   dawn: { el: 0.13, top: '#56689a', hor: '#f2b09a', sun: '#ffc49c', sunI: 0.75, hemi: 0.8, mix: 0.55, dens: 1.25, mist: 1 },
-  dusk: { el: 0.09, top: '#24265a', hor: '#f0825a', sun: '#ff9056', sunI: 0.65, hemi: 0.72, mix: 0.6, dens: 1.1 },
+  dusk: { el: 0.09, top: '#24265a', hor: '#f0825a', sun: '#ff9056', sunI: 0.7, hemi: 0.85, mix: 0.6, dens: 1.1 },
   overcast: { el: 0.9, top: '#7c848c', hor: '#b4b8b8', sun: '#dfe4ea', sunI: 0.42, hemi: 1.2, mix: 0.7, dens: 1.4, clouds: 1 },
-  night: { el: 0.55, top: '#02040c', hor: '#18203a', sun: '#8ea4e0', sunI: 0.32, hemi: 0.45, mix: 0.82, dens: 1.15, stars: 1, moon: 1 }
+  night: { el: 0.55, top: '#02040c', hor: '#18203a', sun: '#8ea4e0', sunI: 0.4, hemi: 0.6, mix: 0.82, dens: 1.15, stars: 1, moon: 1 }
 };
 // weather around the camera: count, colours, size, fall speed, wind, sway, box height, additive glow
 const WX = {
@@ -391,7 +391,7 @@ export class Outland extends Game {
       }
       stones(2);
     } else if (k === 'crystal') {
-      for (const t of scatter(50, 10)) { t.s = this.r(0.7, 1.8); t.n = this.ri(3, 6); t.seed = R(); P.crystals.push(t); ob(t, 0.9 * t.s, 4 * t.s); }
+      for (const t of scatter(46, 12)) { t.s = this.r(1, 2.4); t.n = this.ri(4, 7); t.seed = R(); P.crystals.push(t); ob(t, 0.9 * t.s, 4 * t.s); }
       rocks(26, 0.8, 3, 8);
       stones(5, 24);
     } else if (k === 'volcano') {
@@ -1453,7 +1453,7 @@ export class Outland extends Game {
     // giant fungi with glowing spots; little glowing caps all over
     const capCols = [new T.Color(this.pal.c[0]), new T.Color(this.pal.c[2] || this.pal.c[1]), new T.Color('#7af0ff')].map((c) => c.lerp(new T.Color('#ffffff'), 0.2));
     const cap = new T.SphereGeometry(0.5, 10, 5, 0, TAU, 0, Math.PI / 2);
-    this.inst(merge([[CYL(8, 0.7), MAT(0, 3, 0, 0.06, 0, 0.04, 0.9, 6, 0.9), '#d8d0c0', TILE.plain], [cap, MAT(0, 5.8, 0, 0, 0, 0, 7, 3, 7), null, TILE.fungus], [CYL(12), MAT(0, 5.8, 0, 0, 0, 0, 6.6, 0.3, 6.6), '#3a3040', TILE.dark]]), sol, P.shrooms, tree, { col: (t, c) => c.set('#ffffff').lerp(capCols[t.c], 0.55) });
+    this.inst(merge([[CYL(8, 0.7), MAT(0, 3, 0, 0.06, 0, 0.04, 0.9, 6, 0.9), '#f0e8d8', TILE.plain], [cap, MAT(0, 5.8, 0, 0, 0, 0, 7, 3, 7), null, TILE.fungus], [CYL(12), MAT(0, 5.8, 0, 0, 0, 0, 6.6, 0.3, 6.6), '#3a3040', TILE.dark]]), sol, P.shrooms, tree, { col: (t, c) => c.set('#ffffff').lerp(capCols[t.c], 0.4) });
     this.inst(merge([[new T.TorusGeometry(3.3, 0.16, 3, 20), MAT(0, 5.75, 0, Math.PI / 2, 0, 0), null, TILE.glow], ...[0, 1.3, 2.5, 3.8, 5.1].map((a, i) => [ICO(), MAT(Math.cos(a) * (1.4 + (i % 2)), 7.4 - (i % 2) * 0.6, Math.sin(a) * (1.4 + (i % 2)), 0, 0, 0, 0.6, 0.35, 0.6), null, TILE.glow])]), gl.glow, P.shrooms, tree, { col: (t, c) => c.copy(capCols[t.c]) });
     this.inst(merge([[CYL(6, 0.7), MAT(0, 0.6, 0, 0, 0, 0, 0.35, 1.2, 0.35), '#c8c0b0', TILE.plain], [cap, MAT(0, 1.15, 0, 0, 0, 0, 1.6, 0.9, 1.6), null, TILE.fungus]]), gl.glow, P.minis, tree, { col: (t, c) => c.copy(capCols[t.c]).multiplyScalar(0.9) });
     // waterfalls: a strip of falling water hugging the cliff
