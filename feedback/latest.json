@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-07T08:00:01.186Z",
+  "generatedAt": "2026-11-07T09:45:44.186Z",
   "package": "2026-W43",
   "mix": {
     "game": 51,
@@ -23,15 +23,15 @@
     }
   },
   "usage7d": {
-    "hours": 4.6,
-    "posts": 2018,
-    "sessions": 67,
-    "skips": 426,
+    "hours": 4.7,
+    "posts": 2069,
+    "sessions": 69,
+    "skips": 430,
     "selfcareDone": 1,
     "byHour": [
       31,
-      1,
-      0,
+      2,
+      3,
       0,
       0,
       0,
@@ -63,8 +63,8 @@
     },
     "wiki": {
       "total": 1197,
-      "viewed": 782,
-      "avgDwellSec": 5.7
+      "viewed": 815,
+      "avgDwellSec": 5.6
     },
     "video": {
       "total": 750,
@@ -93,13 +93,13 @@
     },
     "web": {
       "total": 260,
-      "viewed": 140,
-      "avgDwellSec": 9.1
+      "viewed": 146,
+      "avgDwellSec": 9.5
     },
     "oracle": {
       "total": 156,
-      "viewed": 84,
-      "avgDwellSec": 6.1
+      "viewed": 88,
+      "avgDwellSec": 5.8
     },
     "power": {
       "total": 104,
@@ -108,13 +108,13 @@
     },
     "read": {
       "total": 152,
-      "viewed": 114,
-      "avgDwellSec": 9.2
+      "viewed": 120,
+      "avgDwellSec": 8.7
     },
     "studio": {
       "total": 104,
-      "viewed": 54,
-      "avgDwellSec": 9.6
+      "viewed": 56,
+      "avgDwellSec": 8.9
     },
     "news": {
       "total": 91,
@@ -123,6 +123,104 @@
     }
   },
   "favorites": [
+    {
+      "id": "w38375",
+      "cat": "wiki",
+      "sub": "history",
+      "label": "Hypatia",
+      "url": "https://en.wikipedia.org/wiki/Hypatia"
+    },
+    {
+      "id": "web1at68m7",
+      "cat": "web",
+      "sub": "comic",
+      "label": "Batman vs The Trolley Problem",
+      "url": "http://existentialcomics.com/comic/673"
+    },
+    {
+      "id": "w361269",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Gesang der Jünglinge",
+      "url": "https://en.wikipedia.org/wiki/Gesang_der_J%C3%BCnglinge"
+    },
+    {
+      "id": "rd1bqptbu",
+      "cat": "read",
+      "sub": "poem",
+      "label": "DamæTas",
+      "url": "https://www.google.com/search?q=Dam%C3%A6Tas%20George%20Gordon%2C%20Lord%20Byron"
+    },
+    {
+      "id": "w172847",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "King Tubby",
+      "url": "https://en.wikipedia.org/wiki/King_Tubby"
+    },
+    {
+      "id": "w632434",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "Rat king",
+      "url": "https://en.wikipedia.org/wiki/Rat_king"
+    },
+    {
+      "id": "w319288",
+      "cat": "wiki",
+      "sub": "transgressive",
+      "label": "Chris Burden",
+      "url": "https://en.wikipedia.org/wiki/Chris_Burden"
+    },
+    {
+      "id": "w16274415",
+      "cat": "wiki",
+      "sub": "literature",
+      "label": "Wild Seed (novel)",
+      "url": "https://en.wikipedia.org/wiki/Wild_Seed_(novel)"
+    },
+    {
+      "id": "w42371992",
+      "cat": "wiki",
+      "sub": "science",
+      "label": "Dual consciousness",
+      "url": "https://en.wikipedia.org/wiki/Dual_consciousness"
+    },
+    {
+      "id": "w3449517",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Aghori",
+      "url": "https://en.wikipedia.org/wiki/Aghori"
+    },
+    {
+      "id": "w30873666",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "Shugborough inscription",
+      "url": "https://en.wikipedia.org/wiki/Shugborough_inscription"
+    },
+    {
+      "id": "rd1gl7s0p",
+      "cat": "read",
+      "sub": "poem",
+      "label": "When I Roved a Young Highlander",
+      "url": "https://www.google.com/search?q=When%20I%20Roved%20a%20Young%20Highlander%20George%20Gordon%2C%20Lord%20Byron"
+    },
+    {
+      "id": "w520066",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "History of cryptography",
+      "url": "https://en.wikipedia.org/wiki/History_of_cryptography"
+    },
+    {
+      "id": "w19403070",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Merzbow",
+      "url": "https://en.wikipedia.org/wiki/Merzbow"
+    },
     {
       "id": "rd1y6xirw",
       "cat": "read",
