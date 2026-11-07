@@ -18,7 +18,10 @@ const CACHE = 'feed-img-v1';
 export async function loadKenney() {
   try { const r = await fetch('assets/kenney/index.json'); if (r.ok) kenney = await r.json(); } catch { kenney = null; }
 }
-export function setProps(list) { props = (list || []).map((p) => p.src).filter(Boolean); }
+let propList = [];
+export function setProps(list) { propList = list || []; props = propList.map((p) => p.src).filter(Boolean); }
+// a package sprite by its index in sprites.json (product posts refer to sprites this way)
+export const propSrc = (i) => propList[i]?.src || '';
 let textures = [];
 // Weathered texture photos (rust, bark, concrete…) shipped in the package as small data URIs.
 export function setTextures(list) { textures = (list || []).map((t) => img(t.src)); }

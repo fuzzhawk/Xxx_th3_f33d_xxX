@@ -11,9 +11,10 @@ export function productsBuilder(K) {
     const imgsFor = (text) => {
       if (!sprites?.length || !K.matchSprites) return undefined;
       const n = 2 + Math.floor(rand() * 3), ix = K.matchSprites(text, sprites, n + 2), out = [];
-      for (const i of ix) if (sprites[i]?.src && !out.includes(sprites[i].src)) out.push(sprites[i].src);
+      // indexes into the package's sprites.json (the PNGs are data URIs: copying them would bloat product.json)
+      for (const i of ix) if (sprites[i]?.src && !out.includes(i)) out.push(i);
       if (out.length > n) out.length = n;
-      if (out.length > 2 && rand() < 0.3) { const r = sprites[Math.floor(rand() * sprites.length)]?.src; if (r && !out.includes(r)) out[out.length - 1] = r; }
+      if (out.length > 2 && rand() < 0.3) { const r = Math.floor(rand() * sprites.length); if (sprites[r]?.src && !out.includes(r)) out[out.length - 1] = r; }
       return out.length >= 2 ? out : undefined;
     };
     const art = () => ({ style: pick(STYLES), seed: Math.floor(rand() * 2 ** 31) });

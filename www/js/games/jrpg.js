@@ -68,7 +68,7 @@ const HELLO = {
 const TAUNT = ['You will not take the {r}!', '{v} promised me a feast. You will do nicely.', 'Turn back, little lights. Nothing waits here but teeth.', 'I have guarded the {r} for a thousand years.'];
 const need = (lv) => Math.round(12 * lv ** 1.7);
 const DIR4 = ['S', 'W', 'N', 'E'], SKINS = ['Fair', 'Olive', 'Bronze', 'Umber', 'Porcelain', 'Ebony'];
-const LUNGE = -42, BSC = 2; // battle step-forward distance and sprite scale
+const LUNGE = -42, BSC = 2, QY = 66; // battle step-forward distance, sprite scale, top of the quest line (below the mutator pills)
 const F = (f) => [null, null, null, f]; // a callback inside a dialogue
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 const mul = (a) => () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -639,7 +639,7 @@ export class Jrpg extends Game {
     else if (t.actor && t.hp > 0) t.actor.hurt();
     if (t.boss && t.hp > 0) {
       const ph = t.hp < t.max * 0.3 ? 3 : t.hp < t.max * 0.6 ? 2 : 1;
-      if (ph > t.phase) { t.phase = ph; b.note = ph === 2 ? `${t.name} is enraged! New attacks unlocked…` : `${t.name} is desperate — it moves twice a round!`; b.flash = 0.4; }
+      if (ph > t.phase) { const nm = t.name.split(',')[0]; t.phase = ph; b.note = ph === 2 ? `${nm} is enraged! New attacks unlocked…` : `${nm} is desperate — it acts twice a round!`; b.flash = 0.4; }
     }
     if (t.hp <= 0) {
       this.burst(x, y, t.hero ? this.col(3) : this.col(0), t.boss ? 40 : 14, t.boss ? 240 : 150);
@@ -677,23 +677,23 @@ export class Jrpg extends Game {
       return;
     }
     if (!enemies.length) return;
-    const el = a.el || 'shadow', col = ECOL[el] || '#c070ff';
+    const el = a.el || 'shadow', col = ECOL[el] || '#c070ff', nm = a.name.split(',')[0];
     if (ch.k === 'atk') { const t = pick(ch.t, enemies); b.msg = `${a.name} attacks ${t.name}!`; this.strike(a, t, 1); }
     else if (ch.k === 'zap') { const t = pick(ch.t, herosA); b.msg = `${a.name} uses ${ZAP[el] || 'Hex'} on ${t.name}!`; this.hurt(t, a.mag * 1.6 * this.r(0.85, 1.1) - this.defOf(t) * 0.3, col); const [x, y] = this.posOf(t); this.burst(x, y, col, 10, 110); }
     else if (ch.k === 'breath') { b.msg = `${a.name} lashes out at the whole party!`; for (const t of herosA) { this.hurt(t, a.mag * 1.1 * this.r(0.85, 1.1) - this.defOf(t) * 0.3, col); const [x, y] = this.posOf(t); this.burst(x, y, col, 8, 100); } }
-    else if (ch.k === 'gather') { b.msg = ch.more ? `${a.name}'s power keeps swelling…` : `⚠ ${a.name} is gathering power! Brace yourselves!`; const [x, y] = this.posOf(a); this.burst(x, y, col, 24, 60); b.wait = 1; }
+    else if (ch.k === 'gather') { b.msg = ch.more ? `${nm}'s power keeps swelling…` : `⚠ ${nm} is gathering power — brace!`; const [x, y] = this.posOf(a); this.burst(x, y, col, 24, 60); b.wait = 1; }
     else if (ch.k === 'big') {
-      b.msg = `${a.name} unleashes ${BIG[el] || 'Doom'}!`; b.flash = 0.7; b.quake = 0.6;
+      b.msg = `${nm} unleashes ${BIG[el] || 'Doom'}!`; b.flash = 0.7; b.quake = 0.6;
       for (const t of herosA) { this.hurt(t, a.mag * 2.9 * this.r(0.9, 1.1) - this.defOf(t) * 0.3, col); const [x, y] = this.posOf(t); this.burst(x, y, col, 20, 180); }
       b.wait = 1.1;
     } else if (ch.k === 'summon') {
       b.foes = b.foes.filter((f) => f === a || f.hp > 0);
       for (let k = 0; k < 2 && b.foes.length < 4; k++) b.foes.push(this.makeFoe((this.post.seed || 1) * 131 + (this.dg?.d.k || 0) * 17 + this.ri(0, 3), Math.max(1, a.lv - 2)));
-      b.msg = `${a.name} calls its brood to fight!`; this.burst(186, 180, col, 20, 120);
+      b.msg = `${nm} calls its brood to fight!`; this.burst(186, 180, col, 20, 120);
     } else if (ch.k === 'drain') {
-      const t = pick(null, herosA), h0 = t.hp; b.msg = `${a.name} drains ${t.name}'s life!`;
+      const t = pick(null, herosA), h0 = t.hp; b.msg = `${nm} drains ${t.name}'s life!`;
       this.hurt(t, a.mag * 1.5 - this.defOf(t) * 0.3, '#c070ff'); this.heal(a, h0 - t.hp);
-    } else if (ch.k === 'barrier') { a.barrier = 2; b.msg = `A barrier shimmers around ${a.name}! Physical blows are weakened.`; b.wait = 1; }
+    } else if (ch.k === 'barrier') { a.barrier = 2; b.msg = `A barrier shields ${nm}! Physical blows weakened.`; b.wait = 1; }
   }
   castSpell(a, ch) {
     const b = this.bt, sp = SK[ch.s], herosA = this.alive(this.party);
@@ -1083,13 +1083,13 @@ export class Jrpg extends Game {
     for (const p of this.pops) { c.globalAlpha = Math.min(1, p.life * 2); c.lineWidth = 3; c.strokeStyle = '#000'; c.font = '800 14px ui-monospace, monospace'; c.textAlign = 'center'; c.strokeText(p.s, p.x, p.y); this.text(c, p.s, p.x, p.y, 14, p.col); }
     c.globalAlpha = 1;
     if (this.mode !== 'battle') this.drawQuest(c);
-    if (this.label) { c.globalAlpha = Math.min(1, this.label.t * 2); const lw = this.mode === 'world' ? W - 76 : W; c.fillStyle = 'rgba(8,6,4,.7)'; c.fillRect(0, 80, lw, 20); this.text(c, this.label.s, lw / 2, 90, 10, this.pal.ink); c.globalAlpha = 1; }
+    if (this.label) { c.globalAlpha = Math.min(1, this.label.t * 2); const lw = this.mode === 'world' ? W - 76 : W; const ly = this.mode === 'battle' ? 88 : QY + (this.qh || 17) + 3; c.fillStyle = 'rgba(8,6,4,.7)'; c.fillRect(0, ly, lw, 20); this.text(c, this.label.s, lw / 2, ly + 10, 10, this.pal.ink); c.globalAlpha = 1; }
     if (this.card) this.drawCard(c);
     if (this.say) this.drawSay(c);
   }
   questText() {
     const st = this.story, c = this.chap, d = this.dungeons[Math.min(c, 4)], tw = this.storyTown();
-    if (c > 4) return 'The world is saved… for now';
+    if (c > 4 || this.dungeons[4].done) return 'The world is saved… for now';
     if (this.needReturn) return `Bring the relics to ${st.sage} in ${tw.name}`;
     if (tw) return tw.k === 1 || (st.rec[2] && !this.met[2]) ? `Find the ${st.rec[tw.k === 1 ? 0 : 2]} waiting in ${tw.name}` : `Meet the others in ${tw.name}`;
     if (c === 4) return d.locked ? `Find a way into the ${st.cit}` : `Storm the ${d.name} and stop ${st.vname} (Lv ${d.lv})`;
@@ -1098,10 +1098,12 @@ export class Jrpg extends Game {
   }
   drawQuest(c) {
     const w = this.mode === 'world' ? W - 76 : W, s = `Ch${Math.min(5, this.chap + 1)} ▸ ${this.questText()}`;
-    c.fillStyle = 'rgba(8,6,4,.78)'; c.fillRect(0, 60, w, 18); c.fillStyle = this.col(1); c.fillRect(0, 60, 2, 18);
-    let fs = 10; c.font = `700 ${fs}px ui-monospace, monospace`;
-    while (fs > 7 && c.measureText(s).width > w - 12) { fs--; c.font = `700 ${fs}px ui-monospace, monospace`; }
-    this.text(c, s, 7, 69, fs, this.pal.ink, 'left');
+    c.font = '700 10px ui-monospace, monospace';
+    let lines = [s];
+    if (c.measureText(s).width > w - 14) { c.font = '700 9px ui-monospace, monospace'; const ws = s.split(' '); let k = ws.length; while (k > 1 && c.measureText(ws.slice(0, k).join(' ')).width > w - 14) k--; lines = [ws.slice(0, k).join(' '), ws.slice(k).join(' ')]; }
+    const h = this.qh = lines.length > 1 ? 28 : 17;
+    c.fillStyle = 'rgba(8,6,4,.78)'; c.fillRect(0, QY, w, h); c.fillStyle = this.col(1); c.fillRect(0, QY, 2, h);
+    lines.forEach((l, i) => this.text(c, l, 7, QY + 8.5 + i * 11, lines.length > 1 ? 9 : 10, this.pal.ink, 'left'));
   }
   drawCard(c) {
     const k = this.card, a = Math.min(1, (k.max - k.t) * 2.5, k.t * 2);
@@ -1241,7 +1243,7 @@ export class Jrpg extends Game {
       const x = this.mini.getContext('2d');
       for (let i = 0; i < N * N; i++) { x.fillStyle = this.tileCol(this.wm[i]); x.fillRect(i % N, (i / N) | 0, 1, 1); }
     }
-    const X = W - 70, Y = 60, blink = Math.floor(this.t * 3) % 2;
+    const X = W - 70, Y = QY, blink = Math.floor(this.t * 3) % 2;
     c.globalAlpha = 0.85; c.fillStyle = '#000'; c.fillRect(X - 2, Y - 2, N + 4, N + 4); c.drawImage(this.mini, X, Y); c.globalAlpha = 1;
     for (const tw of this.towns) { c.fillStyle = this.pal.ink; c.fillRect(X + tw.x - 1, Y + tw.y - 1, 3, 3); }
     for (const d of this.dungeons) { c.fillStyle = d.done ? '#888' : d.i === 4 ? (d.locked ? '#444' : '#c070ff') : this.col(0); c.fillRect(X + d.x - 1.5, Y + d.y - 1.5, 3, 3); }
@@ -1329,9 +1331,9 @@ export class Jrpg extends Game {
     // the boss's name, HP and phase
     const boss = b.boss && b.foes[0];
     if (boss && (boss.hp > 0 || boss.transform || boss.morph)) {
-      this.text(c, boss.name, 8, 92, 10, this.pal.ink, 'left');
-      c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(8, 100, 168, 5); c.fillStyle = boss.phase >= 3 ? '#ff4a6a' : boss.phase === 2 ? '#ff9a3a' : '#e04a3a'; c.fillRect(8, 100, 168 * boss.hp / boss.max, 5);
-      for (let k = 0; k < 3; k++) { c.fillStyle = k < boss.phase ? this.col(1) : 'rgba(255,255,255,.2)'; c.fillRect(180 + k * 7, 99, 5, 7); }
+      this.text(c, boss.name, 8, 96, 10, this.pal.ink, 'left');
+      c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(8, 104, 168, 5); c.fillStyle = boss.phase >= 3 ? '#ff4a6a' : boss.phase === 2 ? '#ff9a3a' : '#e04a3a'; c.fillRect(8, 104, 168 * boss.hp / boss.max, 5);
+      for (let k = 0; k < 3; k++) { c.fillStyle = k < boss.phase ? this.col(1) : 'rgba(255,255,255,.2)'; c.fillRect(180 + k * 7, 103, 5, 7); }
     }
     // heroes
     for (const h of this.party) {
@@ -1344,9 +1346,9 @@ export class Jrpg extends Game {
     if (b.flash > 0) { c.fillStyle = `rgba(255,255,255,${Math.min(0.7, b.flash)})`; c.fillRect(-6, 56, W + 12, 244); }
     c.restore();
     // message
-    c.fillStyle = 'rgba(8,6,4,.78)'; c.fillRect(0, 58, W, 24);
-    this.text(c, b.phase === 'cmd' && b.menu === 'target' && !this.auto ? 'Tap a monster to target it' : b.msg, W / 2, 70, b.msg.length > 52 ? 9 : 11, b.msg.startsWith('⚠') ? '#ffd23a' : this.pal.ink);
-    if (b.phase === 'intro') { c.fillStyle = `rgba(0,0,0,${Math.max(0, b.wait - 0.3)})`; c.fillRect(0, 82, W, 218); }
+    c.fillStyle = 'rgba(8,6,4,.78)'; c.fillRect(0, 62, W, 24);
+    this.text(c, b.phase === 'cmd' && b.menu === 'target' && !this.auto ? 'Tap a monster to target it' : b.msg, W / 2, 74, b.msg.length > 52 ? 9 : 11, b.msg.startsWith('⚠') ? '#ffd23a' : this.pal.ink);
+    if (b.phase === 'intro') { c.fillStyle = `rgba(0,0,0,${Math.max(0, b.wait - 0.3)})`; c.fillRect(0, 86, W, 214); }
     // command panel
     c.fillStyle = 'rgba(10,7,5,.92)'; c.fillRect(0, 300, W, H - 300); c.fillStyle = this.col(0); c.fillRect(0, 300, W, 2);
     const cmd = b.phase === 'cmd' && b.actor && !this.auto;

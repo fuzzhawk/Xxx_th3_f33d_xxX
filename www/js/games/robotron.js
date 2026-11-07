@@ -21,14 +21,16 @@ export class Robotron extends Game {
     this.p = p; this.dying = 0; this.clearT = 0; this.shootT = 0;
     this.hero = new Actor(this.skin.crystal(0, 'Sci-fi'), { runSpeed: 60, runStride: 7 }); this.bullets = []; this.eShots = []; this.cool = 0; this.saved = 0;
     this.foes = []; this.humans = []; this.zaps = [];
-    const sw = this.mods.swarm ? 1.5 : 1, n = Math.round((6 + this.wave * 3) * sw);
-    const away = () => { let x, y; do { x = this.r(PAD + 10, W - PAD - 10); y = this.r(TOP + 10, H - PAD - 10); } while (Math.hypot(x - p.x, y - p.y) < 90); return { x, y }; };
-    for (let i = 0; i < n; i++) this.foes.push({ kind: 'grunt', ...away(), hp: 1, sp: this.r(24, 36) + this.wave * 3, i: this.skin.list('grunts', 3, 'enemy', 'monster')[i % 3] });
-    for (let i = 0; i < Math.min(5, Math.floor(this.wave / 2)); i++) this.foes.push({ kind: 'hulk', ...away(), hp: 1e9, sp: 18, dir: this.r(0, 7), i: this.skin.creatures[4].frames[0], i2: this.skin.creatures[4].frames[1] });
-    for (let i = 0; i < Math.min(4, Math.floor((this.wave - 1) / 2)); i++) this.foes.push({ kind: 'spawner', ...away(), hp: 3, sp: 40, dir: this.r(0, 7), cd: this.r(2, 4), i: this.skin.creatures[5].frames[0], i2: this.skin.creatures[5].frames[1] });
-    for (let i = 0; i < Math.min(3, Math.floor(this.wave / 3)); i++) this.foes.push({ kind: 'tank', ...away(), hp: 2, sp: 20, dir: this.r(0, 7), cd: this.r(1, 3), i: this.skin.pick('tank', 'car', 'ship', 'enemy') });
-    for (let i = 0; i < 4 + this.wave; i++) this.zaps.push({ ...away(), i: this.skin.pick('zap', 'item', 'fx', 'deco'), ph: this.r(0, 7) });
-    for (let i = 0; i < 3; i++) { const k = 1 + ((this.wave + i) % 6); this.humans.push({ ...away(), k, dir: this.r(0, 7), a: new Actor(this.skin.crystal(k, 'Present day'), { runStride: 6 }), greet: 0 }); }
+    // a calm start that builds up: a few grunts first, then hulks (wave 3), spawners (4) and tanks (5)
+    const w = this.wave, sw = this.mods.swarm ? 1.5 : 1, n = Math.round(Math.min(20, 2 + w * 2) * sw);
+    const away = () => { let x, y; do { x = this.r(PAD + 10, W - PAD - 10); y = this.r(TOP + 10, H - PAD - 10); } while (Math.hypot(x - p.x, y - p.y) < 90); return { x, y, warp: this.r(0.3, 1.4) }; };
+    for (let i = 0; i < n; i++) this.foes.push({ kind: 'grunt', ...away(), hp: 1, sp: this.r(20, 30) + Math.min(w, 10) * 2.5, i: this.skin.list('grunts', 3, 'enemy', 'monster')[i % 3] });
+    for (let i = 0; i < (w < 3 ? 0 : Math.min(4, (w - 1) >> 1)); i++) this.foes.push({ kind: 'hulk', ...away(), hp: 1e9, sp: 18, dir: this.r(0, 7), i: this.skin.creatures[4].frames[0], i2: this.skin.creatures[4].frames[1] });
+    for (let i = 0; i < (w < 4 ? 0 : Math.min(3, (w - 2) >> 1)); i++) this.foes.push({ kind: 'spawner', ...away(), hp: 3, sp: 40, dir: this.r(0, 7), cd: this.r(2, 4), i: this.skin.creatures[5].frames[0], i2: this.skin.creatures[5].frames[1] });
+    for (let i = 0; i < (w < 5 ? 0 : Math.min(3, (w - 3) >> 1)); i++) this.foes.push({ kind: 'tank', ...away(), hp: 2, sp: 20, dir: this.r(0, 7), cd: this.r(1, 3), i: this.skin.pick('tank', 'car', 'ship', 'enemy') });
+    for (let i = 0; i < Math.min(8, 1 + w); i++) this.zaps.push({ ...away(), i: this.skin.pick('zap', 'item', 'fx', 'deco'), ph: this.r(0, 7) });
+    for (let i = 0; i < Math.min(4, 1 + Math.ceil(w / 2)); i++) { const k = 1 + ((w + i) % 6); this.humans.push({ ...away(), k, dir: this.r(0, 7), a: new Actor(this.skin.crystal(k, 'Present day'), { runStride: 6 }), greet: 0 }); }
+    this.banner = { s: `WAVE ${w}`, sub: { 1: 'rescue the humans', 3: 'HULKS can\'t be killed', 4: 'SPAWNERS breed grunts', 5: 'TANKS shoot back' }[w] || `${this.foes.length} robots · ${this.humans.length} humans`, t: 2 };
   }
   // twin sticks: each pointer that starts on a half of the screen owns that stick
   down(x, y, id = 0) { const side = x < W / 2 ? 'move' : 'fire'; this.sticks[side] = { id, ox: x, oy: y, x, y }; }
@@ -51,7 +53,7 @@ export class Robotron extends Game {
     mx += (W / 2 - p.x) * 0.002; my += ((TOP + H) / 2 - p.y) * 0.002;
     const md = Math.hypot(mx, my);
     this.autoMove = md > 0.05 ? { x: mx / md, y: my / md, m: Math.min(1, md) } : null;
-    const t = this.foes.filter((f) => f.kind !== 'hulk').sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+    const t = this.foes.filter((f) => f.kind !== 'hulk' && !(f.warp > 0)).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
     if (t) { const d = Math.hypot(t.x - p.x, t.y - p.y), lead = d / 360, a = Math.atan2(t.y + (t.vy || 0) * lead - p.y, t.x + (t.vx || 0) * lead - p.x); this.autoFire = { x: Math.cos(a), y: Math.sin(a), m: 1 }; }
     else this.autoFire = null;
   }
@@ -88,6 +90,7 @@ export class Robotron extends Game {
   }
   step(dt) {
     const p = this.p;
+    if (this.banner && (this.banner.t -= dt) <= 0) this.banner = null;
     if (this.dying || this.clearT) {
       const evs = this.hero.update(dt);
       if (this.dying) { if (evs.includes('done:flinch') || (this.dying < 1.5 && !this.hero.isKO)) this.hero.ko(); if ((this.dying -= dt) <= 0) this.finishDeath(); }
@@ -122,6 +125,7 @@ export class Robotron extends Game {
     const born = [];
     for (const f of this.foes) {
       f.ph = (f.ph || 0) + dt;
+      if (f.warp > 0) { f.warp -= dt; continue; }
       if (f.kind === 'grunt') {
         const dx = p.x - f.x, dy = p.y - f.y, d = Math.hypot(dx, dy) + 1, s = f.sp * (1 + Math.sin(f.ph * 9) * 0.4);
         f.vx = dx / d * s; f.vy = dy / d * s;
@@ -147,7 +151,7 @@ export class Robotron extends Game {
     for (const z of this.zaps) {
       z.ph += dt;
       for (const b of this.bullets) if (b.life > 0 && Math.hypot(b.x - z.x, b.y - z.y) < 9) { b.life = 0; z.dead = true; this.score += 25; this.burst(z.x, z.y, this.col(1), 8, 100); }
-      for (const f of this.foes) if (f.kind === 'grunt' && Math.hypot(f.x - z.x, f.y - z.y) < 10) { f.dead = true; z.dead = true; }
+      for (const f of this.foes) if (f.kind === 'grunt' && !(f.warp > 0) && Math.hypot(f.x - z.x, f.y - z.y) < 10) { f.dead = true; z.dead = true; }
       if (!z.dead && p.inv <= 0 && Math.hypot(z.x - p.x, z.y - p.y) < 11) { this.die(); return; }
     }
     this.stepHumans(dt);
@@ -172,7 +176,9 @@ export class Robotron extends Game {
       const s = (f.kind === 'hulk' ? 30 : f.kind === 'grunt' ? 20 : 24) * this.S;
       ents.push({ y: f.y + s / 2, d: () => {
         const im = f.i2 && Math.floor(f.ph * 4) % 2 ? f.i2 : f.i;
+        if (f.warp > 0) { c.strokeStyle = this.col(Math.floor(f.ph * 10)); c.lineWidth = 2; c.beginPath(); c.arc(f.x, f.y, 4 + f.warp * 22, 0, 7); c.stroke(); c.globalAlpha = Math.max(0, 1 - f.warp * 1.5); }
         if (!drawFit(c, im, f.x, f.y + Math.sin(f.ph * 12) * (f.kind === 'grunt' ? 1.5 : 0), s, s, 0, f.vx < 0)) { c.fillStyle = this.col(f.kind === 'hulk' ? 2 : 0); c.fillRect(f.x - s / 3, f.y - s / 3, s / 1.5, s / 1.5); }
+        c.globalAlpha = 1;
       } });
     }
     if (this.dying || p.inv <= 0 || Math.floor(this.t * 12) % 2) ents.push({ y: p.y + 13 * this.S, d: () => this.hero.draw(c, p.x, p.y + 13 * this.S, this.S, { alpha: this.dying ? Math.min(1, this.dying / 0.6) : 1 }) });
@@ -182,6 +188,7 @@ export class Robotron extends Game {
     for (const b of this.bullets) { c.fillStyle = this.col(4); c.globalAlpha = 0.5; c.beginPath(); c.arc(b.x, b.y, 4, 0, 7); c.fill(); c.globalAlpha = 1; drawFit(c, bimg, b.x, b.y, 9, 9, b.a); }
     for (const b of this.eShots) { c.fillStyle = this.col(0); c.beginPath(); c.arc(b.x, b.y, 3.5, 0, 7); c.fill(); }
     if (this.pop) this.text(c, this.pop.s, this.pop.x, this.pop.y - 16 - (1 - this.pop.t) * 20, 11, this.pal.ink);
+    if (this.banner) { c.globalAlpha = Math.min(1, this.banner.t * 2); this.text(c, this.banner.s, W / 2, H / 2 - 40, 22, this.pal.ink); this.text(c, this.banner.sub, W / 2, H / 2 - 14, 11, this.col(1)); c.globalAlpha = 1; }
     // lives, top right
     for (let i = 0; i < this.lives; i++) drawFrame(c, this.hero.sheet, 'idle', 'S', 0, W - 18 - i * 16, 26, 0.6);
     if (!this.auto) for (const s of Object.values(this.sticks)) if (s) {

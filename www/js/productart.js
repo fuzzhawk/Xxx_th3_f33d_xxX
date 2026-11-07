@@ -1,5 +1,6 @@
 // Procedural 80s/90s promo graphics for made-up products, as inline SVG.
 import { mulberry32 } from './util.js';
+import { propSrc } from './games/assets.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const BURSTS = ['NEW!', 'AS SEEN ON TV!', 'NOW 40% WEIRDER', 'LIMITED TIME!', 'ACT NOW!', 'FREE GIFT INSIDE', 'AMAZING!', 'PATENT DENIED', 'WOW!', 'NO MONEY DOWN', 'CALL NOW!', 'NOT IN STORES'];
@@ -45,7 +46,7 @@ export function productSVG(p) {
   const id = `p${(p.art?.seed || 1).toString(36)}`;
   const lines = wrap(p.name.replace(/^The /, ''));
   const burst = BURSTS[Math.floor(R() * BURSTS.length)];
-  const imgs = Array.isArray(p.imgs) ? p.imgs.filter((u) => typeof u === 'string' && u).slice(0, 4) : [];
+  const imgs = Array.isArray(p.imgs) ? p.imgs.map((u) => (typeof u === 'number' ? propSrc(u) : u)).filter((u) => typeof u === 'string' && u).slice(0, 4) : [];
   const glyph = imgs.length >= 2 ? '' : esc(p.glyph || '✦');
   const nameText = (fill, stroke, y0, size = 34, font = "Impact, 'Arial Black', sans-serif", extra = '') =>
     lines.map((l, i) => `<text x="200" y="${y0 + i * (size + 4)}" text-anchor="middle" font-family="${font}" font-size="${l.length > 12 ? size * 0.82 : size}" font-weight="900" fill="${fill}" stroke="${stroke}" stroke-width="${stroke === 'none' ? 0 : 2}" paint-order="stroke" letter-spacing="1" ${extra}>${esc(l)}</text>`).join('');
