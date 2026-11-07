@@ -57,7 +57,7 @@ export class Ski extends Game {
     p.y = this.groundY(p.x); p.ang = this.slope(p.x);
     this.holding = false; this.pressAir = false; this.holdT = 0; this.buffer = 0; this.ap = {};
     this.fx = { boost: 0, shield: 0, magnet: 0 };
-    this.stats = { crash: 0, flips: 0, lands: 0, jumps: 0, pop: 0, wall: 0, hopSpin: 0, pit: 0 };
+    this.stats = { crash: 0, rock: 0, bad: 0, flips: 0, lands: 0, jumps: 0, pop: 0, wall: 0, hopSpin: 0, pit: 0, carry: 0 };
     this.combo = 0; this.dist = 0; this.msg = null; this.coinRun = 0; this.cheerQ = 0;
     this.puffs = []; this.trail = []; this.track = [];
     this.camX = p.x - W * 0.3; this.camY = p.y - H * 0.5; this.camB = this.camY; this.dyP = 0;
@@ -328,7 +328,7 @@ export class Ski extends Game {
       if (r.hit || Math.abs(r.x - p.x) > r.s * 0.45 || this.groundY(r.x) - p.y > r.h * 0.75) continue;
       r.hit = true;
       if (this.fx.shield > 0) { this.fx.shield = 0; this.puff(r.x, this.groundY(r.x) - 8, 16, 120, '#bfefff'); this.msg = { s: 'SHIELD SAVED YOU', t: 1.2 }; this.rider.hurt(); }
-      else return this.crash();
+      else { this.stats.rock++; return this.crash(); }
     }
     for (const c of this.coins) {
       if (c.got) continue;
@@ -382,6 +382,12 @@ export class Ski extends Game {
     }
     p.ang += p.av * dt; p.rot += p.av * dt;
     p.vy += g * dt;
+    // a rider who took off early (before a gap's lip) is carried gently across rather than dropped in
+    const gf = this.feats.find((f) => f.g0 != null && p.x > f.g0 - 160 && p.x < f.g1);
+    if (gf) {
+      const fy = this.groundY(gf.g1 + 8) - p.y, disc = p.vy * p.vy + 2 * g * fy;
+      if (fy > 0 && disc > 0) { const need = (gf.g1 + 30 - p.x) * g / (Math.sqrt(disc) - p.vy); if (p.vx < need) { p.vx = Math.min(need, p.vx + 500 * dt); this.stats.carry++; } }
+    }
     const nx = p.x + p.vx * dt, ny = p.y + p.vy * dt;
     if (this.isGap(nx)) { p.x = nx; p.y = ny; if (ny > this.groundY(nx) + 140) this.crash(true); return; }
     const gy = this.groundY(nx);
@@ -398,7 +404,7 @@ export class Ski extends Game {
     p.air = false; p.av = 0; p.flipping = false; p.lipF = null;
     p.v = clamp(Math.max(along, speed * 0.7), VMIN, VMAX);
     if (Math.abs(d) > LAND) {
-      if (this.fx.shield <= 0) return this.crash();
+      if (this.fx.shield <= 0) { this.stats.bad++; return this.crash(); }
       this.fx.shield = 0; this.msg = { s: 'SHIELD SAVED YOU', t: 1.2 }; this.rider.hurt();
     }
     p.ang = sa; this.stats.lands++;

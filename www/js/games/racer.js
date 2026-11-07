@@ -138,7 +138,7 @@ export class Racer extends Game {
       kit.chevL = mkSprite('sign', R, S.pal.bake, -1); kit.chevR = mkSprite('sign', R, S.pal.bake, 1);
       kit.lampN = kit.lamp || [mkSprite('lamp', R, S.pal.bake)];
       const tot = B.spr.reduce((s, x) => s + x[1], 0);
-      const put = (s, side, sp, inner, extra) => { const sc = this.r(0.85, 1.25), hw = sp.ww * sc / 2 / this.roadW; s.sp.push({ b: sp, off: side * (inner + hw), s: sc, hw: hw * 0.75, solid: sp.solid && inner < 2.1, flip: side > 0, hit: 0, ...extra }); };
+      const put = (s, side, sp, inner, extra) => { const sc = this.r(0.85, 1.25), hw = sp.ww * sc / 2 / this.roadW; s.sp.push({ b: sp, off: side * (inner + hw), s: sc, hw: hw * 0.75, solid: sp.solid && inner < 2.1, flip: side > 0 && sp.kind !== 'bb' && sp.kind !== 'sign', hit: 0, ...extra }); };
       for (let i = S.a + 12; i < S.b; i += this.ri(B.gap[0], B.gap[1])) {
         const s = this.segs[i];
         if (s.tun || s.br) { if (s.br && i % 3 === 0) for (const side of [-1, 1]) put(s, side, kit.lampN[0], 1.18); continue; }

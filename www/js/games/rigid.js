@@ -206,7 +206,7 @@ export class World {
     // islands of touching dynamic bodies sleep together once every one of them is still
     for (const b of bs) if (b.invM && b.awake) b.up = b;
     const root = (b) => { while (b.up !== b) { b.up = b.up.up; b = b.up; } return b; };
-    for (const k of list) if (k.a.invM && k.b.invM && k.a.awake && k.b.awake) { const ra = root(k.a), rb = root(k.b); if (ra !== rb) ra.up = rb; }
+    for (const k of list) if (k.a.invM && k.b.invM && k.a.awake && k.b.awake && !k.a.gone && !k.b.gone) { const ra = root(k.a), rb = root(k.b); if (ra !== rb) ra.up = rb; }
     const still = new Map();
     for (const b of bs) if (b.invM && b.awake) { const r = root(b); still.set(r, Math.min(still.get(r) ?? Infinity, b.sleepT)); }
     for (const b of bs) if (b.invM && b.awake && still.get(root(b)) > 0.5) { b.awake = false; b.vx = b.vy = b.av = 0; }

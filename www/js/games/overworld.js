@@ -108,16 +108,18 @@ export class Region {
   lay(x, y) { const t = this.at(x, y); if (t === WATER) this.set(x, y, BRIDGE); else if (t !== BUILD && t !== DOOR && t !== FENCE && t !== BRIDGE) this.set(x, y, t === TALL && hh(x, y, 5) < 0.35 ? TALL : PATH); }
   route_(a, done) {
     const cost = [1.4, 2.6, 1, 9, 5, 1.4, 1.2, 1, 1e9, 1e9, 6, 1e9], dist = new Float64Array(N * N).fill(1e9), prev = new Int32Array(N * N).fill(-1);
-    const q = [[0, a[1] * N + a[0]]]; if (a[0] < 0 || a[1] < 0 || a[0] >= N || a[1] >= N) return null; dist[q[0][1]] = 0;
+    if (a[0] < 0 || a[1] < 0 || a[0] >= N || a[1] >= N) return null;
+    const q = [], push = (d, i) => { q.push([d, i]); let k = q.length - 1; while (k) { const p = (k - 1) >> 1; if (q[p][0] <= q[k][0]) break; [q[p], q[k]] = [q[k], q[p]]; k = p; } };
+    const pop = () => { const top = q[0], last = q.pop(); if (q.length) { q[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < q.length && q[l][0] < q[m][0]) m = l; if (r < q.length && q[r][0] < q[m][0]) m = r; if (m === k) break; [q[m], q[k]] = [q[k], q[m]]; k = m; } } return top; };
+    push(0, a[1] * N + a[0]); dist[a[1] * N + a[0]] = 0;
     while (q.length) {
-      let bi = 0; for (let k = 1; k < q.length; k++) if (q[k][0] < q[bi][0]) bi = k;
-      const [d, i] = q.splice(bi, 1)[0]; if (d > dist[i]) continue;
+      const [d, i] = pop(); if (d > dist[i]) continue;
       const x = i % N, y = (i / N) | 0;
       if (done(x, y)) { const out = []; for (let j = i; j >= 0; j = prev[j]) out.push([j % N, (j / N) | 0]); return out; }
       for (const [dx, dy] of D4) {
         const X = x + dx, Y = y + dy; if (X < 1 || Y < 1 || X > N - 2 || Y > N - 2) continue;
         const j = Y * N + X, nd = d + cost[this.map[j]] + hh(X, Y, 9) * 0.8;
-        if (nd < dist[j]) { dist[j] = nd; prev[j] = i; q.push([nd, j]); }
+        if (nd < dist[j]) { dist[j] = nd; prev[j] = i; push(nd, j); }
       }
     }
     return null;
@@ -166,31 +168,36 @@ export class Region {
     const deep = new Uint8Array(N * N); // water tiles two away from land
     for (let i = 0; i < N * N; i++) if (m[i] === WATER) { const x = i % N, y = (i / N) | 0; deep[i] = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]].every(([a, b]) => this.at(x + a, y + b) === WATER) ? 1 : 0; }
     const isP = (t) => t === PATH || t === BRIDGE || t === DOOR;
-    const grassC = (px, py, tx, ty) => { const v = hh(px >> 1, py >> 1, 1), lo = 0.5 + 0.5 * Math.sin(px * 0.045 + Math.sin(py * 0.03) * 2) * Math.cos(py * 0.05); let c = sh(B.grass, (lo - 0.5) * 0.12); if (this.at(tx, ty) === TREE) c = sh(c, -0.22); return v < 0.06 ? sh(c, -0.12) : v > 0.97 ? sh(c, 0.12) : c; };
-    for (let py = 0; py < W; py++) for (let px = 0; px < W; px++) {
-      const tx = (px / TS) | 0, ty = (py / TS) | 0, lx = px - tx * TS, ly = py - ty * TS, t = m[ty * N + tx];
-      let c;
-      if (t === TALL) {
-        const band = ly < 12 ? 0 : 1, by = ly % 12, col = (lx + band * 4 + tx * 3) % 8, hb = [4, 7, 10, 12, 10, 7, 5, 9][col], hn = [4, 7, 10, 12, 10, 7, 5, 9][(col + 1) % 8];
-        const base = sh(B.tall, -0.18);
-        if (11 - by < hb) c = 11 - by === hb - 1 ? sh(B.tall, wint ? 0.5 : 0.28) : hn < hb && 11 - by >= hn ? sh(B.tall, -0.08) : by > 9 ? sh(B.tall, -0.1) : B.tall;
-        else c = base;
-      } else if (t === WATER) {
-        c = deep[ty * N + tx] ? sh(B.water, -0.12) : B.water;
-        const near = (dx, dy, d) => d < 3 && this.at(tx + dx, ty + dy) !== WATER && this.at(tx + dx, ty + dy) !== BRIDGE;
-        if (near(-1, 0, lx) || near(1, 0, TS - 1 - lx) || near(0, -1, ly) || near(0, 1, TS - 1 - ly)) c = bay(px, py) < 0.7 ? sh(B.water, wint ? 0.75 : 0.55) : sh(B.water, 0.25);
-        else if (hh(px >> 2, py, 3) < 0.03) c = sh(c, 0.18);
-      } else if (isP(t) || t === SAND) {
-        const base = t === SAND ? B.sand : B.path;
-        c = hh(px, py, 4) < 0.06 ? sh(base, -0.14) : hh(px, py, 6) > 0.975 ? sh(base, 0.2) : base;
-        if (t === BRIDGE) { const vert = this.at(tx, ty - 1) === BRIDGE || this.at(tx, ty + 1) === BRIDGE || open(this.at(tx, ty - 1)) && !open(this.at(tx - 1, ty)); const a = vert ? lx : ly, b = vert ? ly : lx; c = a < 2 || a > 21 ? [70, 44, 28] : b % 6 === 0 ? [96, 62, 38] : sh([150, 104, 64], hh(tx, (vert ? ly : lx) / 6 | 0, 8) * 0.2 - 0.1); }
-        else {
-          const edge = (dx, dy, d) => { const n = this.at(tx + dx, ty + dy); return d < 3 && !(t === SAND ? n === SAND || n === WATER || isP(n) : isP(n) || n === SAND) && bay(px, py) > d / 3.2; };
-          if (edge(-1, 0, lx) || edge(1, 0, TS - 1 - lx) || edge(0, -1, ly) || edge(0, 1, TS - 1 - ly)) c = grassC(px, py, tx, ty);
-          if (t === SAND) for (const [dx, dy, d] of [[-1, 0, lx], [1, 0, TS - 1 - lx], [0, -1, ly], [0, 1, TS - 1 - ly]]) if (d < 4 && this.at(tx + dx, ty + dy) === WATER) c = sh(base, -0.18 * (1 - d / 4));
-        }
-      } else c = grassC(px, py, tx, ty);
-      put(px, py, c);
+    const ramp = (c) => Array.from({ length: 29 }, (_, i) => sh(c, i / 20 - 0.6)), RG = ramp(B.grass), RT = ramp(B.tall), RW = ramp(B.water), RP = ramp(B.path), RS = ramp(B.sand);
+    const tone = (Rm, k) => Rm[Math.max(0, Math.min(28, Math.round((k + 0.6) * 20)))];
+    const wr = (o, c) => { D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = 255; };
+    const grass = (px, py, forest) => { const v = hh(px >> 1, py >> 1, 1), lo = Math.sin(px * 0.045 + Math.sin(py * 0.03) * 2) * Math.cos(py * 0.05) * 0.06; return tone(RG, lo - (forest ? 0.22 : 0) + (v < 0.06 ? -0.12 : v > 0.97 ? 0.12 : 0)); };
+    const BH = [4, 7, 10, 12, 10, 7, 5, 9], PLANK = [[70, 44, 28], [96, 62, 38]], WOOD = ramp([150, 104, 64]);
+    for (let ty = 0; ty < N; ty++) for (let tx = 0; tx < N; tx++) {
+      const t = m[ty * N + tx], nb = [this.at(tx - 1, ty), this.at(tx + 1, ty), this.at(tx, ty - 1), this.at(tx, ty + 1)], forest = t === TREE;
+      const land = nb.map((n) => n !== WATER && n !== BRIDGE), pathEdge = nb.map((n) => (t === SAND ? !(n === SAND || n === WATER || isP(n)) : !(isP(n) || n === SAND))), wet = nb.map((n) => n === WATER);
+      const vert = t === BRIDGE && (nb[2] === BRIDGE || nb[3] === BRIDGE || (open(nb[2]) && !open(nb[0])));
+      for (let ly = 0; ly < TS; ly++) for (let lx = 0; lx < TS; lx++) {
+        const px = tx * TS + lx, py = ty * TS + ly, o = (py * W + px) * 4, ds = [lx, TS - 1 - lx, ly, TS - 1 - ly];
+        if (t === TALL) {
+          const by = ly % 12, col = (lx + (ly < 12 ? 0 : 4) + tx * 3) % 8, hb = BH[col], hn = BH[(col + 1) % 8], up = 11 - by;
+          wr(o, up < hb ? tone(RT, up === hb - 1 ? (wint ? 0.5 : 0.28) : hn < hb && up >= hn ? -0.08 : by > 9 ? -0.1 : 0) : tone(RT, -0.18));
+        } else if (t === WATER) {
+          let k = deep[ty * N + tx] ? -0.12 : 0;
+          for (let q = 0; q < 4; q++) if (ds[q] < 3 && land[q]) { k = bay(px, py) < 0.7 ? (wint ? 0.75 : 0.55) : 0.25; break; }
+          if (k <= 0 && hh(px >> 2, py, 3) < 0.03) k += 0.18;
+          wr(o, tone(RW, k));
+        } else if (t === BRIDGE) {
+          const a2 = vert ? lx : ly, b2 = vert ? ly : lx;
+          wr(o, a2 < 2 || a2 > 21 ? PLANK[0] : b2 % 6 === 0 ? PLANK[1] : tone(WOOD, hh(tx, (b2 / 6) | 0, 8) * 0.2 - 0.1));
+        } else if (isP(t) || t === SAND) {
+          const Rm = t === SAND ? RS : RP, h1 = hh(px, py, 4);
+          let c = tone(Rm, h1 < 0.06 ? -0.14 : hh(px, py, 6) > 0.975 ? 0.2 : 0);
+          for (let q = 0; q < 4; q++) if (ds[q] < 3 && pathEdge[q] && bay(px, py) > ds[q] / 3.2) { c = grass(px, py, false); break; }
+          if (t === SAND) for (let q = 0; q < 4; q++) if (ds[q] < 4 && wet[q]) c = tone(RS, -0.18 * (1 - ds[q] / 4));
+          wr(o, c);
+        } else wr(o, grass(px, py, forest));
+      }
     }
     // stamps: grass tufts, flowers, rocks, fences
     const R = mulberry32(this.seed ^ 0x77);

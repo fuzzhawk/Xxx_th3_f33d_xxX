@@ -43,7 +43,7 @@ export const GAME_NAMES = {
 export const GAME_HINT = {
   plinko: 'tap to drop a ball', breakout: 'drag to move the paddle', merge: 'drag to aim, release to drop · two alike merge (on the planet, aim around the core)', dash: 'tap to jump (twice to double-jump)',
   flappy: 'tap to flap', tetris: 'tap beside the piece to move, tap the piece to turn, drag to slide, swipe down to drop, swipe up to hold · every full line is lifted out as a saying', pong: 'drag to move your paddle', peggle: 'aim, release to shoot', juggle: 'tap the balls to keep them up',
-  platformer: 'tap to jump, twice to double-jump · ladders, pads and springs work by themselves · grab power-ups', racer: 'hold left or right to steer', raycast: 'drag sideways to turn, up/down to walk, tap to fire, tap the HUD to switch weapons',
+  platformer: 'tap to jump, twice to double-jump · ladders, pads and springs work by themselves · grab power-ups', racer: 'hold left or right to steer, tap to change lane · pass the gates for extra time', raycast: 'drag sideways to turn, up/down to walk, tap to fire, tap the HUD to switch weapons',
   rocks: 'tap to shoot, hold to thrust toward your finger', sling: 'drag down and release to fire upward',
   chess: 'tap a white piece, then its destination', dice: 'tap the cup or ROLL to shake, tap dice to hold, tap a row to score',
   cards: 'tap up to five cards, then play or discard', monsters: 'tap a move', fighter: '◀ ▶ walk (hold away to block) · ▲ jump · ▼ crouch for sweeps and uppercuts · P K S attack · land hits to chain combos, fill the meter for an ULTRA · on autopilot, bet on the fight',
