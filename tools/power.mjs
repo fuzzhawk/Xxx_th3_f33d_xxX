@@ -2,17 +2,32 @@
 export function powerBuilder(K) {
   const { OFFLINE, ROOT, cleanExtract, clip, extracts, fetchJSON, hashStr, id, path, pick, rand, readJSON, report, sleep, want, warn, wq } = K;
 
+  // a real number from the article intro: a measurement if there is one, else a year (also kept as an age)
+  const UNIT = 'm|metres|meters|km|kilometres|kilometers|cm|ft|feet|inches|kg|tonnes|tons|mph|km\\/h|miles|years|days|hours|people|inhabitants|copies|pages|words|species';
+  const MEAS = new RegExp(`(\\d{1,3}(?:,\\d{3})+|\\d+(?:\\.\\d+)?)(?:\\s|\u00a0)?(million |billion |thousand )?(${UNIT})\\b`, 'i');
+  function findFact(text) {
+    const t = (text || '').replace(/\([^)]*\)/g, (m) => (/\d/.test(m) && /born|died|c\.|\b\d{3,4}\b/.test(m) ? ' ' : m));
+    const m = t.match(MEAS);
+    if (m) {
+      const u = m[3].toLowerCase(), big = (m[2] || '').trim();
+      return { f: `${/m|km|cm|ft|feet|inches|miles|kg|tonnes|tons/i.test(u) ? 'est. ' : ''}${m[1]}${big ? ' ' + big : ''} ${u === 'meters' ? 'm' : u}` };
+    }
+    const y = t.match(/\b(1[0-9]{3}|[3-9][0-9]{2}|20[0-2][0-9])\b(?:\s?(BC|AD|BCE|CE))?/);
+    if (y && !/BC/.test(y[2] || '')) { const yr = Number(y[1]); return { f: `dates to ${yr}`, age: 2026 - yr }; }
+    return {};
+  }
+
   // ------------------------------------------------------------------ absurd power scale
   async function buildPower() {
     const P = readJSON(path.join(ROOT, 'tools/data/power.json'));
     const all = Object.entries(P.entities).flatMap(([kind, ts]) => ts.map((t) => ({ t, kind })));
     const ents = new Map();
-    if (OFFLINE) for (const e of all) ents.set(e.t, { t: e.t, k: e.kind, b: `${e.t} is a placeholder entry for offline testing.`, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(e.t.replace(/ /g, '_'))}`, views: 500 + (hashStr(e.t) % 90000), len: 3000 + (hashStr(e.t) % 60000) });
+    if (OFFLINE) for (const e of all) ents.set(e.t, { t: e.t, k: e.kind, b: `${e.t} is a placeholder entry for offline testing.`, ...findFact(hashStr(e.t) % 3 ? `It stands ${(hashStr(e.t) % 40) / 10 + 1} m tall.` : hashStr(e.t) % 2 ? `It dates from ${1000 + (hashStr(e.t) % 900)}.` : ''), url: `https://en.wikipedia.org/wiki/${encodeURIComponent(e.t.replace(/ /g, '_'))}`, views: 500 + (hashStr(e.t) % 90000), len: 3000 + (hashStr(e.t) % 60000) });
     else {
       for (let i = 0; i < all.length; i += 20) {
         const batch = all.slice(i, i + 20);
         try {
-          const j = await fetchJSON(wq({ action: 'query', prop: 'extracts|pageimages|info|pageviews', exintro: '1', explaintext: '1', exsentences: '2', exlimit: '20', piprop: 'thumbnail', pithumbsize: '320', pilimit: '20', pvipdays: '30', inprop: 'url', redirects: '1', titles: batch.map((e) => e.t).join('|') }));
+          const j = await fetchJSON(wq({ action: 'query', prop: 'extracts|pageimages|info|pageviews', exintro: '1', explaintext: '1', exsentences: '5', exlimit: '20', piprop: 'thumbnail', pithumbsize: '320', pilimit: '20', pvipdays: '30', inprop: 'url', redirects: '1', titles: batch.map((e) => e.t).join('|') }));
           const back = {};
           for (const n of j.query?.normalized || []) back[n.to] = n.from;
           for (const r of j.query?.redirects || []) back[r.to] = back[r.from] || r.from;
@@ -21,7 +36,7 @@ export function powerBuilder(K) {
             const orig = back[pg.title] || pg.title, e = batch.find((x) => x.t === orig) || batch.find((x) => x.t === pg.title);
             if (!e || ents.has(pg.title)) continue;
             const views = Object.values(pg.pageviews || {}).reduce((a, v) => a + (v || 0), 0);
-            ents.set(pg.title, { t: pg.title, k: e.kind, b: clip(cleanExtract(pg.extract), 170), img: pg.thumbnail?.source, url: pg.fullurl || `https://en.wikipedia.org/wiki/${encodeURIComponent(pg.title.replace(/ /g, '_'))}`, views, len: pg.length || 0 });
+            ents.set(pg.title, { t: pg.title, k: e.kind, b: clip(cleanExtract(pg.extract), 170), ...findFact(cleanExtract(pg.extract)), img: pg.thumbnail?.source, url: pg.fullurl || `https://en.wikipedia.org/wiki/${encodeURIComponent(pg.title.replace(/ /g, '_'))}`, views, len: pg.length || 0 });
           }
         } catch (e) { warn(`power batch ${i}: ${e.message}`); }
         await sleep(80);
@@ -46,7 +61,9 @@ export function powerBuilder(K) {
         while ((b === a || (b.k === a.k && rand() < 0.7)) && g++ < 20) b = pick(list);
         const w = a.pw === b.pw ? (rand() < 0.5 ? 0 : 1) : a.pw > b.pw ? 0 : 1, win = [a, b][w], lose = [a, b][1 - w];
         const stat = Object.entries(win.s).sort((x, y) => (y[1] - lose.s[y[0]]) - (x[1] - lose.s[x[0]]))[0][0];
-        posts.push({ id: `pw${seed.toString(36)}`, cat: 'power', sub: 'versus', seed, unit, a, b, winner: w, how: `${win.t} wins ${fill(pick(P.wins), { stat: stat.toLowerCase(), loser: lose.t })}.`, verdict: pick(P.verdicts) });
+        const fx = (e) => (e.f ? ` (${e.f})` : '');
+        const why = (a.f || b.f) ? fill(pick(P.reasons), { w: win.t, l: lose.t, fw: fx(win), fl: fx(lose), stat: stat.toLowerCase() }) : undefined;
+        posts.push({ id: `pw${seed.toString(36)}`, cat: 'power', sub: 'versus', seed, unit, a, b, winner: w, how: `${win.t} wins ${fill(pick(P.wins), { stat: stat.toLowerCase(), loser: lose.t })}.`, why, verdict: pick(P.verdicts) });
       } else {
         const picks = new Set(); while (picks.size < 6) picks.add(pick(list));
         const ranked = [...picks].sort((x, y) => y.pw - x.pw);

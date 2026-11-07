@@ -308,7 +308,7 @@ function parseWikiquote(html) {
 const YT_SORT = { relevance: 'EgIYAQ==', views: 'CAMSAhgB' };
 const ytText = (x) => (x?.runs || []).map((r) => r.text).join('') || x?.simpleText || x?.content || '';
 // the upload age when the result has no publishedTimeText: any "N years ago" in its labels (e.g. accessibility text)
-const ytAgo = (o) => (JSON.stringify(o || {}).match(/\b\d+\s+(?:year|month|week|day|hour|minute)s?\s+ago\b/i) || [])[0] || '';
+const ytAgo = (o) => (JSON.stringify(o || {}).match(/\b\d+\s*(?:years?|months?|weeks?|days?|hours?|minutes?|y|mo|w|d|h)\s+ago\b/i) || [])[0] || '';
 async function ytSearch(query, sort = 'relevance') {
   const url = `https://www.youtube.com/results?${new URLSearchParams({ search_query: query, sp: YT_SORT[sort] || YT_SORT.relevance, hl: 'en' })}`;
   const html = await fetchText(url, { ua: BROWSER_UA, headers: { Cookie: 'CONSENT=YES+cb; SOCS=CAI' } });
@@ -351,10 +351,11 @@ async function ytSearch(query, sort = 'relevance') {
 function durSec(d) { if (!d) return 0; return d.split(':').reduce((s, x) => s * 60 + (+x || 0), 0); }
 // "12 years ago", "Streamed 3 years ago", "8 months ago" -> years (null when unknown)
 function ytAge(t) {
-  const m = /(\d+)\s+(year|month|week|day|hour|minute|second)s?\s+ago/i.exec(t || '');
+  // also the short forms search results now use: "15y ago", "8mo ago", "3w ago"
+  const m = /(\d+)\s*(years?|months?|weeks?|days?|hours?|minutes?|seconds?|y|mo|w|d|h|m|s)\s+ago/i.exec(t || '');
   if (!m) return null;
   const n = +m[1], u = m[2].toLowerCase();
-  return u === 'year' ? n : u === 'month' ? n / 12 : u === 'week' ? n / 52 : 0;
+  return /^y/.test(u) ? n : /^mo/.test(u) ? n / 12 : /^w/.test(u) ? n / 52 : 0;
 }
 const yearsSince = (d) => { const t = Date.parse(d || ''); return isNaN(t) ? null : (Date.now() - t) / (365.25 * 86400000); };
 // AI-made or AI-processed videos and narrated listicle farms (patterns in tools/data/content.mjs):
