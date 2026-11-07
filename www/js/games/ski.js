@@ -57,7 +57,7 @@ export class Ski extends Game {
     p.y = this.groundY(p.x); p.ang = this.slope(p.x);
     this.holding = false; this.pressAir = false; this.holdT = 0; this.buffer = 0; this.ap = {};
     this.fx = { boost: 0, shield: 0, magnet: 0 };
-    this.stats = { crash: 0, rock: 0, bad: 0, flips: 0, lands: 0, jumps: 0, pop: 0, wall: 0, hopSpin: 0, pit: 0, carry: 0 };
+    this.stats = { crash: 0, rock: 0, bad: 0, flips: 0, lands: 0, jumps: 0, pop: 0, wall: 0, hopSpin: 0, pit: 0, carry: 0, coins: 0, power: 0, bubbles: 0 };
     this.combo = 0; this.dist = 0; this.msg = null; this.coinRun = 0; this.cheerQ = 0;
     this.puffs = []; this.trail = []; this.track = [];
     this.camX = p.x - W * 0.3; this.camY = p.y - H * 0.5; this.camB = this.camY; this.dyP = 0;
@@ -102,7 +102,7 @@ export class Ski extends Game {
       const last = this.feats[this.feats.length - 1];
       if (!last || X > last.x1 + 40) {
         const d = 0.5 + 0.5 * Math.sin(X * this.forest[1] + this.forest[0]);
-        if (this.rng() < 0.07 * d * d) this.trees.push({ x: X, s: this.r(26, 58), k: this.weather === 'blossom' && this.rng() < 0.45 ? 'bloom' : 'pine', far: this.rng() < 0.4 });
+        if (this.rng() < 0.11 * d * d) this.trees.push({ x: X, s: this.r(26, 58), k: this.weather === 'blossom' && this.rng() < 0.45 ? 'bloom' : 'pine', far: this.rng() < 0.4 });
         else if (this.rng() < 0.0035) this.trees.push({ x: X, s: this.r(26, 34), k: 'cabin' });
       }
     }
@@ -167,12 +167,12 @@ export class Ski extends Game {
       x0, x1: x0 + n * 22 + 20, kind: 'coins',
       spawn: () => {
         for (let k = 0; k < n; k++) { const x = x0 + k * 22; this.coins.push({ x, y: this.groundY(x) - 18 - (hop ? Math.sin(k / (n - 1) * Math.PI) * 40 : 0) }); }
-        if (hop) this.marks.push({ x: x0 + (n - 1) * 11, kind: 'arc' });
+        if (hop) this.marks.push({ x: x0 + (n - 1) * 11, kind: 'arc', h: 44 });
       }
     };
   }
   powerF(x0) {
-    return { x0, x1: x0 + 90, kind: 'power', spawn: () => { const x = x0 + 40, c = { x, y: this.groundY(x) - 46, power: ['boost', 'shield', 'magnet'][this.ri(0, 2)] }; this.coins.push(c); this.marks.push({ x, kind: 'bubble' }); } };
+    return { x0, x1: x0 + 90, kind: 'power', spawn: () => { const x = x0 + 40, c = { x, y: this.groundY(x) - 46, power: ['boost', 'shield', 'magnet'][this.ri(0, 2)] }; this.coins.push(c); this.stats.bubbles++; this.marks.push({ x, kind: 'bubble', h: 32 }); } };
   }
   // coins along the flight from a lip at an average speed, no jump
   lipCoins(f) {
@@ -231,10 +231,14 @@ export class Ski extends Game {
     }
     return { t, x };
   }
-  simJump() {
+  simJump(h) {
     const p = this.p, a = p.ang, g = GRAV * this.G;
     let x = p.x, y = p.y, vx = p.v * Math.cos(a) + Math.max(0, Math.sin(a)) * JUMP, vy = p.v * Math.sin(a) - Math.cos(a) * JUMP, peak = 0, px = x;
     const pts = [];
+    if (h != null) { // where the rising board first reaches height h above the snow
+      for (let t = 0; t < 1.5; t += 1 / 60) { vy += g / 60; x += vx / 60; y += vy / 60; if (this.groundY(x) - y >= h) return { px: x - p.x }; if (vy > 0) break; }
+      return this.simJump();
+    }
     for (let t = 0; t < 3; t += 1 / 60) {
       vy += g / 60; x += vx / 60; y += vy / 60;
       const gy = this.groundY(x);
@@ -252,7 +256,7 @@ export class Ski extends Game {
       this.holding = false;
       const m = this.marks.find((m) => !m.done && m.x > p.x + 2);
       if (m && m.x - p.x < 340) {
-        const s = this.simJump();
+        const s = this.simJump(m.h);
         if (m.x - p.x <= s.px + 4) { m.done = true; if (m.kind === 'rock' || this.rng() < 0.9) this.press(); }
       } else if (this.rng() < 0.0015 && !this.feats.some((f) => f.lip > p.x && f.lip < p.x + 260)) this.press();
       return;
@@ -336,8 +340,8 @@ export class Ski extends Game {
       if (this.fx.magnet > 0 && !c.power) { const ex = p.x - c.x, ey = p.y - 14 - c.y; if (ex * ex + ey * ey < 150 * 150) { c.x += ex * 5 * dt; c.y += ey * 5 * dt; } }
       if (Math.abs(c.x - p.x) < (c.power ? 20 : 14) && Math.abs(c.y - (p.y - 14)) < (c.power ? 26 : 20)) {
         c.got = true; this.puff(c.x, c.y, c.power ? 14 : 6, 90, c.power ? '#bfefff' : '#ffd24a');
-        if (c.power) { this.fx[c.power] = c.power === 'shield' ? 1 : 5; this.msg = { s: { boost: 'BOOST', shield: 'SHIELD UP', magnet: 'COIN MAGNET' }[c.power], t: 1.2 }; this.score += 50; this.cheerQ = 0.7; }
-        else { this.score += 10; if (++this.coinRun % 6 === 0) this.cheerQ = 0.5; }
+        if (c.power) { this.stats.power++; this.fx[c.power] = c.power === 'shield' ? 1 : 5; this.msg = { s: { boost: 'BOOST', shield: 'SHIELD UP', magnet: 'COIN MAGNET' }[c.power], t: 1.2 }; this.score += 50; this.cheerQ = 0.7; }
+        else { this.score += 10; this.stats.coins++; if (++this.coinRun % 6 === 0) this.cheerQ = 0.5; }
       }
     }
     this.dist = p.x;

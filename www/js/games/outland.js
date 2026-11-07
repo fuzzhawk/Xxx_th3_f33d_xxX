@@ -38,14 +38,14 @@ const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 // ground: terrain shape · rim: how hard the edge rises · liq: [kind, share of low ground under it]
 // tods: times of day ('base' keeps the biome's own sky) · ring: far-ridge silhouette style
 const BIOMES = {
-  forest: { name: 'Forest', amp: 11, ground: 'hills', sky: ['#6f93b4', '#d6d8c4'], fog: '#a9b4a4', dens: 0.0062, sun: '#fff0cc', sunI: 2.2, hemi: ['#b9cbd8', '#4a4a30', 1.4], grass: ['#3b4a20', '#5d6c2c', '#86844a'], rock: ['#4d4a44', '#6f6a60', '#9a9384'], weather: 'leaves', tods: ['dawn', 'day', 'day', 'dusk', 'overcast'], birds: '#1e2018', mist: 1, shafts: 1 },
+  forest: { name: 'Forest', amp: 11, ground: 'hills', sky: ['#6f93b4', '#d6d8c4'], fog: '#a9b4a4', dens: 0.0062, sun: '#fff0cc', sunI: 2.2, hemi: ['#b9cbd8', '#4a4a30', 1.4], grass: ['#3b4a20', '#5d6c2c', '#86844a'], rock: ['#4d4a44', '#6f6a60', '#9a9384'], weather: 'leaves', tods: ['dawn', 'day', 'day', 'dusk', 'overcast'], birds: '#1e2018', mist: 1 },
   junk: { name: 'Junkyard', amp: 7, ground: 'junk', sky: ['#a8865e', '#ebcf9c'], fog: '#c4a47a', dens: 0.0058, sun: '#ffd9a0', sunI: 2.4, hemi: ['#e4c9a0', '#4a3828', 1.3], grass: ['#4b3c2a', '#6e5838', '#91774f'], rock: ['#4a3a30', '#6e5444', '#8e7462'], weather: 'dust', tods: ['day', 'dusk', 'overcast', 'base'], birds: '#16120e' },
   city: { name: 'Neon city', amp: 1, ground: 'flat', rim: 0.12, sky: ['#07041a', '#3a1660'], fog: '#2a1846', dens: 0.0066, sun: '#b0b8ff', sunI: 1.1, hemi: ['#8a70d0', '#2a2030', 1.5], grass: ['#2a2834', '#3a3846', '#55526a'], rock: ['#3a3846', '#4c4a5a', '#6a687a'], weather: 'rain', tods: ['base', 'base', 'dusk'], night: true, stars: 1, ring: 'skyline' },
   canyon: { name: 'Canyon', amp: 24, ground: 'mesa', sky: ['#c98458', '#f6d2a0'], fog: '#d6a67a', dens: 0.0042, sun: '#fff0d0', sunI: 2.6, hemi: ['#f0c8a0', '#5a3020', 1.3], grass: ['#7a4428', '#a3613a', '#c88a56'], rock: ['#6a3a26', '#8e5234', '#b57a52'], weather: 'dust', tods: ['day', 'dawn', 'dusk'], birds: '#20120c', ring: 'mesa' },
   tundra: { name: 'Snow tundra', amp: 12, ground: 'hills', liq: ['ice', 0.16], sky: ['#8aa4c0', '#e4ecf2'], fog: '#d4dee6', dens: 0.0074, sun: '#fff4e4', sunI: 1.9, hemi: ['#dfe8f4', '#7a8494', 1.5], grass: ['#aeb8c6', '#d6dee8', '#f4f8fc'], rock: ['#4a5260', '#6c7684', '#98a2ae'], weather: 'snow', tods: ['day', 'overcast', 'dusk', 'dawn'] },
   dunes: { name: 'Desert dunes', amp: 8, ground: 'dunes', rim: 0.22, sky: ['#5f8ec4', '#f2dcb0'], fog: '#e8d2a8', dens: 0.0042, sun: '#fff4d8', sunI: 2.8, hemi: ['#f4dcb4', '#7a5a34', 1.3], grass: ['#b8864c', '#d8aa68', '#f0cc8c'], rock: ['#8a6440', '#aa8458', '#cca878'], weather: 'sand', tods: ['day', 'day', 'dusk', 'dawn'], haze: 1, birds: '#2a1a10', ring: 'dunes' },
   swamp: { name: 'Bayou', amp: 4, ground: 'hills', liq: ['water', 0.38], sky: ['#5a6a5c', '#b4b89c'], fog: '#8e9682', dens: 0.0115, sun: '#f4e8c0', sunI: 1.5, hemi: ['#a4b0a0', '#2e3420', 1.4], grass: ['#2e3618', '#46502a', '#646a3c'], rock: ['#3a3a30', '#545444', '#727060'], weather: 'fireflies', tods: ['dusk', 'overcast', 'night', 'dawn'], mist: 1, birds: '#141810', water: '#2a3422' },
-  jungle: { name: 'Jungle', amp: 13, ground: 'terraced', liq: ['water', 0.12], sky: ['#5f9ab4', '#d4e4c4'], fog: '#9cb498', dens: 0.0082, sun: '#fff2c4', sunI: 2.2, hemi: ['#c4e0c4', '#2c3a18', 1.5], grass: ['#264018', '#3c5e22', '#5e8434'], rock: ['#3c4434', '#56604a', '#7a8468'], weather: 'drizzle', tods: ['day', 'dawn', 'overcast'], mist: 1, shafts: 1, birds: '#3a1410', water: '#2a5a5a', falls: 1 },
+  jungle: { name: 'Jungle', amp: 13, ground: 'terraced', liq: ['water', 0.12], sky: ['#5f9ab4', '#d4e4c4'], fog: '#9cb498', dens: 0.0082, sun: '#fff2c4', sunI: 2.2, hemi: ['#c4e0c4', '#2c3a18', 1.5], grass: ['#264018', '#3c5e22', '#5e8434'], rock: ['#3c4434', '#56604a', '#7a8468'], weather: 'drizzle', tods: ['day', 'dawn', 'overcast'], mist: 1, birds: '#3a1410', water: '#2a5a5a', falls: 1 },
   crystal: { name: 'Crystal fields', amp: 10, ground: 'hills', sky: ['#24104a', '#b47ad8'], fog: '#7a58a8', dens: 0.0058, sun: '#ffd8f4', sunI: 1.6, hemi: ['#c8a0f0', '#2a1a40', 1.6], grass: ['#3a2e56', '#54467a', '#7c6aa4'], rock: ['#2c2440', '#463a62', '#6a5c8a'], weather: 'motes', tods: ['base', 'base', 'night'], stars: 1, moons: 2, birds: '#ffb0f0', glowBirds: 1 },
   volcano: { name: 'Volcanic wastes', amp: 13, ground: 'ridged', liq: ['lava', 0.14], sky: ['#2a0c08', '#c4462a'], fog: '#6a2a1c', dens: 0.0072, sun: '#ffb070', sunI: 1.6, hemi: ['#ff9a6a', '#2a1410', 1.3], grass: ['#1e1a1a', '#302a28', '#4a403a'], rock: ['#181414', '#2c2624', '#46403c'], weather: 'ash', tods: ['base', 'dusk', 'night'], haze: 1 },
   moon: { name: 'Moon base', amp: 5, ground: 'craters', rim: 0.3, sky: ['#000000', '#05060a'], fog: '#0b0c10', dens: 0.0016, sun: '#ffffff', sunI: 2.8, hemi: ['#8a90a0', '#141414', 0.55], grass: ['#6a6a6c', '#8a8a8c', '#aeaeb0'], rock: ['#4a4a4c', '#6c6c6e', '#909092'], weather: null, tods: ['base'], el: 0.35, space: true, stars: 1, earth: 1, lowG: 0.4 },
@@ -1307,14 +1307,14 @@ export class Outland extends Game {
         }
         const db = (b - 0.5) * 0.08;
         d[i] = clamp(Math.round((c.r + db) * 7) / 7, 0, 1) * 255; d[i + 1] = clamp(Math.round((c.g + db) * 7) / 7, 0, 1) * 255; d[i + 2] = clamp(Math.round((c.b + db) * 7) / 7, 0, 1) * 255;
-        d[i + 3] = b + 0.03 < a ? 255 : 0;
+        d[i + 3] = a * 255;
       }
       x.putImageData(id, 0, 0); t.needsUpdate = true;
     };
     paint();
     this.whenLoaded(bgs, paint);
     const g = new T.CylinderGeometry(820, 820, 717, 48, 1, true); g.translate(0, 329.5, 0);
-    const m = new T.Mesh(g, new T.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: T.BackSide, fog: false, depthWrite: false }));
+    const m = new T.Mesh(g, new T.MeshBasicMaterial({ map: t, transparent: true, side: T.BackSide, fog: false, depthWrite: false }));
     m.renderOrder = -2; gl.sky.add(m);
   }
   // two far ridges, hazier with distance (aerial perspective); a skyline for the city
@@ -1471,20 +1471,6 @@ export class Outland extends Game {
       }
       const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); g.computeBoundingSphere();
       gl.falls = new T.Mesh(g, new T.MeshBasicMaterial({ map: gl.kit.falls, transparent: true, opacity: 0.88, side: T.DoubleSide, depthWrite: false })); gl.scene.add(gl.falls);
-    }
-    // sun shafts slanting through the groves
-    const groves = [...P.trees, ...P.broad, ...P.jtrees];
-    if (this.B.shafts && !A.night && !A.clouds && groves.length) {
-      const cv = canvas(16, 64), x = cv.getContext('2d'), id = x.createImageData(16, 64);
-      for (let y = 0; y < 64; y++) for (let q = 0; q < 16; q++) { const i = (y * 16 + q) * 4; id.data[i] = id.data[i + 1] = id.data[i + 2] = 255; id.data[i + 3] = 255 * Math.sin(Math.PI * (q + 0.5) / 16) ** 2 * sstep(20, 46, y) * sstep(64, 54, y); }
-      x.putImageData(id, 0, 0);
-      const bt = this.canTex(cv, gl); bt.magFilter = T.LinearFilter; bt.minFilter = T.LinearFilter;
-      const parts = [], q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), A.dir), col = A.sun.clone().multiplyScalar(A.low ? 0.3 : 0.2);
-      for (let i = 0; i < Math.min(12, groves.length); i++) {
-        const t = groves[Math.floor(i * groves.length / 12)], c = new T.Vector3(t.x, t.y + 3, t.z).addScaledVector(A.dir, 18);
-        for (const r of [0, Math.PI / 2]) parts.push([PLANE(), new T.Matrix4().compose(c, q.clone().multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), r + i)), new T.Vector3(3.2, 40, 1)), col, -1]);
-      }
-      gl.scene.add(new T.Mesh(merge(parts), new T.MeshBasicMaterial({ map: bt, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false })));
     }
     if (SP.length) gl.scene.add(new T.Mesh(merge(SP), sol));
     if (GP.length) gl.scene.add(new T.Mesh(merge(GP), gl.glow));

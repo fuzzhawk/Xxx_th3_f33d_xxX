@@ -120,7 +120,7 @@ export class Jrpg extends Game {
     return this.vil;
   }
   sage() { return this.sageN || (this.sageN = this.npc(this.story.sage, this.skin.crystal(7 + this.world, 'Fantasy', DIR4))); }
-  keepers(tw) { return tw.keep || (tw.keep = ['Innkeeper', 'Merchant', 'Smith'].map((n, i) => this.npc(n, this.skin.crystal(20 + tw.k * 3 + i + this.world * 9, 'Fantasy', DIR4)))); }
+  keeper(tw) { return tw.keep || (tw.keep = this.npc('Shopkeeper', this.skin.crystal(20 + tw.k + this.world * 3, 'Fantasy', DIR4))); }
   newActor(sheet, dir = 'S') { return new Actor(sheet, { mode: 'four', dir, walkSpeed: 4, runSpeed: 160, walkStride: 12, runStride: 16 }); }
   npc(name, sheet, dir = 'S') { const n = { name, actor: this.newActor(sheet, dir) }; this.npcs.push(n); return n; }
   castAt(n, dx, dy, dir) { const L = this.walkers?.[0]; if (!L) return; this.cast = this.cast.filter((m) => m.n !== n); this.cast.push({ n, x: L.x + dx, y: L.y + dy }); n.actor.face(dir); }
@@ -425,10 +425,10 @@ export class Jrpg extends Game {
   }
   visitTown(tw) {
     this.lastTown = tw; this.mode = 'town'; this.route = []; this.cast = [];
-    const k = this.keepers(tw);
+    const k = this.keeper(tw);
     this.tw = { town: tw, tab: 0, hl: -1, stage: 0, t: 0.9, px: 180, night: 0 };
     for (const h of this.party) { if (h.actor.isKO) h.actor.revive(); h.actor.face('N'); }
-    k[0].actor.emote('wave', 1.5);
+    k.actor.emote('wave', 1.5);
     const L = this.townBeats(tw);
     if (L.length) this.talk(L); else this.label = { s: `Welcome to ${tw.name}`, t: 1.6 };
   }
@@ -441,7 +441,7 @@ export class Jrpg extends Game {
     this.gold -= c; for (const h of [...this.party, ...this.reserve]) { h.hp = h.max; h.mp = h.mmp; if (h.actor.isKO) h.actor.revive(); }
     this.tw.night = 1.3; this.emoteParty('love', 1.6); this.label = { s: 'HP and MP fully restored', t: 1.6 };
   }
-  buyItem(k) { const c = ITEMS[k][1]; if (this.gold < c) return; this.gold -= c; this.inv[k]++; this.keepers(this.tw.town)[1].actor.emote('nod', 0.8); }
+  buyItem(k) { const c = ITEMS[k][1]; if (this.gold < c) return; this.gold -= c; this.inv[k]++; this.keeper(this.tw.town).actor.emote('nod', 0.8); }
   gearOffer(h, kind, budget = this.gold) {
     const cur = kind === 'w' ? h.w : h.a, top = this.shopTier(this.tw.town);
     if (cur >= top) return null;
@@ -459,7 +459,7 @@ export class Jrpg extends Game {
     this.gold -= c; if (kind === 'w') h.w = t; else h.a = t;
     const [x, y] = this.townPos(h);
     this.pops.push({ x, y: y - 62, s: `+${a1 - a0} ${stat}`, col: kind === 'w' ? '#ffd23a' : '#9ad0ff', life: 1.4 });
-    this.burst(x, y - 30, this.col(1), 10, 80); h.actor.emote(this.rng() < 0.5 ? 'cheer' : 'love', 1.2); this.keepers(this.tw.town)[2].actor.emote('nod', 0.8);
+    this.burst(x, y - 30, this.col(1), 10, 80); h.actor.emote(this.rng() < 0.5 ? 'cheer' : 'love', 1.2); this.keeper(this.tw.town).actor.emote('nod', 0.8);
     this.label = { s: `${h.name}: ${GEAR[t]} ${kind === 'w' ? h.cl.wk : h.cl.ak}`, t: 1.4 };
   }
   swap(inH, outH) {
@@ -1244,7 +1244,7 @@ export class Jrpg extends Game {
     if (blink) { c.fillStyle = '#fff'; c.fillRect(X + this.walkers[0].x - 1, Y + this.walkers[0].y - 1, 2, 2); }
   }
   drawTown(c) {
-    const tw = this.tw, keep = this.keepers(tw.town), bg = this.skin.bgSet?.[1] || this.skin.bg, hot = [0, 1, 2, 2, -1, -1][tw.tab];
+    const tw = this.tw, keep = this.keeper(tw.town), bg = this.skin.bgSet?.[1] || this.skin.bg, hot = [0, 1, 2, 2, -1, -1][tw.tab];
     const g = c.createLinearGradient(0, 0, 0, 200); g.addColorStop(0, this.pal.bg2); g.addColorStop(1, this.pal.bg); c.fillStyle = g; c.fillRect(0, 0, W, 264);
     if (ready(bg)) { const iw = bg.naturalWidth || bg.width, ih = bg.naturalHeight || bg.height, s = Math.max(W / iw, 130 / ih); c.globalAlpha = 0.45; c.drawImage(bg, W / 2 - iw * s / 2, 200 - ih * s, iw * s, ih * s); c.globalAlpha = 1; }
     c.fillStyle = this.tileCol(ROAD); c.fillRect(0, 196, W, 68);
@@ -1258,7 +1258,7 @@ export class Jrpg extends Game {
       c.fillStyle = '#3a2618'; c.fillRect(x - 10, 172, 20, 26);
       c.fillStyle = hot === k ? `rgba(255,214,120,${0.75 + Math.sin(this.t * 5) * 0.2})` : 'rgba(40,40,60,.8)'; c.fillRect(x - 36, 150, 14, 12); c.fillRect(x + 22, 150, 14, 12);
       c.fillStyle = '#2a1a10'; c.fillRect(x - 24, 140, 48, 13); this.text(c, name, x, 147, 9, hot === k ? this.col(1) : '#f0e0c0');
-      this.shadowed(c, keep[k].actor, x, 202, 1.2);
+      if (hot === k || (hot < 0 && k === 1)) this.shadowed(c, keep.actor, x, 202, 1.2);
     });
     const guest = this.say?.sp?.actor && !this.party.includes(this.say.sp) ? this.say.sp : null;
     if (guest) { const gx = tw.px > 180 ? tw.px - 120 : tw.px + 120; guest.actor.face(gx < tw.px ? 'E' : 'W'); this.shadowed(c, guest.actor, gx, 248, 1.5); }

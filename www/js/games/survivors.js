@@ -21,7 +21,7 @@ export class Survivors extends Game {
   static noMods = ['mirror', 'lowg', 'heavy', 'wobble'];
   setup() {
     this.cells = new Uint8Array(G * G);
-    let a = Array.from({ length: G * G }, () => (this.rng() < 0.47 ? 1 : 0));
+    let a = Array.from({ length: G * G }, () => (this.rng() < 0.46 ? 1 : 0));
     for (let it = 0; it < 5; it++) {
       const b = a.slice();
       for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
@@ -33,8 +33,8 @@ export class Survivors extends Game {
       a = b;
     }
     for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
-      const edge = x < 1 || y < 1 || x >= G - 1 || y >= G - 1, centre = Math.hypot(x - G / 2, y - G / 2) < 6;
-      this.cells[y * G + x] = edge ? 9 : centre ? 0 : a[y * G + x] ? 1 + Math.floor(this.rng() * 3) : 0;
+      const edge = x < 1 || y < 1 || x >= G - 1 || y >= G - 1, centre = Math.hypot(x - G / 2, y - G / 2) < 8;
+      this.cells[y * G + x] = edge ? 9 : centre ? 0 : a[y * G + x] ? (this.rng() < 0.3 ? 2 : 1) : 0;
     }
     this.world = Object.assign(document.createElement('canvas'), { width: WW, height: WW });
     this.wx = this.world.getContext('2d');
@@ -126,19 +126,52 @@ export class Survivors extends Game {
     else { this.passive[o.k] = (this.passive[o.k] || 0) + 1; if (o.k === 'heart') { this.p.max += 30; this.p.hp = this.p.max; } }
     this.pick = null;
   }
+  // re-plan a few times a second and ease toward the chosen heading, so the hero never flickers between goals
   autopilot(dt) {
     if (this.pick) { if (this.pickIn > 0) return; this.pickT -= dt; if (this.pickT <= 0) this.choose(this.pick.find((o) => o.w && !this.weapons[o.k]) || this.pick[0]); return; }
-    const p = this.p;
-    let mx = 0, my = 0;
-    for (const f of this.foes) { const dx = p.x - f.x, dy = p.y - f.y, d = Math.hypot(dx, dy) + 1; if (d < 110) { mx += dx / d * (110 - d) / 30; my += dy / d * (110 - d) / 30; } }
-    const g = this.gems.reduce((b, g) => { const d = Math.hypot(g.x - p.x, g.y - p.y); return d < 160 && (!b || d < b.d) ? { g, d } : b; }, null);
-    if (g) { mx += (g.g.x - p.x) / g.d * 1.2; my += (g.g.y - p.y) / g.d * 1.2; }
-    // prefer open space: sample eight directions
-    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, cx = Math.cos(a), cy = Math.sin(a); let free = 0; for (let s = 1; s <= 4; s++) if (!this.solid(p.x + cx * s * 12, p.y + cy * s * 12)) free++; else break; mx += cx * (free - 2) * 0.25; my += cy * (free - 2) * 0.25; }
-    this.wander = (this.wander || 0) + this.r(-1, 1) * dt * 2;
-    mx += Math.cos(this.wander) * 0.4; my += Math.sin(this.wander) * 0.4;
-    const m = Math.hypot(mx, my);
-    this.autoMove = m > 0.1 ? { x: mx / m, y: my / m } : null;
+    if ((this.planT = (this.planT || 0) - dt) <= 0) { this.planT = 0.12; this.plan(); }
+    const s = (this.steer ||= { x: 0, y: 0 }), w = this.want || s, k = Math.min(1, dt * 5);
+    s.x += (w.x - s.x) * k; s.y += (w.y - s.y) * k;
+    const m = Math.hypot(s.x, s.y);
+    this.autoMove = m > 0.12 ? { x: s.x / Math.max(1, m), y: s.y / Math.max(1, m) } : null;
+  }
+  // a goal kept until reached (a gem, else a far open spot), then the best of 16 headings:
+  // along the path to the goal, into open space, away from the horde, and close to the last heading
+  plan() {
+    const p = this.p, D = this.dist, cell = (x, y) => Math.floor(y / C) * G + Math.floor(x / C), cx = Math.floor(p.x / C), cy = Math.floor(p.y / C);
+    let g = this.goal;
+    if (g && (g.gem?.got || (g.t -= 0.12) <= 0 || Math.hypot(g.x - p.x, g.y - p.y) < 10 || D[cell(g.x, g.y)] < 0)) g = null;
+    let best = null, bs = Infinity;
+    for (const gem of this.gems) { const d = D[cell(gem.x, gem.y)]; if (d < 0 || d > 24) continue; const sc = d - gem.v * 2; if (sc < bs) { bs = sc; best = gem; } }
+    if (best && (!g || !g.gem || bs < g.s * 0.6 - 1)) g = { x: best.x, y: best.y, gem: best, s: bs, t: 5 };
+    for (let k = 0; !g && k < 30; k++) {
+      const X = cx + this.ri(-14, 14), Y = cy + this.ri(-14, 14);
+      if (X > 0 && Y > 0 && X < G - 1 && Y < G - 1 && D[Y * G + X] >= 6 && D[Y * G + X] < 30) g = { x: (X + 0.5) * C, y: (Y + 0.5) * C, s: 99, t: 4 };
+    }
+    this.goal = g;
+    let gx = 0, gy = 0;
+    if (g) {
+      // walk the distance field back from the goal to a waypoint a few cells out
+      let X = Math.floor(g.x / C), Y = Math.floor(g.y / C), d = D[Y * G + X];
+      for (let n = 0; d > 3 && n < 90; n++) {
+        let moved = false;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const j = (Y + dy) * G + X + dx; if (D[j] >= 0 && D[j] < d) { X += dx; Y += dy; d = D[j]; moved = true; break; } }
+        if (!moved) break;
+      }
+      const wx = (X + 0.5) * C - p.x, wy = (Y + 0.5) * C - p.y, wl = Math.hypot(wx, wy) || 1;
+      gx = wx / wl; gy = wy / wl;
+    }
+    const prev = this.want || { x: 0, y: 0 };
+    let bv = -Infinity;
+    for (let k = 0; k < 16; k++) {
+      const a = (k * Math.PI) / 8, dx = Math.cos(a), dy = Math.sin(a);
+      let free = 0;
+      for (let st = 1; st <= 5; st++) if (!this.solid(p.x + dx * st * 9, p.y + dy * st * 9)) free++; else break;
+      let danger = 0;
+      for (const f of this.foes) { const fx = f.x - p.x, fy = f.y - p.y, d = Math.hypot(fx, fy); if (d > 100) continue; const al = (fx * dx + fy * dy) / (d + 0.01); if (al > -0.3) danger += (al + 0.3) * (1 - d / 100) * (f.big ? 2 : 1); }
+      const v = dx * gx + dy * gy + free * 0.18 - danger * 1.6 + (dx * prev.x + dy * prev.y) * 0.4 - (free ? 0 : 1.5);
+      if (v > bv) { bv = v; this.want = { x: dx, y: dy }; }
+    }
   }
   nearest(r = 999) { let b = null, bd = r; for (const f of this.foes) { const d = Math.hypot(f.x - this.p.x, f.y - this.p.y); if (d < bd) { bd = d; b = f; } } return b; }
   hit(f, dmg) { f.hp -= dmg; f.flash = 0.08; if (f.hp <= 0 && !f.dead) { f.dead = true; this.kills++; this.score += f.big ? 50 : 5; this.gems.push({ x: f.x, y: f.y, v: f.big ? 8 : 1 }); } }
@@ -160,6 +193,7 @@ export class Survivors extends Game {
       const sp = p.sp * (1 + (this.passive.speed || 0) * 0.12) * dt * (act === 'attack' ? 0.45 : act === 'flinch' ? 0.6 : 1), r = 5;
       const nx = p.x + mv.x * sp; if (!this.solid(nx + Math.sign(mv.x) * r, p.y - r) && !this.solid(nx + Math.sign(mv.x) * r, p.y + r)) p.x = nx;
       const ny = p.y + mv.y * sp; if (!this.solid(p.x - r, ny + Math.sign(mv.y) * r) && !this.solid(p.x + r, ny + Math.sign(mv.y) * r)) p.y = ny;
+      if (p.x === ox && p.y === oy && this.rng() < dt * 6) this.dig(p.x + mv.x * 10, p.y + mv.y * 10, 1);
       if (Math.abs(mv.x) > 0.2) p.face = Math.sign(mv.x);
       p.walk = (p.walk || 0) + dt;
     }
@@ -175,14 +209,14 @@ export class Survivors extends Game {
     }
     if (L.whip && cd('whip', 1.4 / (1 + L.whip * 0.15))) {
       this.hero.face(p.face < 0 ? 'W' : 'E');
-      this.queue('whip', 'attack', () => { for (const s of L.whip > 2 ? [1, -1] : [p.face]) { this.slashes.push({ s, t: 0.2 }); for (const f of this.foes) if (Math.sign(f.x - p.x) === s && Math.abs(f.x - p.x) < 60 + L.whip * 6 && Math.abs(f.y - p.y) < 18) this.hit(f, 10 + L.whip * 4); this.digCircle(p.x + s * 40, p.y, 12, 1); } });
+      this.queue('whip', 'attack', () => { for (const s of L.whip > 2 ? [1, -1] : [p.face]) { this.slashes.push({ s, t: 0.2 }); for (const f of this.foes) if (Math.sign(f.x - p.x) === s && Math.abs(f.x - p.x) < 60 + L.whip * 6 && Math.abs(f.y - p.y) < 18) this.hit(f, 10 + L.whip * 4); this.digCircle(p.x + s * 40, p.y, 20, 2); } });
     }
-    if (L.orbit) { const n = 1 + L.orbit, R2 = 34 + L.orbit * 3; for (let k = 0; k < n; k++) { const a = this.t * 3 + k * Math.PI * 2 / n, ox = p.x + Math.cos(a) * R2, oy = p.y + Math.sin(a) * R2; for (const f of this.foes) if (Math.hypot(f.x - ox, f.y - oy) < f.r + 7) this.hit(f, 30 * dt * (1 + L.orbit * 0.3)); if (this.rng() < dt * 6) this.dig(ox, oy, 1); } }
-    if (L.aura) { const R2 = 30 + L.aura * 6; for (const f of this.foes) if (Math.hypot(f.x - p.x, f.y - p.y) < R2) this.hit(f, (6 + L.aura * 3) * dt); if (this.rng() < dt * 3 * L.aura) { const a = this.r(0, 7); this.dig(p.x + Math.cos(a) * R2, p.y + Math.sin(a) * R2, 1); } }
+    if (L.orbit) { const n = 1 + L.orbit, R2 = 34 + L.orbit * 3; for (let k = 0; k < n; k++) { const a = this.t * 3 + k * Math.PI * 2 / n, ox = p.x + Math.cos(a) * R2, oy = p.y + Math.sin(a) * R2; for (const f of this.foes) if (Math.hypot(f.x - ox, f.y - oy) < f.r + 7) this.hit(f, 30 * dt * (1 + L.orbit * 0.3)); if (this.rng() < dt * 12) this.dig(ox, oy, 2); } }
+    if (L.aura) { const R2 = 30 + L.aura * 6; for (const f of this.foes) if (Math.hypot(f.x - p.x, f.y - p.y) < R2) this.hit(f, (6 + L.aura * 3) * dt); if (this.rng() < dt * 6 * L.aura) { const a = this.r(0, 7); this.dig(p.x + Math.cos(a) * R2, p.y + Math.sin(a) * R2, 2); } }
     if (L.bomb && cd('bomb', 3.2 / (1 + L.bomb * 0.2))) this.queue('bomb', 'cast', () => { const f = this.nearest(200); const a = f ? Math.atan2(f.y - p.y, f.x - p.x) : this.r(0, 7), d = f ? Math.min(140, Math.hypot(f.x - p.x, f.y - p.y)) : 80; this.booms.push({ x: p.x, y: p.y - 14, tx: p.x + Math.cos(a) * d, ty: p.y + Math.sin(a) * d, t: 0.6, r: 34 + L.bomb * 6 }); });
     for (const b of this.shots) {
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-      if (this.solid(b.x, b.y)) { this.dig(b.x, b.y, 1); b.life = 0; }
+      if (this.solid(b.x, b.y)) { this.digCircle(b.x, b.y, C, 2); b.life = 0; }
       for (const f of this.foes) if (!f.dead && b.life > 0 && Math.hypot(f.x - b.x, f.y - b.y) < f.r + 3) { this.hit(f, b.dmg); if (b.pierce-- <= 0) b.life = 0; }
     }
     for (const b of this.booms) { b.t -= dt; if (b.t <= 0 && !b.done) { b.done = true; b.flash = 0.25; this.digCircle(b.tx, b.ty, b.r, 3); for (const f of this.foes) if (Math.hypot(f.x - b.tx, f.y - b.ty) < b.r) this.hit(f, 25 + L.bomb * 8); this.burst(b.tx - this.camX, b.ty - this.camY, this.col(0), 20, 200); } if (b.done) b.flash -= dt; }
