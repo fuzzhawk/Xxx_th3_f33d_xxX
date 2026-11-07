@@ -902,7 +902,293 @@
     "poems": 70,
     "poemMaxLines": 70,
     "articles": 30,
-    "erotica": 20
+    "erotica": 20,
+    "knownBooks": {
+      "occult": [
+        [
+          14209,
+          "Kybalion"
+        ],
+        [
+          3623,
+          "Golden Bough"
+        ],
+        [
+          174,
+          "Dorian Gray"
+        ],
+        [
+          345,
+          "Dracula"
+        ]
+      ],
+      "ghost stories": [
+        [
+          209,
+          "Turn of the Screw"
+        ],
+        [
+          8486,
+          "Ghost Stories of an Antiquary"
+        ],
+        [
+          14522,
+          "Canterville Ghost"
+        ],
+        [
+          10007,
+          "Carmilla"
+        ]
+      ],
+      "horror tales": [
+        [
+          84,
+          "Frankenstein"
+        ],
+        [
+          345,
+          "Dracula"
+        ],
+        [
+          43,
+          "Jekyll"
+        ],
+        [
+          8492,
+          "King in Yellow"
+        ],
+        [
+          389,
+          "Great God Pan"
+        ]
+      ],
+      "gothic fiction": [
+        [
+          696,
+          "Castle of Otranto"
+        ],
+        [
+          3268,
+          "Udolpho"
+        ],
+        [
+          768,
+          "Wuthering Heights"
+        ],
+        [
+          601,
+          "The Monk"
+        ]
+      ],
+      "science fiction": [
+        [
+          35,
+          "Time Machine"
+        ],
+        [
+          36,
+          "War of the Worlds"
+        ],
+        [
+          159,
+          "Doctor Moreau"
+        ],
+        [
+          201,
+          "Flatland"
+        ],
+        [
+          5230,
+          "Invisible Man"
+        ],
+        [
+          32,
+          "Herland"
+        ]
+      ],
+      "fantasy fiction": [
+        [
+          11,
+          "Alice"
+        ],
+        [
+          12,
+          "Looking-Glass"
+        ],
+        [
+          325,
+          "Phantastes"
+        ],
+        [
+          55,
+          "Wizard of Oz"
+        ],
+        [
+          8395,
+          "Gods of Peg"
+        ]
+      ],
+      "detective and mystery stories": [
+        [
+          1661,
+          "Sherlock Holmes"
+        ],
+        [
+          2852,
+          "Hound of the Baskervilles"
+        ],
+        [
+          155,
+          "Moonstone"
+        ],
+        [
+          583,
+          "Woman in White"
+        ],
+        [
+          204,
+          "Father Brown"
+        ]
+      ],
+      "psychological fiction": [
+        [
+          600,
+          "Underground"
+        ],
+        [
+          2554,
+          "Crime and Punishment"
+        ],
+        [
+          5200,
+          "Metamorphosis"
+        ],
+        [
+          1952,
+          "Yellow Wallpaper"
+        ],
+        [
+          160,
+          "Awakening"
+        ]
+      ],
+      "mythology": [
+        [
+          1727,
+          "Odyssey"
+        ],
+        [
+          6130,
+          "Iliad"
+        ],
+        [
+          21765,
+          "Metamorphoses"
+        ],
+        [
+          4928,
+          "Bulfinch"
+        ]
+      ],
+      "magic": [
+        [
+          14209,
+          "Kybalion"
+        ],
+        [
+          3623,
+          "Golden Bough"
+        ],
+        [
+          55,
+          "Wizard of Oz"
+        ],
+        [
+          325,
+          "Phantastes"
+        ]
+      ],
+      "utopias": [
+        [
+          2130,
+          "Utopia"
+        ],
+        [
+          624,
+          "Looking Backward"
+        ],
+        [
+          3261,
+          "News from Nowhere"
+        ],
+        [
+          1906,
+          "Erewhon"
+        ],
+        [
+          2816,
+          "City of the Sun"
+        ]
+      ],
+      "satire": [
+        [
+          829,
+          "Gulliver"
+        ],
+        [
+          19942,
+          "Candide"
+        ],
+        [
+          972,
+          "Devil's Dictionary"
+        ],
+        [
+          308,
+          "Three Men in a Boat"
+        ]
+      ],
+      "philosophy": [
+        [
+          1998,
+          "Zarathustra"
+        ],
+        [
+          4363,
+          "Beyond Good and Evil"
+        ],
+        [
+          2680,
+          "Meditations"
+        ],
+        [
+          216,
+          "Tao Te"
+        ],
+        [
+          205,
+          "Walden"
+        ]
+      ],
+      "voyages, imaginary": [
+        [
+          829,
+          "Gulliver"
+        ],
+        [
+          1329,
+          "Voyage to Arcturus"
+        ],
+        [
+          3154,
+          "Munchausen"
+        ],
+        [
+          18857,
+          "Centre of the Earth"
+        ]
+      ]
+    }
   },
   "strips": {
     "share": 0.2,

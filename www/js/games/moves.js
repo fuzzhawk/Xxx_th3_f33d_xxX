@@ -87,7 +87,7 @@ export function species(seed) {
   add(pick(of(cov, (m) => m.L === 0 && m.p), used()), 5);
   add(pick(of(el, (m) => m.L === 1 && !m.p), used()), 8);
   add(pick(of(el, (m) => m.L >= 1 && m.p), used()) || pick(of(el, (m) => m.p), used()), 11);
-  add(pick(of(cov, (m) => m.L >= 1), used()), 14);
+  add(pick(of(cov, (m) => m.L >= 1 && (m.p || !m.wx)), used()), 14);
   add(pick(of(el, (m) => m.L === 2 && m.p), used()), 18);
   add(pick(of('beast', (m) => m.L >= 1), used()), 23);
   const evo = [7 + Math.floor(R() * 3), 15 + Math.floor(R() * 3), 26 + Math.floor(R() * 4)];
@@ -101,7 +101,9 @@ const SUF = { fire: ['flare', 'blaze', 'pyre'], water: ['tide', 'surge', 'kai'],
 export function formName(sp, tier) {
   if (sp.names[tier]) return sp.names[tier];
   const g = genome(sp.seed, 0, tier);
-  const n = !sp.names.includes(g.name) ? g.name : sp.names[0].slice(0, 6) + SUF[sp.el][tier - 1];
+  let stem = sp.names[0].slice(0, 5);
+  while (stem.length > 3 && !/[aeiouy]$/i.test(stem)) stem = stem.slice(0, -1);
+  const n = !sp.names.includes(g.name) ? g.name : stem + SUF[sp.el][tier - 1];
   return (sp.names[tier] = n[0].toUpperCase() + n.slice(1, 11));
 }
 export const tierAt = (sp, lv) => sp.evo.filter((v) => lv >= v).length;

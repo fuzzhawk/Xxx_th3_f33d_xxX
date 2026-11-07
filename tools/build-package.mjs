@@ -307,6 +307,8 @@ function parseWikiquote(html) {
 // search filters: short (< 4 min) by relevance, and short by view count (older uploads rank higher)
 const YT_SORT = { relevance: 'EgIYAQ==', views: 'CAMSAhgB' };
 const ytText = (x) => (x?.runs || []).map((r) => r.text).join('') || x?.simpleText || x?.content || '';
+// the upload age when the result has no publishedTimeText: any "N years ago" in its labels (e.g. accessibility text)
+const ytAgo = (o) => (JSON.stringify(o || {}).match(/\b\d+\s+(?:year|month|week|day|hour|minute)s?\s+ago\b/i) || [])[0] || '';
 async function ytSearch(query, sort = 'relevance') {
   const url = `https://www.youtube.com/results?${new URLSearchParams({ search_query: query, sp: YT_SORT[sort] || YT_SORT.relevance, hl: 'en' })}`;
   const html = await fetchText(url, { ua: BROWSER_UA, headers: { Cookie: 'CONSENT=YES+cb; SOCS=CAI' } });
@@ -319,7 +321,7 @@ async function ytSearch(query, sort = 'relevance') {
     if (Array.isArray(o)) { o.forEach(walk); return; }
     if (o.videoRenderer?.videoId) {
       const v = o.videoRenderer;
-      found.push({ vid: v.videoId, title: ytText(v.title), channel: ytText(v.ownerText) || ytText(v.longBylineText), dur: v.lengthText?.simpleText || '', published: ytText(v.publishedTimeText),
+      found.push({ vid: v.videoId, title: ytText(v.title), channel: ytText(v.ownerText) || ytText(v.longBylineText), dur: v.lengthText?.simpleText || '', published: ytText(v.publishedTimeText) || ytAgo({ a: v.title?.accessibility, b: v.accessibility, c: v.publishedTimeText, d: v.lengthText?.accessibility }) || ytAgo(v),
         desc: (v.detailedMetadataSnippets || []).map((s) => ytText(s.snippetText)).join(' ') || ytText(v.descriptionSnippet) });
       return;
     }
@@ -329,7 +331,7 @@ async function ytSearch(query, sort = 'relevance') {
       const md = lv.metadata?.lockupMetadataViewModel;
       const parts = (md?.metadata?.contentMetadataViewModel?.metadataRows || []).flatMap((r) => (r.metadataParts || []).map((p) => ytText(p.text))).filter(Boolean);
       const dur = (JSON.stringify(lv.contentImage || {}).match(/"(?:text|content)":"(\d{1,2}(?::\d\d){1,2})"/) || [])[1] || '';
-      found.push({ vid: lv.contentId, title: ytText(md?.title), channel: parts[0] || '', dur, published: parts.find((p) => /\bago\b/.test(p)) || '' });
+      found.push({ vid: lv.contentId, title: ytText(md?.title), channel: parts[0] || '', dur, published: parts.find((p) => /\bago\b/.test(p)) || ytAgo(lv) });
       return;
     }
     if (o.reelItemRenderer?.videoId) {
@@ -902,16 +904,21 @@ function buildStudio() {
 // ------------------------------------------------------------------ long reads: novels (Gutenberg), poems (PoetryDB), long articles (Wikipedia)
 // Gutendex is slow and refuses bursts (HTTP 403), so its requests go one at a time, with a long
 // timeout, a pause and retries.
-let gutQueue = Promise.resolve();
+let gutQueue = Promise.resolve(), gutRefusals = 0;
 function gutendex(params) {
   const run = async () => {
+    // after three refused or timed-out calls in a row, stop asking for the rest of the build
+    if (gutRefusals >= 3) throw new Error('gutendex unavailable (refused earlier)');
     const url = `https://gutendex.com/books/?${new URLSearchParams(params)}`;
     for (let a = 0; ; a++) {
-      try { return await fetchJSON(url, { timeout: 75000, retries: 0 }); }
-      catch (e) { if (a >= 2 || (e.status && ![403, 429].includes(e.status) && e.status < 500)) throw e; await sleep(5000 * (a + 1)); }
+      try { const j = await fetchJSON(url, { timeout: 75000, retries: 0 }); gutRefusals = 0; return j; }
+      catch (e) {
+        if (a >= 2 || (e.status && ![403, 429].includes(e.status) && e.status < 500)) { if (!e.status || e.status === 403 || e.status === 429) gutRefusals++; throw e; }
+        await sleep(8000 * (a + 1));
+      }
     }
   };
-  const p = gutQueue.then(() => sleep(1200)).then(run);
+  const p = gutQueue.then(() => sleep(3000)).then(run);
   gutQueue = p.catch(() => {});
   return p;
 }
@@ -1097,19 +1104,31 @@ async function buildErotica() {
 async function readsPrefetch() {
   const R = config.reads || {}, out = [];
   // novels: popular public-domain books on our themes, excerpts of five paragraphs
-  const books = [];
+  const books = [], noGut = [];
   await pool(few(R.gutenbergTopics, 2), 3, async (topic) => {
+    let n = 0;
     try {
       const j = await gutendex({ topic, languages: 'en', sort: 'popular' });
       for (const b of (j.results || []).slice(0, R.booksPerTopic || 4)) {
         const txt = Object.entries(b.formats || {}).find(([k, v]) => k.startsWith('text/plain') && !v.endsWith('.zip'))?.[1];
-        if (txt && !books.some((x) => x.id === b.id)) books.push({ id: b.id, title: b.title, author: (b.authors?.[0]?.name || '').split(', ').reverse().join(' '), year: b.authors?.[0]?.death_year, txt, topic });
+        if (txt && !books.some((x) => x.id === b.id)) { books.push({ id: b.id, title: b.title, author: (b.authors?.[0]?.name || '').split(', ').reverse().join(' '), year: b.authors?.[0]?.death_year, txt, topic }); n++; }
       }
-    } catch (e) { warn(`gutendex ${topic}: ${e.message}`); }
+    } catch (e) { noGut.push(`${topic} (${e.message})`); }
+    // known books for the topic (config.reads.knownBooks: [ebook id, title]), checked against their Title: line
+    if (!n) for (const [gid, title] of shuffle([...(R.knownBooks?.[topic] || [])]).slice(0, R.booksPerTopic || 4)) {
+      if (!books.some((x) => x.id === gid)) books.push({ id: gid, title, expect: title, txt: `https://www.gutenberg.org/cache/epub/${gid}/pg${gid}.txt`, topic });
+    }
   });
+  if (noGut.length) warn(`gutendex failed for ${noGut.length} novel topics, used known books instead: ${noGut.slice(0, 3).join(', ')}`);
   await pool(shuffle(books).slice(0, QUICK ? 2 : R.books || 30), 3, async (b) => {
     try {
-      const t = gutBody(await fetchText(b.txt, { timeout: 40000, retries: 1 }));
+      const raw = await fetchText(b.txt, { timeout: 40000, retries: 1 });
+      if (b.expect) {
+        const hd = raw.slice(0, 4000), title = (hd.match(/^Title:\s*(.+)$/m) || [])[1] || '';
+        if (!eroNorm(title).includes(eroNorm(b.expect))) { warn(`gutenberg #${b.id}: "${clip(title, 60)}" is not ${b.expect}`); return; }
+        b.author = (((hd.match(/^Author:\s*(.+)$/m) || [])[1] || '').split(/[,;]| and /)[0] || '').trim();
+      }
+      const t = gutBody(raw);
       const paras = t.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').replace(/_/g, '').trim()).filter(Boolean);
       const good = (p) => p.length > 160 && p.length < 1600 && !/^(chapter|book|part|contents|illustration|\[)/i.test(p) && p.replace(/[^A-Z]/g, '').length < p.length * 0.3;
       const per = R.perBook || 3, start = Math.floor(paras.length * 0.08);
