@@ -1,17 +1,17 @@
 {
-  "generatedAt": "2026-10-29T16:15:26.657Z",
+  "generatedAt": "2026-11-07T09:53:19.464Z",
   "package": "2026-W43",
   "mix": {
     "game": 51,
     "wiki": 23,
-    "video": 18,
+    "video": 52,
     "meme": 60,
-    "product": 58,
+    "product": 60,
     "psych": 57,
-    "selfcare": 5,
+    "selfcare": 45,
     "web": 5,
     "oracle": 3,
-    "power": 2,
+    "power": 50,
     "read": 4,
     "studio": 2,
     "news": 41
@@ -23,106 +23,447 @@
     }
   },
   "usage7d": {
-    "hours": 3.1,
-    "posts": 1502,
-    "sessions": 66,
-    "skips": 456,
-    "selfcareDone": 0,
+    "hours": 4.8,
+    "posts": 2156,
+    "sessions": 69,
+    "skips": 453,
+    "selfcareDone": 1,
     "byHour": [
-      0,
+      31,
       2,
-      0,
-      0,
-      17,
-      0,
-      0,
-      17,
-      13,
       10,
+      0,
+      0,
+      0,
+      10,
+      0,
       7,
+      3,
+      8,
       9,
-      12,
-      24,
+      6,
+      71,
       4,
-      18,
-      19,
       1,
-      1,
-      4,
-      5,
-      1,
-      23,
-      0
+      20,
+      17,
+      11,
+      25,
+      2,
+      22,
+      11,
+      17
     ]
   },
   "perCategory": {
     "game": {
       "total": 1040,
-      "viewed": 410,
-      "avgDwellSec": 16.1
+      "viewed": 1040,
+      "avgDwellSec": 17
     },
     "wiki": {
       "total": 1197,
-      "viewed": 315,
-      "avgDwellSec": 7.9
+      "viewed": 869,
+      "avgDwellSec": 5.5
     },
     "video": {
       "total": 750,
-      "viewed": 241,
-      "avgDwellSec": 7.1
+      "viewed": 750,
+      "avgDwellSec": 8
     },
     "meme": {
       "total": 520,
-      "viewed": 401,
-      "avgDwellSec": 5.4
+      "viewed": 520,
+      "avgDwellSec": 3.4
     },
     "product": {
       "total": 208,
       "viewed": 208,
-      "avgDwellSec": 4.3
+      "avgDwellSec": 0
     },
     "psych": {
       "total": 208,
       "viewed": 208,
-      "avgDwellSec": 3.3
+      "avgDwellSec": 0
     },
     "selfcare": {
       "total": 260,
-      "viewed": 75,
-      "avgDwellSec": 10.8
+      "viewed": 260,
+      "avgDwellSec": 5.2
     },
     "web": {
       "total": 260,
-      "viewed": 67,
-      "avgDwellSec": 7.7
+      "viewed": 159,
+      "avgDwellSec": 9.2
     },
     "oracle": {
       "total": 156,
-      "viewed": 42,
-      "avgDwellSec": 4.8
+      "viewed": 95,
+      "avgDwellSec": 5.2
     },
     "power": {
       "total": 104,
-      "viewed": 26,
-      "avgDwellSec": 5
+      "viewed": 104,
+      "avgDwellSec": 2.9
     },
     "read": {
       "total": 152,
-      "viewed": 54,
-      "avgDwellSec": 11
+      "viewed": 129,
+      "avgDwellSec": 8.2
     },
     "studio": {
       "total": 104,
-      "viewed": 26,
-      "avgDwellSec": 9.8
+      "viewed": 60,
+      "avgDwellSec": 8.1
     },
     "news": {
       "total": 91,
-      "viewed": 0,
-      "avgDwellSec": 0
+      "viewed": 91,
+      "avgDwellSec": 4.7
     }
   },
   "favorites": [
+    {
+      "id": "w47506143",
+      "cat": "wiki",
+      "sub": "history",
+      "label": "User revolt",
+      "url": "https://en.wikipedia.org/wiki/User_revolt"
+    },
+    {
+      "id": "rdixqlmv",
+      "cat": "read",
+      "sub": "novel",
+      "label": "Crime and Punishment",
+      "url": "https://www.gutenberg.org/ebooks/2554"
+    },
+    {
+      "id": "w16699735",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Bristol underground scene",
+      "url": "https://en.wikipedia.org/wiki/Bristol_underground_scene"
+    },
+    {
+      "id": "w5538718",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "Captain Midnight broadcast signal intrusion",
+      "url": "https://en.wikipedia.org/wiki/Captain_Midnight_broadcast_signal_intrusion"
+    },
+    {
+      "id": "w888915",
+      "cat": "wiki",
+      "sub": "science",
+      "label": "Hypnagogia",
+      "url": "https://en.wikipedia.org/wiki/Hypnagogia"
+    },
+    {
+      "id": "w172914",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Suicide (band)",
+      "url": "https://en.wikipedia.org/wiki/Suicide_(band)"
+    },
+    {
+      "id": "w294374",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Sigil",
+      "url": "https://en.wikipedia.org/wiki/Sigil"
+    },
+    {
+      "id": "w6918",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "Rod (optical phenomenon)",
+      "url": "https://en.wikipedia.org/wiki/Rod_(optical_phenomenon)"
+    },
+    {
+      "id": "rdjdbls9",
+      "cat": "read",
+      "sub": "poem",
+      "label": "That Girl's Clear Eyes",
+      "url": "https://www.google.com/search?q=That%20Girl's%20Clear%20Eyes%20Edward%20Thomas"
+    },
+    {
+      "id": "w6841806",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "UVB-76",
+      "url": "https://en.wikipedia.org/wiki/UVB-76"
+    },
+    {
+      "id": "w70886761",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Christ Brotherhood",
+      "url": "https://en.wikipedia.org/wiki/Christ_Brotherhood"
+    },
+    {
+      "id": "w38375",
+      "cat": "wiki",
+      "sub": "history",
+      "label": "Hypatia",
+      "url": "https://en.wikipedia.org/wiki/Hypatia"
+    },
+    {
+      "id": "web1at68m7",
+      "cat": "web",
+      "sub": "comic",
+      "label": "Batman vs The Trolley Problem",
+      "url": "http://existentialcomics.com/comic/673"
+    },
+    {
+      "id": "w361269",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Gesang der Jünglinge",
+      "url": "https://en.wikipedia.org/wiki/Gesang_der_J%C3%BCnglinge"
+    },
+    {
+      "id": "rd1bqptbu",
+      "cat": "read",
+      "sub": "poem",
+      "label": "DamæTas",
+      "url": "https://www.google.com/search?q=Dam%C3%A6Tas%20George%20Gordon%2C%20Lord%20Byron"
+    },
+    {
+      "id": "w172847",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "King Tubby",
+      "url": "https://en.wikipedia.org/wiki/King_Tubby"
+    },
+    {
+      "id": "w632434",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "Rat king",
+      "url": "https://en.wikipedia.org/wiki/Rat_king"
+    },
+    {
+      "id": "w319288",
+      "cat": "wiki",
+      "sub": "transgressive",
+      "label": "Chris Burden",
+      "url": "https://en.wikipedia.org/wiki/Chris_Burden"
+    },
+    {
+      "id": "w16274415",
+      "cat": "wiki",
+      "sub": "literature",
+      "label": "Wild Seed (novel)",
+      "url": "https://en.wikipedia.org/wiki/Wild_Seed_(novel)"
+    },
+    {
+      "id": "w42371992",
+      "cat": "wiki",
+      "sub": "science",
+      "label": "Dual consciousness",
+      "url": "https://en.wikipedia.org/wiki/Dual_consciousness"
+    },
+    {
+      "id": "w3449517",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Aghori",
+      "url": "https://en.wikipedia.org/wiki/Aghori"
+    },
+    {
+      "id": "w30873666",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "Shugborough inscription",
+      "url": "https://en.wikipedia.org/wiki/Shugborough_inscription"
+    },
+    {
+      "id": "rd1gl7s0p",
+      "cat": "read",
+      "sub": "poem",
+      "label": "When I Roved a Young Highlander",
+      "url": "https://www.google.com/search?q=When%20I%20Roved%20a%20Young%20Highlander%20George%20Gordon%2C%20Lord%20Byron"
+    },
+    {
+      "id": "w520066",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "History of cryptography",
+      "url": "https://en.wikipedia.org/wiki/History_of_cryptography"
+    },
+    {
+      "id": "w19403070",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Merzbow",
+      "url": "https://en.wikipedia.org/wiki/Merzbow"
+    },
+    {
+      "id": "rd1y6xirw",
+      "cat": "read",
+      "sub": "poem",
+      "label": "The Moon Maiden's Song",
+      "url": "https://www.google.com/search?q=The%20Moon%20Maiden's%20Song%20Ernest%20Dowson"
+    },
+    {
+      "id": "rduys8y9",
+      "cat": "read",
+      "sub": "poem",
+      "label": "In Memoriam A.H.H.: 3. O Sorrow, cruel fellowship",
+      "url": "https://www.google.com/search?q=In%20Memoriam%20A.H.H.%3A%203.%20O%20Sorrow%2C%20cruel%20fellowship%20Lord%20Alfred%20Tennyson"
+    },
+    {
+      "id": "w1860469",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Oomancy",
+      "url": "https://en.wikipedia.org/wiki/Oomancy"
+    },
+    {
+      "id": "w2923417",
+      "cat": "wiki",
+      "sub": "science",
+      "label": "Interprime",
+      "url": "https://en.wikipedia.org/wiki/Interprime"
+    },
+    {
+      "id": "w14538879",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Yom hillula",
+      "url": "https://en.wikipedia.org/wiki/Yom_hillula"
+    },
+    {
+      "id": "w72705",
+      "cat": "wiki",
+      "sub": "mysteries",
+      "label": "Out-of-place artifact",
+      "url": "https://en.wikipedia.org/wiki/Out-of-place_artifact"
+    },
+    {
+      "id": "rd6u45wk",
+      "cat": "read",
+      "sub": "novel",
+      "label": "The lesser Key of Solomon, Goetia, the book of evil spirits ",
+      "url": "https://www.gutenberg.org/ebooks/72679"
+    },
+    {
+      "id": "w226497",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "The Haçienda",
+      "url": "https://en.wikipedia.org/wiki/The_Ha%C3%A7ienda"
+    },
+    {
+      "id": "rd104wlga",
+      "cat": "read",
+      "sub": "poem",
+      "label": "Life",
+      "url": "https://www.google.com/search?q=Life%20Charlotte%20Bronte"
+    },
+    {
+      "id": "w21442",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Necronomicon",
+      "url": "https://en.wikipedia.org/wiki/Necronomicon"
+    },
+    {
+      "id": "w33599991",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Riot grrrl",
+      "url": "https://en.wikipedia.org/wiki/Riot_grrrl"
+    },
+    {
+      "id": "w515395",
+      "cat": "wiki",
+      "sub": "history",
+      "label": "Göbekli Tepe",
+      "url": "https://en.wikipedia.org/wiki/G%C3%B6bekli_Tepe"
+    },
+    {
+      "id": "w46064",
+      "cat": "wiki",
+      "sub": "literature",
+      "label": "Story of O",
+      "url": "https://en.wikipedia.org/wiki/Story_of_O"
+    },
+    {
+      "id": "rdj9lw7m",
+      "cat": "read",
+      "sub": "novel",
+      "label": "Meditations",
+      "url": "https://www.gutenberg.org/ebooks/2680"
+    },
+    {
+      "id": "web18yiyty",
+      "cat": "web",
+      "sub": "site",
+      "label": "Storefront Church – Blue Movie",
+      "url": "https://thequietus.com/quietus-reviews/storefront-church-blue-movie-review/"
+    },
+    {
+      "id": "web1tjevt5",
+      "cat": "web",
+      "sub": "comic",
+      "label": "They’re going to kill us all to build a beach resort",
+      "url": "https://catandgirl.com/theyre-going-to-kill-us-all-to-build-a-beach-resort/"
+    },
+    {
+      "id": "rda944er",
+      "cat": "read",
+      "sub": "novel",
+      "label": "The Satires of Juvenal, Persius, Sulpicia, and Lucilius",
+      "url": "https://www.gutenberg.org/ebooks/50657"
+    },
+    {
+      "id": "w43304976",
+      "cat": "wiki",
+      "sub": "transgressive",
+      "label": "Megumi Igarashi",
+      "url": "https://en.wikipedia.org/wiki/Megumi_Igarashi"
+    },
+    {
+      "id": "w577026",
+      "cat": "wiki",
+      "sub": "music",
+      "label": "Boredoms",
+      "url": "https://en.wikipedia.org/wiki/Boredoms"
+    },
+    {
+      "id": "gn2yv5w",
+      "cat": "game",
+      "sub": "survivors",
+      "label": "Flint Cave Horde"
+    },
+    {
+      "id": "w210019",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Edward Kelley",
+      "url": "https://en.wikipedia.org/wiki/Edward_Kelley"
+    },
+    {
+      "id": "w84098688",
+      "cat": "wiki",
+      "sub": "occult",
+      "label": "Zadanfarrukh Andarzgar",
+      "url": "https://en.wikipedia.org/wiki/Zadanfarrukh_Andarzgar"
+    },
+    {
+      "id": "gi5xcjz",
+      "cat": "game",
+      "sub": "ski",
+      "label": "Basalt Downhill"
+    },
+    {
+      "id": "vxhHUGAfuysM",
+      "cat": "video",
+      "sub": "literature",
+      "label": "Thanksgiving Prayer - By William S Burroughs Read by JC Denton (AI Reading)",
+      "vid": "xhHUGAfuysM"
+    },
     {
       "id": "w26056",
       "cat": "wiki",
