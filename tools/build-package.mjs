@@ -322,7 +322,7 @@ async function ytSearch(query, sort = 'relevance') {
     if (o.videoRenderer?.videoId) {
       const v = o.videoRenderer;
       found.push({ vid: v.videoId, title: ytText(v.title), channel: ytText(v.ownerText) || ytText(v.longBylineText), dur: v.lengthText?.simpleText || '', published: ytText(v.publishedTimeText) || ytAgo({ a: v.title?.accessibility, b: v.accessibility, c: v.publishedTimeText, d: v.lengthText?.accessibility }) || ytAgo(v),
-        desc: (v.detailedMetadataSnippets || []).map((s) => ytText(s.snippetText)).join(' ') || ytText(v.descriptionSnippet) });
+        desc: (v.detailedMetadataSnippets || []).map((s) => ytText(s.snippetText)).join(' ') || ytText(v.descriptionSnippet), raw: found.length ? undefined : `videoRenderer ${Object.keys(v).join(',')} ${clip(JSON.stringify(v.publishedTimeText || v.viewCountText || ''), 200)}` });
       return;
     }
     // newer result layout
@@ -331,7 +331,7 @@ async function ytSearch(query, sort = 'relevance') {
       const md = lv.metadata?.lockupMetadataViewModel;
       const parts = (md?.metadata?.contentMetadataViewModel?.metadataRows || []).flatMap((r) => (r.metadataParts || []).map((p) => ytText(p.text))).filter(Boolean);
       const dur = (JSON.stringify(lv.contentImage || {}).match(/"(?:text|content)":"(\d{1,2}(?::\d\d){1,2})"/) || [])[1] || '';
-      found.push({ vid: lv.contentId, title: ytText(md?.title), channel: parts[0] || '', dur, published: parts.find((p) => /\bago\b/.test(p)) || ytAgo(lv) });
+      found.push({ vid: lv.contentId, title: ytText(md?.title), channel: parts[0] || '', dur, published: parts.find((p) => /\bago\b/.test(p)) || ytAgo(lv), raw: found.length ? undefined : `lockup parts=${JSON.stringify(parts).slice(0, 300)}` });
       return;
     }
     if (o.reelItemRenderer?.videoId) {
@@ -366,6 +366,26 @@ function aiMarked(title, channel, ...rest) {
   return null;
 }
 // YouTube's own disclosure ("How this content was made: Altered or synthetic content"), not any page text
+// the upload date from a watch page even behind a bot check: SEO meta tags, the microformat, or the "dateText" line
+const MONTH_DATE = /\b([A-Z][a-z]{2,8}\.? \d{1,2}, (?:19|20)\d\d)\b/;
+function pageDate(html) {
+  const m = html.match(/itemprop="(?:datePublished|uploadDate)"\s+content="(\d{4}-\d\d-\d\d)/) || html.match(/"(?:publishDate|uploadDate)":\{?"?(?:simpleText":")?(\d{4}-\d\d-\d\d)/);
+  if (m) return m[1];
+  const d = (html.match(/"dateText":\{"simpleText":"([^"]{4,60})"/) || [])[1];
+  const md = d && MONTH_DATE.exec(d);
+  const t = md ? Date.parse(md[1].replace('.', '')) : NaN;
+  return isNaN(t) ? '' : new Date(t).toISOString().slice(0, 10);
+}
+// innertube "next" (the watch page's side data), which a bot check on the player usually spares
+async function nextDate(vid) {
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const r = await fetch('https://www.youtube.com/youtubei/v1/next?prettyPrint=false', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json', 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.8' },
+      body: JSON.stringify({ videoId: vid, context: { client: { clientName: 'WEB', clientVersion: '2.20250101.00.00', hl: 'en', gl: config.videoRegion || 'US' } } }) });
+    if (!r.ok) return '';
+    return pageDate(await r.text());
+  } catch { return ''; } finally { clearTimeout(timer); }
+}
 const syntheticLabel = (html) => { const i = html.indexOf('howThisWasMadeSectionViewModel'); return i >= 0 && /altered or synthetic/i.test(html.slice(i, i + 4000)); };
 // Checks that a video plays embedded and is not blocked in config.videoRegion
 // (YouTube's own watch-page data); falls back to oEmbed when the page can't be read.
@@ -374,6 +394,7 @@ const syntheticLabel = (html) => { const i = html.indexOf('howThisWasMadeSection
 async function playable(vid) {
   const region = config.videoRegion, vc = (report.sources.videoChecks ||= {});
   const tally = (k) => { vc[k] = (vc[k] || 0) + 1; };
+  let date = '';
   try {
     const html = await fetchText(`https://www.youtube.com/watch?v=${vid}&hl=en`, { ua: BROWSER_UA, headers: { Cookie: 'CONSENT=YES+cb; SOCS=CAI' }, retries: 1, timeout: 15000 });
     const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]+?\})\s*;\s*(?:var\s|<\/script>)/);
@@ -383,7 +404,7 @@ async function playable(vid) {
       const ps = pr.playabilityStatus || {};
       const why = `${ps.reason || ''} ${JSON.stringify(ps.errorScreen || '').slice(0, 600)}`;
       // a bot check or sign-in wall says nothing about the video itself: ask oEmbed instead
-      if (ps.status && ps.status !== 'OK' && /not a bot|unusual traffic|sign in to confirm(?! your age)/i.test(why)) tally('watch page bot check');
+      if (ps.status && ps.status !== 'OK' && /not a bot|unusual traffic|sign in to confirm(?! your age)/i.test(why)) { tally('watch page bot check'); date = pageDate(html); }
       else if (ps.status && ps.status !== 'OK') { tally(`status ${ps.status}`); return null; }
       else if (ps.playableInEmbed === false) { tally('embedding off'); return null; }
       else {
@@ -399,7 +420,11 @@ async function playable(vid) {
   try {
     const j = await fetchJSON(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${vid}`)}&format=json`, { retries: 1, timeout: 10000 });
     tally(j?.title ? 'oembed ok' : 'oembed empty');
-    return j && j.title ? j : null;
+    if (!j || !j.title) return null;
+    if (date) tally('date from watch page');
+    else if ((date = await nextDate(vid))) tally('date from next');
+    else tally('no date');
+    return { ...j, date };
   } catch { tally('oembed failed'); return null; }
 }
 // The owner wants older, human-made videos: uploads 5–20 years old come first (config.videoAge),
@@ -430,6 +455,7 @@ async function buildVideos() {
     const dedup = [...new Map(fresh.map((v) => [v.vid, v])).values()];
     const clean = dedup.filter((v) => { const why = aiMarked(v.title, v.channel, v.desc); return why ? drop(v, why) : true; });
     for (const v of clean) { const a = ytAge(v.published); if (a != null) { stat.searchDated++; if (tier(a) === 0) stat.searchInRange++; } }
+    if (!report.sources.videoSample && clean[0]?.raw && ytAge(clean[0].published) == null) report.sources.videoSample = clean[0].raw;
     const ranked = clean.map((v, i) => ({ v, i, t: tier(ytAge(v.published), v.short), k: kw && kw.test(v.title) ? 0 : 1 }))
       .sort((a, b) => a.t - b.t || a.k - b.k || a.i - b.i).map((x) => x.v);
     const uniq = ranked.slice(0, Math.ceil(quota * 1.8));

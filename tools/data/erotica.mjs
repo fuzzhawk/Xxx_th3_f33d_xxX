@@ -70,14 +70,14 @@ export const eroticaWorks = [
     ] },
   { key: 'perfumed', search: 'perfumed garden', title: /perfumed garden/i, book: 'The Perfumed Garden (tr. Burton)', by: 'Sheikh Nefzaoui', year: 1886, kind: 'novel',
     picks: [{ at: 'that there are women of all sorts', n: 2, title: 'Concerning praiseworthy women' }] },
-  { key: 'nights', search: 'thousand nights', title: /thousand nights|arabian nights/i, book: 'The Arabian Nights', by: 'Anonymous', kind: 'novel', multi: 4,
+  { key: 'nights', search: 'thousand nights', title: /thousand nights|arabian nights/i, ids: [51252], book: 'The Arabian Nights', by: 'Anonymous', kind: 'novel', multi: 4,
     picks: [{ at: ['there was a Porter in Baghdad', 'in the city of Baghdad a porter', 'a porter in the city of Baghdad'], n: 6, title: 'The porter and the ladies of Baghdad' }] },
-  { key: 'ovid', search: 'ovid art of love', title: /art of love|amores|amours|love books/i, author: /ovid/i, book: 'The Art of Love', by: 'Ovid', year: 'c. 2 AD', kind: 'poem', multi: 2,
+  { key: 'ovid', search: 'ovid art of love', title: /art of love|amores|amours|love books/i, author: /ovid/i, ids: [31036], book: 'The Art of Love', by: 'Ovid', year: 'c. 2 AD', kind: 'poem', multi: 2,
     auto: { count: 2, span: [0.15, 1] } },
-  { key: 'sappho', search: 'sappho', title: /sappho/i, book: 'Sappho', by: 'Sappho', year: 'c. 600 BC', kind: 'poem', multi: 2,
+  { key: 'sappho', search: 'sappho', title: /sappho/i, ids: [42166], book: 'Sappho', by: 'Sappho', year: 'c. 600 BC', kind: 'poem', multi: 2,
     auto: { count: 3, span: [0.05, 1] } },
   // the songs of Bilitis' girlhood come first; only the courtesan years and the tombs at the end
-  { key: 'bilitis', search: 'songs of bilitis', title: /bilitis/i, book: 'The Songs of Bilitis', by: 'Pierre Louÿs', year: 1894, kind: 'novel',
+  { key: 'bilitis', search: 'songs of bilitis', title: /bilitis/i, ids: [76646], book: 'The Songs of Bilitis', by: 'Pierre Louÿs', year: 1894, kind: 'novel',
     auto: { count: 2, span: [0.88, 1], prose: true } }
 ];
 
