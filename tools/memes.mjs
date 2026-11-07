@@ -60,7 +60,11 @@ export function memesBuilder(K) {
     const short = (t) => t.replace(/ \(.*\)$/, '');
     const factText = (f) => (f ? `${f.title} ${f.hook}` : '');
     // same topic as f, scored by shared themes and words with the lead material
-    const relatedFact = (f, not, lead) => bestBy((bySub[f?.sub] || facts).filter((x) => !not.includes(x)), (x) => overlap(themesOf(factText(x)), themesOf(lead)) * 2 + sharedWords(factText(x), lead));
+    // (any topic once the fact's own topic runs out)
+    const relatedFact = (f, not, lead) => {
+      const own = (bySub[f?.sub] || []).filter((x) => !not.includes(x)), pool = own.length ? own : facts.filter((x) => x && !not.includes(x));
+      return pool.length ? bestBy(pool, (x) => overlap(themesOf(factText(x)), themesOf(lead)) * 2 + sharedWords(factText(x), lead)) : undefined;
+    };
     const imageFor = (text) => { const th = themesOf(text); const im = bestBy(commons, (x) => overlap(themesOf(imgText(x)), th) * 3 + sharedWords(imgText(x), text) * 2 - (used.get(x.img) || 0) * 2, 60); used.set(im.img, (used.get(im.img) || 0) + 1); return im; };
     const yearOf = (t) => (String(t).match(/\b(1[0-9]{3}|20[0-2][0-9])\b/) || [])[1];
     let guard = 0;
@@ -72,6 +76,7 @@ export function memesBuilder(K) {
       const q = shortQ.length ? bestBy(shortQ, (x) => overlap(themesOf(x.text), themesOf(fT)) * 2 + sharedWords(x.text, fT) * 2) : { text: 'Only the madman is absolutely sure.', author: 'Robert Anton Wilson' };
       const lead = `${fT} ${q.text}`;
       const f2 = relatedFact(f, [f], lead), f3 = relatedFact(f, [f, f2], lead), f4 = relatedFact(f, [f, f2, f3], lead);
+      if (!f || ((!f2 || !f3) && /^(venn|placard|align|triptych|flow|graph)$/.test(style))) continue;
       const usesQuote = (s3) => /\{quote|\{author|quoteA/.test(s3);
       const factLower = f ? f.hook.replace(/\.$/, '').replace(/^(\S)/, (c) => (/^[A-Z][a-z]+ [a-z]/.test(f.hook) ? c.toLowerCase() : c)) : 'nothing is true';
       const words = q.text.split(' '), half = Math.ceil(words.length / 2);
