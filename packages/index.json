@@ -21,7 +21,29 @@
         "read": 152
       },
       "estHours": 36.2
+    },
+    {
+      "id": "2026-W45",
+      "title": "The Feed · 2026-W45",
+      "created": "2026-11-07T22:35:14.543Z",
+      "total": 5215,
+      "counts": {
+        "game": 1040,
+        "wiki": 996,
+        "video": 937,
+        "meme": 520,
+        "product": 208,
+        "psych": 208,
+        "selfcare": 260,
+        "web": 260,
+        "news": 215,
+        "oracle": 156,
+        "power": 104,
+        "studio": 104,
+        "read": 207
+      },
+      "estHours": 38.3
     }
   ],
-  "latest": "2026-W43"
+  "latest": "2026-W45"
 }

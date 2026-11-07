@@ -1,0 +1,639 @@
+{
+  "id": "2026-W45",
+  "title": "The Feed · 2026-W45",
+  "created": "2026-11-07T22:35:14.543Z",
+  "total": 5215,
+  "counts": {
+    "game": 1040,
+    "wiki": 996,
+    "video": 937,
+    "meme": 520,
+    "product": 208,
+    "psych": 208,
+    "selfcare": 260,
+    "web": 260,
+    "news": 215,
+    "oracle": 156,
+    "power": 104,
+    "studio": 104,
+    "read": 207
+  },
+  "estHours": 38.3,
+  "categories": {
+    "game": {
+      "label": "Physics games",
+      "pct": 20
+    },
+    "wiki": {
+      "label": "Condensed Wikipedia",
+      "pct": 23
+    },
+    "video": {
+      "label": "Videos",
+      "pct": 18
+    },
+    "meme": {
+      "label": "Memes",
+      "pct": 10
+    },
+    "product": {
+      "label": "Made-up products",
+      "pct": 4
+    },
+    "psych": {
+      "label": "Psychedelic",
+      "pct": 4
+    },
+    "selfcare": {
+      "label": "Self-care",
+      "pct": 5
+    },
+    "web": {
+      "label": "From the web",
+      "pct": 5
+    },
+    "news": {
+      "label": "News",
+      "pct": 0
+    },
+    "oracle": {
+      "label": "Oracle",
+      "pct": 3
+    },
+    "power": {
+      "label": "Power scale",
+      "pct": 2
+    },
+    "studio": {
+      "label": "Studio",
+      "pct": 2
+    },
+    "read": {
+      "label": "Long reads",
+      "pct": 4
+    }
+  },
+  "topics": {
+    "wiki": {
+      "music": "Music history",
+      "literature": "Literature",
+      "science": "Science",
+      "history": "History",
+      "transgressive": "Transgressive art",
+      "mysteries": "Unsolved mysteries",
+      "occult": "Occult & religious customs",
+      "theory": "Music theory",
+      "math": "Mathematics",
+      "biology": "Biology",
+      "offbeat": "Offbeat history"
+    },
+    "video": {
+      "animals": "Cute animals",
+      "retrogaming": "Retro gaming",
+      "vintagescifi": "Vintage sci-fi & fantasy",
+      "music": "Music history",
+      "literature": "Literature",
+      "science": "Science",
+      "history": "History",
+      "transgressive": "Transgressive art",
+      "mysteries": "Unsolved mysteries",
+      "occult": "Occult & religious customs"
+    },
+    "game": {
+      "plinko": "Plinko",
+      "breakout": "Breakout",
+      "merge": "Merge",
+      "dash": "Dash",
+      "flappy": "Flap",
+      "tetris": "Tetris",
+      "pong": "Pong",
+      "peggle": "Peg Shot",
+      "juggle": "Juggle",
+      "platformer": "Platformer",
+      "racer": "Road Racer",
+      "raycast": "Hell Maze",
+      "rocks": "Rocks",
+      "sling": "Slingshot",
+      "chess": "Chess",
+      "dice": "Yacht Dice",
+      "cards": "Joker Hands",
+      "monsters": "Monster Battle",
+      "fighter": "Street Brawl",
+      "starfox": "Sky Fox",
+      "expedition": "Expeditions",
+      "ski": "Downhill",
+      "graves": "Grave Merge",
+      "survivors": "Cave Horde",
+      "robotron": "Robo Arena",
+      "crokinole": "Crokinole",
+      "wordle": "Five Letters",
+      "bee": "Spelling Hive",
+      "wordsearch": "Word Search",
+      "wheel": "Letter Wheel",
+      "hangman": "Hangman",
+      "vocab": "Vocab Quiz",
+      "ladder": "Word Ladder",
+      "t2048": "2048",
+      "arrows": "Arrow Escape",
+      "jrpg": "Crystal Quest",
+      "hack": "Crypt Hack",
+      "outland": "Outland"
+    },
+    "web": {
+      "hn": "Hacker News",
+      "site": "Sites",
+      "comic": "Comics",
+      "reddit": "Reddit"
+    },
+    "oracle": {
+      "tarot": "Tarot",
+      "iching": "I Ching",
+      "augury": "Augury",
+      "dnd": "Adventurer",
+      "haruspicy": "Haruspicy",
+      "dice": "Dice",
+      "die": "One die",
+      "sigil": "Sigil",
+      "paradigm": "Paradigm shift",
+      "ritual": "Random ritual"
+    },
+    "studio": {
+      "prompt": "Writing prompt",
+      "blank": "Blank page",
+      "rhyme": "Rhyming dictionary",
+      "creator": "Character creator"
+    },
+    "read": {
+      "novel": "Novels",
+      "poem": "Poems",
+      "article": "Articles"
+    },
+    "news": {
+      "mideast": "Middle East / Palestine",
+      "globalsouth": "Anti-imperialist / Global South",
+      "usleft": "US left",
+      "wire": "Wire services"
+    }
+  },
+  "files": {
+    "game": "game.json",
+    "wiki": "wiki.json",
+    "video": "video.json",
+    "meme": "meme.json",
+    "product": "product.json",
+    "psych": "psych.json",
+    "selfcare": "selfcare.json",
+    "web": "web.json",
+    "news": "news.json",
+    "oracle": "oracle.json",
+    "power": "power.json",
+    "studio": "studio.json",
+    "read": "read.json"
+  },
+  "sprites": "sprites.json",
+  "themes": "themes.json",
+  "textures": "textures.json",
+  "backgrounds": "backgrounds.json",
+  "oracle": "tarot.json",
+  "vocab": "vocab.json",
+  "prompt": "# The Feed — package prompt\n\nThis is the living spec for each weekly package. It is editable from the app\n(Settings → Package prompt) and synced back here. Each new package is\ngenerated from this file, `tools/data/config.json`, and the newest file in\n`feedback/`.\n\n## Goals\n- Replace 3–5 hours/day of doomscrolling with a feed that is curious, weird and kind.\n- One package lasts a full week (target: 5 h/day × 7 days) with **no repeated posts**,\n  and nothing repeated from earlier packages.\n- Mostly offline. Only videos (and, optionally, images) need the network.\n- Keep AI-generated images and text to a minimum unless a category asks for it.\n- Use favorites, saves and more/less marks from `feedback/` to steer the next package.\n\n## Categories and share of the feed\n\n### Physics games — 20%\nSimple 2D physics games: bouncing objects, merging items, breaking blocks,\nside-scrolling dash mechanics and other classic casual styles. Each card runs on\nauto-pilot when it appears and becomes playable when tapped.\n\n### Condensed Wikipedia — 30%\nArticles condensed to 5 sentences or fewer. Each card shows a one-sentence hook;\ntapping it expands the summary and links to the full article. Topics:\n- **Music history**: all genres, especially underground trip-hop, punk, avant-garde,\n  electronic, hip-hop, heavy metal and transgressive experimental.\n- **Literature**: all genres, especially sci-fi, sex and erotica, Beat Generation authors,\n  esoteric and occult, experimental, offbeat non-fiction, poetry and alternative science.\n- **Science**: especially biology, sociology, psychology, technology and mathematics.\n- **History**: especially revolutionary periods, indigenous history and art history.\n- **Transgressive art**: especially queer artists and artists imprisoned or persecuted for their work.\n- **Unsolved mysteries**: especially esoteric and supernatural mysteries.\n- **Occult and religious customs**: indigenous spirituality, Gnosticism and cult activities.\n\n### YouTube videos — 20%\nMostly short videos and reels. They autoplay muted and have an unmute button. Topics:\ncute animals, retro gaming, vintage sci-fi and fantasy films and shows, plus every\nWikipedia topic above.\n\n### Memes — 10%\nHumorous images juxtaposed with snippets from the Wikipedia section, plus quotes\nfrom Robert Anton Wilson, William S. Burroughs, Tom Robbins and other offbeat authors.\nAlso memes collected from knowyourmeme.com.\n\n### Made-up products — 5%\nWeird, absurd products that don't exist and serve surreal purposes, with 80s/90s-style\npromo graphics and absurdist product descriptions.\n\n### Psychedelic visuals — 5%\nFractals, tunnels, fading colors and other generative, math-based imagery, each with a\nshort quote from the sections above.\n\n### Self-care reminders — 5%\nPrompts to make art and music, go for walks, work out, breathe, meditate and so on.\n\n### From around the web — 5%\nCarefully picked posts and articles from Substack, Hacker News and occasionally Reddit,\nchosen to match the topics above.\n",
+  "report": {
+    "sources": {
+      "wikiquote": 4053,
+      "erotica": {
+        "venus": 5,
+        "decameron": 3,
+        "catullus": 5,
+        "song": 5,
+        "whitman": 6,
+        "swinburne": 4,
+        "kamasutra": 3,
+        "fannyhill": 2,
+        "perfumed": 0,
+        "nights": 1,
+        "ovid": 0,
+        "sappho": 3,
+        "bilitis": 0
+      },
+      "eroticaBooks": {
+        "venus": "#6852 Venus in Furs",
+        "decameron": "#23700 The Decameron of Giovanni Boccaccio",
+        "catullus": "#20732 The Carmina of Caius Valerius Catullus",
+        "song": "#8022 The Bible, King James version, Book 22: Song of Solomon",
+        "whitman": "#1322 Leaves of Grass",
+        "swinburne": "#35402 Poems & Ballads (First Series)",
+        "kamasutra": "#27827 The Kama Sutra of Vatsyayana",
+        "fannyhill": "#25305 Memoirs of Fanny Hill",
+        "perfumed": "none",
+        "nights": "#51252 The Book of the Thousand Nights and a Night — Volume 01 (of 10)",
+        "ovid": "none",
+        "sappho": "#42166 The Poems of Sappho: An Interpretative Rendition into English",
+        "bilitis": "none"
+      },
+      "wikipedia": 996,
+      "videoChecks": {
+        "watch page bot check": 336,
+        "oembed ok": 1671,
+        "date from watch page": 332,
+        "status LOGIN_REQUIRED": 1,
+        "oembed failed": 16,
+        "watch page failed": 1351,
+        "date from next": 1339
+      },
+      "youtube": 937,
+      "videoAges": {
+        "aiDropped": 27,
+        "inRange": 901,
+        "older": 0,
+        "newer": 36,
+        "undated": 0,
+        "searchDated": 1553,
+        "searchInRange": 1169
+      },
+      "videoDropped": [
+        {
+          "title": "Top 5 Funny Dog Moments Caught on Camera 😂",
+          "channel": "",
+          "why": "Top 5"
+        },
+        {
+          "title": "Kitten Builds a Tesla Cybertruck for Daddy from Old Scraps 🤖🚗💥 #viralvideo #cat #funny…",
+          "channel": "Meow-curious",
+          "why": "#ai"
+        },
+        {
+          "title": "#puppy #funny #AI #comedy",
+          "channel": "",
+          "why": "AI"
+        },
+        {
+          "title": "I Translated My Husky Puppy’s Speech 🎤 He Has Complaints 😤 #shorts #husky #aianimation",
+          "channel": "",
+          "why": "#aianimation"
+        },
+        {
+          "title": "The Lost Mario 64 Sequel Commercial (Sora 2)",
+          "channel": "",
+          "why": "Sora 2"
+        },
+        {
+          "title": "POKE 56576,1 for Unlimited AI - A Commodore 64 Demo by Trident/Active",
+          "channel": "",
+          "why": "AI"
+        },
+        {
+          "title": "Top 10 Underrated SNES Games",
+          "channel": "",
+          "why": "Top 10"
+        },
+        {
+          "title": "Top 5 Games that Defined the Atari 2600",
+          "channel": "",
+          "why": "Top 5"
+        },
+        {
+          "title": "Futures of The Past - 1950s Sci-Fi - AI Microfilm",
+          "channel": "Ai Fascinated",
+          "why": "AI"
+        },
+        {
+          "title": "Gilligan's Island as a 1970s Grindhouse Horror - Super Panavision 70",
+          "channel": "A.I. Film Forge",
+          "why": "A.I."
+        },
+        {
+          "title": "Lost in Space as a 1980's Dark Sci Fi Fantasy - Super Panavision 70",
+          "channel": "A.I. Film Forge",
+          "why": "A.I."
+        },
+        {
+          "title": "Project Icarus | Bioshock Movie, Netflix Style Trailer - 1960s #filmnoir #ai #shorts",
+          "channel": "",
+          "why": "#ai"
+        },
+        {
+          "title": "Silent Running: The Truth About Lowell #chatgpt #shorts #viral",
+          "channel": "",
+          "why": "chatgpt"
+        },
+        {
+          "title": "Logan's Run - 1950's Super Panavision 70 (Retro Trailer)",
+          "channel": "SKSenior",
+          "why": "AI image"
+        },
+        {
+          "title": "The Fantastic Four - 1950's Super Panavision 70 | A.I. Concept Trailer",
+          "channel": "AI Golden Age Studios",
+          "why": "A.I."
+        },
+        {
+          "title": "Forbidden Planet - AI \"image to video\"",
+          "channel": "",
+          "why": "AI"
+        },
+        {
+          "title": "Top 7 Industrial Albums",
+          "channel": "",
+          "why": "Top 7"
+        },
+        {
+          "title": "Speculative Documentary challenges AI Generative Music",
+          "channel": "",
+          "why": "AI"
+        },
+        {
+          "title": "Tubeway Army - Are 'Friends' Electric? |Top Of The Pops| (1979) (AI Upscale, 60fps)",
+          "channel": "Marko Jelenek",
+          "why": "AI"
+        },
+        {
+          "title": "Top 5 Trip Hop - Of All Time",
+          "channel": "",
+          "why": "Top 5"
+        },
+        {
+          "title": "Who Programs the Programmers? | AI & Robert Anton Wilson",
+          "channel": "",
+          "why": "AI"
+        },
+        {
+          "title": "Cosmic Trigger - The Life and Teachings of Robert Anton Wilson",
+          "channel": "Dave the Dude",
+          "why": "InVideo AI"
+        },
+        {
+          "title": "AI WEI WEI: BUTTONS UP ART EXHIBITION #thatafricansojourner #vlog #eziijude #aiweiwei…",
+          "channel": "",
+          "why": "AI"
+        },
+        {
+          "title": "#Ai WeiWei #art #exhibition #button up #manchester",
+          "channel": "",
+          "why": "#Ai"
+        },
+        {
+          "title": "AI WEIWEI: NEVER SORRY - Official Trailer",
+          "channel": "Independent Film Company",
+          "why": "AI"
+        }
+      ],
+      "hackernews": 518,
+      "sites": {
+        "Tildes ~science": 8,
+        "Tildes ~books": 8,
+        "Tildes ~music": 8,
+        "MetaFilter": 9,
+        "Tildes ~arts": 6,
+        "Tildes ~humanities": 6,
+        "Lobsters": 25,
+        "Slashdot": 12,
+        "Kottke": 15,
+        "JSTOR Daily": 10,
+        "Atlas Obscura": 20,
+        "Nautilus": 10,
+        "Quanta Magazine": 5,
+        "The Public Domain Review": 15,
+        "Aeon": 15,
+        "The Marginalian": 12,
+        "Hyperallergic": 15,
+        "Hackaday": 7,
+        "Open Culture": 15,
+        "The Daily Grail": 10,
+        "The Quietus": 15,
+        "Colossal": 10,
+        "Experimental History": 6,
+        "Everlasting Blort": 12
+      },
+      "comics": 236,
+      "comicSources": {
+        "SMBC": 15,
+        "Existential Comics": 12,
+        "Dinosaur Comics": 10,
+        "The Perry Bible Fellowship": 10,
+        "Wondermark": 10,
+        "Cat and Girl": 10,
+        "Poorly Drawn Lines": 10,
+        "Oglaf": 12,
+        "False Knees": 10,
+        "Buttersafe": 8,
+        "War and Peas": 8,
+        "Deep Dark Fears": 8,
+        "Zen Pencils": 6,
+        "PhD Comics": 5,
+        "Math with Bad Drawings": 6,
+        "Achewood": 8,
+        "Oh Joy Sex Toy": 8,
+        "Moonbeard": 2,
+        "Extra Fabulous Comics": 8,
+        "xkcd": 40,
+        "Little Nemo in Slumberland": 6,
+        "Dream of the Rarebit Fiend": 6,
+        "Krazy Kat": 6,
+        "The Upside Downs": 6,
+        "Little Sammy Sneeze": 6
+      },
+      "reddit": 25,
+      "commons": 853,
+      "knowyourmeme": 0,
+      "sprites": 29,
+      "moreSprites": "32/43",
+      "spriteGroups": {
+        "animal": 11,
+        "plant": 5,
+        "body": 2,
+        "food": 6,
+        "clothing": 10,
+        "creature": 2,
+        "object": 11,
+        "tool": 5,
+        "music": 1,
+        "tech": 8
+      },
+      "backgrounds": {
+        "groups": 24,
+        "images": 567,
+        "per": {
+          "storm": "24: commons 18/22 [shape 1 reject 3], commons 36/40 [small 2 shape 2]",
+          "golden": "24: commons 19/37 [reject 14 shape 3 licence 1], commons 33/40 [small 2 reject 1 shape 4], commons 30/40 [shape 4 reject 6]",
+          "fair": "24: commons 20/40 [reject 18 shape 2], commons 27/40 [licence 1 small 4 reject 7 shape 1]",
+          "night": "24: commons 3/8 [shape 3 licence 1 reject 1], commons 33/40 [small 3 reject 4]",
+          "aurora": "24: commons 27/33 [shape 4 reject 2], commons 31/40 [shape 2 small 7]",
+          "mist": "24: commons 37/40 [reject 2 shape 1], commons 36/40 [small 3 reject 1]",
+          "alpine": "24: commons 10/16 [shape 3 reject 3], commons 18/18",
+          "coast": "21: commons 29/40 [shape 2 reject 9], commons 8/28 [reject 20]",
+          "forest": "18: commons 26/40 [reject 13 licence 1], commons 4/4",
+          "desert": "24: commons 19/40 [reject 10 shape 11], commons 35/40 [shape 5]",
+          "north": "24: commons 33/40 [reject 7], commons 30/40 [reject 7 shape 2 licence 1]",
+          "autumn": "24: commons 33/40 [licence 1 reject 6], commons 39/40 [shape 1]",
+          "photochrom": "24: commons 34/40 [reject 6], commons 36/40 [reject 4], commons 36/40 [small 3 reject 1]",
+          "silver": "24: commons 38/40 [reject 2], commons 29/40 [reject 1 small 10], commons 37/40 [small 3]",
+          "hudson": "24: aic 36/36, commons 34/40 [small 6], commons 39/40 [shape 1], met 7/12 [shape 3 reject 1 licence 1], cma 3/3, cma 3/3",
+          "sublime": "24: commons 34/40 [small 3 reject 3], commons 22/22, aic 4/4, cma 2/2",
+          "ukiyoe": "24: aic 46/60 [shape 8 reject 2 type 2 small 2], cma 55/60 [shape 5], cma 25/38 [shape 11 reject 2], met 12/12, commons 36/40 [small 4]",
+          "impressionist": "24: aic 31/32 [reject 1], commons 2/3 [reject 1], cma 8/12 [reject 4], cma 1/1, met 0/12 [licence 12]",
+          "dutch": "24: aic 8/8, commons 29/40 [small 10 reject 1], commons 6/6, cma 6/6",
+          "visionary": "24: commons 35/40 [small 5], commons 35/40 [small 4 shape 1], commons 29/40 [small 6 shape 2 reject 3], commons 21/28 [small 5 reject 1 shape 1], aic 6/7 [shape 1]",
+          "nocturne": "24: commons 18/40 [small 21 shape 1], commons 19/22 [shape 3], aic 24/27 [shape 2 reject 1], commons 24/29 [shape 2 small 3]",
+          "russian": "24: commons 25/40 [reject 5 small 10], commons 31/40 [small 6 reject 2 shape 1], commons 28/40 [small 12], commons 35/40 [small 4 reject 1]",
+          "cloudstudy": "24: commons 11/11, commons 30/40 [shape 1 reject 3 small 6], aic 57/60 [reject 2 shape 1], cma 45/60 [shape 14 reject 1]",
+          "marine": "24: commons 31/40 [reject 2 small 6 shape 1], aic 12/13 [reject 1], cma 4/4, met 9/12 [shape 3]"
+        },
+        "turnedDown": [
+          {
+            "g": "storm",
+            "no": "shape",
+            "t": "Anvil shaped cumulus panorama edit",
+            "u": "a.org&utm_campaign=imageinfo&utm_content=thumbnail",
+            "mime": "image/jpeg",
+            "w": 2500,
+            "h": 1015,
+            "lic": "GFDL 1.2",
+            "keys": "size,width,height,thumburl,thumbwidth,thumbheight,responsiveUrls,thumbattribs,url,descriptionurl,descriptionshorturl,ext"
+          },
+          {
+            "g": "night",
+            "no": "shape",
+            "t": "VallesMarinerisHuge",
+            "u": "a.org&utm_campaign=imageinfo&utm_content=thumbnail",
+            "mime": "image/jpeg",
+            "w": 9002,
+            "h": 3196,
+            "lic": "",
+            "keys": "size,width,height,thumburl,thumbwidth,thumbheight,responsiveUrls,thumbattribs,url,descriptionurl,descriptionshorturl,ext"
+          },
+          {
+            "g": "fair",
+            "no": "reject",
+            "t": "Lunenburg - NS - Lunenburg Academy edit",
+            "u": "a.org&utm_campaign=imageinfo&utm_content=thumbnail",
+            "mime": "image/jpeg",
+            "w": 3303,
+            "h": 2547,
+            "lic": "CC BY-SA 3.0",
+            "keys": "size,width,height,thumburl,thumbwidth,thumbheight,responsiveUrls,thumbattribs,url,descriptionurl,descriptionshorturl,ext"
+          },
+          {
+            "g": "aurora",
+            "no": "shape",
+            "t": "Aurora borealis above Storfjorden and the Lyngen Alps in moo",
+            "u": "a.org&utm_campaign=imageinfo&utm_content=thumbnail",
+            "mime": "image/jpeg",
+            "w": 5580,
+            "h": 1535,
+            "lic": "CC BY-SA 3.0",
+            "keys": "size,width,height,thumburl,thumbwidth,thumbheight,responsiveUrls,thumbattribs,url,descriptionurl,descriptionshorturl,ext"
+          },
+          {
+            "g": "golden",
+            "no": "reject",
+            "t": "Dülmen, Feldweg -- 2014 -- 6696",
+            "u": "a.org&utm_campaign=imageinfo&utm_content=thumbnail",
+            "mime": "image/jpeg",
+            "w": 3453,
+            "h": 5179,
+            "lic": "CC BY-SA 4.0",
+            "keys": "size,width,height,thumburl,thumbwidth,thumbheight,responsiveUrls,thumbattribs,url,descriptionurl,descriptionshorturl,ext"
+          },
+          {
+            "g": "mist",
+            "no": "reject",
+            "t": "Dülmen, Umland, Sonnenaufgang -- 2012 -- 8766",
+            "u": "a.org&utm_campaign=imageinfo&utm_content=thumbnail",
+            "mime": "image/jpeg",
+            "w": 3119,
+            "h": 4463,
+            "lic": "CC BY-SA 4.0",
+            "keys": "size,width,height,thumburl,thumbwidth,thumbheight,responsiveUrls,thumbattribs,url,descriptionurl,descriptionshorturl,ext"
+          }
+        ]
+      },
+      "themes": 65,
+      "textures": 37,
+      "news": {
+        "Drop Site News": 20,
+        "The Electronic Intifada": 20,
+        "The Cradle": 20,
+        "Middle East Eye": 20,
+        "Al Jazeera English": 20,
+        "Mondoweiss": 10,
+        "+972 Magazine": 20,
+        "Tricontinental": 1,
+        "Democracy Now!": 20,
+        "Common Dreams": 20,
+        "Reuters": 20,
+        "AP": 19,
+        "Declassified UK": 4,
+        "Geopolitical Economy Report": 1
+      },
+      "tarotCards": 78,
+      "tarotImages": 144,
+      "power": 192,
+      "vocab": 275,
+      "strips": 104,
+      "memesBuilt": 520,
+      "reads": {
+        "novels": 91,
+        "poems": 67,
+        "articles": 29,
+        "books": 51,
+        "erotica": 37
+      }
+    },
+    "warnings": [
+      "gutendex failed for 14 novel topics, used known books instead: occult (This operation was aborted), ghost stories (This operation was aborted), horror tales (HTTP 403)",
+      "erotica swinburne: \"Sapphics\" not found in #35402",
+      "erotica perfumed: gutendex: gutendex unavailable (refused earlier)",
+      "erotica ovid: no excerpt in #31036 passed the content filters",
+      "erotica ovid: gutendex: gutendex unavailable (refused earlier)",
+      "erotica bilitis: no excerpt in #76646 passed the content filters",
+      "erotica bilitis: gutendex: gutendex unavailable (refused earlier)",
+      "youtube animals: 2/20 searches failed",
+      "youtube retrogaming: 1/14 searches failed",
+      "youtube vintagescifi: 1/18 searches failed",
+      "feed Bandcamp Daily: https://daily.bandcamp.com/feed: no items; no feed found on the home page",
+      "feed Mr. Lovenstein: https://www.mrlovenstein.com/rss.xml: no items; no feed found on the home page",
+      "reddit: 11/12 subreddits unreachable, e.g. occult (HTTP 429), UnresolvedMysteries (HTTP 429), AskHistorians (HTTP 429)",
+      "knowyourmeme https://knowyourmeme.com/memes/trending: HTTP 404",
+      "feed MR Online: https://mronline.org/feed: no items; no feed found on the home page",
+      "vocab rhadamanthine: HTTP 404"
+    ],
+    "memeStyles": {
+      "wanted": 26,
+      "venn": 26,
+      "align": 22,
+      "starter": 20,
+      "post": 20,
+      "brain": 18,
+      "pov": 15,
+      "placard": 23,
+      "triptych": 21,
+      "twopanel": 33,
+      "isthis": 16,
+      "caption": 63,
+      "nobody": 17,
+      "flow": 21,
+      "labels": 26,
+      "impact": 41,
+      "quotecard": 29,
+      "versus": 15,
+      "chyron": 32,
+      "demotivator": 20,
+      "graph": 16
+    },
+    "wanted": {
+      "game": 1040,
+      "wiki": 1196,
+      "video": 936,
+      "meme": 520,
+      "product": 208,
+      "psych": 208,
+      "selfcare": 260,
+      "web": 260,
+      "news": 0,
+      "oracle": 156,
+      "power": 104,
+      "studio": 104,
+      "read": 208
+    }
+  }
+}
