@@ -207,5 +207,62 @@ export const DICE3 = {
 export const QUESTIONS = [
   'Should I text them back?', 'Is today a good day to start something?', 'Will the plan work?', 'Should I go out tonight?', 'Is it time to quit?', 'What should I pay attention to this week?',
   'Will I find what I lost?', 'Should I say yes?', 'Is this a sign?', 'Should I buy the thing?', 'What is blocking me?', 'Will it rain on my parade?', 'Should I trust my gut on this?',
-  'What does the cat know that I don’t?', 'Should I rearrange the furniture?', 'Am I on the right path?', 'Will the meeting go well?', 'Should I learn the accordion?'
+  'What does the cat know that I don’t?', 'Should I rearrange the furniture?', 'Am I on the right path?', 'Will the meeting go well?', 'Should I learn the accordion?',
+  'Should I send the email I wrote at 2 a.m.?', 'Is it okay to leave the party early?', 'Will this phase pass?', 'Should I forgive them?', 'Do I need a haircut or a new life?', 'What am I pretending not to know?',
+  'Is the thing I’m avoiding as bad as I think?', 'Should I move to the other city?', 'Will I ever finish this project?', 'Who should I call today?', 'What is the next small right thing?',
+  'Is it time to clean out the closet, the inbox or the friendship?', 'Should I adopt the dog?', 'Does the stranger on the bus matter?', 'Am I being too hard on myself?', 'What should I stop doing?',
+  'Will they say yes?', 'Should I ask for the raise?', 'What is my houseplant trying to tell me?', 'Is this the week to start over?', 'Should I tell the truth or the funny version?', 'What would I do if I weren’t afraid?',
+  'Is my gut right or just hungry?', 'Should I stay in tonight?', 'Will the weather hold?', 'What am I overlooking?', 'Should I take the long way home?', 'What does the next chapter want from me?',
+  'Is it time to say goodbye to the old phone, the old plan, the old name?', 'Will I get what I’m hoping for?', 'Should I buy the plane ticket?', 'What do I owe myself?', 'Which of my two options is the lie?',
+  'Am I ready?', 'Should I keep the secret?', 'Will I get back what I lent?', 'What is hiding in plain sight?', 'Should I paint the door red?', 'Is it too late, or only late?',
+  'What should I cook for someone I like?', 'Will I sleep tonight?', 'Should I start the novel, the band or the garden?', 'Is the universe nudging me or just noisy?', 'What do I need to hear?', 'Should I delete the app?',
+  'Will it be worth it?', 'What would my future self say?', 'Should I put my phone in a drawer for a day?', 'Is it safe to be happy about this?', 'Who am I when no one is watching?', 'Should I trust the new person?',
+  'What is the most useful thing I could do in the next hour?', 'Will I regret this tattoo?', 'Should I go back to school?', 'What is the lesson in this mess?', 'Should I make the first move?',
+  'Is there a better word for what I’m feeling?', 'Does last night’s dream mean something?', 'Should I give them another chance?', 'Where should I look for what I lost?', 'Should I ignore the noise?', 'What do my hands want to make?',
+  'Am I the villain in someone else’s story?', 'Should I learn to juggle?', 'Will today be strange in a good way?', 'Should I water the plant I’ve been neglecting?', 'What am I waiting for permission to do?',
+  'Is the answer yes and I’m afraid of it?', 'Should I sell it, keep it or give it away?', 'What does the river know about patience?', 'Should I stay up and watch the sunrise?', 'Do I trust the plan or the improvisation?',
+  'Is it time to ask for help?', 'What should I forget on purpose?', 'Will this old song help?', 'Should I speak up in the meeting?', 'What would make tomorrow lighter?', 'Should I get a second opinion?',
+  'Is it a coincidence?', 'What is the pigeon on my windowsill doing there?', 'Should I follow the strange map?', 'How do I make peace with Monday?', 'Will the sourdough rise?', 'Is it wise to say what I really think?',
+  'Should I be doing something else right now?', 'What is the best use of a free afternoon?', 'Should I paint over the old mural?', 'Is my luck turning?', 'Who is thinking about me right now?', 'Should I plant something?',
+  'What is this restlessness for?', 'What do I do with the extra key?', 'Will I make it on time?', 'Should I believe the horoscope or the coin?', 'What does my shadow want?', 'Should I give the speech?',
+  'Am I the one who is lost?', 'Should I take the strange job offer?', 'Is it time to forgive the past me?', 'Should I buy the ridiculous hat?', 'What do I need to say out loud?', 'Will the last piece of cake still be there?',
+  'Should I try the thing I’m bad at?', 'What would a stranger notice about my day?', 'Is it okay to be unreasonably happy?', 'Should I sleep on it or sleep through it?', 'Will they remember my name?',
+  'What is the right size for this ambition?', 'Should I name the plant?', 'What does the next hour need?', 'Is this the right time to reply all?', 'Should I turn the music up?', 'What is the one thing I shouldn’t postpone?',
+  'Should I wear the red one?', 'Will we get lost, and will it be good?', 'What does the empty chair want?', 'Should I take it personally?', 'What would the ghost of this house advise?', 'Should I say sorry first?',
+  'Am I too early or too late?', 'Will the bridge hold?', 'Is it time to stop apologising for taking up space?', 'Should I light a candle?', 'What will surprise me this week?', 'Which door is the real door?',
+  'Do I need rest, or a reason?', 'Should I fix it or let it break?', 'What am I about to learn the hard way?', 'Who is the next person I will make laugh?', 'Should I bring a gift?',
+  'What is the one thing worth finishing today?', 'Should I talk to the mirror?', 'Is the fridge the answer?', 'Will the printer work when it counts?', 'Should I eat the leftovers of unknown age?'
 ];
+
+// ---------------------------------------------------------------- readings
+// How the oracle sounds when it answers: verdicts run from yes through lean, mixed and wait to no.
+export const VERDICT = {
+  yes: ['says yes, and means it', 'is warm toward it, the way a doorway is warm when the light is on', 'nods firmly: the signs line up', 'gives a clear green light'],
+  lean: ['leans yes, though warm isn’t the same as certain', 'tilts toward yes with a few conditions attached', 'is cautiously for it', 'says probably, with one eyebrow raised'],
+  mixed: ['says both, which is its way of saying it depends on how you go about it', 'refuses to pick a side; the outcome is still in your hands', 'shrugs, kindly: the answer is not in the omen, it is in the doing', 'comes back evenly split'],
+  wait: ['asks you to wait', 'says not yet', 'leans no for now, which is different from no for ever', 'would rather you sleep on it'],
+  no: ['says no, and would like you to hear it', 'is cold toward it', 'frowns: the signs do not line up', 'advises against, firmly']
+};
+// something concrete to do, whatever the question was
+export const ADVICE = {
+  yes: ['Take the first step before lunch, while the sign is fresh: a draft, a call, a booking you can still cancel.', 'Say yes out loud to one person today, so that it is a little harder to take back.', 'Do the part you have been rehearsing, and do it badly first; the real version will follow.', 'Clear thirty minutes this afternoon and spend them on this and nothing else.', 'Write down what “success” would look like in one sentence, tape it where you will see it, and begin.', 'Tell the one friend who will be pleased, then act while their cheer is still in your ears.'],
+  lean: ['Go ahead, but make the first move small and reversible, and look at how it feels afterwards.', 'Decide a limit in advance, such as an amount, a time or a number of tries, and then say yes inside it.', 'Do it, and ask one person you trust to check on you in three days.', 'Start with the version that costs least, and let the oracle’s lean turn into a certainty by evidence.', 'Say yes to the part that makes you slightly nervous in a good way and no to the part that makes you tired.'],
+  mixed: ['Flip a coin, and watch what you hope for while it is in the air; that is your answer.', 'List what you would gain and what you would grieve, one line each, then read both aloud to someone.', 'Take the smallest step that keeps both doors open, and decide properly after a night’s sleep.', 'Ask the one question you have been avoiding; the whole reading hinges on its answer.', 'Do half of it today: the half you would be glad to have done whatever happens next.'],
+  wait: ['Give it three days, and in that time collect one new fact; decide when the fact arrives.', 'Do not decide today. Tidy something physical instead: a drawer, a desk, a sock pile; clarity travels through the hands.', 'Write the decision on a slip of paper, put it in a pocket, and look at it again on the weekend.', 'Wait until you have eaten, slept and walked. Then ask again; if the answer changes, the first one was tiredness.', 'Use the pause to prepare: gather the paperwork, the courage or the apology, so that when the time comes you are fast.'],
+  no: ['Leave it alone for now, and put the energy into something that is already half-built.', 'Say a polite no today, or simply do not reply; silence is also an answer, and cheaper.', 'Name what you were hoping this would give you, and find a smaller way to get that exact thing this week.', 'Do the opposite of your first impulse for one hour and see whether anything in you objects.', 'Close the tab, put the phone in another room and take a ten-minute walk; the urge cools quicker than you think.']
+};
+// how the question is being read, for the sentence that ties the omen to it
+export const LENS = { do: 'On whether to act', will: 'As a forecast', what: 'As to what is going on', am: 'About you', other: 'Held up against your question' };
+export function qKind(q) {
+  q = (q || '').toLowerCase();
+  return /^(should|shall|can i|must i|is it (time|okay|ok|wise|safe)|is (today|this) (a good|the right)|do i need)/.test(q) ? 'do' : /^(will|would|is .* going to|are we going)/.test(q) ? 'will' : /^(am i|are we|do i|did i|who am i)/.test(q) ? 'am' : /^(what|why|who|where|when|how|which|does|is there)/.test(q) ? 'what' : 'other';
+}
+export const verdictOf = (score) => (score >= 1 ? 'yes' : score >= 0.3 ? 'lean' : score > -0.3 ? 'mixed' : score > -1 ? 'wait' : 'no');
+
+// How favourable each card is: the major arcana, the ranks, and a nudge for swords. A reversed card is weighted at -½.
+export const MAJOR_TONE = [1, 2, 0, 1.5, 0.5, 0, 1.5, 1.5, 1.5, -0.5, 1, 0.5, -0.5, -0.5, 1, -1.5, -2, 2, -0.5, 2, 1, 2];
+export const RANK_TONE = [1.5, 0, 1, 0, -1.5, 1, -0.5, 0.5, 0, -1, 0.5, 0.5, 1, 1];
+export const SUIT_TONE = { W: 0.2, C: 0.2, S: -0.4, P: 0.1 };
+export const cardTone = (c) => (c.major ? MAJOR_TONE[c.num] : RANK_TONE[c.num - 1] + SUIT_TONE[c.suit]);
+// I Ching: + favourable, - hard, ~ wait, 0 mixed (hexagrams 1–64)
+export const HEX_TONE = '+0~~~-0+' + '~0+-++++' + '+0+00 0-'.replace(/ /g, '') + '+0+0-0--'.replace(/ /g, '').slice(0) ;
