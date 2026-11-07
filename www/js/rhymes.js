@@ -146,7 +146,7 @@ export function rhymeBody(p) {
     if (!keys.length) { box.append(el('p.muted.rhyme-none', 'None in this dictionary.')); return box; }
     for (const k of keys) {
       const list = g[k], row = el('div.rhyme-chips');
-      const fill = (n) => { row.replaceChildren(...list.slice(0, n).map(chip), list.length > n ? el('button.rhyme-more', { type: 'button', onclick: (e) => { e.stopPropagation(); fill(list.length); } }, `+${list.length - n} more`) : null); };
+      const fill = (n) => { row.replaceChildren(...list.slice(0, n).map(chip)); if (list.length > n) row.append(el('button.rhyme-more', { type: 'button', onclick: (e) => { e.stopPropagation(); fill(list.length); } }, `+${list.length - n} more`)); };
       fill(SHOWN[k]);
       box.append(el('div.rhyme-grp', el('span.rhyme-n', SYL[k], el('i', ` ${list.length}`)), row));
     }
