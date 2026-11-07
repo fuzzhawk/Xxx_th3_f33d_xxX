@@ -194,7 +194,7 @@ export class Outland extends Game {
         }
         default: y = (a - 0.45) * B.amp * 2.2 + (b - 0.5) * B.amp * 0.3;
       }
-      if (r > 130) y += Math.pow(r - 130, 1.3) * (B.rim ?? 0.45);
+      if (r > 130) y += Math.min(30, Math.pow(r - 130, 1.3) * (B.rim ?? 0.45));
       raw[j * N + i] = y;
     }
     // water, ice or lava fills the lowest share of the playfield
@@ -1262,7 +1262,10 @@ export class Outland extends Game {
       for (let i = 0; i < 16384; i++) { id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = 255; id.data[i * 4 + 3] = sstep(0.3, 0.78, cn[(i * 7) % 16384]) * 190; }
       x.putImageData(id, 0, 0);
       const mt = this.canTex(cv, gl, 3), base = this.liq?.k === 'water' ? this.liq.y : this.lowY, mc = A.fog.clone().lerp(new T.Color('#ffffff'), A.night ? 0.05 : 0.25);
-      gl.mist = [[1.4, 0.55], [4.2, 0.32]].map(([dy, op]) => { const m = new T.Mesh(new T.PlaneGeometry(700, 700).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: mt, color: mc, transparent: true, opacity: op, depthWrite: false, side: T.DoubleSide })); m.position.y = base + dy; gl.scene.add(m); return m; });
+      const rg = new T.RingGeometry(0.5, 350, 32, 8).rotateX(-Math.PI / 2), RP = rg.attributes.position, ra = [];
+      for (let i = 0; i < RP.count; i++) { const r = Math.hypot(RP.getX(i), RP.getZ(i)); ra.push(1, 1, 1, sstep(15, 90, r) * (1 - sstep(250, 350, r))); }
+      rg.setAttribute('color', new T.Float32BufferAttribute(ra, 4));
+      gl.mist = [[1.2, 0.6], [3.6, 0.38]].map(([dy, op]) => { const m = new T.Mesh(rg, new T.MeshBasicMaterial({ map: mt, color: mc, vertexColors: true, transparent: true, opacity: op, depthWrite: false, side: T.DoubleSide })); m.position.y = base + dy; gl.scene.add(m); return m; });
     }
   }
   // the far painted horizon: the theme's backdrop group (clouds, landscapes, paintings) wrapped round the
@@ -1473,7 +1476,7 @@ export class Outland extends Game {
     const groves = [...P.trees, ...P.broad, ...P.jtrees];
     if (this.B.shafts && !A.night && !A.clouds && groves.length) {
       const cv = canvas(16, 64), x = cv.getContext('2d'), id = x.createImageData(16, 64);
-      for (let y = 0; y < 64; y++) for (let q = 0; q < 16; q++) { const i = (y * 16 + q) * 4; id.data[i] = id.data[i + 1] = id.data[i + 2] = 255; id.data[i + 3] = 255 * Math.sin(Math.PI * (q + 0.5) / 16) ** 2 * sstep(0, 20, y) * sstep(64, 30, y); }
+      for (let y = 0; y < 64; y++) for (let q = 0; q < 16; q++) { const i = (y * 16 + q) * 4; id.data[i] = id.data[i + 1] = id.data[i + 2] = 255; id.data[i + 3] = 255 * Math.sin(Math.PI * (q + 0.5) / 16) ** 2 * sstep(20, 46, y) * sstep(64, 54, y); }
       x.putImageData(id, 0, 0);
       const bt = this.canTex(cv, gl); bt.magFilter = T.LinearFilter; bt.minFilter = T.LinearFilter;
       const parts = [], q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), A.dir), col = A.sun.clone().multiplyScalar(A.low ? 0.3 : 0.2);
