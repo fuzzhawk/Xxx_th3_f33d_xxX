@@ -588,8 +588,8 @@ export class Outland extends Game {
     this.tracer({ x: o.x + d.x, y: o.y + d.y, z: o.z + d.z }, end, [1, 0.9, 0.5]);
     if (h.e) this.damage(h.e, 13, 'gun', false); else if (h.ground) this.puff(end.x, end.y, end.z, this.dustCol, 3, 2, 0.4, 0.25);
   }
-  reload() { const p = this.p, a = this.arms[p.w], am = this.ammo[p.w]; if (p.reload > 0 || am.mag >= a.mag || am.res <= 0) { if (am.mag <= 0 && am.res <= 0) this.swapTo(this.best()); return; } p.reload = a.k === 'rocket' ? 1.8 : a.k === 'marksman' ? 1.6 : 1.3; p.zoom = false; }
-  best() { return [0, 3, 1, 2].find((i) => this.ammo[i].mag + this.ammo[i].res > 0) ?? 0; }
+  reload() { const p = this.p, a = this.arms[p.w], am = this.ammo[p.w]; if (p.reload > 0 || am.mag >= a.mag || am.res <= 0) { if (am.mag <= 0 && am.res <= 0) this.swapTo(this.bestGun()); return; } p.reload = a.k === 'rocket' ? 1.8 : a.k === 'marksman' ? 1.6 : 1.3; p.zoom = false; }
+  bestGun() { return [0, 3, 1, 2].find((i) => this.ammo[i].mag + this.ammo[i].res > 0) ?? 0; }
   swapTo(w) { const p = this.p; if (w === p.w) return; p.w = w; p.swap = 0.45; p.reload = 0; p.zoom = false; }
   throwNade() {
     const p = this.p; if (p.nades <= 0 || p.dead || p.veh || p.swap > 0) return;
@@ -891,7 +891,7 @@ export class Outland extends Game {
         else if (d > 55 && has(1) && tgt.kind !== 'tower') w = 1;
         else if (tgt.kind === 'tower' && has(1) && !has(2)) w = 1;
         else if (crowd >= 3 && has(3)) w = 3;
-        else if (!has(0)) w = this.best();
+        else if (!has(0)) w = this.bestGun();
         if (w !== p.w && p.swap <= 0) this.swapTo(w);
         p.zoom = w === 1 && d > 80 && tgt.kind !== 'crawler';
         A.nadeT -= 0.2;

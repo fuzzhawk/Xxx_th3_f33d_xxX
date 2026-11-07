@@ -83,10 +83,10 @@ export class Monsters extends Game {
     try { const r = this.script.next(); if (r.done) this.script = null; else this.wait = r.value || 0; } catch (e) { console.error(e); this.script = null; this.recover(); }
   }
   recover() { this.mode = 'world'; this.menu = null; this.msg = ''; this.bt = null; this.trans = null; this.ball = null; this.evo = null; this.card = null; this.fx.clear(); }
-  *say(text, hold = 0.75) { this.msg = text; this.msgT = 0; this.skip = 0; const T = text.length / 70 + hold * (this.auto ? 1 : 1.4); for (let t = 0; t < T && !this.skip; t += 0.05) yield 0.05; this.skip = 0; }
+  *say(text, hold = 0.75) { this.msg = text; this.msgT = 0; this.skip = 0; const T = text.length / 110 + hold * (this.auto ? 0.75 : 1.3); for (let t = 0; t < T && !this.skip; t += 0.05) yield 0.05; this.skip = 0; }
   // ---------------------------------------------------------------- frame
   step(dt) {
-    if (this.msg && this.msgT < this.msg.length) this.msgT += dt * 70;
+    if (this.msg && this.msgT < this.msg.length) this.msgT += dt * 110;
     if (this.trans) { this.trans.t += dt; if (this.trans.t >= this.trans.dur) this.trans = null; }
     if (this.card) this.card.t += dt;
     if (this.fx.stop > 0) { this.fx.stop -= dt; this.fx.update(dt * 0.15); return; }
@@ -255,7 +255,7 @@ export class Monsters extends Game {
   mid(s) { const m = this.bs[s].m, sz = sprite(m).size * SC; return [POS[s][0], POS[s][1] - sz * 0.42 - (sprite(m).floats ? 8 : 0)]; }
   *fight() {
     const bt = this.bt, foe = bt.foes[0];
-    yield 0.55;
+    yield 0.45;
     if (!bt.tr) { this.bs[1].hop = 0.4; this.fx.ring(...this.mid(1), ECOL[foe.el], 10, 70, 0.45, 3); }
     yield* this.say(bt.tr ? `${bt.tr.name} wants to battle!` : `A wild ${foe.name} appeared!`, 0.5);
     if (bt.tr) { bt.trGo = 1; yield* this.sendOut(1, foe); }
@@ -445,7 +445,7 @@ export class Monsters extends Game {
     const bt = this.bt, F = this.bs[1], M = this.bs[0];
     if (F.m.hp <= 0 && !F.out) {
       F.out = true; F.faint = 0.001; this.fx.emit(F.m.el, ...this.mid(1), 20, 120);
-      yield 0.5; yield* this.say(`${this.nm(1)} fainted!`, 0.4);
+      yield 0.35; yield* this.say(`${this.nm(1)} fainted!`, 0.4);
       this.score += F.m.lv * 10;
       if (M.m.hp > 0) yield* this.xp(M.m, F.m);
       const next = bt.foes.find((m) => m.hp > 0);
@@ -454,7 +454,7 @@ export class Monsters extends Game {
     }
     if (M.m.hp <= 0 && !M.out) {
       M.out = true; M.faint = 0.001;
-      yield 0.5; yield* this.say(`${M.m.name} fainted!`, 0.4);
+      yield 0.35; yield* this.say(`${M.m.name} fainted!`, 0.4);
       if (!this.team.some((m) => m.hp > 0)) return 'lost';
       const i = yield* this.chooseSwap(); yield* this.sendOut(0, this.team[i]);
     }
@@ -500,7 +500,7 @@ export class Monsters extends Game {
     B.rot = 0;
     const p = this.catchChance(foe), ok = this.rng() < p; let n = ok ? 3 : 0;
     if (!ok) { const q = Math.pow(p, 0.3); while (n < 3 && this.rng() < q) n++; }
-    for (let i = 0; i < n; i++) { yield 0.3; for (let t = 0; t < 0.36; t += 1 / 60) { B.rot = Math.sin((t / 0.36) * TAU) * 0.45; yield 1 / 60; } B.rot = 0; fx.emit('beast', B.x, B.y - 6, 4, 60); }
+    for (let i = 0; i < n; i++) { yield 0.22; for (let t = 0; t < 0.3; t += 1 / 60) { B.rot = Math.sin((t / 0.3) * TAU) * 0.45; yield 1 / 60; } B.rot = 0; fx.emit('beast', B.x, B.y - 6, 4, 60); }
     yield 0.35;
     if (ok) {
       fx.emit('spirit', B.x, B.y - 6, 24, 180); fx.word('ゲット!', W / 2, 110, '#ffe14a', 44, 'GOTCHA!', 1.2); fx.flash('#fff8d0', 0.25);
@@ -579,15 +579,15 @@ export class Monsters extends Game {
     const ap = (this.ap ||= { t: 0, p: this.forced ? { kind: 'swap', i: this.bestBench() } : this.decide() }), p = ap.p;
     ap.t += dt;
     const done = (t) => { if (ap.t > t) { this.pick = p; this.ap = null; } };
-    if (this.forced) { if (ap.t > 0.45) this.cursor = ['team', p.i]; return done(0.85); }
-    if (p.mv?.ult) { if (ap.t > 0.4) this.cursor = ['burst']; return done(0.85); }
-    if (ap.t > 0.35) this.cursor = ['act', { move: 0, orb: 1, swap: 2, run: 3 }[p.kind]];
+    if (this.forced) { if (ap.t > 0.35) this.cursor = ['team', p.i]; return done(0.7); }
+    if (p.mv?.ult) { if (ap.t > 0.3) this.cursor = ['burst']; return done(0.7); }
+    if (ap.t > 0.25) this.cursor = ['act', { move: 0, orb: 1, swap: 2, run: 3 }[p.kind]];
     if (p.kind === 'move' || p.kind === 'swap') {
-      if (ap.t > 0.6) this.menu = p.kind === 'move' ? 'moves' : 'team';
-      if (ap.t > 0.8) this.cursor = p.kind === 'move' ? ['moves', this.bs[0].m.moves.indexOf(p.mv)] : ['team', p.i];
-      return done(1.1);
+      if (ap.t > 0.45) this.menu = p.kind === 'move' ? 'moves' : 'team';
+      if (ap.t > 0.6) this.cursor = p.kind === 'move' ? ['moves', this.bs[0].m.moves.indexOf(p.mv)] : ['team', p.i];
+      return done(0.85);
     }
-    done(0.8);
+    done(0.6);
   }
   // ---------------------------------------------------------------- input
   down(x, y) {
@@ -762,6 +762,7 @@ export class Monsters extends Game {
       if (!onPath) { x.fillStyle = tone(B.tall, -0.25); for (let i = 0; i < 18; i++) { const a = (i / 18) * TAU, bx = px + Math.cos(a) * rx * 0.96, by = py + Math.sin(a) * ry * 0.96; x.beginPath(); x.moveTo(bx - 3, by + 2); x.lineTo(bx, by - 6 - (i % 3) * 2); x.lineTo(bx + 3, by + 2); x.fill(); } }
     };
     plat(POS[1][0], POS[1][1] - 2, 84, 19); plat(POS[0][0], POS[0][1] - 2, 100, 23);
+    if (this.night || this.dusk) { x.globalCompositeOperation = 'multiply'; x.fillStyle = this.night ? '#6a74b0' : '#ffd0b8'; x.fillRect(0, 120, W, H - 120); }
     return c;
   }
   drawBattle(c) {
