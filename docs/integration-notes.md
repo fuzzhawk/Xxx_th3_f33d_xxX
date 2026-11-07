@@ -12,7 +12,7 @@ Running list of wiring the lead must do before the final push.
 ## Notes from finished packages
 - Characters: persona.js shared spec; MARROW VER m5, Crystal VER c2 (caches refresh); brawler roster from the persona pool; saved hero fights every other match; hero = { name, seed, persona, dnd, crystal, marrow } (old saves upgrade).
 - Merge + Tetris: done; stacker.js deleted.
-- Creatures: spirits.js done; monster() returns it (square frames facing right; walk/attack/hurt/dead/big/anatomy lazy); beasts.js now unused (delete at the end if nothing imports it).
+- Creatures: spirits.js done; monster() returns it (square frames facing right; walk/attack/hurt/dead/big/anatomy lazy); beasts.js deleted (lead).
 - Images: background groups + sprite tags; CI fixes done (Commons vetting loosened + diagnostics, Met v1.1, AIC chunked) — needs CI re-run together with the builder fixes.
 - Sky Fox: done (three.js SNES polygons, 7 environments, 3 bosses); hint set.
 - Grave Merge: done (spirit chains, graveyard scene, merge/evolve moments); `trails` mutator excluded.
@@ -26,6 +26,5 @@ Running list of wiring the lead must do before the final push.
 - Memes: 8 new formats (venn, nobody, placard, wanted, align, flow, graph, triptych), subject-coherent remixes, conversation strips ("A and B on <subject>"); strip volume online depends on Wikiquote subject matches.
 
 ## To do
-- cards.js studio `rhyme` routing and oracle captions: delegated to the Oracle + Rhymes agent (check its report).
-- Link any `www/css/<package>.css` files agents create.
+- Link any further `www/css/<package>.css` files (only oracle-rhymes.css so far: linked + in sw.js SHELL).
 - Final: full harness pass over every game type, app smoke test, merge into claude/repo-access-mobile-a25dht, bump packages/request.json.
