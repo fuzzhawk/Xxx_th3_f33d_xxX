@@ -708,7 +708,7 @@ export class Monsters extends Game {
   }
   drawWorldHud(c) {
     this.team.forEach((m, i) => {
-      const x = 6 + i * 31, y = 6, s = mini(m);
+      const x = W - 6 - (this.team.length - i) * 31, y = 44, s = mini(m);
       c.fillStyle = 'rgba(12,9,22,.62)'; roundRect(c, x, y, 29, 34, 6); c.fill();
       c.globalAlpha = m.hp > 0 ? 1 : 0.35; c.drawImage(s.frames[0], x + 1, y + 1); c.globalAlpha = 1;
       const f = m.hp / m.max; c.fillStyle = '#222'; c.fillRect(x + 3, y + 29, 23, 3); c.fillStyle = f > 0.5 ? '#6fd36a' : f > 0.2 ? '#ffd23a' : '#ff5a3a'; c.fillRect(x + 3, y + 29, 23 * f, 3);
@@ -721,9 +721,9 @@ export class Monsters extends Game {
     this.tx(c, `Lv${this.lead().lv}`, W - 12, 30, 10, '#bfe8ff', 'right', { w: 800 });
     if (this.banner > 0 && this.mode === 'world') {
       const k = Math.min(1, this.banner / 0.4, (3.4 - this.banner) / 0.4), R = this.region;
-      c.save(); c.globalAlpha = k; c.fillStyle = 'rgba(12,9,22,.8)'; c.beginPath(); c.moveTo(70, 52); c.lineTo(W - 60, 52); c.lineTo(W - 70, 90); c.lineTo(60, 90); c.closePath(); c.fill();
-      this.tx(c, SEASON_KAN[R.B.season], 92, 71, 26, 'rgba(255,233,168,.9)', 'center', { j: 1, w: 900 });
-      this.tx(c, R.name.toUpperCase(), 118, 65, 16, '#fff', 'left', { it: 1, w: 900 }); this.tx(c, `ROUTE ${R.route} · ${this.dexTotal} SPIRITS TO FIND`, 118, 81, 9, '#ffe9a8', 'left', { w: 800 });
+      c.save(); c.globalAlpha = k; c.fillStyle = 'rgba(12,9,22,.8)'; c.beginPath(); c.moveTo(70, 82); c.lineTo(W - 60, 82); c.lineTo(W - 70, 120); c.lineTo(60, 120); c.closePath(); c.fill();
+      this.tx(c, SEASON_KAN[R.B.season], 92, 101, 26, 'rgba(255,233,168,.9)', 'center', { j: 1, w: 900 });
+      this.tx(c, R.name.toUpperCase(), 118, 95, 16, '#fff', 'left', { it: 1, w: 900 }); this.tx(c, `ROUTE ${R.route} · ${this.dexTotal} SPIRITS TO FIND`, 118, 111, 9, '#ffe9a8', 'left', { w: 800 });
       c.restore();
     }
   }
@@ -832,7 +832,7 @@ export class Monsters extends Game {
   }
   drawHud(c, s) {
     const S = this.bs[s]; if (!S?.m || (S.hidden && S.enter >= 1 && !this.ball)) return;
-    const m = S.m, foe = s === 1, w = 172, h = foe ? 46 : 62, x = foe ? 8 - S.slide * 220 : W - w - 8 + S.slide * 220, y = foe ? 14 : 196, col = ECOL[m.el];
+    const m = S.m, foe = s === 1, w = 172, h = foe ? 46 : 62, x = foe ? 8 - S.slide * 220 : W - w - 8 + S.slide * 220, y = foe ? 64 : 196, col = ECOL[m.el];
     c.beginPath(); c.moveTo(x + 10, y); c.lineTo(x + w, y); c.lineTo(x + w - 10, y + h); c.lineTo(x, y + h); c.closePath();
     c.fillStyle = 'rgba(14,10,26,.86)'; c.fill(); c.lineWidth = 2; c.strokeStyle = col; c.stroke();
     c.fillStyle = col; c.beginPath(); c.arc(x + 17, y + 16, 11, 0, TAU); c.fill(); c.strokeStyle = '#140a14'; c.lineWidth = 1.5; c.stroke();
