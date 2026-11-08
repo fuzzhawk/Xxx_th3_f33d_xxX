@@ -1,5 +1,5 @@
 {
-  "note": "CC0 plant sprites for the garden's daily wild flora, from Kenney asset packs (https://kenney.nl). Fetched by tools/fetch-plants.mjs into www/assets/plants/. 'named': keep files whose names say they are plants; 'scan': numbered tiles, keep the ones that look like plants (cut-outs, mostly leaf-green or flowers on green). 'only' / 'skip' filter paths inside the zip. If kenney.nl gives no download, the pack is looked up on OpenGameArt instead ('oga' sets the search); entries with \"from\": \"oga\" come only from there. OpenGameArt entries are kept only when the page says CC0. Sheets of many plants are split into single sprites.",
+  "note": "CC0 plant sprites for the garden's daily wild flora, from Kenney asset packs (https://kenney.nl). Fetched by tools/fetch-plants.mjs into www/assets/plants/. 'named': keep files whose names say they are plants; 'scan': numbered tiles, keep the ones that look like plants (cut-outs, mostly leaf-green or flowers on green). 'only' / 'skip' filter paths inside the zip. If kenney.nl gives no download, the pack is looked up on OpenGameArt instead ('oga' sets the search, and only pages whose names carry its words are used); OpenGameArt entries are kept only when the page says CC0. Sheets of many plants are split into single sprites.",
   "maxSprites": 240,
   "packs": [
     {
@@ -15,6 +15,12 @@
       "search": "foliage",
       "mode": "scan",
       "max": 50
+    },
+    {
+      "slug": "foliage-sprites",
+      "search": "foliage sprites",
+      "mode": "scan",
+      "max": 40
     },
     {
       "slug": "platformer-pack-redux",
@@ -49,34 +55,6 @@
       "slug": "jumper-pack",
       "search": "jumper",
       "mode": "named",
-      "max": 12
-    },
-    {
-      "slug": "oga-pixel-plants",
-      "from": "oga",
-      "oga": "pixel plants",
-      "mode": "scan",
-      "max": 30
-    },
-    {
-      "slug": "oga-pixel-trees",
-      "from": "oga",
-      "oga": "pixel trees",
-      "mode": "scan",
-      "max": 20
-    },
-    {
-      "slug": "oga-pixel-flowers",
-      "from": "oga",
-      "oga": "pixel flowers",
-      "mode": "scan",
-      "max": 24
-    },
-    {
-      "slug": "oga-mushrooms",
-      "from": "oga",
-      "oga": "pixel mushrooms",
-      "mode": "scan",
       "max": 12
     }
   ]

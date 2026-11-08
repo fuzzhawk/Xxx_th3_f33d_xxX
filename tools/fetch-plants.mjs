@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { decodePNG, encodePNG } from './png.mjs';
 
@@ -21,6 +22,8 @@ const say = (...m) => { const l = m.join(' '); log.push(l); console.log(l); };
 
 // ------------------------------------------------ what a plant is
 const NAMED = /(^|[^a-z])(tree|trees|pine|palm|birch|oak|willow|bush|bushes|shrub|hedge|fern|plant|plants|flower|flowers|rose|tulip|daisy|lily|sunflower|lavender|poppy|mushroom|shroom|toadstool|cactus|crop|crops|wheat|corn|carrot|pumpkin|lettuce|cabbage|tomato|potato|berry|berries|grass|reed|reeds|clover|weed|vine|leaf|leaves|sapling|stump|lilypad|seaweed|coral)(?![a-z])/i;
+// things that turn up next to plants in game packs and are not plants
+const JUNK = /key|jewel|gem|crystal|flag|coin|star|heart|arrow|sword|blade|skull|monster|hydra|figure|combat|paperdoll|hand|arms?(?![a-z])|legs?(?![a-z])|feet|torso|head|magic|summon|sumon|transmut|transform|poison|mapping|fire|flame|torch|shell|chest|ladder|lock|switch|spike|lava|bomb|weapon|bullet|potion|bridge|chain|rope|stem(?:corner|cross|left|right)|trunk|branchend|cornerleft|cornerright/i;
 const NOT = /(grass|dirt|sand|snow|stone)(block|center|mid|half|cliff|left|right|corner|hill|top|bottom|edge|ramp|slope|platform|tile|ground)|ground|terrain|platform|wall|floor|road|path|button|icon|ui_|hud|fence|sign|house|roof|door|window|car|truck|character|player|enemy/i;
 const KIND = [
   ['tree', /tree|pine|palm|birch|oak|willow|sapling|stump/i],
@@ -67,7 +70,13 @@ function looks(img) {
     else if ((H >= 280 || H <= 20 || (H >= 40 && H <= 62)) && S > 0.3 && V > 0.45) bloom++;
     else if (H > 15 && H < 45 && V < 0.7) brown++;
   }
-  return { fill: n / (w * h), green: n ? green / n : 0, bloom: n ? bloom / n : 0, brown: n ? brown / n : 0, grey: n ? grey / n : 0, bottom: bottom / w };
+  // how much of the top, left and right sides is solid (plants have ragged outlines; tile pieces don't)
+  const solid = (x, y) => d[(y * w + x) * 4 + 3] >= 128;
+  let top = 0, left = 0, right = 0;
+  for (let x = 0; x < w; x++) if (solid(x, 0)) top++;
+  for (let y = 0; y < h; y++) { if (solid(0, y)) left++; if (solid(w - 1, y)) right++; }
+  const cut = Math.max(w >= 6 ? top / w : 0, h >= 6 ? left / h : 0, h >= 6 ? right / h : 0);
+  return { fill: n / (w * h), green: n ? green / n : 0, bloom: n ? bloom / n : 0, brown: n ? brown / n : 0, grey: n ? grey / n : 0, bottom: bottom / w, cut };
 }
 function kindOf(name, img, L) {
   for (const [k, re] of KIND) if (re.test(name)) return k;
@@ -162,7 +171,8 @@ async function zipUrl(html, pack) {
 async function fromOGA(pack, tmp) {
   const q = pack.oga || `kenney ${pack.search || pack.slug.replace(/-/g, ' ')}`;
   const res = await get(`https://opengameart.org/art-search-advanced?keys=${encodeURIComponent(q)}&field_art_type_tid%5B%5D=9&sort_by=count&sort_order=DESC`).catch(() => get(`https://opengameart.org/art-search?keys=${encodeURIComponent(q)}`));
-  const pages = [...new Set([...res.matchAll(/href="\/content\/([a-z0-9-]+)"/g)].map((m) => m[1]))].filter((x) => !/^(faq|art-search)/.test(x)).slice(0, pack.ogaPages || 4);
+  const words = q.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !['kenney', 'pack', 'redux', 'art', 'the', 'and'].includes(w));
+  const pages = [...new Set([...res.matchAll(/href="\/content\/([a-z0-9-]+)"/g)].map((m) => m[1]))].filter((x) => !/^(faq|art-search)/.test(x) && words.every((w) => x.includes(w))).slice(0, pack.ogaPages || 4);
   const dir = path.join(tmp, `oga-${pack.slug}`);
   fs.mkdirSync(dir, { recursive: true });
   let files = 0, bytes = 0;
@@ -216,6 +226,7 @@ async function fromKenney(pack, tmp) {
 
 function pick(pack, dir) {
   let files = walk(dir).map((f) => ({ f, rel: path.relative(dir, f) })).filter(({ rel }) => !/vector|preview|sample|tilemap|@2x|retina|double|\.svg/i.test(rel));
+  const singles = files.filter(({ rel }) => !/sheet|atlas|tileset/i.test(path.basename(rel))).length;
   if (pack.only) { const re = new RegExp(pack.only, 'i'), o = files.filter(({ rel }) => re.test(rel)); if (o.length) files = o; }
   if (pack.skip) { const re = new RegExp(pack.skip, 'i'); files = files.filter(({ rel }) => !re.test(rel)); }
   // one view of each model in 3D kits (renders come in four directions)
@@ -228,7 +239,9 @@ function pick(pack, dir) {
     const name = path.basename(rel, '.png');
     // judge by the file name and its folder only (zips often sit in a folder named after the pack)
     const near = `${path.basename(path.dirname(rel))} ${name}`;
-    if (NOT.test(near.replace(/[\s_.-]+/g, ''))) continue;
+    if (NOT.test(near.replace(/[\s_.-]+/g, '')) || JUNK.test(name)) continue;
+    // a pack's combined sheet repeats its single sprites: use the singles when there are enough
+    if (/sheet|atlas|tileset/i.test(name) && singles >= 12) continue;
     if (pack.mode === 'named' && !NAMED.test(name.replace(/([a-z])([A-Z])/g, '$1 $2'))) continue;
     if (fs.statSync(f).size > 600000) continue;
     let full;
@@ -243,6 +256,9 @@ function pick(pack, dir) {
       if (L.fill < 0.12 || L.fill > (named ? 0.97 : 0.9)) return;
       if (L.bottom > 0.85 && img.w >= 14) return;   // a strip of ground
       if (L.grey > 0.6) return;                     // rocks, metal, shadows
+      const asp = img.w / img.h;
+      if (asp > 2.6 || (asp < 0.3 && !/tree|pine|cactus|reed/i.test(name))) return;   // slivers: trunks, poles, edges
+      if (L.cut > 0.62 && !/cactus/i.test(name)) return;   // cut straight along a side: part of a tile
       if (!named && L.green + L.bloom * 0.6 < 0.4) return;
       if (named && !/mushroom|shroom|toadstool|cactus|stump|crop|wheat|corn|carrot|pumpkin|potato/i.test(name) && L.green + L.bloom + L.brown < 0.35) return;
       const kind = kindOf(name.replace(/([a-z])([A-Z])/g, '$1 $2'), img, L);
@@ -259,7 +275,7 @@ function pick(pack, dir) {
 // ------------------------------------------------ run
 const args = process.argv.slice(2), local = args[0] === '--local' ? args[1] : null;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'plants-'));
-const items = [];
+const items = [], seenPix = new Set();
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 const sources = local ? [{ slug: path.basename(local), mode: 'scan', max: 60, dir: local }] : cfg.packs;
@@ -271,6 +287,10 @@ for (const pack of sources) {
       if (items.length >= cfg.maxSprites) break;
       const id = `${pack.slug}-${x.name}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       if (items.some((i) => i.id === id)) continue;
+      // the same picture reached through two packs (they share pages on OpenGameArt) is kept once
+      const hash = createHash('sha1').update(x.img.d).digest('hex');
+      if (seenPix.has(hash)) continue;
+      seenPix.add(hash);
       fs.writeFileSync(path.join(OUT, `${id}.png`), encodePNG(x.img.w, x.img.h, new Uint8Array(x.img.d.buffer)));
       items.push({ id, f: `${id}.png`, w: x.img.w, h: x.img.h, kind: x.kind, pack: pack.slug, src: pack._src || 'local' });
     }
