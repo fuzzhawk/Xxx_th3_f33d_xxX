@@ -27,7 +27,7 @@ const TOPIC_COLOR = {
   animals: '#d8a25a', retrogaming: '#5b9aa9', vintagescifi: '#a77bd0', theory: '#d9b26f', math: '#5b8fd0', biology: '#5fa86a', offbeat: '#c98a3a'
 };
 const TOPIC_GLYPH = { humanbody: '♡', neuro: '✧', nootropics: '❀', breath: '∾', mystic: '☉', dreams: '☾', scifi: '✦', music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉', theory: '𝄞', math: '∑', biology: '❦', offbeat: '⚘' };
-const CAT_FACE = { news: ['◉', '#8a2b2b'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], read: ['❧', '#6a5a3a'], studio: ['✎', '#3a6a5a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'] };
+const CAT_FACE = { news: ['◉', '#8a2b2b'], garden: ['✿', '#6aa86a'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], read: ['❧', '#6a5a3a'], studio: ['✎', '#3a6a5a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'] };
 let soundOn = false;
 
 export function labelOf(post) {
@@ -37,7 +37,7 @@ const handleFor = (post, ctx) => {
   switch (post.cat) {
     case 'wiki': return [`wiki.${post.sub}`, `${ctx.topics?.wiki?.[post.sub] || post.sub} · Wikipedia`];
     case 'video': return [post.channel ? post.channel.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'tube' : `tube.${post.sub}`, `${ctx.topics?.video?.[post.sub] || 'Video'}${post.dur ? ` · ${post.dur}` : ''}${/^\d{4}/.test(post.date || '') ? ` · ${post.date.slice(0, 4)}` : ''}`];
-    case 'game': return ['arcade', `${ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
+    case 'game': return post.sub === 'garden' ? ['your.garden', 'Grows while you’re away · tap to tend'] : ['arcade', `${ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
     case 'meme': return [post.sub === 'kym' ? 'knowyourmeme' : 'meme.lord', post.sub === 'kym' ? 'Know Your Meme' : 'remix'];
     case 'product': return ['infomercial.tv', 'Sponsored · not available in stores'];
     case 'psych': return ['the.trip', `${post.sub} · generative`];
@@ -57,7 +57,7 @@ const handleFor = (post, ctx) => {
 // ------------------------------------------------ shared chrome
 function header(post, ctx) {
   const [handle, sub] = handleFor(post, ctx);
-  const [g, bg] = post.cat === 'wiki' ? [TOPIC_GLYPH[post.sub] || 'W', TOPIC_COLOR[post.sub] || '#3a3530'] : post.cat === 'mind' || post.cat === 'quote' ? (post.mode === 'evening' ? ['☾', '#5b4a78'] : ['☀︎', '#e59a6c']) : CAT_FACE[post.cat] || ['•', '#333'];
+  const [g, bg] = post.sub === 'garden' && post.cat === 'game' ? CAT_FACE.garden : post.cat === 'wiki' ? [TOPIC_GLYPH[post.sub] || 'W', TOPIC_COLOR[post.sub] || '#3a3530'] : post.cat === 'mind' || post.cat === 'quote' ? (post.mode === 'evening' ? ['☾', '#5b4a78'] : ['☀︎', '#e59a6c']) : CAT_FACE[post.cat] || ['•', '#333'];
   const more = el('button.more-btn', { 'aria-label': 'More', html: icon('more') });
   more.onclick = (e) => { e.stopPropagation(); postMenu(post, ctx, more.closest('.post')); };
   return el('div.post-head',
@@ -218,7 +218,7 @@ function game(p, ctx) {
   const stage = el('div.stage', canvas, hud, autobtn, tapplay);
   const media = el('div.media', stage);
   const hint = el('span.muted', GAME_HINT[p.sub] || '');
-  const card = post('game', p, ctx, { media, caption: capt('arcade', `${p.title} · `, hint), mediaInteractive: true });
+  const card = post('game', p, ctx, { media, caption: capt(p.sub === 'garden' ? 'your.garden' : 'arcade', `${p.title} · `, hint), mediaInteractive: true });
   let g = null, idle;
   const Cls = GAMES[p.sub] || GAMES.plinko;
   const ensure = () => {

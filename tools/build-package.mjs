@@ -1282,7 +1282,7 @@ function assignThemes(games, kits) {
 
 // ------------------------------------------------------------------ procedural categories
 const GAME_NAMES = {
-  plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', tetris: 'Tetris', pong: 'Pong', peggle: 'Peg Shot', juggle: 'Juggle',
+  garden: 'Garden', plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', tetris: 'Tetris', pong: 'Pong', peggle: 'Peg Shot', juggle: 'Juggle',
   platformer: 'Platformer', racer: 'Road Racer', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot',
   chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl',
   starfox: 'Sky Fox', expedition: 'Expeditions', ski: 'Downhill', graves: 'Grave Merge', survivors: 'Cave Horde', robotron: 'Robo Arena', crokinole: 'Crokinole',

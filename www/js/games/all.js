@@ -1,5 +1,6 @@
 import { Platformer } from './platformer.js';
 import { Racer } from './racer.js';
+import { Garden } from './garden.js';
 import { Rocks } from './rocks.js';
 import { HellMaze } from './hellmaze.js';
 import { Outland } from './outland.js';
@@ -28,12 +29,13 @@ import { Pong } from './pong.js';
 import { PegShot } from './peggle.js';
 import { Juggle } from './juggle.js';
 
-export const GAMES = { plinko: Plinko, breakout: Breakout, merge: Merge, dash: Dash, flappy: Flap, tetris: Tetris, pong: Pong, peggle: PegShot, juggle: Juggle, platformer: Platformer, racer: Racer, raycast: HellMaze, rocks: Rocks, sling: Sling,
+export const GAMES = { garden: Garden, plinko: Plinko, breakout: Breakout, merge: Merge, dash: Dash, flappy: Flap, tetris: Tetris, pong: Pong, peggle: PegShot, juggle: Juggle, platformer: Platformer, racer: Racer, raycast: HellMaze, rocks: Rocks, sling: Sling,
   chess: Chess, dice: Dice, cards: Cards, monsters: Monsters, fighter: Fighter,
   starfox: Flight, ski: Ski, robotron: Robotron, crokinole: Crokinole, survivors: Survivors, graves: Graves, expedition: Expedition,
   wordle: Wordle, bee: Bee, wordsearch: WordSearch, wheel: Wheel, hangman: Hangman, vocab: Vocab, ladder: Ladder, t2048: Twenty48, arrows: Arrows, jrpg: Jrpg, hack: Hack, outland: Outland };
 // display names (the package's own names win when it has them)
 export const GAME_NAMES = {
+  garden: 'Garden',
   plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', tetris: 'Tetris', pong: 'Pong', peggle: 'Peg Shot', juggle: 'Juggle',
   platformer: 'Platformer', racer: 'Road Racer', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot', outland: 'Outland',
   chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl',
@@ -51,6 +53,7 @@ export function upgradeGamePost(p) {
   return p;
 }
 export const GAME_HINT = {
+  garden: 'tap the ground to walk and plant · tap tall grass to clear it · tap animals to feed them · the seed button picks what you plant',
   plinko: 'tap to drop a ball', breakout: 'drag to move the paddle', merge: 'drag to aim, release to drop · two alike merge (on the planet, aim around the core)', dash: 'tap to jump (twice to double-jump)',
   flappy: 'tap to flap', tetris: 'tap beside the piece to move, tap the piece to turn, drag to slide, swipe down to drop, swipe up to hold · every full line is lifted out as a saying', pong: 'drag to move your paddle', peggle: 'aim, release to shoot', juggle: 'tap the balls to keep them up',
   platformer: 'tap to jump, twice to double-jump · ladders, pads and springs work by themselves · grab power-ups', racer: 'hold left or right to steer, tap to change lane · pass the gates for extra time', raycast: 'drag sideways to turn, up/down to walk · tap to fire, hold to keep firing · tap the weapon bar to switch · find the key, reach the glowing exit',

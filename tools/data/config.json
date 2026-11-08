@@ -80,6 +80,7 @@
     }
   },
   "gameTypes": [
+    "garden",
     "plinko",
     "breakout",
     "merge",
