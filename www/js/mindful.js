@@ -80,7 +80,7 @@ function bodyView(p) {
     const c = cv.getContext('2d');
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     const g = c.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, `hsl(${hue},70%,86%)`); g.addColorStop(1, `hsl(${(hue + 50) % 360},60%,80%)`);
+    g.addColorStop(0, `hsl(${hue},38%,82%)`); g.addColorStop(1, `hsl(${(hue + 50) % 360},32%,76%)`);
     c.fillStyle = g; c.fillRect(0, 0, w, h);
     // breathing ring behind the figure
     const k = h / 300, cx = w / 2;

@@ -41,3 +41,11 @@ Running list of wiring the lead must do before the final push.
 - `www/js/feed.js`: mode feeds show only mode content: package posts from `morning.json` / `evening.json` (wiki, video, quote, poem) mixed with mind cards and the garden (third card, then every 5+). The day feed gets a garden card every ~22 posts (`settings.gardenInFeed`).
 - `www/js/games/garden.js` (type `garden`): one shared garden in IndexedDB (`garden-v1`), real-time growth and catch-up between visits, planting / watering / seed gathering / harvest, animals that move in and breed when fed in pairs, clearing tall grass to expand, ponds and 11 ruins with rare seeds. Light follows the card's mode; day has gusts, showers and rainbows. Autopilot only tends.
 - Builder: `tools/modes.mjs` + `topics.json → modes` (morning: human biology, neuroplasticity, nootropics, breathwork articles; miraculous life, wildlife, vistas, kindness videos; uplifting quotes. Evening: mysticism, dreams, sci-fi worlds articles; introspective quotes; night poems from PoetryDB). CI builder test run 7 passed (`--quick --only morning,evening`).
+
+## Garden world + sage mornings (2026-11-08, later)
+- Morning theme is a desaturated sage green instead of near-white (`www/css/modes.css`, theme-color `#dce5d8`).
+- The garden is now a world (`www/js/games/garden-world.js` + `garden.js`), saved as `garden-v2` (a `garden-v1` save moves into the middle of the new meadows, ruins/plants/animals/inventory kept):
+  - The meadows (128×128): meadow, forests (pine/oak/birch, ferns), flower fields, lakes with a small island (tap water beside the shore to build plank bridges), rocky hills with 3–4 cave mouths, 12 ruins including the Cloud Stair.
+  - The caverns (64×64, cellular caves): lantern-lit darkness, rubble to clear, pools, glowshrooms (cave-only seeds), crystals, 3 ruins, bats/glowworms/salamanders/cave fish; ladders back up to each mouth.
+  - The sky islands (64×64): islands over a cloud sea joined by cloud paths, mist to clear, cloud steps (tap the cloud sea beside an island), 3 ruins, sky orchids, cloud sheep/swallows/dragonflies; reached by the Cloud Stair once uncovered.
+  - Map chunks are painted on demand (16×16 tiles, LRU of 54) and a minimap shows explored tiles; draw cost ~0.5 ms/frame in the test browser, save ≈200 KB.
