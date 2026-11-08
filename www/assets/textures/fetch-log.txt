@@ -1,11 +1,9 @@
-grass: polyhaven.com/a/leafy_grass, polyhaven.com/a/thatch_roof_angled
-moss: polyhaven.com/a/brown_mud_leaves_01, polyhaven.com/a/forrest_ground_01
-forest: polyhaven.com/a/forest_leaves_02, polyhaven.com/a/forest_leaves_04
+grass: polyhaven.com/a/leafy_grass, polyhaven.com/a/sparse_grass
+moss: polyhaven.com/a/forrest_ground_01, polyhaven.com/a/leaves_forest_ground
+forest: polyhaven.com/a/brown_mud_leaves_01, polyhaven.com/a/forest_leaves_02
 sand: polyhaven.com/a/aerial_beach_01, polyhaven.com/a/sand_01
-path: polyhaven.com/a/concrete_floor_worn_001, polyhaven.com/a/wood_table_worn
-stone: polyhaven.com/a/gravel_embedded_concrete, polyhaven.com/a/gravel_concrete_03
+path: polyhaven.com/a/rocks_ground_02, polyhaven.com/a/brown_mud_dry
+stone: polyhaven.com/a/cobblestone_floor_04, polyhaven.com/a/monastery_stone_floor
 rock: polyhaven.com/a/coast_sand_rocks_02, polyhaven.com/a/aerial_rocks_02
-cave: polyhaven.com/a/forest_ground_04, polyhaven.com/a/rocks_ground_02
-sky: polyhaven.com/a/snow_02
-water: polyhaven.com/a/rubber_tiles
-total 18 textures
+cave: polyhaven.com/a/rock_boulder_dry, polyhaven.com/a/rock_01
+total 16 textures
