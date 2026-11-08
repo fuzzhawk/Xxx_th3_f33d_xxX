@@ -172,6 +172,13 @@ nav#tabs button.notify .badge-dot { display: block; }
 .stage.playing .autobtn { display: flex; }
 .stage .tapplay { left: 50%; bottom: 14px; transform: translateX(-50%); pointer-events: none; }
 .stage.playing .tapplay { display: none; }
+/* whole games in a frame: portrait, the page inside frames itself; touches reach it only once you play */
+.stage.ext { aspect-ratio: 4 / 5; overflow: hidden; background: #07060a; }
+.stage.ext iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.stage.ext.playing iframe { pointer-events: auto; }
+.extposter { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #e8e0cf; text-align: center; padding: 24px; transition: opacity .6s; pointer-events: none; }
+.extposter b { font-size: 26px; letter-spacing: 2px; text-transform: uppercase; }
+.extposter small { font-size: 13px; color: #a89f8c; max-width: 240px; }
 .psych .stage { aspect-ratio: 4 / 5; }
 .psych .quote {
   position: absolute; left: 0; right: 0; bottom: 0; padding: 50px 18px 18px; pointer-events: none;

@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VITRIOL — procedural industrial run &amp; gun</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230a0c0d'/%3E%3Crect x='3' y='3' width='10' height='2' fill='%23f0a830'/%3E%3Crect x='7' y='5' width='2' height='8' fill='%23f0a830'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0a0c0d; --bg2:#101314; --panel:#141719; --line:#1e2325; --line2:#2b3235;
+  --ink:#c8d2d6; --dim:#6e7c84; --amber:#f0a830; --hot:#e05a1e; --good:#4ad07a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--ink);
+  font:12px/1.45 "Courier New",ui-monospace,monospace;overflow:hidden;
+  -webkit-font-smoothing:none;image-rendering:pixelated}
+button{font:inherit;cursor:pointer}
+
+/* ---------- stage ---------- */
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:#070809;overflow:hidden}
+#game{display:block;image-rendering:pixelated;image-rendering:crisp-edges;
+  box-shadow:0 0 0 1px #1c2123, 0 24px 90px rgba(0,0,0,.85)}
+#stage.playing #game{cursor:none}
+
+/* ---------- screen overlays ---------- */
+.screen{position:fixed;inset:0;display:none;z-index:10;
+  align-items:center;justify-content:center;padding:24px}
+.screen.on{display:flex}
+.screen::before{content:"";position:absolute;inset:0;background:
+  repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,rgba(0,0,0,0) 1px 3px);
+  pointer-events:none;z-index:2}
+
+/* ---------- title ---------- */
+#scr-title{flex-direction:column;gap:0}
+.wordmark{position:relative;z-index:3;text-align:center;margin-bottom:6px}
+.wordmark h1{margin:0;font-size:76px;letter-spacing:16px;line-height:.9;font-weight:700;
+  color:var(--amber);text-shadow:0 0 26px rgba(240,168,48,.34),0 5px 0 #120c04,4px 4px 0 rgba(0,0,0,.55);
+  padding-left:16px}
+.wordmark .rule{height:2px;background:linear-gradient(90deg,transparent,var(--hot),transparent);
+  margin:10px auto 8px;width:min(560px,80vw)}
+.wordmark p{margin:0;color:#9fb0b8;letter-spacing:5px;font-size:11px;
+  text-shadow:0 2px 6px rgba(0,0,0,.95),0 0 2px rgba(0,0,0,1)}
+.wordmark .src{margin-top:9px;color:#75858d;letter-spacing:2px;font-size:10px;
+  text-shadow:0 2px 6px rgba(0,0,0,.95)}
+.menu{position:relative;z-index:3;display:flex;flex-direction:column;gap:8px;
+  margin-top:26px;min-width:250px}
+.big{background:#171b1d;border:1px solid var(--line2);color:var(--ink);
+  padding:13px 18px;letter-spacing:4px;font-size:12px;text-align:center;
+  transition:background .12s,color .12s,border-color .12s}
+.big:hover{background:#20272a;border-color:#3c464a;color:#fff}
+.big.primary{background:var(--amber);border-color:var(--amber);color:#1c1204;font-weight:700}
+.big.primary:hover{background:#ffb254;color:#1c1204}
+#t-seed{position:relative;z-index:3;margin-top:22px;color:#66757c;letter-spacing:3px;font-size:10px;
+  text-shadow:0 2px 6px rgba(0,0,0,.95)}
+#howto{display:none;position:relative;z-index:3;margin-top:16px;max-width:520px;
+  background:rgba(12,15,16,.94);border:1px solid var(--line);padding:14px 18px}
+#howto.on{display:block}
+#howto table{width:100%;border-collapse:collapse;font-size:11px}
+#howto td{padding:3px 0;color:var(--dim)}
+#howto td:first-child{color:var(--amber);width:118px;letter-spacing:1px}
+#howto h4{margin:0 0 9px;color:var(--ink);letter-spacing:3px;font-size:11px;font-weight:700}
+#howto p{margin:10px 0 0;color:#5d6a72;font-size:10.5px;line-height:1.6}
+
+/* ---------- setup ---------- */
+#scr-setup{background:rgba(7,8,9,.93);align-items:stretch;padding:0}
+.setup-shell{position:relative;z-index:3;display:flex;flex-direction:column;width:100%;height:100%}
+.bar{display:flex;align-items:center;gap:14px;padding:11px 18px;
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,#141719,#0f1213);flex:0 0 auto}
+.bar h2{margin:0;font-size:13px;letter-spacing:7px;color:var(--amber);font-weight:700}
+.bar .spacer{flex:1}
+.seg{display:flex;border:1px solid var(--line2)}
+.seg button{background:transparent;border:none;border-right:1px solid var(--line2);
+  color:var(--dim);padding:7px 15px;letter-spacing:2px;font-size:10.5px}
+.seg button:last-child{border-right:none}
+.seg button.on{background:#22282b;color:var(--amber);box-shadow:inset 0 -2px 0 var(--amber)}
+.seg button:hover:not(.on){background:#181c1e;color:var(--ink)}
+.field{display:flex;align-items:center;gap:7px}
+.field label{color:var(--dim);letter-spacing:2px;font-size:10px}
+.field input[type=text]{background:#0c0f10;border:1px solid var(--line2);color:var(--amber);
+  padding:6px 9px;width:112px;font:inherit;letter-spacing:2px;text-align:center}
+.tag{color:#4d585e;font-size:9.5px;letter-spacing:2px;min-width:64px}
+.mini{background:#1b2023;border:1px solid var(--line2);color:var(--ink);padding:6px 11px;
+  letter-spacing:2px;font-size:10px}
+.mini:hover{background:#252c30}
+.sound-btn.off{color:#4d585e}
+
+.setup-body{flex:1;display:flex;min-height:0}
+.setup-main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.setup-side{width:300px;flex:0 0 300px;border-left:1px solid var(--line);
+  background:var(--bg2);padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+
+#rollSummary{padding:26px 30px;overflow-y:auto}
+.sum-row{display:flex;justify-content:space-between;gap:20px;padding:8px 0;
+  border-bottom:1px solid #16191b}
+.sum-row span{color:var(--dim);letter-spacing:3px;font-size:10px}
+.sum-row b{color:var(--ink);font-weight:400;letter-spacing:1px;text-transform:uppercase}
+.blurb{color:#5d6a72;font-size:10.5px;line-height:1.7;margin:0 0 18px;max-width:560px}
+
+#customWrap{flex:1;display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;border-bottom:1px solid var(--line);background:#101314;flex:0 0 auto}
+.tabs{flex-wrap:wrap}
+.tabs button{background:transparent;border:none;border-right:1px solid var(--line);
+  color:var(--dim);padding:8px 11px;letter-spacing:1.5px;font-size:9.5px;white-space:nowrap}
+.tabs button.on{background:#191e20;color:var(--amber);box-shadow:inset 0 -2px 0 var(--amber)}
+.panels{flex:1;overflow-y:auto;padding:12px 14px}
+
+.grp{border:1px solid var(--line);background:var(--panel);margin-bottom:8px}
+.grp-h{padding:7px 11px;border-bottom:1px solid var(--line);background:#1a1e20;
+  display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+.grp-h b{font-size:10px;letter-spacing:3px;color:var(--amber);font-weight:700}
+.grp-h i{font-style:normal;color:var(--dim);font-size:12px}
+.grp.closed .grp-b{display:none}
+.grp.closed .grp-h{border-bottom:none}
+.grp-b{padding:8px 11px 10px}
+.ctl{display:flex;align-items:center;gap:9px;padding:2px 0;min-height:22px}
+.ctl label{flex:0 0 106px;color:var(--dim);font-size:10.5px}
+.ctl select{flex:1;background:#0d1011;border:1px solid var(--line2);color:var(--ink);
+  padding:3px 5px;font:inherit;font-size:10.5px;min-width:0}
+.ctl input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:16px;
+  background:transparent;min-width:0}
+.ctl input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line2)}
+.ctl input[type=range]::-moz-range-track{height:2px;background:var(--line2)}
+.ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:8px;height:14px;
+  background:var(--amber);margin-top:-6px;border:none}
+.ctl input[type=range]::-moz-range-thumb{width:8px;height:14px;background:var(--amber);
+  border:none;border-radius:0}
+.ctl input[type=color]{flex:1;height:18px;padding:0;border:1px solid var(--line2);
+  background:#0d1011;cursor:pointer}
+.ctl .val{flex:0 0 54px;text-align:right;color:var(--amber);font-size:10px}
+.ctl .chk{flex:1}
+.ctl .chk input{accent-color:var(--amber)}
+.ctl-wide label{flex:0 0 60px}
+
+#previewWrap,#crawlerPreviewWrap,#scrapPreviewWrap,#bossPreviewWrap,#protoPreviewWrap{border:1px solid var(--line);background:#0e1113}
+#previewWrap .cap,#crawlerPreviewWrap .cap,#scrapPreviewWrap .cap,
+#bossPreviewWrap .cap,#protoPreviewWrap .cap{padding:6px 9px;border-bottom:1px solid var(--line);
+  background:#171b1d;color:var(--amber);letter-spacing:3px;font-size:9.5px}
+#crawlerPreviewWrap .cap{color:#d4536a}
+#scrapPreviewWrap .cap{color:#8aa0b4}
+#bossPreviewWrap .cap{color:#c8323a}
+#protoPreviewWrap .cap{color:#ffd06b}
+#mercPreview,#crawlerPreview,#scrapPreview,#bossPreview,#protoPreview{display:block;width:100%;image-rendering:pixelated}
+.pinrow{display:flex;align-items:center;gap:7px;padding:6px 2px 2px;cursor:pointer}
+.pinrow input{accent-color:var(--amber)}
+.pinrow span{color:var(--dim);letter-spacing:2px;font-size:9.5px}
+.pinnote{margin:4px 2px 0;color:#4d585e;font-size:9.5px;line-height:1.55}
+.side-h{color:var(--dim);letter-spacing:3px;font-size:9.5px;margin:0 0 7px}
+.diffs{display:flex;flex-direction:column;gap:5px}
+.diffs button{background:#141719;border:1px solid var(--line2);color:var(--dim);
+  padding:8px 11px;text-align:left;letter-spacing:3px;font-size:10px}
+.diffs button.on{background:#221a0c;border-color:var(--amber);color:var(--amber)}
+.diffs button small{display:block;letter-spacing:0;color:#4d585e;font-size:9.5px;margin-top:2px}
+.diffs button.on small{color:#c09a5a}
+.slide-row{display:flex;align-items:center;gap:8px}
+.slide-row input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:16px;background:transparent}
+.slide-row input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line2)}
+.slide-row input[type=range]::-moz-range-track{height:2px;background:var(--line2)}
+.slide-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:8px;height:14px;
+  background:var(--amber);margin-top:-6px;border:none}
+.slide-row input[type=range]::-moz-range-thumb{width:8px;height:14px;background:var(--amber);border:none;border-radius:0}
+.slide-row span{color:var(--amber);font-size:10px;min-width:44px;text-align:right}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+
+/* ---------- loading ---------- */
+#scr-load{background:rgba(7,8,9,.8);flex-direction:column}
+.load-box{position:relative;z-index:3;width:min(620px,88vw);
+  border:1px solid var(--line);background:rgba(12,15,16,.95);padding:22px 26px}
+.load-box h3{margin:0 0 4px;font-size:13px;letter-spacing:7px;color:var(--amber);font-weight:700}
+.load-box .sub{color:#4d585e;font-size:10px;letter-spacing:2px;margin-bottom:18px}
+.track{height:4px;background:#191d1f;position:relative;overflow:hidden;border:1px solid var(--line2)}
+.track i{position:absolute;inset:0 auto 0 0;width:0%;background:var(--amber);
+  transition:width .12s linear;box-shadow:0 0 12px rgba(240,168,48,.6)}
+.load-meta{display:flex;justify-content:space-between;margin-top:9px;font-size:10.5px}
+#l-msg{color:var(--ink);letter-spacing:1px}
+#l-pct{color:var(--amber)}
+.tip{margin-top:20px;padding-top:14px;border-top:1px solid var(--line);
+  color:#5d6a72;font-size:10.5px;line-height:1.65}
+.tip b{color:var(--dim);letter-spacing:3px;font-size:9.5px;display:block;margin-bottom:5px}
+
+/* ---------- pause / debrief ---------- */
+#scr-pause,#scr-debrief{background:rgba(7,8,9,.9)}
+.card{position:relative;z-index:3;width:min(460px,88vw);border:1px solid var(--line);
+  background:rgba(13,16,17,.97);padding:24px 28px}
+.card h3{margin:0 0 18px;font-size:14px;letter-spacing:7px;font-weight:700;color:var(--amber)}
+.card h3.won{color:var(--good)}
+.card h3.lost{color:var(--hot)}
+.card .acts{display:flex;flex-direction:column;gap:7px;margin-top:20px}
+#db-auto{display:none;margin-top:16px;font-size:10px;letter-spacing:3px;color:var(--good);
+         text-align:center;animation:autoblink 1s steps(2,end) infinite}
+#db-auto.on{display:block}
+@keyframes autoblink{0%,60%{opacity:1}61%,100%{opacity:.45}}
+
+/* ---------- story ----------
+   One vocabulary for every story screen: the briefing, the decision,
+   the codex and the debrief are the same list of labelled rows under
+   the same headings, because they are all the same document at
+   different points in the run. */
+#scr-story{background:rgba(6,7,8,.94)}
+.story-card{position:relative;z-index:3;width:min(720px,92vw);max-height:88vh;
+  display:flex;flex-direction:column;border:1px solid var(--line2);
+  background:rgba(11,14,15,.98);padding:22px 26px 18px}
+.story-card .acts{display:flex;gap:8px;margin-top:16px;flex:0 0 auto}
+.story-card .acts .big{flex:1}
+#story-body{overflow-y:auto;flex:1;min-height:0;padding-right:6px}
+.st-title{margin:0 0 4px;font-size:14px;letter-spacing:6px;font-weight:700;color:var(--amber)}
+.st-sub{margin:0 0 14px;font-size:10px;letter-spacing:3px;color:var(--dim)}
+.st-act{margin:0 0 6px;font-size:9.5px;letter-spacing:4px;color:#5d6a72}
+.st-brief{margin:0 0 12px;font-size:12px;line-height:1.7;color:var(--ink);
+  border-left:2px solid var(--hot);padding-left:11px}
+.st-body{display:flex;flex-direction:column;gap:14px}
+.st-block{border-top:1px solid #191d1f;padding-top:10px}
+.st-h{margin:0 0 7px;font-size:9.5px;letter-spacing:4px;color:var(--amber);font-weight:700}
+.st-row{display:flex;justify-content:space-between;gap:16px;align-items:baseline;
+  padding:2px 0}
+.st-k{color:var(--ink);font-weight:400;letter-spacing:1.5px;font-size:10.5px}
+.st-v{color:var(--dim);letter-spacing:1.5px;font-size:10px;text-align:right;white-space:nowrap}
+.st-note{margin:1px 0 7px;color:#5d6a72;font-size:10px;line-height:1.6}
+.st-flag{margin:0 0 5px;font-size:10.5px;letter-spacing:2px}
+.t-good{color:var(--good)} .t-ok{color:#8fb} .t-warn{color:var(--amber)}
+.t-bad{color:var(--hot)}   .t-flat{color:var(--dim)}
+.st-choices{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+.st-choice{display:flex;flex-direction:column;gap:4px;text-align:left;
+  background:#161a1c;border:1px solid var(--line2);color:var(--ink);padding:12px 15px;
+  transition:background .12s,border-color .12s}
+.st-choice:hover{background:#20272a;border-color:var(--amber)}
+.st-choice b{letter-spacing:3px;font-size:11px;color:var(--amber)}
+.st-choice-line{color:#8b979d;font-size:10.5px;line-height:1.6}
+.st-choice-trait{color:var(--good);font-size:9.5px;letter-spacing:2px}
+.st-choice-cost{color:#5d6a72;font-size:9.5px;letter-spacing:2px}
+#storyWrap .st-body{gap:10px}
+#storyDossier{padding:22px 26px;overflow-y:auto}
+</style>
+</head>
+<body>
+
+<div id="stage"><canvas id="game" width="560" height="315"></canvas></div>
+
+<!-- ============ LAUNCH ============ -->
+<div id="scr-title" class="screen on">
+  <div class="wordmark">
+    <h1>VITRIOL</h1>
+    <div class="rule"></div>
+    <p>PROCEDURAL INDUSTRIAL RUN &amp; GUN</p>
+    <div class="src">GREEBLEWORKS · MERC FORGE</div>
+  </div>
+  <div class="menu">
+    <button id="btn-start" class="big primary">DEPLOY</button>
+    <button id="btn-howto" class="big">BRIEFING</button>
+    <button class="big sound-btn">♪ SOUND ON</button>
+  </div>
+  <div id="howto">
+    <h4>BRIEFING</h4>
+    <table>
+      <tr><td>A / D</td><td>move</td></tr>
+      <tr><td>W / SPACE</td><td>jump — press again in the air to kick off nothing</td></tr>
+      <tr><td>S</td><td>crouch · hold and jump to drop through a catwalk</td></tr>
+      <tr><td>MOUSE</td><td>aim — full 360°</td></tr>
+      <tr><td>LEFT CLICK</td><td>fire</td></tr>
+      <tr><td>R</td><td>reload</td></tr>
+      <tr><td>ESC</td><td>pause</td></tr>
+      <tr><td>P</td><td>hand over to the pilot, or take back</td></tr>
+      <tr><td>M</td><td>mute</td></tr>
+    </table>
+    <p>Not everything here walks. Crawlers come up walls and across ceilings,
+    haul themselves along on tentacles, and leave a trail you can follow back.
+    Shoot them and they come apart.</p>
+    <p>Reserve operatives stand frozen along the route. Walk into one to
+    bring it up — it fights with you and draws fire. The same AI can fly
+    the whole run if you would rather watch.</p>
+    <p>Crates and rubble are real weight — shoot them and they move, and they
+    will stop a bullet meant for you. Some of the garrison has been got at:
+    corrupted mercs hover, vent, and take more killing. Something much larger
+    is already waiting near the extraction pad, and it throws the scenery.</p>
+    <p>Fight east to the extraction pad. Nothing here was drawn by hand — the walls,
+    decks, skyline, weather and every merc in the level are generated from your build
+    seed the moment you deploy.</p>
+  </div>
+  <div id="t-seed">BUILD ————————</div>
+</div>
+
+<!-- ============ SETUP ============ -->
+<div id="scr-setup" class="screen">
+ <div class="setup-shell">
+  <div class="bar">
+    <h2>BUILD</h2>
+    <div class="seg">
+      <button id="m-random" class="on">RANDOMIZE</button>
+      <button id="m-campaign">CAMPAIGN</button>
+      <button id="m-story">STORY</button>
+      <button id="m-custom">CUSTOM BUILD</button>
+    </div>
+    <div class="field">
+      <label>SEED</label>
+      <input id="seedField" type="text" spellcheck="false">
+      <button id="btn-roll" class="mini">ROLL</button>
+      <span id="seedNote" class="tag">SEEDED</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="mini sound-btn">♪ SOUND ON</button>
+    <button id="btn-back" class="mini">BACK</button>
+  </div>
+
+  <div class="setup-body">
+    <div class="setup-main">
+      <div id="rollSummary"></div>
+      <div id="storyDossier" style="display:none"></div>
+
+      <div id="customWrap" style="display:none">
+        <div class="tabs">
+          <button id="tab-level" class="on">LEVEL · GREEBLEWORKS</button>
+          <button id="tab-merc">OPERATIVE · MERC FORGE</button>
+          <button id="tab-crawler">CRAWLERS · CRAWLER FORGE</button>
+          <button id="tab-scrap">DEBRIS · SCRAP FORGE</button>
+          <button id="tab-boss">OVERLORD · BOSS FORGE</button>
+          <button id="tab-proto">PROTOTYPE · WEAPON FORGE</button>
+        </div>
+        <div class="panels">
+          <div id="panel-level"></div>
+          <div id="panel-merc" style="display:none"></div>
+          <div id="panel-crawler" style="display:none"></div>
+          <div id="panel-scrap" style="display:none"></div>
+          <div id="panel-boss" style="display:none"></div>
+          <div id="panel-proto" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-side">
+      <div id="previewWrap" style="display:none">
+        <div class="cap">OPERATIVE PREVIEW</div>
+        <canvas id="mercPreview" width="268" height="236"></canvas>
+      </div>
+
+      <div id="crawlerPreviewWrap" style="display:none">
+        <div class="cap">CRAWLER PREVIEW</div>
+        <canvas id="crawlerPreview" width="268" height="236"></canvas>
+      </div>
+
+      <div id="rollLevelWrap" style="display:none">
+        <button id="btn-rollLevel" class="mini" style="width:100%">⟳ REROLL LEVEL</button>
+      </div>
+      <div id="rollMercWrap" style="display:none">
+        <button id="btn-rollMerc" class="mini" style="width:100%;margin-bottom:6px">⟳ REROLL OPERATIVE</button>
+        <button id="btn-presetMerc" class="mini" style="width:100%">LOAD PRESET</button>
+      </div>
+
+      <div id="scrapPreviewWrap" style="display:none">
+        <div class="cap">DEBRIS PREVIEW</div>
+        <canvas id="scrapPreview" width="268" height="150"></canvas>
+      </div>
+      <div id="bossPreviewWrap" style="display:none">
+        <div class="cap">OVERLORD PREVIEW</div>
+        <canvas id="bossPreview" width="268" height="250"></canvas>
+      </div>
+      <div id="rollBossWrap" style="display:none">
+        <button id="btn-rollBoss" class="mini" style="width:100%">⟳ REROLL OVERLORD</button>
+        <p class="pinnote">The boss is a crawler grown past needing the floor.
+        Bigger bodies cost more to bake — the loading screen pays for it.</p>
+      </div>
+
+      <div id="protoPreviewWrap" style="display:none">
+        <div class="cap">PROTOTYPE PREVIEW</div>
+        <canvas id="protoPreview" width="268" height="250"></canvas>
+      </div>
+      <div id="rollProtoWrap" style="display:none">
+        <button id="btn-rollProto" class="mini" style="width:100%;margin-bottom:6px">⟳ REROLL WEAPON</button>
+        <button id="btn-renameProto" class="mini" style="width:100%">NEW DESIGNATION</button>
+        <p class="pinnote">Ten parameters. A rolled gun spends a fixed budget
+        across them; hand-editing does not, so you can build something absurd.</p>
+      </div>
+
+      <div id="rollScrapWrap" style="display:none">
+        <button id="btn-rollScrap" class="mini" style="width:100%">⟳ REROLL DEBRIS</button>
+        <p class="pinnote">Crates, drums, slabs, girders, bales and torn plate.
+        Shoot them and they move; the Overlord picks them up and throws them.</p>
+      </div>
+
+      <div id="rollCrawlerWrap" style="display:none">
+        <button id="btn-rollCrawler" class="mini" style="width:100%;margin-bottom:6px">⟳ REROLL CRAWLER</button>
+        <label class="pinrow">
+          <input id="pinCrawler" type="checkbox">
+          <span>USE THIS EXACT BUILD</span>
+        </label>
+        <p class="pinnote">Off: every level grows its own crawlers, coloured to
+        suit the architecture. On: every crawler in the run is this one.</p>
+      </div>
+
+      <div>
+        <p class="side-h">THREAT LEVEL</p>
+        <div class="diffs">
+          <button id="d-recruit">RECRUIT<small>forgiving · 5 lives</small></button>
+          <button id="d-regular" class="on">REGULAR<small>the intended fight · 3 lives</small></button>
+          <button id="d-veteran">VETERAN<small>they hit hard · 2 lives</small></button>
+          <button id="d-vitriol">VITRIOL<small>one life. that is the joke.</small></button>
+        </div>
+      </div>
+
+      <div>
+        <p class="side-h">HOSTILE DENSITY</p>
+        <div class="slide-row">
+          <input id="densField" type="range" min="0.2" max="2.5" step="0.05" value="1">
+          <span id="densVal">1.00×</span>
+        </div>
+      </div>
+
+      <div>
+        <p class="side-h">RESERVE OPERATIVES</p>
+        <div class="slide-row">
+          <input id="allyField" type="range" min="0" max="6" step="1" value="2">
+          <span id="allyVal">2</span>
+        </div>
+        <p class="pinnote">Frozen in stasis along the level. Walk into one to
+        bring it up; it fights alongside you and draws fire.</p>
+      </div>
+
+      <div id="storyWrap" style="display:none">
+        <p class="side-h">THE RUN</p>
+        <p class="pinnote">A world generated from this seed — its factions, its
+        people, its ground and what everyone is fighting over — with a story
+        laid across it in three acts. Reroll the seed until you like the shape
+        of the war; the dossier on the left is what you are walking into.</p>
+        <button id="btn-rollWorld" class="mini" style="width:100%">⟳ REROLL THE WORLD</button>
+        <div id="storyResume" style="display:none;margin-top:12px">
+          <p class="side-h">A RUN IN PROGRESS</p>
+          <p id="storyResumeNote" class="pinnote"></p>
+          <button id="btn-storyResume" class="mini" style="width:100%;margin-bottom:6px">CONTINUE IT</button>
+          <button id="btn-storyDiscard" class="mini" style="width:100%">ABANDON IT</button>
+        </div>
+      </div>
+
+      <div id="campaignWrap">
+        <p class="side-h">CAMPAIGN LENGTH</p>
+        <div class="slide-row">
+          <input id="sectorField" type="range" min="2" max="12" step="1" value="8">
+          <span id="sectorVal">8</span>
+        </div>
+        <p class="pinnote">A string of sectors from one seed, each deeper and
+        harder than the last. Your operative and everything in their hands
+        carries through; the place does not.</p>
+      </div>
+
+      <div>
+        <p class="side-h">PILOT</p>
+        <label class="pinrow">
+          <input id="autoField" type="checkbox">
+          <span>FULL AUTOPILOT</span>
+        </label>
+        <p class="pinnote">The merc AI runs the whole build unassisted — it
+        navigates, fights and extracts. Toggle it mid-run with P.</p>
+      </div>
+
+      <div class="side-foot">
+        <button id="btn-deploy" class="big primary">DEPLOY</button>
+      </div>
+    </div>
+  </div>
+ </div>
+</div>
+
+<!-- ============ LOADING ============ -->
+<div id="scr-load" class="screen">
+  <div class="load-box">
+    <h3>BAKING</h3>
+    <div class="sub">BUILD <span id="l-seed">————</span> · <span id="l-style">—</span></div>
+    <div class="track"><i id="l-bar"></i></div>
+    <div class="load-meta"><span id="l-msg">preparing</span><span id="l-pct">0%</span></div>
+    <div class="tip"><b>FIELD NOTE</b><span id="l-tip"></span></div>
+  </div>
+</div>
+
+<!-- ============ PAUSE ============ -->
+<div id="scr-pause" class="screen">
+  <div class="card">
+    <h3>PAUSED</h3>
+    <div id="p-stats"></div>
+    <div class="acts">
+      <button id="btn-resume" class="big primary">RESUME</button>
+      <button class="big sound-btn">♪ SOUND ON</button>
+      <button id="btn-abort" class="big">ABORT TO BUILD</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DEBRIEF ============ -->
+<!-- ============ STORY ============ -->
+<div id="scr-story" class="screen">
+  <div class="story-card">
+    <div id="story-body"></div>
+    <div class="acts">
+      <button id="btn-story-go" class="big primary">CONTINUE</button>
+      <button id="btn-story-codex" class="big">CODEX</button>
+      <button id="btn-story-quit" class="big">ABANDON</button>
+    </div>
+  </div>
+</div>
+
+<div id="scr-debrief" class="screen">
+  <div class="card">
+    <h3 id="db-title">DEBRIEF</h3>
+    <div id="db-stats"></div>
+    <div id="db-auto"></div>
+    <div class="acts">
+      <button id="btn-again" class="big primary">RUN THIS BUILD AGAIN</button>
+      <button id="btn-newseed" class="big">NEW BUILD</button>
+      <button id="btn-menu" class="big">BUILD SCREEN</button>
+    </div>
+  </div>
+</div>
+
+<script src="src/gen/greebleworks.js"></script>
+<script src="src/gen/mercforge.js"></script>
+<script src="src/gen/crawlerforge.js"></script>
+<script src="src/gen/scrapforge.js"></script>
+<script src="src/game/config.js"></script>
+<script src="src/game/audio.js"></script>
+<script src="src/game/weapons.js"></script>
+<script src="src/game/sprite.js"></script>
+<script src="src/game/physics.js"></script>
+<script src="src/game/dialog.js"></script>
+<script src="src/game/lore.js"></script>
+<script src="src/game/story.js"></script>
+<script src="src/game/cutscene.js"></script>
+<script src="src/game/story-ui.js"></script>
+<script src="src/game/campaign.js"></script>
+<script src="src/game/pilot.js"></script>
+<script src="src/game/rigid.js"></script>
+<script src="src/game/entities.js"></script>
+<script src="src/game/world.js"></script>
+<script src="src/game/render.js"></script>
+<script src="src/game/screens.js"></script>
+<script src="src/game/main.js"></script>
+<script src="embed.js"></script>
+</body>
+</html>

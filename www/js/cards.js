@@ -37,7 +37,7 @@ const handleFor = (post, ctx) => {
   switch (post.cat) {
     case 'wiki': return [`wiki.${post.sub}`, `${ctx.topics?.wiki?.[post.sub] || post.sub} · Wikipedia`];
     case 'video': return [post.channel ? post.channel.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'tube' : `tube.${post.sub}`, `${ctx.topics?.video?.[post.sub] || 'Video'}${post.dur ? ` · ${post.dur}` : ''}${/^\d{4}/.test(post.date || '') ? ` · ${post.date.slice(0, 4)}` : ''}`];
-    case 'game': return post.sub === 'garden' ? ['your.garden', ''] : ['arcade', `${ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
+    case 'game': return post.sub === 'garden' ? ['your.garden', ''] : EXT_GAMES[post.sub] ? EXT_GAMES[post.sub].handle : ['arcade', `${ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
     case 'meme': return [post.sub === 'kym' ? 'knowyourmeme' : 'meme.lord', post.sub === 'kym' ? 'Know Your Meme' : 'remix'];
     case 'product': return ['infomercial.tv', 'Sponsored · not available in stores'];
     case 'psych': return ['the.trip', `${post.sub} · generative`];
@@ -246,7 +246,46 @@ function video(p, ctx) {
 }
 
 // ------------------------------------------------ games
+// ------------------------------------------------ whole games from other projects, in a frame
+// Each runs its own page under www/ext with ?embed: it starts itself on autopilot and frames
+// itself for a portrait card (a camera that follows the player and zooms with the action). The
+// frame loads when the card scrolls in and is dropped when it scrolls out.
+const EXT_GAMES = {
+  vitriol: { src: 'ext/vitriol/index.html?embed=1', handle: ['vitriol', 'Story mode · on autopilot'], title: 'VITRIOL', sub: 'An industrial run-and-gun that plays its own story', bg: 'linear-gradient(170deg,#2a2f22,#0e0f0b)', playable: false },
+  cavecrawler: { src: 'ext/cave-crawler.html?embed=1', handle: ['cave.crawler', 'Dig deeper · tap to take over'], title: 'Cave Crawler', sub: 'A deck-building delve that digs on its own', bg: 'linear-gradient(170deg,#2a1d14,#07050c)', playable: true }
+};
+function extGame(p, ctx) {
+  const E = EXT_GAMES[p.sub];
+  const poster = el('div.extposter', { style: `background:${E.bg}` }, el('b', E.title), el('small', E.sub));
+  const tap = E.playable ? el('div.pillbtn.tapplay', { html: `${icon('play', 'fill')}<span>Tap to play</span>` }) : null;
+  const stage = el('div.stage.ext', poster, tap);
+  const media = el('div.media', stage);
+  const card = post('game', p, ctx, { media, caption: null, mediaInteractive: E.playable });
+  let frame = null, idle = null;
+  const mount = () => {
+    if (frame) return;
+    frame = el('iframe', { src: `${E.src}&seed=${p.seed || 1}`, title: E.title, allow: 'autoplay', tabindex: '-1' });
+    frame.addEventListener('load', () => { poster.style.opacity = '0'; });
+    stage.prepend(frame);
+  };
+  const unmount = () => { clearTimeout(idle); if (frame) { frame.remove(); frame = null; } poster.style.opacity = ''; stage.classList.remove('playing'); };
+  if (E.playable) {
+    // first tap hands the run to you; the frame then takes touches until you leave it alone
+    stage.addEventListener('click', () => {
+      if (stage.classList.contains('playing')) return;
+      mount(); stage.classList.add('playing');
+      frame.contentWindow?.postMessage({ feed: 1, cmd: 'takeover' }, '*');
+    });
+    stage.addEventListener('pointerdown', () => { clearTimeout(idle); idle = setTimeout(() => stage.classList.remove('playing'), 45000); });
+  }
+  card._activate = () => mount();
+  card._deactivate = () => unmount();
+  card._heavy = true;
+  return card;
+}
+
 function game(p, ctx) {
+  if (EXT_GAMES[p.sub]) return extGame(p, ctx);
   const canvas = el('canvas');
   const mode = el('span.pill.auto', (GAMES[p.sub] || GAMES.plinko).noAuto ? 'READY' : 'AUTO');
   const score = el('span.pill', '0');

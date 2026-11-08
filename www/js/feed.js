@@ -188,6 +188,12 @@ export class Feed {
     if (this.mode && this.mode !== 'day' && !this.focus) return this.nextModePost();
     // the garden visits the day feed too, every couple of dozen posts
     if (!this.focus && settings.gardenInFeed !== false && this.total - (this.lastDayGarden ?? -10) >= 22) { this.lastDayGarden = this.total; this.total++; return gardenPost('day', this.total); }
+    // and the two whole games (Vitriol's story, Cave Crawler), taking turns, every dozen and a half
+    if (!this.focus && this.total - (this.lastExt ?? -8) >= 17) {
+      this.lastExt = this.total; this.total++;
+      const sub = (this.extTurn = (this.extTurn || 0) + 1) % 2 ? 'cavecrawler' : 'vitriol';
+      return { id: `${sub}-${Date.now().toString(36)}-${this.total}`, cat: 'game', sub, seed: (Math.random() * 1e9) | 0, title: sub === 'vitriol' ? 'Vitriol' : 'Cave Crawler', mods: [] };
+    }
     if (this.focus && this.focusSub) {
       const l = this.pools[this.focus]?.get(this.focusSub);
       if (l?.length) { this.emitted[this.focus]++; this.total++; this.last = this.focus; return l.shift(); }
