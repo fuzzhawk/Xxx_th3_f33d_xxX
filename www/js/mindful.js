@@ -3,6 +3,7 @@
 // Also the quote card for the package's morning and night quotes.
 import { el, mulberry32 } from './util.js';
 import { cellView } from './cells.js';
+import { dreamscape } from './dreamscape.js';
 
 const pick = (R, a) => a[Math.floor(R() * a.length)];
 export const MORNING_KINDS = { body: 2.2, affirm: 1.8, cells: 1.4 };
@@ -257,8 +258,12 @@ function worldView(p) {
     el('p', `A world around ${pick(R, STAR)}. The sky is ${pick(R, SKY)}, over ${landText}.`),
     el('p', `It is home to ${pick(R, PEOPLE)}. Here ${pick(R, CUSTOM)}.`),
     el('p.then', `Tonight, imagine arriving on ${name} as you fall asleep.`)));
+  // a dreamscape flown through in 3D; if WebGL is not there, the painted world as before
   let painted = false;
-  return { body: box, label: name, activate: () => { if (!painted) { painted = true; paintWorld(cv, mulberry32(p.seed ^ 0x9e3779b9), land); } } };
+  const scape = dreamscape(cv, p.seed >>> 0);
+  return { body: box, label: name,
+    activate: () => { scape.start().then((ok) => { if (!ok && !painted) { painted = true; paintWorld(cv, mulberry32(p.seed ^ 0x9e3779b9), land); } }); },
+    deactivate: () => scape.stop() };
 }
 
 // ------------------------------------------------ the card body for a mind post
