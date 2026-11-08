@@ -25,24 +25,26 @@
     {
       "id": "2026-W45",
       "title": "The Feed · 2026-W45",
-      "created": "2026-11-07T22:35:14.543Z",
-      "total": 5215,
+      "created": "2026-11-08T14:33:52.100Z",
+      "total": 5859,
       "counts": {
         "game": 1040,
-        "wiki": 996,
+        "wiki": 997,
         "video": 937,
         "meme": 520,
         "product": 208,
         "psych": 208,
         "selfcare": 260,
         "web": 260,
-        "news": 215,
+        "news": 57,
         "oracle": 156,
         "power": 104,
         "studio": 104,
-        "read": 207
+        "read": 197,
+        "morning": 430,
+        "evening": 381
       },
-      "estHours": 38.3
+      "estHours": 38.1
     }
   ],
   "latest": "2026-W45"
