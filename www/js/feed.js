@@ -9,8 +9,8 @@ import { mindPost, greetingPost } from './mindful.js';
 // Morning and evening feeds: package posts (articles, videos, quotes, poems) mixed with cards made
 // on the phone (body and breath, prompts, dream guides, scenes, worlds) and the garden.
 const MODE_MIX = {
-  morning: { body: 2.2, affirm: 1.6, garden: 0.9, wiki: 2.6, video: 2.4, quote: 2.4 },
-  evening: { guide: 1.1, scene: 1.4, world: 1.4, garden: 0.9, wiki: 2.5, poem: 2.2, quote: 2.4 }
+  morning: { body: 2.2, affirm: 1.6, cells: 1.5, garden: 0.9, wiki: 2.6, video: 2.4, quote: 2.4 },
+  evening: { guide: 1.1, scene: 1.4, world: 1.4, cells: 1.2, garden: 0.9, wiki: 2.5, poem: 2.2, quote: 2.4 }
 };
 const PKG_KIND = (p) => (p.cat === 'read' ? 'poem' : p.cat);
 // one shared garden: every garden card opens the same saved garden

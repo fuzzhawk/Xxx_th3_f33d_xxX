@@ -64,6 +64,10 @@ body[data-mode=evening] .textpost.read { background: linear-gradient(160deg, #2b
 .mind.bodycard { background: linear-gradient(170deg, hsl(var(--h) 22% 67%), #acb8a8); }
 body:not([data-mode=morning]) .mind.bodycard { background: var(--card); }
 .mind.bodycard .pacer { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.mind.cellcard { background: var(--card); }
+.mind.cellcard .pacer { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.mind.cellcard .pace { font-weight: 700; color: #c8455a; letter-spacing: .4px; }
+.mind.cellcard.night .pace { color: #9a86d8; }
 .mind.bodycard .pace { font-weight: 700; color: hsl(calc(var(--h) + 180) 55% 45%); font-size: 15px; letter-spacing: .4px; }
 body:not([data-mode=morning]) .mind.bodycard .pace { color: var(--orange); }
 

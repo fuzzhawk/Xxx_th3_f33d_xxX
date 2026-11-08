@@ -2,14 +2,15 @@
 // short gratitude and noticing prompts, greetings, dream guides, dream scenes and imagined worlds.
 // Also the quote card for the package's morning and night quotes.
 import { el, mulberry32 } from './util.js';
+import { cellView } from './cells.js';
 
 const pick = (R, a) => a[Math.floor(R() * a.length)];
-export const MORNING_KINDS = { body: 2.2, affirm: 1.8 };
-export const EVENING_KINDS = { guide: 1.2, scene: 1.5, world: 1.4 };
+export const MORNING_KINDS = { body: 2.2, affirm: 1.8, cells: 1.4 };
+export const EVENING_KINDS = { guide: 1.2, scene: 1.5, world: 1.4, cells: 1.1 };
 export function mindPost(kind, mode, seed = Math.floor(Math.random() * 2 ** 31)) {
   return { id: `m-${kind}-${seed.toString(36)}`, cat: 'mind', sub: kind, mode, seed };
 }
-export const MIND_HANDLE = { body: ['body.breath', 'Feel it · breathe into it'], affirm: ['good.morning', 'A small reminder'], hello: ['the.feed', 'Today'], guide: ['dream.guide', 'Tonight’s practice'], scene: ['dream.scene', 'Rehearse this dream'], world: ['other.worlds', 'A world to dream of'] };
+export const MIND_HANDLE = { body: ['body.breath', 'Feel it · breathe into it'], affirm: ['good.morning', 'A small reminder'], hello: ['the.feed', 'Today'], guide: ['dream.guide', 'Tonight’s practice'], scene: ['dream.scene', 'Rehearse this dream'], world: ['other.worlds', 'A world to dream of'], cells: ['cell.life', 'Inside you, right now'] };
 
 // ------------------------------------------------ body and breath
 // [key, line, [points as (x from the centre line, y)], radius] on a 300-unit-tall figure
@@ -261,7 +262,7 @@ function worldView(p) {
 }
 
 // ------------------------------------------------ the card body for a mind post
-const VIEWS = { body: bodyView, affirm: affirmView, hello: helloView, guide: guideView, scene: sceneView, world: worldView };
+const VIEWS = { body: bodyView, affirm: affirmView, hello: helloView, guide: guideView, scene: sceneView, world: worldView, cells: cellView };
 export function mindView(p) { return (VIEWS[p.sub] || affirmView)(p); }
 
 // quotes from the package (Wikiquote)
