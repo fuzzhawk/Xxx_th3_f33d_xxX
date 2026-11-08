@@ -7,7 +7,7 @@ WARN nature-kit: nothing CC0 on OpenGameArt for "kenney nature kit"
 foliage-pack: kenney.nl failed (no zip link on page); trying OpenGameArt
   oga foliage-pack-100x: CC0, 3 files
   oga foliage-sprites: CC0, 3 files
-foliage-pack: kept 25 (tree 17, bush 7, flower 1)
+foliage-pack: kept 27 (flower 6, tree 16, bush 5)
   page "Foliage Sprites &middot; Kenney" 19119 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:nature | https://kenney.nl/assets/tag:foliage | https://kenney.nl/assets/tag:vfx | https://kenney.nl/assets/tag:grass | https://kenney.nl/assets/category:2D | https://kenney.nl/assets/series:VFX | #inline-download | https://kenney.nl/media/pages/assets/foliage-sprites/b43add0da5-1761288693/3416070.jpg | https://kenney.nl/media/pages/assets/foliage-sprites/955bae86e6-1761337004/3405340.jpg | https://kenney.nl/media/pages/assets/foliage-sprites/ab6a7b4a06-1677495973/preview.png | https://kenney.nl/media/pages/assets/foliage-sprites/634189118b-1677495976/sample.png | https://kenney.nl/assets/splat-pack | https://kenney.nl/assets?category=2D | https://kenney.nl/assets?series=VFX | https://kenney.nl/assets/particle-pack | https://kenney.nl/assets/smoke-particles | https://kenney.nl/assets/light-masks | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
   page text: Foliage Sprites &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Foliage Sprites Tags nature foliage vfx grass Category 2D &#8226; VFX Files 50× License Creative Commons CC0 Download Get All-in-1 bundle Updates 1.0 Released in 2020 As seen i
 foliage-sprites: kenney.nl failed (no zip link on page); trying OpenGameArt
@@ -34,7 +34,7 @@ pixel-platformer: kenney.nl failed (no zip link on page); trying OpenGameArt
   oga platformer-art-pixel-redux: CC0, 3 files
   oga pixel-platformer-0: CC0, 4 files
   oga pixel-platformer-metal-expansion: CC0, 3 files
-pixel-platformer: kept 9 (bush 6, flower 2, grass 1)
+pixel-platformer: kept 8 (bush 7, grass 1)
   page "Tiny Town &middot; Kenney" 18790 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:rpg | https://kenney.nl/assets/tag:roguelike | https://kenney.nl/assets/tag:town | https://kenney.nl/assets/tag:overworld | https://kenney.nl/assets/tag:map | https://kenney.nl/assets/tag:pixel | https://kenney.nl/assets/category:2D | https://kenney.nl/assets/series:Tiny | https://kenney.nl/assets/size:16 | #inline-download | https://kenney.nl/media/pages/assets/tiny-town/fc6adf02eb-1674742335/preview.png | https://kenney.nl/media/pages/assets/tiny-town/e241a9f6c0-1674742338/sample.png | https://kenney.nl/assets/tiny-battle | https://kenney.nl/assets?category=2D | https://kenney.nl/assets?series=Tiny | https://kenney.nl/assets/tiny-ski | https://kenney.nl/assets/tiny-dungeon | https://kenney.nl/assets/tiny-farm | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
   page text: Tiny Town &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Tiny Town Tags rpg roguelike town overworld map pixel Category 2D &#8226; Tiny Tile size 16 × 16 Files 130× License Creative Commons CC0 Download Get All-in-1 bundle Updates 1.1 Fixe
 tiny-town: kenney.nl failed (no zip link on page); trying OpenGameArt
@@ -51,4 +51,4 @@ background-elements-redux: kept 18 (grass 5, tree 5, bush 5, cactus 3)
 jumper-pack: kenney.nl failed (no zip link on page); trying OpenGameArt
   oga jumper-pack: CC0, 3 files
 jumper-pack: kept 5 (cactus 1, grass 2, mushroom 2)
-total 69 sprites, 34 KB {"tree":24,"bush":23,"flower":3,"cactus":5,"mushroom":5,"grass":9}
+total 70 sprites, 33 KB {"flower":6,"tree":23,"bush":22,"cactus":5,"mushroom":5,"grass":9}
