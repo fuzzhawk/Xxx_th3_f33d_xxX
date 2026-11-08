@@ -763,6 +763,9 @@ export class Garden extends Game {
       return;
     }
     if (this.mode === 'morning') {
+      // dim the pastel meadow a little to sit with the sage page, then the soft dawn tint
+      b.globalCompositeOperation = 'multiply'; b.globalAlpha = 0.8; b.fillStyle = '#ccd6c8'; b.fillRect(0, 0, VW, VH);
+      b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1;
       const g = b.createLinearGradient(0, 0, VW, VH);
       g.addColorStop(0, 'rgba(255,200,220,.16)'); g.addColorStop(0.5, 'rgba(255,240,220,0)'); g.addColorStop(1, 'rgba(190,220,255,.12)');
       b.fillStyle = g; b.fillRect(0, 0, VW, VH);

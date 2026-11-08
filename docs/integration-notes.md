@@ -43,7 +43,7 @@ Running list of wiring the lead must do before the final push.
 - Builder: `tools/modes.mjs` + `topics.json → modes` (morning: human biology, neuroplasticity, nootropics, breathwork articles; miraculous life, wildlife, vistas, kindness videos; uplifting quotes. Evening: mysticism, dreams, sci-fi worlds articles; introspective quotes; night poems from PoetryDB). CI builder test run 7 passed (`--quick --only morning,evening`).
 
 ## Garden world + sage mornings (2026-11-08, later)
-- Morning theme is a desaturated sage green instead of near-white (`www/css/modes.css`, theme-color `#dce5d8`).
+- Morning theme is a dimmed, desaturated sage green (`www/css/modes.css`, theme-color `#bfcbbb`; first `#dce5d8`, darkened on request). The body card canvas and the garden's morning light are dimmed to match.
 - The garden is now a world (`www/js/games/garden-world.js` + `garden.js`), saved as `garden-v2` (a `garden-v1` save moves into the middle of the new meadows, ruins/plants/animals/inventory kept):
   - The meadows (128×128): meadow, forests (pine/oak/birch, ferns), flower fields, lakes with a small island (tap water beside the shore to build plank bridges), rocky hills with 3–4 cave mouths, 12 ruins including the Cloud Stair.
   - The caverns (64×64, cellular caves): lantern-lit darkness, rubble to clear, pools, glowshrooms (cave-only seeds), crystals, 3 ruins, bats/glowworms/salamanders/cave fish; ladders back up to each mouth.

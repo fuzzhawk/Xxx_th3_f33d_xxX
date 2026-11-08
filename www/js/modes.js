@@ -28,7 +28,7 @@ export function setMode(m, { manual = false } = {}) {
   const changed = m !== mode;
   mode = m;
   document.body.dataset.mode = m;
-  document.querySelector('meta[name=theme-color]')?.setAttribute('content', m === 'morning' ? '#dce5d8' : m === 'evening' ? '#1b130e' : '#14110f');
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', m === 'morning' ? '#bfcbbb' : m === 'evening' ? '#1b130e' : '#14110f');
   if (manual) { settings.lastMode = m; saveSettings(); }
   applyFilter();
   renderSwitch();
