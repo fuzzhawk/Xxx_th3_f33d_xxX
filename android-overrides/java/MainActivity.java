@@ -16,6 +16,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(FeedNativePlugin.class);
         super.onCreate(savedInstanceState);
+        // let feed videos start on their own (muted or not) instead of waiting behind a play button
+        if (getBridge() != null && getBridge().getWebView() != null) getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
         immersive = prefs().getBoolean("immersive", true);
         applyImmersive();
     }

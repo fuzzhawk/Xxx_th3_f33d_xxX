@@ -155,19 +155,37 @@ function wiki(p, ctx) {
 }
 
 // ------------------------------------------------ video
+// YouTube without YouTube's chrome: no controls, no big play button, no title bar. The player starts
+// muted (so autoplay is always allowed) under the thumbnail, and the thumbnail only fades away once
+// the video is really playing. Tap the video to turn the sound on or off; double-tap to like.
+const canUnmute = () => !!window.Capacitor?.isNativePlatform?.() || !!navigator.userActivation?.hasBeenActive;
 function video(p, ctx) {
   const frame = el('div.frame');
-  const poster = el('img', { alt: '', loading: 'lazy' });
+  const poster = el('img.poster', { alt: '', loading: 'lazy' });
   poster.src = `https://i.ytimg.com/vi/${p.vid}/${p.short ? 'oar2' : 'hqdefault'}.jpg`;
-  poster.onerror = () => { if (!poster.dataset.f) { poster.dataset.f = 1; poster.src = `https://i.ytimg.com/vi/${p.vid}/hqdefault.jpg`; } else poster.remove(); };
+  poster.onerror = () => { if (!poster.dataset.f) { poster.dataset.f = 1; poster.src = `https://i.ytimg.com/vi/${p.vid}/hqdefault.jpg`; } else poster.style.visibility = 'hidden'; };
   const unmute = el('button.pillbtn.unmute', { html: icon('mute') });
-  let iframe = null;
+  const tapper = el('div.vtap');
+  let iframe = null, heard = false, playing = false, wait = null, reveal = null;
   const send = (func, args = []) => iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
   const setLabel = () => { unmute.innerHTML = icon(card._muted ? 'mute' : 'sound'); };
+  const applySound = () => { if (card._muted) send('mute'); else if (canUnmute()) { send('unMute'); send('setVolume', [100]); } };
+  const live = () => {
+    if (playing) return;
+    playing = true; clearTimeout(wait);
+    frame.classList.remove('stuck');
+    applySound();
+    // YouTube flashes its title for a moment when playback begins: let that pass under the thumbnail
+    reveal = setTimeout(() => frame.classList.add('live'), heard ? 1200 : 0);
+  };
   const onMsg = (e) => {
     if (!iframe || e.source !== iframe.contentWindow) return;
     let d; try { d = JSON.parse(e.data); } catch { return; }
-    if (d.event === 'onError' || (d.event === 'infoDelivery' && d.info?.playerState === undefined && d.info?.errorCode)) unavailable(d.info);
+    heard = true;
+    if (d.event === 'onError' || (d.event === 'infoDelivery' && d.info?.playerState === undefined && d.info?.errorCode)) return unavailable(d.info?.errorCode ?? d.info);
+    const st = d.event === 'onStateChange' ? d.info : d.event === 'infoDelivery' ? d.info?.playerState : undefined;
+    if (st === 1) live();
+    if (d.event === 'onReady') send('playVideo');
   };
   const unavailable = (code) => {
     removeEventListener('message', onMsg);
@@ -178,31 +196,51 @@ function video(p, ctx) {
   const mount = () => {
     if (iframe) return;
     if (!navigator.onLine) { frame.replaceChildren(el('div.offline', 'You are offline. This video will play when you are back online.')); return; }
-    const muted = settings.startMuted && !(settings.rememberSound && soundOn);
-    const q = new URLSearchParams({ autoplay: 1, mute: muted ? 1 : 0, playsinline: 1, loop: 1, playlist: p.vid, controls: 1, rel: 0, modestbranding: 1, enablejsapi: 1, origin: location.origin });
-    iframe = el('iframe', { src: `https://www.youtube.com/embed/${p.vid}?${q}`, allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', allowfullscreen: true, referrerpolicy: 'strict-origin-when-cross-origin', title: p.title });
-    iframe.addEventListener('load', () => iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: p.vid, channel: 'widget' }), '*'));
+    // sound only where the browser will allow it without a tap (always in the app)
+    card._muted = (settings.startMuted && !(settings.rememberSound && soundOn)) || !canUnmute();
+    playing = false; heard = false;
+    const q = new URLSearchParams({ autoplay: 1, mute: 1, playsinline: 1, loop: 1, playlist: p.vid, controls: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, disablekb: 1, fs: 0, cc_load_policy: 0, enablejsapi: 1, origin: location.origin });
+    iframe = el('iframe', { src: `https://www.youtube.com/embed/${p.vid}?${q}`, allow: 'autoplay; encrypted-media; picture-in-picture', referrerpolicy: 'strict-origin-when-cross-origin', title: p.title, tabindex: '-1' });
+    iframe.addEventListener('load', () => {
+      iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: p.vid, channel: 'widget' }), '*');
+      // if the player never talks to us, show it anyway; if it talks but never starts, keep the
+      // thumbnail and let a tap start it
+      clearTimeout(wait);
+      wait = setTimeout(() => { if (!heard) live(); else if (!playing) frame.classList.add('stuck'); }, 5000);
+    });
     addEventListener('message', onMsg);
-    frame.append(iframe);
-    card._muted = muted; setLabel();
+    frame.prepend(iframe);
+    setLabel();
   };
-  unmute.onclick = (e) => {
-    e.stopPropagation();
+  const toggleSound = () => {
     if (!iframe) mount();
     card._muted = !card._muted;
-    send(card._muted ? 'mute' : 'unMute'); if (!card._muted) send('setVolume', [100]);
+    if (!playing) send('playVideo');
+    if (card._muted) send('mute'); else { send('unMute'); send('setVolume', [100]); }
     soundOn = !card._muted; setLabel();
   };
-  frame.append(poster, unmute);
+  unmute.onclick = (e) => { e.stopPropagation(); toggleSound(); };
+  // one tap: sound on/off (or start, if autoplay was refused); two taps: like
+  let tapT = 0, tapTimer = null;
+  tapper.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - tapT < 300) {
+      clearTimeout(tapTimer); tapT = 0;
+      if (!favs.has('fav', p.id)) favs.toggle('fav', p, ctx.pkgId);
+      card._sync?.();
+      const heart = card.querySelector('.bigheart'); heart?.classList.remove('pop'); void heart?.offsetWidth; heart?.classList.add('pop');
+      return;
+    }
+    tapT = now;
+    tapTimer = setTimeout(() => { if (!iframe) mount(); else if (!playing) { send('playVideo'); applySound(); } else toggleSound(); }, 300);
+  });
+  frame.append(poster, tapper, unmute);
+  if (!settings.autoplay) frame.classList.add('stuck');   // a small corner triangle: tap to play
   const media = el('div.media', frame);
   const card = post(`video${p.short ? '.short' : ''}`, p, ctx, { media, ext: `https://www.youtube.com/watch?v=${p.vid}`, caption: capt(handleFor(p, ctx)[0], p.title), mediaInteractive: true });
-  if (!settings.autoplay) {
-    const play = el('button.pillbtn.play', { html: `${icon('play', 'fill')}<span>Play</span>` });
-    play.onclick = (e) => { e.stopPropagation(); play.remove(); mount(); };
-    frame.append(play);
-  }
   card._activate = () => { if (settings.autoplay) mount(); };
-  card._deactivate = () => { if (iframe) { removeEventListener('message', onMsg); iframe.remove(); iframe = null; } };
+  card._deactivate = () => { clearTimeout(wait); clearTimeout(reveal); if (iframe) { removeEventListener('message', onMsg); iframe.remove(); iframe = null; } playing = false; frame.classList.remove('live', 'stuck'); };
   card._heavy = true;
   return card;
 }
