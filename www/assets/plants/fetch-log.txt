@@ -1,10 +1,79 @@
-WARN nature-kit: no zip link on page
-WARN foliage-pack: no zip link on page
+  page "Nature Kit &middot; Kenney" 17952 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:nature | https://kenney.nl/assets/tag:tree | https://kenney.nl/assets/tag:rock | https://kenney.nl/assets/tag:foliage | https://kenney.nl/assets/category:3D | #inline-download | https://kenney.nl/media/pages/assets/nature-kit/2d81fc716e-1677698893/preview.png | https://kenney.nl/media/pages/assets/nature-kit/656a90532f-1677698896/sample.png | https://kenney.nl/assets/foliage-sprites | https://kenney.nl/assets?category=2D | https://kenney.nl/assets?series=VFX | https://kenney.nl/assets/survival-kit | https://kenney.nl/assets?category=3D | https://kenney.nl/assets/hexagon-pack | https://kenney.nl/assets/foliage-pack | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
+  page text: Nature Kit &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Nature Kit Tags nature tree rock foliage Category 3D Files 330× License Creative Commons CC0 Download Get All-in-1 bundle Updates 1.0 Released in 2020 You might also like... Foliage
+nature-kit: kenney.nl failed (no zip link on page); trying OpenGameArt
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+WARN nature-kit: nothing CC0 on OpenGameArt for "kenney nature kit"
+  page "Foliage Pack &middot; Kenney" 18022 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:nature | https://kenney.nl/assets/tag:tree | https://kenney.nl/assets/category:2D | #inline-download | https://kenney.nl/media/pages/assets/foliage-pack/59ee6d6f79-1677693467/preview.png | https://kenney.nl/media/pages/assets/foliage-pack/2041042bf7-1677693469/sample.png | https://kenney.nl/assets/foliage-sprites | https://kenney.nl/assets?category=2D | https://kenney.nl/assets?series=VFX | https://kenney.nl/assets/survival-kit | https://kenney.nl/assets?category=3D | https://kenney.nl/assets/hexagon-pack | https://kenney.nl/assets/isometric-tiles-landscape | https://kenney.nl/assets?series=Isometric Tiles | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
+  page text: Foliage Pack &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Foliage Pack Tags nature tree Category 2D Files 100× License Creative Commons CC0 Download Get All-in-1 bundle Updates 1.0 Released in 2016 You might also like... Foliage Sprites 
+foliage-pack: kenney.nl failed (no zip link on page); trying OpenGameArt
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga abstract-platformer: CC0, 3 files
+  oga foliage-pack-100x: CC0, 3 files
+  oga foliage-sprites: CC0, 3 files
+foliage-pack: kept 34 (bush 10, flower 10, tree 10, crop 2, grass 2)
 platformer-pack-redux: using platformer-art-buildings
-WARN platformer-pack-redux: no zip link on page
-WARN pixel-platformer-farm-expansion: no zip link on page
-WARN pixel-platformer: no zip link on page
-WARN tiny-town: no zip link on page
-WARN background-elements-redux: no zip link on page
-WARN jumper-pack: no zip link on page
-total 0 sprites, 0 KB {}
+  page "Platformer Art Buildings &middot; Kenney" 18765 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:platformer | https://kenney.nl/assets/tag:tile | https://kenney.nl/assets/tag:building | https://kenney.nl/assets/category:2D | https://kenney.nl/assets/series:Platformer Pack | #inline-download | https://kenney.nl/media/pages/assets/platformer-art-buildings/023244d22c-1677696281/preview.png | https://kenney.nl/media/pages/assets/platformer-art-buildings/16c5e863a1-1677696283/sample.png | https://kenney.nl/assets/platformer-pack-industrial | https://kenney.nl/assets?category=2D | https://kenney.nl/assets?series=Platformer Pack | https://kenney.nl/assets/platformer-pack-medieval | https://kenney.nl/assets/platformer-pack-remastered | https://kenney.nl/assets/platformer-art-candy | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
+  page text: Platformer Art Buildings &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Platformer Art Buildings Tags platformer tile building Category 2D &#8226; Platformer Pack Files 100× License Creative Commons CC0 Download Get All-in-1 bundle Updates
+platformer-pack-redux: kenney.nl failed (no zip link on page); trying OpenGameArt
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga platformer-art-complete-pack-often-updated: CC0, 3 files
+  oga platformer-art-deluxe: CC0, 3 files
+  oga platformer-tiles: CC0, 2 files
+platformer-pack-redux: kept 15 (cactus 2, mushroom 4, bush 4, tree 4, grass 1)
+  page "Pixel Platformer Farm Expansion &middot; Kenney" 19092 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:platformer | https://kenney.nl/assets/tag:farm | https://kenney.nl/assets/tag:pixel | https://kenney.nl/assets/category:2D | https://kenney.nl/assets/series:Pixel Platformer | https://kenney.nl/assets/size:18 | #inline-download | https://kenney.nl/media/pages/assets/pixel-platformer-farm-expansion/a8df210156-1668789784/preview.png | https://kenney.nl/media/pages/assets/pixel-platformer-farm-expansion/774e7e43c1-1668789788/sample.png | https://kenney.nl/assets/pixel-platformer-food-expansion | https://kenney.nl/assets?category=2D | https://kenney.nl/assets?series=Pixel Platformer | https://kenney.nl/assets/pixel-platformer | https://kenney.nl/assets/pixel-platformer-blocks | https://kenney.nl/assets/pixel-platformer-industrial-expansion | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
+  page text: Pixel Platformer Farm Expansion &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Pixel Platformer Farm Expansion Tags platformer farm pixel Category 2D &#8226; Pixel Platformer Tile size 18 × 18 Files 110× License Creative Commons CC0 Downlo
+pixel-platformer-farm-expansion: kenney.nl failed (no zip link on page); trying OpenGameArt
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga pixel-platformer-farm-expansion: CC0, 3 files
+pixel-platformer-farm-expansion: kept 1 (bush 1)
+  page "Pixel Platformer &middot; Kenney" 19469 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:platformer | https://kenney.nl/assets/tag:pixel | https://kenney.nl/assets/tag:oopi | https://kenney.nl/assets/category:2D | https://kenney.nl/assets/series:Pixel Platformer | https://kenney.nl/assets/size:18 | #inline-download | https://kenney.nl/media/pages/assets/pixel-platformer/9354b2aa6b-1696667871/preview.png | https://kenney.nl/media/pages/assets/pixel-platformer/bf585643f0-1696667860/samplea.png | https://kenney.nl/media/pages/assets/pixel-platformer/b6a81e5558-1696667866/sampleb.png | https://kenney.nl/assets/pixel-platformer-food-expansion | https://kenney.nl/assets?category=2D | https://kenney.nl/assets?series=Pixel Platformer | https://kenney.nl/assets/pixel-platformer-blocks | https://kenney.nl/assets/pixel-platformer-farm-expansion | https://kenney.nl/assets/pixel-platformer-industrial-expansion | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
+  page text: Pixel Platformer &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Pixel Platformer Tags platformer pixel oopi Category 2D &#8226; Pixel Platformer Tile size 18 × 18 Files 200× License Creative Commons CC0 Download Get All-in-1 bundle Updates
+pixel-platformer: kenney.nl failed (no zip link on page); trying OpenGameArt
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga platformer-art-pixel-edition: CC0, 3 files
+  oga platformer-art-pixel-redux: CC0, 3 files
+  oga kenney-16x16: CC0, 3 files
+pixel-platformer: kept 13 (tree 1, flower 4, grass 4, bush 4)
+  page "Tiny Town &middot; Kenney" 18790 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:rpg | https://kenney.nl/assets/tag:roguelike | https://kenney.nl/assets/tag:town | https://kenney.nl/assets/tag:overworld | https://kenney.nl/assets/tag:map | https://kenney.nl/assets/tag:pixel | https://kenney.nl/assets/category:2D | https://kenney.nl/assets/series:Tiny | https://kenney.nl/assets/size:16 | #inline-download | https://kenney.nl/media/pages/assets/tiny-town/fc6adf02eb-1674742335/preview.png | https://kenney.nl/media/pages/assets/tiny-town/e241a9f6c0-1674742338/sample.png | https://kenney.nl/assets/tiny-battle | https://kenney.nl/assets?category=2D | https://kenney.nl/assets?series=Tiny | https://kenney.nl/assets/tiny-ski | https://kenney.nl/assets/tiny-dungeon | https://kenney.nl/assets/tiny-farm | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
+  page text: Tiny Town &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Tiny Town Tags rpg roguelike town overworld map pixel Category 2D &#8226; Tiny Tile size 16 × 16 Files 130× License Creative Commons CC0 Download Get All-in-1 bundle Updates 1.1 Fixe
+tiny-town: kenney.nl failed (no zip link on page); trying OpenGameArt
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga tiny-creatures: CC0, 6 files
+  oga tiny-town: CC0, 3 files
+  oga tiny-farm: CC0, 3 files
+tiny-town: kept 17 (bush 17)
+  page "Background Elements Remastered &middot; Kenney" 17995 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:background | https://kenney.nl/assets/category:2D | #inline-download | https://kenney.nl/media/pages/assets/background-elements-remastered/216e4bc95c-1677693153/preview.png | https://kenney.nl/media/pages/assets/background-elements-remastered/4a6494465e-1677693157/sample.png | https://kenney.nl/assets/shooting-gallery | https://kenney.nl/assets?category=2D | https://kenney.nl/assets/background-elements | https://kenney.nl/assets/yellow-paint-pack | https://kenney.nl/assets/fantasy-ui-borders | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
+  page text: Background Elements Remastered &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Background Elements Remastered Tags background Category 2D Files 90× License Creative Commons CC0 Download Get All-in-1 bundle Updates 1.0 Released in 2019 You m
+background-elements-redux: kenney.nl failed (no zip link on page); trying OpenGameArt
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga background-elements: CC0, 3 files
+  oga background-elements-redux: CC0, 3 files
+  oga scribble-platformer: CC0, 3 files
+background-elements-redux: kept 18 (grass 5, tree 5, bush 5, cactus 3)
+  page "Jumper Pack &middot; Kenney" 18512 chars; candidate links: https://kenney.itch.io/kenney-game-assets | https://kenney.nl/assets | https://kenney.nl/assets/tag:platformer | https://kenney.nl/assets/tag:character | https://kenney.nl/assets/category:2D | #inline-download | https://kenney.nl/media/pages/assets/jumper-pack/c467f064d7-1677666689/preview.png | https://kenney.nl/media/pages/assets/jumper-pack/fafcb50fc8-1677666692/sample.png | https://kenney.nl/assets/pixel-platformer-food-expansion | https://kenney.nl/assets?category=2D | https://kenney.nl/assets?series=Pixel Platformer | https://kenney.nl/assets/pixel-platformer | https://kenney.nl/assets/pixel-platformer-farm-expansion | https://kenney.nl/assets/pixel-platformer-industrial-expansion | https://bsky.app/profile/kenney.nl | https://kenney.nl/data/js/kenney-theme-switching.js
+  page text: Jumper Pack &middot; Kenney Get Kenney Game Assets All-in-1 to download everything at once, plus free updates! Games Tools Assets Starter Kits Donate &times; Games Tools Assets Starter Kits Support Knowledge Base Donate Jumper Pack Tags platformer character Category 2D Files 110× License Creative Commons CC0 Download Get All-in-1 bundle Updates 1.0 Released in 2015 You might also like... Pixel Pla
+jumper-pack: kenney.nl failed (no zip link on page); trying OpenGameArt
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga jumper-pack: CC0, 3 files
+jumper-pack: kept 5 (cactus 1, grass 2, mushroom 2)
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga lpc-tile-atlas: not CC0, skipped
+  oga 2d-lost-garden-zelda-style-tiles-resized-to-32x32-with-additions: not CC0, skipped
+  oga trees-bushes: CC0, 2 files
+oga-pixel-plants: kept 0 (none)
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga zelda-like-tilesets-and-sprites: CC0, 4 files
+  oga whispers-of-avalon-grassland-tileset: not CC0, skipped
+  oga tiny-16-basic: not CC0, skipped
+oga-pixel-trees: kept 13 (flower 5, grass 2, bush 5, tree 1)
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga rpg-town-pixel-art-assets: CC0, 2 files
+  oga denzis-public-domain-art: CC0, 5 files
+  oga flowers: CC0, 3 files
+oga-pixel-flowers: kept 24 (tree 6, flower 6, bush 6, grass 6)
+  oga october-2026-art-challenge-phobias: not CC0, skipped
+  oga the-field-of-the-floating-islands: CC0, 6 files
+  oga cave-tileset: not CC0, skipped
+  oga pixel-land-15: CC0, 2 files
+oga-mushrooms: kept 10 (tree 3, bush 3, flower 2, grass 2)
+total 147 sprites, 53 KB {"bush":53,"flower":27,"tree":30,"crop":2,"grass":24,"cactus":5,"mushroom":6}
