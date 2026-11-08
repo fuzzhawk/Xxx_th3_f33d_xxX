@@ -49,3 +49,14 @@ Running list of wiring the lead must do before the final push.
   - The caverns (64×64, cellular caves): lantern-lit darkness, rubble to clear, pools, glowshrooms (cave-only seeds), crystals, 3 ruins, bats/glowworms/salamanders/cave fish; ladders back up to each mouth.
   - The sky islands (64×64): islands over a cloud sea joined by cloud paths, mist to clear, cloud steps (tap the cloud sea beside an island), 3 ruins, sky orchids, cloud sheep/swallows/dragonflies; reached by the Cloud Stair once uncovered.
   - Map chunks are painted on demand (16×16 tiles, LRU of 54) and a minimap shows explored tiles; draw cost ~0.5 ms/frame in the test browser, save ≈200 KB.
+
+## Garden: lo-fi pixels and live terrain (2026-11-08, later still)
+- Bug fix: after planting (or watering, feeding, clearing) the hero stayed in the cast pose. Crystal's `cast()` loops until `stopCast()`, so `garden.js` now stops the cast when the task timer runs out and whenever a new walk starts.
+- The world is drawn into a 240×280 buffer at one pixel per world pixel and scaled up without smoothing, with film grain and a soft vignette; the UI stays sharp on top.
+- Live terrain, stepped at 60 Hz inside `step()`:
+  - Grass is no longer baked into the chunks. `bladesFor()` gives each tile its blades: tall wild grass, or small clumps on meadow/forest/flower tiles. Each tile is a spring pushed by a travelling wind wave and by anyone walking past (hero and animals).
+  - Plants sway on springs too; trees shake and drop leaves when brushed. Leaves and petals fall, rest, fade and get kicked up again.
+  - Water is a 2-px height field over the view (`Ripples`): rain, wind, swimming animals and new bridges send rings across lakes and cave pools.
+  - Footprints show on sand and paths.
+- Sprites (plants, animals, ruins, crystals) are alpha-thresholded and get a selective 1-px outline: a deep shade of the colour they border.
+- Cost in the test browser: about 1.3 ms per draw plus 0.3 ms of physics per frame.

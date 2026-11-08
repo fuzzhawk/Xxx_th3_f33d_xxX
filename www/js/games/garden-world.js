@@ -128,6 +128,26 @@ function mixHex(a, b, t) {
   return `rgb(${m(16)},${m(8)},${m(0)})`;
 }
 
+// retro finish for a sprite: hard pixel edges (no soft alpha) and a dark one-pixel outline
+function crisp(cv, outline = 'rgba(38,28,44,.92)') {
+  const c = cv.getContext('2d'), w = cv.width, h = cv.height, src = c.getImageData(0, 0, w, h), d = src.data;
+  const big = mk(w + 2, h + 2), out = big[1].createImageData(w + 2, h + 2), o = out.data;
+  const solid = (x, y) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] >= 110;
+  const [or, og, ob, oa] = outline.match(/[\d.]+/g).map(Number);
+  for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++) {
+    const j = ((y + 1) * (w + 2) + (x + 1)) * 4;
+    if (solid(x, y)) { const i = (y * w + x) * 4; o[j] = d[i]; o[j + 1] = d[i + 1]; o[j + 2] = d[i + 2]; o[j + 3] = 255; }
+    else {
+      // selective outline: a deep shade of whatever it borders, pulled toward the ink colour, so thin stems stay green
+      let n = 0, r = 0, g = 0, bl = 0;
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) if (solid(x + dx, y + dy)) { const i = ((y + dy) * w + x + dx) * 4; r += d[i]; g += d[i + 1]; bl += d[i + 2]; n++; }
+      if (!n) continue;
+      o[j] = Math.round(r / n * 0.3 + or * 0.45); o[j + 1] = Math.round(g / n * 0.3 + og * 0.45); o[j + 2] = Math.round(bl / n * 0.3 + ob * 0.45); o[j + 3] = Math.round((oa ?? 1) * 255);
+    }
+  }
+  big[1].putImageData(out, 0, 0);
+  return big[0];
+}
 const spriteCache = new Map();
 export function plantSprite(k, st, fruit) {
   const key = `${k}|${st}|${fruit ? 1 : 0}`;
@@ -209,7 +229,8 @@ export function plantSprite(k, st, fruit) {
       if (P.glow && big && !P.fruit) for (let i = 0; i < 10; i++) px(c, (w / 2 - rx + 3 + R() * (rx * 2 - 6)) | 0, (cy - ry + 3 + R() * (ry * 2 - 4)) | 0, P.glow);
     }
   }
-  s = { cv, w: cv.width, h: cv.height };
+  const cc = crisp(cv);
+  s = { cv: cc, w: cc.width, h: cc.height };
   spriteCache.set(key, s);
   return s;
 }
@@ -242,6 +263,7 @@ export function animalSprite(k, f) {
     case 'cloudsheep': [cv, c] = mk(14, 11); { for (const [x, y, r] of [[4, 5, 3], [7, 4, 3.4], [10, 5, 3], [7, 7, 3.4]]) ell(c, x, y, r, r * 0.8, '#ffffff'); ell(c, 12, 6, 1.8, 1.6, '#4a3e48'); px(c, 12, 5, '#ffffff'); for (const x of [4, 9]) px(c, x + f, 9, '#4a3e48', 1, 2); } break;
     default: [cv, c] = mk(6, 6); ell(c, 3, 3, 2.5, 2.5, '#fff');
   }
+  cv = k === 'glowworm' ? cv : crisp(cv);
   s = { cv, w: cv.width, h: cv.height };
   spriteCache.set(key, s);
   return s;
@@ -272,6 +294,7 @@ export function ruinSprite(type, P) {
     case 'bell': [cv, c] = mk(18, 26); px(c, 1, 2, '#8a6446', 2, 24); px(c, 15, 2, '#8a6446', 2, 24); px(c, 1, 1, '#a0763a', 16, 2); c.fillStyle = '#c99a4a'; c.beginPath(); c.moveTo(4, 18); c.quadraticCurveTo(9, 2, 14, 18); c.fill(); px(c, 8, 18, '#7a5a2a', 2, 2); break;
     default: [cv, c] = mk(8, 8); px(c, 0, 0, st, 8, 8);
   }
+  cv = crisp(cv, 'rgba(34,30,38,.85)');
   s = { cv, w: cv.width, h: cv.height };
   spriteCache.set(key, s);
   return s;
@@ -282,7 +305,8 @@ export function crystalSprite(col) {
   if (s) return s;
   const [cv, c] = mk(12, 16);
   for (const [x, h, w] of [[6, 15, 3], [3, 9, 2], [9, 11, 2]]) { c.fillStyle = col; c.beginPath(); c.moveTo(x - w, 16); c.lineTo(x, 16 - h); c.lineTo(x + w, 16); c.fill(); c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.moveTo(x - w * 0.3, 16); c.lineTo(x, 16 - h); c.lineTo(x, 16); c.fill(); }
-  s = { cv, w: 12, h: 16 };
+  const cc = crisp(cv, 'rgba(30,24,40,.9)');
+  s = { cv: cc, w: cc.width, h: cc.height };
   spriteCache.set(key, s);
   return s;
 }
@@ -735,8 +759,27 @@ function paintWild(c, Rm, P, x, y, X, Y) {
     c.fillStyle = wild[d - 1]; c.beginPath(); c.ellipse(cx, cy, rx - 0.5, ry - 0.5, 0, 0, 7); c.fill();
     c.fillStyle = P.blade; c.beginPath(); c.ellipse(cx - rx * 0.3, cy - ry * 0.35, rx * 0.45, ry * 0.4, 0, 0, 7); c.fill();
   }
-  for (let k = 0; k < 3 + d * 2; k++) { const bx = X + (R() * T | 0), h = 4 + d * 2 + (R() * 4 | 0), by = Y + 4 + (R() * 10 | 0); c.fillStyle = R() < 0.6 ? P.blade : wild[0]; c.fillRect(bx, by - h, 1, h); }
   if (R() < (forest ? 0.2 : 0.45)) { const col = P.dot[Math.floor(R() * P.dot.length)], fx = X + 2 + (R() * 12 | 0), fy = Y + (R() * 10 | 0); c.fillStyle = col; c.fillRect(fx - 1, fy, 3, 2); c.fillRect(fx, fy - 1, 1, 4); }
+}
+// the blades of grass standing on a tile: [x, y, height, shade] in tile pixels (drawn live, they bend)
+export function bladesFor(Rm, x, y) {
+  const i = ix(Rm, x, y), d = Rm.wild[i], g = Rm.ground[i];
+  if (Rm.name === 'cave') return null;
+  const tall = d > 0, grassy = g === 0 || g === FOREST || g === FLOWERS;
+  if (!tall && !grassy) return null;
+  const R = tileRand(x, y, 9), out = [];
+  if (tall) {
+    const n = Rm.name === 'sky' ? 0 : 3 + d * 2;
+    for (let k = 0; k < n; k++) out.push([R() * T | 0, 6 + (R() * 10 | 0), 5 + d * 2 + (R() * 4 | 0), R() < 0.6 ? 1 : 0]);
+    return out;
+  }
+  // short meadow grass grows in little clumps: most tiles have one, a few have two, some are bare
+  const clumps = R() < 0.25 ? 0 : R() < 0.7 ? 1 : 2;
+  for (let c = 0; c < clumps; c++) {
+    const cx = 2 + (R() * 11 | 0), cy = 5 + (R() * 10 | 0), n = 3 + (R() * 3 | 0);
+    for (let k = 0; k < n; k++) { const mid = 1 - Math.abs(k - (n - 1) / 2) / n; out.push([cx + k - (n >> 1), cy + (R() < 0.3 ? 1 : 0), 2 + Math.round(mid * 3 + R() * 1.5), k % 2]); }
+  }
+  return out;
 }
 export function chunk(Rm, mode, cx, cy) {
   const key = `${Rm.name}|${Rm.name === 'cave' ? '' : mode}|${cx},${cy}`, ver = (Rm.cv ||= new Map()).get(`${cx},${cy}`) || 0;
