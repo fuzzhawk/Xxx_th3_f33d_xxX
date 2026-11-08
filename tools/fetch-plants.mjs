@@ -67,7 +67,7 @@ function looks(img) {
     n++;
     if (S < 0.15) grey++;
     else if (H >= 50 && H <= 175) green++;
-    else if ((H >= 280 || H <= 20 || (H >= 40 && H <= 62)) && S > 0.3 && V > 0.45) bloom++;
+    else if ((H >= 195 || H <= 20 || (H >= 40 && H <= 62)) && S > 0.3 && V > 0.45) bloom++;   // petals: red, pink, violet, blue, yellow
     else if (H > 15 && H < 45 && V < 0.7) brown++;
   }
   // how much of the top, left and right sides is solid (plants have ragged outlines; tile pieces don't)
@@ -81,8 +81,8 @@ function looks(img) {
 function kindOf(name, img, L) {
   for (const [k, re] of KIND) if (re.test(name)) return k;
   const tall = img.h / img.w;
+  if (L.bloom > 0.12 && L.green < 0.8) return 'flower';
   if (tall > 1.3 && img.h >= 24) return 'tree';
-  if (L.bloom > 0.12) return 'flower';
   if (tall < 0.7) return 'grass';
   return 'bush';
 }
@@ -259,7 +259,7 @@ function pick(pack, dir) {
       const asp = img.w / img.h;
       if (asp > 2.6 || (asp < 0.3 && !/tree|pine|cactus|reed/i.test(name))) return;   // slivers: trunks, poles, edges
       if (L.cut > 0.62 && !/cactus/i.test(name)) return;   // cut straight along a side: part of a tile
-      if (!named && L.green + L.bloom * 0.6 < 0.4) return;
+      if (!named && (L.green < 0.25 || L.green + L.bloom * 0.6 < 0.4)) return;   // even a flower has a green stem
       if (named && !/mushroom|shroom|toadstool|cactus|stump|crop|wheat|corn|carrot|pumpkin|potato/i.test(name) && L.green + L.bloom + L.brown < 0.35) return;
       const kind = kindOf(name.replace(/([a-z])([A-Z])/g, '$1 $2'), img, L);
       out.push({ rel: parts.length > 1 ? `${rel}#${k}` : rel, name: parts.length > 1 ? `${name}-${k}` : name, kind, img: shrink(img, kind), L });
