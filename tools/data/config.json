@@ -67,6 +67,16 @@
       "label": "Long reads",
       "pct": 4,
       "dwellSec": 60
+    },
+    "morning": {
+      "label": "Morning mode",
+      "pct": 0,
+      "dwellSec": 20
+    },
+    "evening": {
+      "label": "Evening mode",
+      "pct": 0,
+      "dwellSec": 20
     }
   },
   "gameTypes": [

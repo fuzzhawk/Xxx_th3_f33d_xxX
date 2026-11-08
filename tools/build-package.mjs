@@ -21,6 +21,7 @@ import { hasTransparentEdges } from './png.mjs';
 import { memesBuilder } from './memes.mjs';
 import { powerBuilder } from './power.mjs';
 import { productsBuilder } from './products.mjs';
+import { modesBuilder } from './modes.mjs';
 import { imagesBuilder } from './images.mjs';
 import { DECK, QUESTIONS } from '../www/js/oracle-data.js';
 import { selfCare, selfCareFlavors, fallbackQuotes, videoAvoid, videoAvoidTitle } from './data/content.mjs';
@@ -210,15 +211,18 @@ async function extracts(titles) {
   return out;
 }
 
-async function buildWiki() {
-  const topicKeys = Object.keys(topics.wiki);
+// articles already picked this build (the morning/evening modes draw from Wikipedia too)
+const wikiClaimed = new Set();
+// groups: { key: { label, categories, seeds, keywords } }; extra: fields added to every post (e.g. mode)
+async function buildWiki(groups = topics.wiki, wantN = null, extra = {}) {
+  const topicKeys = Object.keys(groups);
   // memes and long reads draw on the week's Wikipedia picks, so a build of only those still needs some
-  const wantN = want.wiki || (need('meme', 'read') ? (QUICK ? 22 : 330) : 0);
+  wantN ??= want.wiki || (need('meme', 'read') ? (QUICK ? 22 : 330) : 0);
   const perTopic = Math.ceil(wantN / topicKeys.length);
-  const claimed = new Set();
+  const claimed = wikiClaimed;
   const posts = [];
   for (const key of topicKeys) {
-    const t = topics.wiki[key];
+    const t = groups[key];
     log(`wiki: ${key}`);
     const cand = new Set(t.seeds);
     const catLists = await pool(few(shuffle([...t.categories]), 2), 2, (c) => categoryMembers(c, QUICK ? 0 : 1));
@@ -247,20 +251,20 @@ async function buildWiki() {
         id: `w${pid}`, cat: 'wiki', sub: key, title: p.title,
         hook: clip(stripParens(ss[0]), 190), summary: ss.join(' '),
         url: p.fullurl || `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
-        thumb: p.thumbnail?.source || undefined
+        thumb: p.thumbnail?.source || undefined, ...extra
       });
       n++;
     }
     log(`wiki: ${key} -> ${n} (${cand.size} candidates)`);
   }
-  report.sources.wikipedia = posts.length;
+  if (extra.mode) report.sources[`${extra.mode}Wiki`] = posts.length; else report.sources.wikipedia = posts.length;
   return posts;
 }
 
 // ------------------------------------------------------------------ Wikiquote
-async function buildQuotes() {
+async function buildQuotes(authors = config.quoteAuthors, tag = '') {
   const quotes = [];
-  await pool(few(config.quoteAuthors, 8), 4, async (author) => {
+  await pool(few(authors, 8), 4, async (author) => {
     try {
       const j = await fetchJSON(`https://en.wikiquote.org/w/api.php?${new URLSearchParams({ action: 'parse', page: author, prop: 'text', redirects: '1', format: 'json', formatversion: '2' })}`);
       const got = parseWikiquote(j.parse?.text || '');
@@ -268,6 +272,7 @@ async function buildQuotes() {
       log(`quotes: ${author} -> ${got.length}`);
     } catch (e) { warn(`wikiquote ${author}: ${e.message}`); }
   });
+  if (tag) { report.sources[`${tag}Quotes`] = quotes.length; return quotes; }
   report.sources.wikiquote = quotes.length;
   if (quotes.length < 40) fallbackQuotes.forEach(([author, text]) => quotes.push({ author, text }));
   return quotes;
@@ -431,16 +436,17 @@ async function playable(vid) {
 // The owner wants older, human-made videos: uploads 5–20 years old come first (config.videoAge),
 // then other dated uploads, then undated ones; Shorts and very recent uploads only fill gaps.
 // Anything with AI markers is dropped outright.
-async function buildVideos() {
-  const groups = topics.video;
+// videos already picked this build (the morning mode draws its own)
+const videoTaken = new Set();
+async function buildVideos(groups = topics.video, total = want.video, extra = {}) {
   const AGE = { min: 5, max: 20, ...(config.videoAge || {}) };
   const totalW = Object.values(groups).reduce((s, g) => s + g.weight, 0);
   const week = +(id.match(/W(\d+)/) || [0, 0])[1];
   const tier = (age, short) => (age == null ? (short ? 4 : 2) : age >= AGE.min && age <= AGE.max + 1 ? 0 : age >= AGE.min - 2 ? 1 : 3);
-  const posts = [], taken = new Set(), stat = { aiDropped: 0, inRange: 0, older: 0, newer: 0, undated: 0, searchDated: 0, searchInRange: 0 }, dropped = [];
+  const posts = [], taken = videoTaken, stat = { aiDropped: 0, inRange: 0, older: 0, newer: 0, undated: 0, searchDated: 0, searchInRange: 0 }, dropped = [];
   const drop = (v, why) => { stat.aiDropped++; if (dropped.length < 25) dropped.push({ title: clip(v.title || '', 90), channel: v.channel || '', why }); return false; };
   for (const [key, g] of Object.entries(groups)) {
-    const quota = Math.round(want.video * g.weight / totalW);
+    const quota = Math.round(total * g.weight / totalW);
     if (!quota) continue;
     const queries = few(g.queries, 2);
     // alternate relevance and view-count sorting per query, and swap them each week
@@ -477,11 +483,12 @@ async function buildVideos() {
       if (n >= quota) break;
       taken.add(v.vid);
       stat[age == null ? 'undated' : t === 0 ? 'inRange' : age > AGE.max ? 'older' : 'newer']++;
-      posts.push({ id: `v${v.vid}`, cat: 'video', sub: key, vid: v.vid, title: v.title || c.title, channel: v.channel || c.author_name || '', dur: v.dur || '', short: !!v.short || durSec(v.dur) <= 75, date: c.date || undefined });
+      posts.push({ id: `v${v.vid}`, cat: 'video', sub: key, vid: v.vid, title: v.title || c.title, channel: v.channel || c.author_name || '', dur: v.dur || '', short: !!v.short || durSec(v.dur) <= 75, date: c.date || undefined, ...extra });
       n++;
     }
     log(`video: ${key} -> ${n}/${quota} (${cand.length} found, ${ok.filter((x) => x.t === 0).length} aged ${AGE.min}–${AGE.max} years)`);
   }
+  if (extra.mode) { report.sources[`${extra.mode}Videos`] = { count: posts.length, ages: stat, dropped: dropped.length }; return posts; }
   report.sources.youtube = posts.length;
   report.sources.videoAges = stat;
   report.sources.videoDropped = dropped;
@@ -1353,7 +1360,7 @@ async function main() {
   // the images builder comes first: products pick theme-matched sprites with its helpers
   const { buildBackgrounds, tagSprites, moreSprites, matchSprites, spriteGroup } = imagesBuilder(K);
   K.matchSprites = matchSprites; K.spriteGroup = spriteGroup;
-  const { buildMemes, buildStrips } = memesBuilder(K), { buildPower } = powerBuilder(K), { buildProducts } = productsBuilder(K);
+  const { buildMemes, buildStrips } = memesBuilder(K), { buildPower } = powerBuilder(K), { buildProducts } = productsBuilder(K), { buildModes } = modesBuilder(K);
   let wiki = [], video = [], web = [], quotes = [], commons = [], kym = [], sprites = [], themes = [], news = [], textures = [], backgrounds = [], oracleData = null;
   // which network sources this build needs (all of them unless --only)
   const pics = need('game', 'product');
@@ -1390,7 +1397,10 @@ async function main() {
     oracle: () => buildOracle(),
     power: () => power,
     studio: () => buildStudio(),
-    read: () => buildReads(wiki, readsEarly)
+    read: () => buildReads(wiki, readsEarly),
+    // Morning and Evening modes (after the regular wiki and videos, so they don't repeat them)
+    morning: () => buildModes('morning'),
+    evening: () => buildModes('evening')
   };
   const posts = {};
   for (const [k, make] of Object.entries(all)) if (need(k)) posts[k] = await make();
@@ -1420,8 +1430,9 @@ async function main() {
     total, counts, estHours: +estHours.toFixed(1),
     categories: Object.fromEntries(Object.entries(cats).map(([k, c]) => [k, { label: c.label, pct: c.pct }])),
     topics: {
-      wiki: Object.fromEntries(Object.entries(topics.wiki).map(([k, t]) => [k, t.label])),
-      video: Object.fromEntries(Object.entries(topics.video).map(([k, t]) => [k, t.label])),
+      wiki: Object.fromEntries([...Object.entries(topics.wiki), ...Object.values(topics.modes || {}).flatMap((m) => Object.entries(m.wiki || {}))].map(([k, t]) => [k, t.label])),
+      video: Object.fromEntries([...Object.entries(topics.video), ...Object.values(topics.modes || {}).flatMap((m) => Object.entries(m.video || {}))].map(([k, t]) => [k, t.label])),
+      quote: { uplift: 'Morning quotes', introspect: 'Night thoughts' },
       game: Object.fromEntries(config.gameTypes.map((t) => [t, GAME_NAMES[t] || t])),
       web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' },
       oracle: { tarot: 'Tarot', iching: 'I Ching', augury: 'Augury', dnd: 'Adventurer', haruspicy: 'Haruspicy', dice: 'Dice', die: 'One die', sigil: 'Sigil', paradigm: 'Paradigm shift', ritual: 'Random ritual' },
@@ -1441,8 +1452,9 @@ async function main() {
     index.latest = pkgId;
     writeJSON(path.join(OUT, 'index.json'), index, true);
     const add = (k, vals) => { history[k] = [...new Set([...(history[k] || []), ...vals])]; };
-    add('wiki', posts.wiki.map((p) => p.id.slice(1)));
-    add('video', posts.video.map((p) => p.vid));
+    const modePosts = [...(posts.morning || []), ...(posts.evening || [])];
+    add('wiki', [...posts.wiki, ...modePosts.filter((p) => p.cat === 'wiki')].map((p) => p.id.slice(1)));
+    add('video', [...posts.video, ...modePosts.filter((p) => p.cat === 'video')].map((p) => p.vid));
     add('web', posts.web.map((p) => p.url));
     add('memeImg', posts.meme.filter((p) => p.sub === 'remix').flatMap((p) => p.imgs || [p.img]));
     add('kym', posts.meme.filter((p) => p.sub === 'kym').map((p) => p.link));
