@@ -1,16 +1,158 @@
 {
-  "note": "CC0 photo textures for the garden's ground, fetched by tools/fetch-textures.mjs into www/assets/textures/ (64 px greyscale detail tiles). Each set lists words to look for in a texture's name, tags and categories ('any'), words it must not have ('not'), and how many to keep. Poly Haven (polyhaven.com, CC0) first, ambientCG (ambientcg.com, CC0) as the fallback.",
+  "note": "CC0 photo textures for the garden's ground, fetched by tools/fetch-textures.mjs into www/assets/textures/ (64 px greyscale detail tiles). A texture fits a set when one of its 'any' words is a whole word of its own id or name (tags are not used: they match far too loosely), none of the 'not' words appear in its id, name, tags or categories, and, unless 'madeByPeople' is set, none of its categories are man-made (roofing, wood, concrete, fabric, plastic...). Poly Haven (polyhaven.com, CC0) first, ambientCG (ambientcg.com, CC0) as the fallback.",
   "size": 64,
   "sets": {
-    "grass": { "any": ["grass", "lawn", "meadow"], "not": ["rock", "stone", "cobble", "path", "brick", "dry", "snow"], "keep": 2, "ambient": "Grass" },
-    "moss": { "any": ["moss", "forest ground", "forrest ground", "clover"], "not": ["rock", "brick", "roof"], "keep": 2, "ambient": "Moss" },
-    "forest": { "any": ["forest", "forrest", "leaves", "leaf", "pine needles", "litter"], "not": ["rock", "brick", "bark"], "keep": 2, "ambient": "Ground" },
-    "sand": { "any": ["sand", "beach"], "not": ["stone", "brick", "sandstone"], "keep": 2, "ambient": "Ground sand" },
-    "path": { "any": ["dirt", "mud", "soil", "path", "gravel", "earth"], "not": ["brick", "wall", "cobble", "road", "asphalt"], "keep": 2, "ambient": "Gravel" },
-    "stone": { "any": ["cobble", "paving", "flagstone", "stone floor", "pavement"], "not": ["wall", "brick"], "keep": 2, "ambient": "PavingStones" },
-    "rock": { "any": ["rock", "cliff", "boulder"], "not": ["wall", "brick", "cobble", "floor", "tile"], "keep": 2, "ambient": "Rock" },
-    "cave": { "any": ["rock", "cliff", "gravel", "lava", "slate"], "not": ["wall", "brick", "cobble", "floor", "tile", "moss", "grass"], "keep": 2, "ambient": "Rock" },
-    "sky": { "any": ["snow", "ice", "frost"], "not": ["rock", "brick"], "keep": 1, "ambient": "Snow" },
-    "water": { "any": ["water", "ripple", "puddle"], "not": ["rock", "brick"], "keep": 1, "ambient": "Water" }
+    "grass": {
+      "any": [
+        "grass",
+        "lawn",
+        "meadow"
+      ],
+      "not": [
+        "rock",
+        "stone",
+        "cobble",
+        "path",
+        "brick",
+        "dry",
+        "snow",
+        "thatch",
+        "roof",
+        "straw"
+      ],
+      "keep": 2,
+      "ambient": "Grass"
+    },
+    "moss": {
+      "any": [
+        "moss",
+        "forest ground",
+        "forrest ground",
+        "clover"
+      ],
+      "not": [
+        "rock",
+        "brick",
+        "roof"
+      ],
+      "keep": 2,
+      "ambient": "Moss"
+    },
+    "forest": {
+      "any": [
+        "forest",
+        "forrest",
+        "leaves",
+        "leaf",
+        "pine needles",
+        "litter"
+      ],
+      "not": [
+        "rock",
+        "brick",
+        "bark"
+      ],
+      "keep": 2,
+      "ambient": "Ground"
+    },
+    "sand": {
+      "any": [
+        "sand",
+        "beach"
+      ],
+      "not": [
+        "stone",
+        "brick",
+        "sandstone"
+      ],
+      "keep": 2,
+      "ambient": "Ground sand"
+    },
+    "path": {
+      "any": [
+        "dirt",
+        "mud",
+        "soil",
+        "gravel",
+        "earth",
+        "ground"
+      ],
+      "not": [
+        "brick",
+        "wall",
+        "cobble",
+        "road",
+        "asphalt",
+        "concrete",
+        "table",
+        "floor",
+        "tile",
+        "forest",
+        "leaves",
+        "grass"
+      ],
+      "keep": 2,
+      "ambient": "Ground"
+    },
+    "stone": {
+      "any": [
+        "cobble",
+        "cobblestone",
+        "paving",
+        "flagstone",
+        "stone floor",
+        "stone tiles",
+        "pavement"
+      ],
+      "not": [
+        "wall",
+        "brick",
+        "concrete",
+        "marble"
+      ],
+      "keep": 2,
+      "ambient": "PavingStones",
+      "madeByPeople": true
+    },
+    "rock": {
+      "any": [
+        "rock",
+        "cliff",
+        "boulder"
+      ],
+      "not": [
+        "wall",
+        "brick",
+        "cobble",
+        "floor",
+        "tile"
+      ],
+      "keep": 2,
+      "ambient": "Rock"
+    },
+    "cave": {
+      "any": [
+        "rock",
+        "rocks",
+        "cliff",
+        "slate",
+        "boulder"
+      ],
+      "not": [
+        "wall",
+        "brick",
+        "cobble",
+        "floor",
+        "tile",
+        "moss",
+        "grass",
+        "forest",
+        "sand",
+        "coast",
+        "aerial"
+      ],
+      "keep": 2,
+      "ambient": "Rock"
+    }
   }
 }

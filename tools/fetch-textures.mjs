@@ -45,14 +45,23 @@ function detail(buf) {
   for (let i = 0; i < S * S; i++) { const g = Math.max(0, Math.min(255, Math.round(128 + ((lum[i] - mean) / sd) * 34))); out[i * 4] = out[i * 4 + 1] = out[i * 4 + 2] = g; out[i * 4 + 3] = 255; }
   return out;
 }
-const words = (a) => `${a.name || ''} ${(a.tags || []).join(' ')} ${(a.categories || []).join(' ')}`.toLowerCase().replace(/[_-]+/g, ' ');
-const matches = (txt, set) => set.any.some((w) => txt.includes(w)) && !(set.not || []).some((w) => txt.includes(w));
+// a texture fits a set by its own id or name, as whole words (tags alone match far too loosely:
+// a worn table is tagged 'dirty'); nothing made by people stands in for grass, dirt or rock
+const MAN_MADE = ['man made', 'roofing', 'wood', 'fabric', 'plastic', 'metal', 'brick', 'plaster', 'concrete', 'wall', 'tiles', 'asphalt', 'road'];
+const flat = (x) => ` ${String(x || '').toLowerCase().replace(/[_\-.,/]+/g, ' ').replace(/\s+/g, ' ')} `;
+const hasWord = (txt, w) => txt.includes(` ${w} `) || txt.includes(` ${w}s `);
+function matches(id, a, set) {
+  const own = flat(`${id} ${a.name || ''}`), tags = flat((a.tags || []).join(' ')), cats = flat((a.categories || []).join(' ')), all = own + tags + cats;
+  if ((set.not || []).some((w) => all.includes(w))) return false;
+  if (!set.madeByPeople && MAN_MADE.some((w) => cats.includes(` ${w} `))) return false;
+  return set.any.some((w) => hasWord(own, w));
+}
 
 // ------------------------------------------------ Poly Haven
 let phList = null;
 async function polyHaven(key, set, used) {
   phList ??= await get('https://api.polyhaven.com/assets?t=textures');
-  const cands = Object.entries(phList).filter(([id, a]) => !used.has(id) && matches(`${id} ${words(a)}`, set)).sort((a, b) => (b[1].download_count || 0) - (a[1].download_count || 0));
+  const cands = Object.entries(phList).filter(([id, a]) => !used.has(id) && matches(id, a, set)).sort((a, b) => (b[1].download_count || 0) - (a[1].download_count || 0));
   const got = [];
   for (const [id] of cands) {
     if (got.length >= set.keep) break;
@@ -72,7 +81,7 @@ async function ambientCG(key, set, used, tmp) {
   const got = [];
   for (const a of j.foundAssets || []) {
     if (got.length >= set.keep) break;
-    if (used.has(a.assetId) || !matches(`${a.assetId} ${words({ name: a.displayName, tags: a.tags, categories: [a.displayCategory] })}`, set)) continue;
+    if (used.has(a.assetId) || !matches(a.assetId, { name: a.displayName, tags: a.tags, categories: [a.displayCategory] }, set)) continue;
     const dl = (a.downloadFolders?.default?.downloadFiletypeCategories?.zip?.downloads || []).find((d) => /^1K-JPG$/i.test(d.attribute));
     if (!dl) continue;
     try {
