@@ -96,6 +96,34 @@ function shrink(img, kind) {
   return { w: W, h: H, d: o };
 }
 
+// split an image into its separate shapes (pixels within 2 px of each other belong together)
+function pieces(img) {
+  const { w, h, d } = img, lab = new Int32Array(w * h).fill(-1), out = [];
+  const solid = (x, y) => d[(y * w + x) * 4 + 3] > 24;
+  for (let y0 = 0; y0 < h; y0++) for (let x0 = 0; x0 < w; x0++) {
+    if (lab[y0 * w + x0] >= 0 || !solid(x0, y0)) continue;
+    const id = out.length, q = [y0 * w + x0]; lab[q[0]] = id;
+    let x1 = x0, y1 = y0, x2 = x0, y2 = y0;
+    for (let qi = 0; qi < q.length && q.length < 200000; qi++) {
+      const x = q[qi] % w, y = (q[qi] / w) | 0;
+      if (x < x1) x1 = x; if (x > x2) x2 = x; if (y < y1) y1 = y; if (y > y2) y2 = y;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const j = ny * w + nx;
+        if (lab[j] < 0 && solid(nx, ny)) { lab[j] = id; q.push(j); }
+      }
+    }
+    out.push([x1, y1, x2, y2, id]);
+    if (out.length > 400) break;
+  }
+  return out.filter(([x1, y1, x2, y2]) => x2 - x1 >= 5 && y2 - y1 >= 5 && x2 - x1 < 200 && y2 - y1 < 220).slice(0, 60).map(([x1, y1, x2, y2, id]) => {
+    const W = x2 - x1 + 1, H = y2 - y1 + 1, o = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const j = (y + y1) * w + x + x1; if (lab[j] === id) o.set(d.subarray(j * 4, j * 4 + 4), (y * W + x) * 4); }
+    return { w: W, h: H, d: o };
+  });
+}
+
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
@@ -109,7 +137,61 @@ async function get(url, binary) {
   return binary ? Buffer.from(await r.arrayBuffer()) : r.text();
 }
 let sitemap = null;
+// the download link, wherever the page keeps it: a plain href, an escaped URL inside a script or
+// JSON blob, or a /download route; failing that, log what the page does have so it can be fixed
+async function zipUrl(html, pack) {
+  const flat = html.replace(/\\\//g, '/').replace(/&amp;/g, '&');
+  const found = [...flat.matchAll(/(?:href|data-href|data-url|content)=["']([^"']+\.zip[^"']*)["']/gi)].map((m) => m[1])
+    .concat([...flat.matchAll(/((?:https?:)?\/\/[^"'\s()<>]+?\.zip(?:\?[^"'\s()<>]*)?)/gi)].map((m) => m[1]))
+    .concat([...flat.matchAll(/["'](\/(?:media|content|files|download)[^"'\s]+?\.zip[^"'\s]*)["']/gi)].map((m) => m[1]));
+  if (found.length) return new URL(found[0].startsWith('//') ? `https:${found[0]}` : found[0], 'https://kenney.nl').href;
+  for (const tail of ['download', 'download/zip']) {
+    try {
+      const r = await fetch(`https://kenney.nl/assets/${pack.slug}/${tail}`, { headers: { 'User-Agent': UA }, redirect: 'follow' });
+      const type = r.headers.get('content-type') || '';
+      if (r.ok && /zip|octet-stream/.test(type)) return r.url;
+    } catch { /* next */ }
+  }
+  const title = (flat.match(/<title>([^<]*)<\/title>/i) || [])[1] || '?';
+  const links = [...new Set([...flat.matchAll(/(?:href|src|data-[a-z-]+)=["']([^"']+)["']/gi)].map((m) => m[1]).filter((u) => /download|zip|media|asset|file|itch/i.test(u)))].slice(0, 25);
+  say(`  page "${title.trim()}" ${flat.length} chars; candidate links: ${links.join(' | ') || 'none'}`);
+  say(`  page text: ${flat.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400)}`);
+  throw new Error('no zip link on page');
+}
+// OpenGameArt: search, keep CC0 entries only, fetch their zips and PNGs into one folder
+async function fromOGA(pack, tmp) {
+  const q = pack.oga || `kenney ${pack.search || pack.slug.replace(/-/g, ' ')}`;
+  const res = await get(`https://opengameart.org/art-search-advanced?keys=${encodeURIComponent(q)}&field_art_type_tid%5B%5D=9&sort_by=count&sort_order=DESC`).catch(() => get(`https://opengameart.org/art-search?keys=${encodeURIComponent(q)}`));
+  const pages = [...new Set([...res.matchAll(/href="\/content\/([a-z0-9-]+)"/g)].map((m) => m[1]))].filter((x) => !/^(faq|art-search)/.test(x)).slice(0, pack.ogaPages || 4);
+  const dir = path.join(tmp, `oga-${pack.slug}`);
+  fs.mkdirSync(dir, { recursive: true });
+  let files = 0, bytes = 0;
+  for (const slug of pages) {
+    const html = await get(`https://opengameart.org/content/${slug}`).catch(() => '');
+    if (!/publicdomain\/zero|>\s*CC0\s*</i.test(html)) { say(`  oga ${slug}: not CC0, skipped`); continue; }
+    const links = [...new Set([...html.matchAll(/href="(https?:\/\/opengameart\.org\/sites\/default\/files\/[^"]+\.(?:zip|png))"/gi)].map((m) => m[1]))].slice(0, 6);
+    for (const url of links) {
+      if (bytes > 40e6) break;
+      try {
+        const data = await get(url, true); bytes += data.length;
+        const base = `${slug}-${path.basename(new URL(url).pathname)}`.replace(/[^\w.-]+/g, '_');
+        if (/\.zip$/i.test(url)) { const z = path.join(tmp, base); fs.writeFileSync(z, data); execFileSync('unzip', ['-q', '-o', z, '-d', path.join(dir, slug)]); }
+        else fs.writeFileSync(path.join(dir, base), data);
+        files++;
+      } catch (e) { say(`  oga ${slug}: ${e.message}`); }
+    }
+    say(`  oga ${slug}: CC0, ${links.length} files`);
+  }
+  if (!files) throw new Error(`nothing CC0 on OpenGameArt for "${q}"`);
+  pack._src = `opengameart.org (CC0): ${pages.join(', ')}`;
+  return dir;
+}
 async function download(pack, tmp) {
+  if (pack.from === 'oga') return fromOGA(pack, tmp);
+  try { return await fromKenney(pack, tmp); }
+  catch (e) { say(`${pack.slug}: kenney.nl failed (${e.message}); trying OpenGameArt`); return fromOGA(pack, tmp); }
+}
+async function fromKenney(pack, tmp) {
   let html;
   try { html = await get(`https://kenney.nl/assets/${pack.slug}`); }
   catch (e) {
@@ -122,16 +204,18 @@ async function download(pack, tmp) {
     say(`${pack.slug}: using ${hit}`);
     html = await get(`https://kenney.nl/assets/${hit}`);
   }
-  const m = html.match(/href="([^"]+\.zip[^"]*)"/i) || html.match(/(https?:\/\/[^"'\s]+\.zip)/i);
-  if (!m) throw new Error('no zip link on page');
+  const url = await zipUrl(html, pack);
   const zip = path.join(tmp, `${pack.slug}.zip`), dir = path.join(tmp, pack.slug);
-  fs.writeFileSync(zip, await get(new URL(m[1].replace(/&amp;/g, '&'), 'https://kenney.nl').href, true));
+  const data = await get(url, true);
+  if (data.readUInt32LE(0) !== 0x04034b50) throw new Error(`not a zip at ${url} (${data.length} bytes)`);
+  fs.writeFileSync(zip, data);
   execFileSync('unzip', ['-q', '-o', zip, '-d', dir]);
+  pack._src = `kenney.nl/assets/${pack.slug} (CC0)`;
   return dir;
 }
 
 function pick(pack, dir) {
-  let files = walk(dir).map((f) => ({ f, rel: path.relative(dir, f) })).filter(({ rel }) => !/vector|spritesheet|sheet|preview|sample|tilemap|@2x|retina|double/i.test(rel));
+  let files = walk(dir).map((f) => ({ f, rel: path.relative(dir, f) })).filter(({ rel }) => !/vector|preview|sample|tilemap|@2x|retina|double|\.svg/i.test(rel));
   if (pack.only) { const re = new RegExp(pack.only, 'i'), o = files.filter(({ rel }) => re.test(rel)); if (o.length) files = o; }
   if (pack.skip) { const re = new RegExp(pack.skip, 'i'); files = files.filter(({ rel }) => !re.test(rel)); }
   // one view of each model in 3D kits (renders come in four directions)
@@ -147,18 +231,23 @@ function pick(pack, dir) {
     if (NOT.test(near.replace(/[\s_.-]+/g, ''))) continue;
     if (pack.mode === 'named' && !NAMED.test(name.replace(/([a-z])([A-Z])/g, '$1 $2'))) continue;
     if (fs.statSync(f).size > 600000) continue;
-    let img;
-    try { img = trim(load(fs.readFileSync(f))); } catch { continue; }
-    if (!img || img.w < 6 || img.h < 6) continue;
-    const L = looks(img);
-    const named = pack.mode === 'named';
-    if (L.fill < 0.12 || L.fill > (named ? 0.97 : 0.9)) continue;
-    if (L.bottom > 0.85 && img.w >= 14) continue;   // a strip of ground
-    if (L.grey > 0.6) continue;                     // rocks, metal, shadows
-    if (!named && L.green + L.bloom * 0.6 < 0.4) continue;
-    if (named && !/mushroom|shroom|toadstool|cactus|stump|crop|wheat|corn|carrot|pumpkin|potato/i.test(name) && L.green + L.bloom + L.brown < 0.35) continue;
-    const kind = kindOf(name.replace(/([a-z])([A-Z])/g, '$1 $2'), img, L);
-    out.push({ rel, name, kind, img: shrink(img, kind), L });
+    let full;
+    try { full = load(fs.readFileSync(f)); } catch { continue; }
+    // a sheet of many plants on a clear background becomes one candidate per plant
+    const parts = full.w > 72 && full.h > 72 && pack.split !== false ? pieces(full) : [full];
+    parts.forEach((part, k) => {
+      const img = trim(part);
+      if (!img || img.w < 6 || img.h < 6) return;
+      const L = looks(img);
+      const named = pack.mode === 'named';
+      if (L.fill < 0.12 || L.fill > (named ? 0.97 : 0.9)) return;
+      if (L.bottom > 0.85 && img.w >= 14) return;   // a strip of ground
+      if (L.grey > 0.6) return;                     // rocks, metal, shadows
+      if (!named && L.green + L.bloom * 0.6 < 0.4) return;
+      if (named && !/mushroom|shroom|toadstool|cactus|stump|crop|wheat|corn|carrot|pumpkin|potato/i.test(name) && L.green + L.bloom + L.brown < 0.35) return;
+      const kind = kindOf(name.replace(/([a-z])([A-Z])/g, '$1 $2'), img, L);
+      out.push({ rel: parts.length > 1 ? `${rel}#${k}` : rel, name: parts.length > 1 ? `${name}-${k}` : name, kind, img: shrink(img, kind), L });
+    });
   }
   // spread the pack's budget across kinds
   const byKind = {};
@@ -183,7 +272,7 @@ for (const pack of sources) {
       const id = `${pack.slug}-${x.name}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       if (items.some((i) => i.id === id)) continue;
       fs.writeFileSync(path.join(OUT, `${id}.png`), encodePNG(x.img.w, x.img.h, new Uint8Array(x.img.d.buffer)));
-      items.push({ id, f: `${id}.png`, w: x.img.w, h: x.img.h, kind: x.kind, pack: pack.slug });
+      items.push({ id, f: `${id}.png`, w: x.img.w, h: x.img.h, kind: x.kind, pack: pack.slug, src: pack._src || 'local' });
     }
     say(`${pack.slug}: kept ${got.length} (${Object.entries(got.reduce((a, x) => ((a[x.kind] = (a[x.kind] || 0) + 1), a), {})).map(([k, n]) => `${k} ${n}`).join(', ') || 'none'})`);
   } catch (e) {
@@ -191,6 +280,6 @@ for (const pack of sources) {
   }
 }
 const bytes = items.reduce((s, i) => s + fs.statSync(path.join(OUT, i.f)).size, 0);
-fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify({ license: 'CC0 1.0, Kenney (www.kenney.nl)', made: new Date().toISOString().slice(0, 10), items }));
+fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify({ license: 'CC0 1.0: Kenney (www.kenney.nl) and CC0 entries on OpenGameArt (see src)', made: new Date().toISOString().slice(0, 10), items }));
 say(`total ${items.length} sprites, ${(bytes / 1024).toFixed(0)} KB`, JSON.stringify(items.reduce((a, x) => ((a[x.kind] = (a[x.kind] || 0) + 1), a), {})));
 fs.writeFileSync(path.join(OUT, 'fetch-log.txt'), log.join('\n') + '\n');
