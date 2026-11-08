@@ -785,6 +785,7 @@ function createAnimator(opt){
     face(d){if(DIRSRC[d])st.dir=d;},
     attack(){return play('attack');}, shoot(){return play('shoot');},
     cast(){st.castHold=true;return play('cast');}, stopCast(){st.castHold=false;if(st.act==='cast')st.act=null;},
+    cancel(){st.castHold=false;if(!st.ko)st.act=null;},
     hurt(){return play('flinch');}, ko(){return play('knockdown',{force:true});},
     revive(){st.ko=false;st.act=null;},
     emote(name,seconds){return ANIM_DOC[name]&&ANIM_DOC[name].emote?play(name,{seconds:seconds==null?2:seconds}):false;},

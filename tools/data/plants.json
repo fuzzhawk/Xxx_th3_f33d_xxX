@@ -1,0 +1,14 @@
+{
+  "note": "CC0 plant sprites for the garden's daily wild flora, from Kenney asset packs (https://kenney.nl). Fetched by tools/fetch-plants.mjs into www/assets/plants/. 'named': keep files whose names say they are plants; 'scan': numbered tiles, keep the ones that look like plants (cut-outs, mostly leaf-green or flowers on green). 'only' / 'skip' filter paths inside the zip.",
+  "maxSprites": 240,
+  "packs": [
+    { "slug": "nature-kit", "search": "nature kit", "mode": "named", "only": "isometric|sprites?|png", "prefer": "_(NE|SE)\\b|_NE\\.|_SE\\.", "max": 80 },
+    { "slug": "foliage-pack", "search": "foliage", "mode": "scan", "max": 50 },
+    { "slug": "platformer-pack-redux", "search": "platformer", "mode": "named", "max": 16 },
+    { "slug": "pixel-platformer-farm-expansion", "search": "farm expansion", "mode": "scan", "max": 30 },
+    { "slug": "pixel-platformer", "mode": "scan", "max": 16 },
+    { "slug": "tiny-town", "search": "tiny town", "mode": "scan", "max": 24 },
+    { "slug": "background-elements-redux", "search": "background elements", "mode": "named", "max": 20 },
+    { "slug": "jumper-pack", "search": "jumper", "mode": "named", "max": 12 }
+  ]
+}

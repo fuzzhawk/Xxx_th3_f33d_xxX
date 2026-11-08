@@ -60,3 +60,10 @@ Running list of wiring the lead must do before the final push.
   - Footprints show on sand and paths.
 - Sprites (plants, animals, ruins, crystals) are alpha-thresholded and get a selective 1-px outline: a deep shade of the colour they border.
 - Cost in the test browser: about 1.3 ms per draw plus 0.3 ms of physics per frame.
+
+## Garden: dreamier, wordless controls, daily wild flora (2026-11-08, evening)
+- Actions never hold the hero still. Crystal's animator gained `cancel()`, and `Actor.cancel()` wraps it. The garden cancels any pose the moment the hero walks, and every new walk drops the current action (its effect still lands). Emotes are shorter.
+- No UI on the card at all: no minimap, seed, food or compass buttons. `seedFor()` picks the seed for a tile: reeds by water, ferns and trees in forest, sky orchids in the sky, never the same kind twice in a row. With no fitting seed the hero shakes their head. Every 45 s a wisp of light drifts toward the nearest hidden ruin. The first-visit tap ripples stay.
+- `drawAtmos()` runs after the lighting. It applies a darker, cooler grade (multiply plus a little desaturation), then two banks of tileable, posterised, Bayer-dithered pixel mist that drift at different depths and slowly breathe, then a highlight-only bloom (a quarter-size copy squared and screened back). The values per light are in `ATMOS`.
+- Daily wild flora: `tools/fetch-plants.mjs` (config `tools/data/plants.json`) downloads Kenney CC0 packs in CI via `.github/workflows/plants.yml`. It keeps plant sprites (by name, or by colour for numbered tile packs), trims them and shrinks them to garden sizes, then writes `www/assets/plants/` with `index.json` (kinds: tree, bush, flower, grass, crop, mushroom, cactus). `Wd.floraToday()` picks a dated handful (about 2–3 per kind) and `Wd.floraAt()` scatters them by a per-day tile hash over open meadow, forest and cave floor. They sway with the grass springs and don't block walking. The local test is `node tools/fetch-plants.mjs --local <dir>`; `tools/png.mjs` gained RGBA decoding and a PNG encoder.
+- Morning mode is one step darker again (`--bg #a3af9f`), with deeper text and topic labels.

@@ -2,10 +2,10 @@
    the top-bar mode switch and the cards made for the modes (www/js/modes.js, www/js/mindful.js). */
 
 body[data-mode=morning] {
-  /* a soft, dimmed sage: easy on the eyes first thing */
-  --bg: #bfcbbb; --bg2: #b6c3b1; --card: #c9d3c4; --card2: #adbca8; --line: #a3b39e; --line2: #93a48d;
-  --text: #26312a; --muted: #4f5e53; --faint: #6f7e72; --orange: #b4613f; --orange2: #c0714f; --ochre: #8f6d30;
-  --terracotta: #ac5f48; --olive: #577f52; --sand: #6e624c; --rust: #9c543c;
+  /* a deep, dim sage: easy on the eyes first thing */
+  --bg: #a3af9f; --bg2: #9aa796; --card: #acb8a8; --card2: #91a08d; --line: #889784; --line2: #798975;
+  --text: #1d2820; --muted: #3a473e; --faint: #55635a; --orange: #9c5236; --orange2: #a95e3e; --ochre: #7a5c26;
+  --terracotta: #974f3b; --olive: #47693f; --sand: #574d3a; --rust: #874530;
   --ring: conic-gradient(from 210deg, #ffc9a9, #f6a9c4, #b9d7f1, #c6e6b6, #ffc9a9);
   color-scheme: light;
 }
@@ -16,18 +16,19 @@ body[data-mode=evening] {
   --ring: conic-gradient(from 210deg, #e3a362, #a8653a, #6c4c7c, #c9915f, #e3a362);
 }
 body[data-mode] { transition: background-color .6s; }
-body[data-mode=morning] header#top { background: rgba(191,203,187,.92); }
-body[data-mode=morning] nav#tabs { background: rgba(191,203,187,.95); }
+body[data-mode=morning] header#top { background: rgba(163,175,159,.92); }
+body[data-mode=morning] nav#tabs { background: rgba(163,175,159,.95); }
 body[data-mode=evening] header#top { background: rgba(21,16,12,.92); }
 body[data-mode=evening] nav#tabs { background: rgba(21,16,12,.94); }
 body[data-mode=morning] .backdrop { background: rgba(40,55,42,.35); }
 body[data-mode=morning] .who b .tick { color: #fff; }
 /* existing cards with dark hard-coded colours */
-body[data-mode=morning] .wiki .textpost { background: linear-gradient(150deg, color-mix(in srgb, var(--tc) 20%, #c9d3c4), #c9d3c4 75%); }
-body[data-mode=morning] .wiki .hook { color: #34413a; }
-body[data-mode=morning] .wiki .rest p { color: #4a5a50; }
-body[data-mode=morning] .textpost.read { background: linear-gradient(160deg, #bccab8, #c9d3c4 70%); }
-body[data-mode=morning] .textpost.read p, body[data-mode=morning] .read-poem { color: #34413a; }
+body[data-mode=morning] .wiki .textpost { background: linear-gradient(150deg, color-mix(in srgb, var(--tc) 20%, #acb8a8), #acb8a8 75%); }
+body[data-mode=morning] .wiki .kicker { color: color-mix(in srgb, var(--tc) 45%, #1d2820); }
+body[data-mode=morning] .wiki .hook { color: #26322b; }
+body[data-mode=morning] .wiki .rest p { color: #34413a; }
+body[data-mode=morning] .textpost.read { background: linear-gradient(160deg, #9fac9b, #acb8a8 70%); }
+body[data-mode=morning] .textpost.read p, body[data-mode=morning] .read-poem { color: #26322b; }
 body[data-mode=evening] .wiki .textpost { background: linear-gradient(150deg, color-mix(in srgb, var(--tc) 26%, #22180f), #1a130d 72%); }
 body[data-mode=evening] .textpost.read { background: linear-gradient(160deg, #2b1f15, #18110c 70%); }
 
@@ -60,13 +61,13 @@ body[data-mode=evening] .textpost.read { background: linear-gradient(160deg, #2b
 .mind .mind-text { padding: 14px 18px 16px; }
 .mind .then { font-style: italic; color: var(--muted); margin: 10px 0 0; font-size: 15px; }
 
-.mind.bodycard { background: linear-gradient(170deg, hsl(var(--h) 26% 77%), #c9d3c4); }
+.mind.bodycard { background: linear-gradient(170deg, hsl(var(--h) 22% 67%), #acb8a8); }
 body:not([data-mode=morning]) .mind.bodycard { background: var(--card); }
 .mind.bodycard .pacer { margin-top: 10px; font-size: 13px; color: var(--muted); }
 .mind.bodycard .pace { font-weight: 700; color: hsl(calc(var(--h) + 180) 55% 45%); font-size: 15px; letter-spacing: .4px; }
 body:not([data-mode=morning]) .mind.bodycard .pace { color: var(--orange); }
 
-.mind.affirm { padding: 26px 22px 28px; background: linear-gradient(140deg, hsl(var(--h) 32% 77%), hsl(calc(var(--h) + 60) 27% 75%)); color: #2c382e; }
+.mind.affirm { padding: 26px 22px 28px; background: linear-gradient(140deg, hsl(var(--h) 26% 67%), hsl(calc(var(--h) + 60) 22% 65%)); color: #2c382e; }
 .mind.affirm .kicker { color: hsl(var(--h) 30% 34%); }
 .mind.affirm .line { color: #2c382e; font-size: 25px; }
 body:not([data-mode=morning]) .mind.affirm { filter: saturate(.7) brightness(.92); }
@@ -74,14 +75,14 @@ body:not([data-mode=morning]) .mind.affirm { filter: saturate(.7) brightness(.92
 .mind.hello { padding: 24px 22px 24px; border: 0; }
 .mind.hello h2 { font-family: var(--serif); font-size: 34px; font-weight: 600; font-style: italic; margin-top: 4px; }
 .mind.hello .small { color: var(--muted); font-size: 14px; margin: 12px 0 0; }
-.mind.hello.morning { background: linear-gradient(160deg, #d4c2b4, #c8d3c0 50%, #bccdd0); }
+.mind.hello.morning { background: linear-gradient(160deg, #b7a698, #abb7a4 50%, #9fb0b3); }
 .mind.hello.evening { background: linear-gradient(170deg, #3a2618, #23170f 55%, #1a1222); }
 .mind.hello.evening .kicker { color: #c99a6a; }
 
 .mind.quote { padding: 26px 22px 22px; }
 .mind.quote blockquote { margin: 10px 0 0; font-family: var(--serif); font-size: 21px; line-height: 1.42; }
 .mind.quote .by { margin-top: 12px; color: var(--muted); font-size: 14px; }
-.mind.quote.morning { background: linear-gradient(150deg, #cad4c1, #bfcfce); }
+.mind.quote.morning { background: linear-gradient(150deg, #adb7a4, #a2b2b1); }
 .mind.quote.evening { background: linear-gradient(160deg, #2a1d14, #191019 80%); }
 .mind.quote.evening .kicker { color: #b892c8; }
 

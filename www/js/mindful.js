@@ -108,7 +108,7 @@ function bodyView(p) {
     const c = cv.getContext('2d'), k = (h * 0.94) / 300, cx = w / 2, oy = h * 0.03;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     const bg = c.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, `hsl(${hue},30%,70%)`); bg.addColorStop(1, `hsl(${(hue + 50) % 360},26%,61%)`);
+    bg.addColorStop(0, `hsl(${hue},24%,60%)`); bg.addColorStop(1, `hsl(${(hue + 50) % 360},22%,51%)`);
     c.fillStyle = bg; c.fillRect(0, 0, w, h);
     // the figure swells a touch with the breath
     const sc = 1 + 0.012 * s;

@@ -120,6 +120,8 @@ export class Actor {
   shoot() { return this.a.shoot(); }
   cast() { return this.a.cast(); }
   stopCast() { return this.a.stopCast?.(); }
+  // drop whatever action or emote is playing (not a knockdown) so walking shows at once
+  cancel() { return this.a.cancel?.(); }
   hurt() { this.flash = 0.18; return this.a.hurt(); }
   ko() { this.flash = 0.18; return this.a.ko(); }
   revive() { return this.a.revive(); }

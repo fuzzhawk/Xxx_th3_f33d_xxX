@@ -821,3 +821,54 @@ export function miniPaint(Rm, x, y) {
   c.fillStyle = Rm.name === 'cave' ? (g === ROCK ? '#3a3044' : g === WATER ? '#2d5680' : g === PORTAL ? '#ffe8a8' : Rm.wild[i] ? '#7a6e80' : '#a898b0') : g === PORTAL ? (Rm.name === 'sky' ? '#ffffff' : '#20181c') : Rm.wild[i] ? (Rm.name === 'sky' ? '#f4f8ff' : '#4f8a4c') : Rm.name === 'sky' && g === GRASS ? '#a8e090' : MINI[g] || '#888';
   c.fillRect(x, y, 1, 1);
 }
+
+// ------------------------------------------------ wild flora of the day (CC0 PNG plants, www/assets/plants)
+// A different handful of real sprites each day, scattered over open ground. They grow wild: you
+// can walk through them and they sway, but they are not yours to tend.
+const FLORA_KINDS = { surface: ['tree', 'bush', 'flower', 'grass', 'crop', 'mushroom', 'cactus'], cave: ['mushroom', 'grass'], sky: ['flower', 'grass', 'bush'] };
+let floraPool = null, floraDay = '', floraSet = null;
+export const dayKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+const hashStr = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
+function loadImg(src) { return new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }); }
+// today's sprites, by kind; resolves to null when no plant sprites are installed
+export async function floraToday(day = dayKey()) {
+  if (floraDay === day && floraSet) return floraSet;
+  if (!floraPool) {
+    try { const r = await fetch('assets/plants/index.json'); floraPool = r.ok ? (await r.json()).items || [] : []; } catch { floraPool = []; }
+  }
+  if (!floraPool.length) return null;
+  const R = mulberry32(hashStr(day)), byKind = {};
+  for (const it of floraPool) (byKind[it.kind] ||= []).push(it);
+  // per kind: two or three of what is there, chosen by the date
+  const want = { tree: 2, bush: 3, flower: 3, grass: 2, crop: 1, mushroom: 2, cactus: 1 }, chosen = [];
+  for (const [k, n] of Object.entries(want)) {
+    const list = (byKind[k] || []).slice();
+    for (let i = 0; i < n && list.length; i++) chosen.push(list.splice(Math.floor(R() * list.length), 1)[0]);
+  }
+  const set = {};
+  await Promise.all(chosen.map(async (it) => {
+    const im = await loadImg(`assets/plants/${it.f}`);
+    if (!im) return;
+    const [cv, c] = mk(im.width, im.height);
+    c.drawImage(im, 0, 0);
+    (set[it.kind] ||= []).push({ ...crispOf(cv), kind: it.kind, id: it.id });
+  }));
+  floraDay = day; floraSet = Object.keys(set).length ? set : null;
+  return floraSet;
+}
+function crispOf(cv) { const o = crisp(cv); return { cv: o, w: o.width, h: o.height }; }
+// what wild plant (if any) grows on a tile today
+export function floraAt(Rm, x, y, set, day) {
+  if (!set) return null;
+  const i = ix(Rm, x, y), g = Rm.ground[i];
+  if (Rm.wild[i] || !(g === GRASS || g === FOREST || g === FLOWERS || (Rm.name === 'cave' && g === GRASS))) return null;
+  const R = tileRand(x, y, hashStr(day) & 0xffff), r = R();
+  const kinds = FLORA_KINDS[Rm.name] || FLORA_KINDS.surface;
+  let kind = null;
+  if (g === FOREST) kind = r < 0.05 ? 'tree' : r < 0.11 ? 'bush' : r < 0.14 ? 'mushroom' : null;
+  else kind = r < 0.035 ? 'flower' : r < 0.06 ? 'bush' : r < 0.075 ? 'grass' : r < 0.082 ? 'crop' : r < 0.087 ? 'mushroom' : r < 0.089 ? 'cactus' : null;
+  if (Rm.name === 'cave') kind = r < 0.06 ? 'mushroom' : r < 0.08 ? 'grass' : null;
+  if (!kind || !kinds.includes(kind) || !set[kind]) return null;
+  const list = set[kind];
+  return { s: list[Math.floor(R() * list.length)], dx: Math.floor(R() * 7) - 3 };
+}

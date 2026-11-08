@@ -1,5 +1,6 @@
 // Minimal PNG decoder (non-interlaced, all colour types and bit depths) used to
-// check that sprites really have transparent edges before we use them.
+// check that sprites really have transparent edges before we use them, and to
+// read and re-encode the plant sprites for the garden.
 import zlib from 'node:zlib';
 
 export function decodePNG(buf) {
@@ -48,7 +49,32 @@ export function decodePNG(buf) {
     }
     return 255;
   };
-  return { w, h, type, depth, alpha };
+  // full colour for pixel (x, y) as [r, g, b, a] (8-bit)
+  const to8 = (v) => (depth === 16 ? v : depth === 8 ? v : Math.round((v * 255) / ((1 << depth) - 1)));
+  const rgba = (x, y) => {
+    const a = alpha(x, y);
+    if (type === 6) return [sample(y, x * 4), sample(y, x * 4 + 1), sample(y, x * 4 + 2), a];
+    if (type === 2) return [sample(y, x * 3), sample(y, x * 3 + 1), sample(y, x * 3 + 2), a];
+    if (type === 3) { const i = sample(y, x) * 3; return [palette[i], palette[i + 1], palette[i + 2], a]; }
+    const g = to8(sample(y, type === 4 ? x * 2 : x)); return [g, g, g, a];
+  };
+  return { w, h, type, depth, alpha, rgba };
+}
+
+// Minimal PNG encoder: 8-bit RGBA, no filtering (sprites here are tiny).
+const CRC = new Int32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c; });
+const crc32 = (b) => { let c = -1; for (const v of b) c = CRC[(c ^ v) & 255] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+function chunk(kind, data) {
+  const len = Buffer.alloc(4), body = Buffer.concat([Buffer.from(kind, 'latin1'), data]), crc = Buffer.alloc(4);
+  len.writeUInt32BE(data.length); crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([len, body, crc]);
+}
+export function encodePNG(w, h, rgba) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 6;
+  const raw = Buffer.alloc((w * 4 + 1) * h);
+  for (let y = 0; y < h; y++) { raw[y * (w * 4 + 1)] = 0; Buffer.from(rgba.buffer, rgba.byteOffset + y * w * 4, w * 4).copy(raw, y * (w * 4 + 1) + 1); }
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
 
 // True when most of the border is see-through and a meaningful share of the
