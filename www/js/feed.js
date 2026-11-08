@@ -3,6 +3,18 @@ import { settings, saveSettings, pctFor, subWeight, seenSet, markSeen, resetSeen
 import { renderCard, notice } from './cards.js';
 import { GAMES, GAME_NAMES, upgradeGamePost } from './games/all.js';
 import * as stats from './stats.js';
+import { getMode } from './modes.js';
+import { mindPost, greetingPost } from './mindful.js';
+
+// Morning and evening feeds: package posts (articles, videos, quotes, poems) mixed with cards made
+// on the phone (body and breath, prompts, dream guides, scenes, worlds) and the garden.
+const MODE_MIX = {
+  morning: { body: 2.2, affirm: 1.6, garden: 0.9, wiki: 2.6, video: 2.4, quote: 2.4 },
+  evening: { guide: 1.1, scene: 1.4, world: 1.4, garden: 0.9, wiki: 2.5, poem: 2.2, quote: 2.4 }
+};
+const PKG_KIND = (p) => (p.cat === 'read' ? 'poem' : p.cat);
+// one shared garden: every garden card opens the same saved garden
+export const gardenPost = (mode, n = 0) => ({ id: `garden-${mode}-${Date.now().toString(36)}-${n}`, cat: 'game', sub: 'garden', seed: 7, title: 'Your garden', mode, mods: [] });
 
 // Activates heavy cards when they are mostly visible, tears them down when they
 // leave the screen, and (optionally) measures dwell time per post.
@@ -62,7 +74,22 @@ export class Feed {
     view.addEventListener('scroll', () => { const y = view.scrollTop; stats.scrolled(y - lastY); lastY = y; }, { passive: true });
   }
 
+  setMode(m) {
+    this.mode = m;
+    if (!this.pkg) return;
+    this.focus = null; this.focusSub = null;
+    [...this.list.children].forEach((c) => this.obs.remove(c));
+    this.list.replaceChildren();
+    this.spacer.style.height = '0px';
+    this.rebuildPools();
+    this.modeN = 0; this.lastGarden = -99; this.lastKind = null; this.ended = false;
+    this.renderStories();
+    this.view.scrollTop = 0;
+    this.append(8);
+  }
   load(pkg) {
+    this.mode = getMode();
+    this.modeN = 0; this.lastGarden = -99; this.lastKind = null; this.lastDayGarden = -10;
     this.pkg = pkg;
     const games = pkg.posts?.game;
     for (const p of (Array.isArray(games) ? games : games?.posts) || []) upgradeGamePost(p);
@@ -85,6 +112,7 @@ export class Feed {
   // Instagram-style "stories": one bubble per kind of post; tapping one focuses the feed on it.
   renderStories() {
     if (!this.storiesEl) return;
+    if (this.mode && this.mode !== 'day') { this.storiesEl.replaceChildren(); return; }
     const FACE = { all: ['✦', '#2a2420'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✧', '#a07a22'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'], read: ['❧', '#6a5a3a'], studio: ['✎', '#3a6a5a'], news: ['◉', '#8a2b2b'] };
     const NAME = { all: 'For you', game: 'Games', wiki: 'Wiki', video: 'Videos', meme: 'Memes', product: 'Shop', psych: 'Trip', selfcare: 'Breathe', web: 'Web', oracle: 'Oracle', power: 'Versus', read: 'Read', studio: 'Studio', news: 'News' };
     const items = ['all', ...CATS.filter((c) => this.remaining(c) > 0)];
@@ -124,12 +152,42 @@ export class Feed {
       }
       this.pools[cat] = bySub;
     }
+    // morning and evening posts by kind (wiki, video, quote, poem), shuffled
+    this.modePools = {};
+    for (const m of ['morning', 'evening']) {
+      const by = {};
+      for (const p of this.pkg.posts[m] || []) if (!seen.has(p.id)) (by[PKG_KIND(p)] ||= []).push(p);
+      for (const l of Object.values(by)) l.sort(() => Math.random() - 0.5);
+      this.modePools[m] = by;
+    }
+  }
+  nextModePost() {
+    const m = this.mode, n = this.modeN++;
+    if (n === 0) return greetingPost(m);
+    const pool = this.modePools[m] || {}, mix = MODE_MIX[m];
+    const PKG = ['wiki', 'video', 'quote', 'poem'];
+    const ok = (k) => {
+      if (k === this.lastKind) return false;
+      if (k === 'garden') return n >= 2 && n - this.lastGarden >= 5;
+      if (PKG.includes(k)) return (pool[k]?.length || 0) > 0 && !(k === 'video' && !navigator.onLine);
+      return true;
+    };
+    // the garden comes early (third card) and then every so often
+    let kind = n === 2 ? 'garden' : weightedPick(Object.keys(mix).filter(ok).map((k) => [k, mix[k]]));
+    kind ||= Object.keys(mix).find((k) => !PKG.includes(k) && k !== 'garden');
+    this.lastKind = kind;
+    if (kind === 'garden') { this.lastGarden = n; return gardenPost(m, n); }
+    if (pool[kind]?.length) return pool[kind].shift();
+    return mindPost(kind, m);
   }
   remaining(cat) { let n = 0; for (const l of this.pools[cat]?.values() || []) n += l.length; return n; }
 
   // Weighted round-robin: the category furthest behind its target share goes next.
   nextPost() {
     const now = Date.now();
+    if (this.mode && this.mode !== 'day' && !this.focus) return this.nextModePost();
+    // the garden visits the day feed too, every couple of dozen posts
+    if (!this.focus && settings.gardenInFeed !== false && this.total - (this.lastDayGarden ?? -10) >= 22) { this.lastDayGarden = this.total; this.total++; return gardenPost('day', this.total); }
     if (this.focus && this.focusSub) {
       const l = this.pools[this.focus]?.get(this.focusSub);
       if (l?.length) { this.emitted[this.focus]++; this.total++; this.last = this.focus; return l.shift(); }

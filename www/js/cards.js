@@ -19,17 +19,19 @@ import { powerBody } from './power.js';
 import { writingBody, creatorMedia } from './studio.js';
 import { rhymeBody } from './rhymes.js';
 import { readBody } from './reads.js';
+import { mindView, quoteView, MIND_HANDLE } from './mindful.js';
 
 const TOPIC_COLOR = {
+  humanbody: '#e58f7a', neuro: '#9b8ad8', nootropics: '#6fb38a', breath: '#6fb0c9', mystic: '#a283c4', dreams: '#6d7fc4', scifi: '#4fa3a8',
   music: '#e8742a', literature: '#c9952b', science: '#8a9a52', history: '#c4623a', transgressive: '#d06a8c', mysteries: '#6d9bb0', occult: '#a283c4',
   animals: '#d8a25a', retrogaming: '#5b9aa9', vintagescifi: '#a77bd0', theory: '#d9b26f', math: '#5b8fd0', biology: '#5fa86a', offbeat: '#c98a3a'
 };
-const TOPIC_GLYPH = { music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉', theory: '𝄞', math: '∑', biology: '❦', offbeat: '⚘' };
+const TOPIC_GLYPH = { humanbody: '♡', neuro: '✧', nootropics: '❀', breath: '∾', mystic: '☉', dreams: '☾', scifi: '✦', music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉', theory: '𝄞', math: '∑', biology: '❦', offbeat: '⚘' };
 const CAT_FACE = { news: ['◉', '#8a2b2b'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], read: ['❧', '#6a5a3a'], studio: ['✎', '#3a6a5a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'] };
 let soundOn = false;
 
 export function labelOf(post) {
-  return post.title || post.name || post.text || post.quote || post.top || post.vid || post.id;
+  return post.title || post.name || post.label || post.text || post.quote || post.top || post.vid || post.id;
 }
 const handleFor = (post, ctx) => {
   switch (post.cat) {
@@ -46,6 +48,8 @@ const handleFor = (post, ctx) => {
     case 'studio': return ['the.studio', post.sub === 'creator' ? 'Character creator · you star in the games' : post.sub === 'blank' ? 'A blank page · tap ✈ to download' : post.sub === 'rhyme' ? 'Rhyming dictionary · tap ✈ to download' : 'Writing prompt · tap ✈ to download'];
     case 'read': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'longread', `${post.kind === 'poem' ? 'Poem' : post.kind === 'novel' ? 'From a novel' : 'Long read'}${post.author ? ` · ${post.author}` : ''}`];
     case 'power': return ['power.scale', post.sub === 'tier' ? 'Tier list · binding in no jurisdiction' : 'Who would win?'];
+    case 'mind': return MIND_HANDLE[post.sub] || ['good.morning', ''];
+    case 'quote': return [post.mode === 'evening' ? 'night.thoughts' : 'morning.pages', `${post.author} · Wikiquote`];
     default: return [post.cat, ''];
   }
 };
@@ -53,7 +57,7 @@ const handleFor = (post, ctx) => {
 // ------------------------------------------------ shared chrome
 function header(post, ctx) {
   const [handle, sub] = handleFor(post, ctx);
-  const [g, bg] = post.cat === 'wiki' ? [TOPIC_GLYPH[post.sub] || 'W', TOPIC_COLOR[post.sub] || '#3a3530'] : CAT_FACE[post.cat] || ['•', '#333'];
+  const [g, bg] = post.cat === 'wiki' ? [TOPIC_GLYPH[post.sub] || 'W', TOPIC_COLOR[post.sub] || '#3a3530'] : post.cat === 'mind' || post.cat === 'quote' ? (post.mode === 'evening' ? ['☾', '#5b4a78'] : ['☀︎', '#e59a6c']) : CAT_FACE[post.cat] || ['•', '#333'];
   const more = el('button.more-btn', { 'aria-label': 'More', html: icon('more') });
   more.onclick = (e) => { e.stopPropagation(); postMenu(post, ctx, more.closest('.post')); };
   return el('div.post-head',
@@ -424,12 +428,25 @@ function read(p, ctx) {
   return card;
 }
 
+// ------------------------------------------------ morning and evening cards
+function mind(p, ctx) {
+  const v = mindView(p);
+  p.label ||= v.label;
+  const card = post(`mind.${p.sub}`, p, ctx, { body: v.body });
+  if (v.activate) { card._activate = v.activate; card._deactivate = v.deactivate; card._heavy = true; }
+  card._label = v.label;
+  return card;
+}
+function quote(p, ctx) {
+  return post('quote', p, ctx, { body: quoteView(p), ext: p.url });
+}
+
 // ------------------------------------------------ special
 export function notice(title, text, buttons = []) {
   return el('article.notice', el('h3', title), el('p', text), el('div.btnrow', { style: { justifyContent: 'center' } }, buttons));
 }
 
-const RENDER = { wiki, video, game, psych, meme, product, selfcare, web, news: web, oracle, power, studio, read };
+const RENDER = { wiki, video, game, psych, meme, product, selfcare, web, news: web, oracle, power, studio, read, mind, quote };
 export function renderCard(p, ctx) {
   const fn = RENDER[p.cat];
   if (!fn) return null;

@@ -34,7 +34,12 @@ export const DEFAULTS = {
   token: '',
   prompt: null,            // null = the package's prompt
   promptEdited: false,
-  pkg: null                // current package id
+  pkg: null,               // current package id
+  autoMode: true,          // pick morning / day / evening by the clock when the app opens
+  lastMode: 'day',
+  blueLight: 0.35,         // evening blue-light filter strength (0–0.75)
+  blueLightOn: true,
+  gardenInFeed: true       // garden cards in the day feed too
 };
 
 export const settings = Object.assign(structuredClone(DEFAULTS), lsGet('settings', {}));

@@ -1,0 +1,104 @@
+/* Morning (light pastel spring) and evening (earth tones, warm) modes, the blue-light filter,
+   the top-bar mode switch and the cards made for the modes (www/js/modes.js, www/js/mindful.js). */
+
+body[data-mode=morning] {
+  --bg: #fbf5ef; --bg2: #f5ebe3; --card: #fffaf6; --card2: #f1e5da; --line: #eadccf; --line2: #ddcbbb;
+  --text: #3f3431; --muted: #8b7a71; --faint: #b0a197; --orange: #e0795a; --orange2: #e58c6e; --ochre: #c4914c;
+  --terracotta: #d27a63; --olive: #86a97f; --sand: #a07c63; --rust: #c06a52;
+  --ring: conic-gradient(from 210deg, #ffc9a9, #f6a9c4, #b9d7f1, #c6e6b6, #ffc9a9);
+  color-scheme: light;
+}
+body[data-mode=evening] {
+  --bg: #15100c; --bg2: #1c1510; --card: #20170f; --card2: #2b2016; --line: #33261b; --line2: #46352a;
+  --text: #ecdcc5; --muted: #b0987c; --faint: #7c6955; --orange: #d98a4c; --orange2: #c97c45; --ochre: #b98a4a;
+  --terracotta: #a35a3a; --olive: #7f8b5a; --sand: #cbb393; --rust: #8a4a2a;
+  --ring: conic-gradient(from 210deg, #e3a362, #a8653a, #6c4c7c, #c9915f, #e3a362);
+}
+body[data-mode] { transition: background-color .6s; }
+body[data-mode=morning] header#top { background: rgba(251,245,239,.9); }
+body[data-mode=morning] nav#tabs { background: rgba(251,245,239,.94); }
+body[data-mode=evening] header#top { background: rgba(21,16,12,.92); }
+body[data-mode=evening] nav#tabs { background: rgba(21,16,12,.94); }
+body[data-mode=morning] .backdrop { background: rgba(70,50,40,.35); }
+body[data-mode=morning] .who b .tick { color: #fff; }
+/* existing cards with dark hard-coded colours */
+body[data-mode=morning] .wiki .textpost { background: linear-gradient(150deg, color-mix(in srgb, var(--tc) 22%, #fffaf6), #fffaf6 75%); }
+body[data-mode=morning] .wiki .hook { color: #4a3f3b; }
+body[data-mode=morning] .wiki .rest p { color: #5c4f49; }
+body[data-mode=morning] .textpost.read { background: linear-gradient(160deg, #f6eadf, #fffaf6 70%); }
+body[data-mode=morning] .textpost.read p, body[data-mode=morning] .read-poem { color: #4a3f3b; }
+body[data-mode=evening] .wiki .textpost { background: linear-gradient(150deg, color-mix(in srgb, var(--tc) 26%, #22180f), #1a130d 72%); }
+body[data-mode=evening] .textpost.read { background: linear-gradient(160deg, #2b1f15, #18110c 70%); }
+
+/* blue-light filter: a warm amber multiplied over everything, videos included */
+#bluelight { position: fixed; inset: 0; z-index: 5000; pointer-events: none; background: #ff9a3c; mix-blend-mode: multiply; opacity: 0; transition: opacity .6s ease; }
+
+/* top-bar switch */
+.modebox { display: flex; align-items: center; gap: 6px; }
+.modebtn { display: flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 99px; background: var(--card2); color: var(--text); font-size: 12px; font-weight: 600; }
+.modebtn .mi { font-size: 14px; line-height: 1; }
+.bl { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; }
+.bl-range { width: 64px; accent-color: var(--orange); }
+@media (max-width: 370px) { .modebtn .ml { display: none; } .bl-range { width: 48px; } }
+.modesheet .modeopt { gap: 14px; }
+.modesheet .modeopt .mi { width: 30px; text-align: center; font-size: 22px; }
+.modesheet .modeopt b { display: block; font-size: 15px; }
+.modesheet .modeopt small { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.modesheet .modeopt.on { background: var(--line); }
+.modeauto { display: flex; align-items: flex-start; gap: 12px; padding: 14px 20px 6px; font-size: 14px; border-top: 1px solid var(--line2); }
+.modeauto input { margin-top: 3px; accent-color: var(--orange); }
+.modeauto small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.rangebox { display: flex; align-items: center; gap: 10px; }
+.rangebox input { flex: 1; accent-color: var(--orange); }
+
+/* ------------------------------------------------ mind cards */
+.mind { margin: 0 12px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); }
+.mind .kicker { font-size: 11px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; color: var(--muted); }
+.mind .line { font-family: var(--serif); font-size: 22px; line-height: 1.32; margin: 8px 0 0; color: var(--text); }
+.mind .media-in canvas, .mind-canvas { display: block; width: 100%; }
+.mind .mind-text { padding: 14px 18px 16px; }
+.mind .then { font-style: italic; color: var(--muted); margin: 10px 0 0; font-size: 15px; }
+
+.mind.bodycard { background: linear-gradient(170deg, hsl(var(--h) 60% 95%), #fffaf6); }
+body:not([data-mode=morning]) .mind.bodycard { background: var(--card); }
+.mind.bodycard .pacer { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.mind.bodycard .pace { font-weight: 700; color: hsl(calc(var(--h) + 180) 55% 45%); font-size: 15px; letter-spacing: .4px; }
+body:not([data-mode=morning]) .mind.bodycard .pace { color: var(--orange); }
+
+.mind.affirm { padding: 26px 22px 28px; background: linear-gradient(140deg, hsl(var(--h) 75% 92%), hsl(calc(var(--h) + 60) 70% 90%)); color: #3f3431; }
+.mind.affirm .kicker { color: hsl(var(--h) 35% 40%); }
+.mind.affirm .line { color: #3f3431; font-size: 25px; }
+body:not([data-mode=morning]) .mind.affirm { filter: saturate(.7) brightness(.92); }
+
+.mind.hello { padding: 24px 22px 24px; border: 0; }
+.mind.hello h2 { font-family: var(--serif); font-size: 34px; font-weight: 600; font-style: italic; margin-top: 4px; }
+.mind.hello .small { color: var(--muted); font-size: 14px; margin: 12px 0 0; }
+.mind.hello.morning { background: linear-gradient(160deg, #ffe3d1, #fde9f0 45%, #e3f0fb); }
+.mind.hello.evening { background: linear-gradient(170deg, #3a2618, #23170f 55%, #1a1222); }
+.mind.hello.evening .kicker { color: #c99a6a; }
+
+.mind.quote { padding: 26px 22px 22px; }
+.mind.quote blockquote { margin: 10px 0 0; font-family: var(--serif); font-size: 21px; line-height: 1.42; }
+.mind.quote .by { margin-top: 12px; color: var(--muted); font-size: 14px; }
+.mind.quote.morning { background: linear-gradient(150deg, #fff4ea, #f2f6fb); }
+.mind.quote.evening { background: linear-gradient(160deg, #2a1d14, #191019 80%); }
+.mind.quote.evening .kicker { color: #b892c8; }
+
+.mind.guide { padding: 22px 20px 18px; background: linear-gradient(175deg, #1f1a2c, #17120e 70%); color: #eadfcf; }
+.mind.guide .kicker { color: #a89ad0; }
+.mind.guide h3 { font-family: var(--serif); font-size: 24px; margin: 6px 0 4px; font-weight: 600; }
+.mind.guide .g-sec { margin-top: 14px; }
+.mind.guide h4 { margin: 0; font-size: 11.5px; letter-spacing: 1px; text-transform: uppercase; color: #c9a77a; font-weight: 700; }
+.mind.guide p { margin: 5px 0 0; font-size: 15px; line-height: 1.55; }
+.mind.guide .intent { font-family: var(--serif); font-size: 18px; font-style: italic; }
+body[data-mode=morning] .mind.guide { filter: brightness(1.05); }
+
+.mind.scene { padding: 26px 22px 24px; background: radial-gradient(circle at 80% 10%, hsl(var(--h) 40% 30% / .55), transparent 55%), linear-gradient(170deg, #1d1724, #120e10); color: #ece0f2; }
+.mind.scene .kicker { color: hsl(var(--h) 45% 72%); }
+.mind.scene .line { color: #f1e6f4; }
+.mind.scene .then { color: #c6b6cf; }
+
+.mind.world { background: #120f14; color: #e6dde8; }
+.mind.world h3 { font-family: var(--serif); font-size: 26px; margin: 4px 0 6px; font-weight: 600; }
+.mind.world p { margin: 6px 0 0; font-size: 15px; line-height: 1.5; }
+.mind.world .kicker { color: #9fc4c8; }

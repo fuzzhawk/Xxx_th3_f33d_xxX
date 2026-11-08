@@ -7,6 +7,7 @@ import * as stats from './stats.js';
 import { buildFeedback, sync } from './github.js';
 import { lsGet, lsSet } from './store.js';
 import { GAMES, GAME_NAMES } from './games/all.js';
+import { MODES, MODE_LABEL, MODE_ICON, getMode, setMode, applyFilter } from './modes.js';
 
 let root, app;
 export function initSettings(view, appApi) { root = view; app = appApi; }
@@ -25,6 +26,21 @@ function text(key, label, type = 'text', placeholder = '') {
   return el('div.field', el('label', label), input);
 }
 
+function modesGroup() {
+  const pct = Math.round((settings.blueLight ?? 0.35) * 100);
+  const val = el('b', `${pct}%`);
+  const range = el('input', { type: 'range', min: '0', max: '75', step: '1', value: String(pct) });
+  range.oninput = () => { settings.blueLight = +range.value / 100; val.textContent = `${range.value}%`; applyFilter(); };
+  range.onchange = () => saveSettings();
+  const btn = (m) => el(`button.btn${getMode() === m ? '.primary' : ''}`, { onclick: () => { setMode(m, { manual: true }); toast(`${MODE_LABEL[m]} mode`); } }, `${MODE_ICON[m]} ${MODE_LABEL[m]}`);
+  return group('Morning & evening', 'Morning: body, breath, gratitude, living things. Evening: dreams, poems, night thoughts. Both have your garden.',
+    el('div.btnrow', MODES.map(btn)),
+    toggle('autoMode', 'Pick the mode by the clock', 'Evening 11 pm – 5 am, morning 5 – 11 am, the regular feed the rest of the day'),
+    toggle('blueLightOn', 'Blue-light filter in evening mode', null, () => applyFilter()),
+    el('div.field', el('label', 'Filter strength', el('small', 'Also on the slider in the top bar during evening mode')), el('div.rangebox', range, val)),
+    toggle('gardenInFeed', 'Garden in the day feed', 'Your garden turns up between posts, with livelier weather'));
+}
+
 export async function render() {
   const pkg = app.pkg();
   const man = pkg?.manifest;
@@ -32,6 +48,7 @@ export async function render() {
     jumpGroup(pkg),
     await packageGroup(man),
     balanceGroup(man),
+    modesGroup(),
     group('Display', null,
       window.Capacitor?.isNativePlatform?.() ? toggle('immersive', 'Full screen', 'Hide the Android navigation buttons. Swipe up from the bottom edge to show them.', () => app.applyImmersive()) : null,
       toggle('showNsfw', 'Adult comics', 'Include NSFW webcomics such as Oglaf', () => app.softReload()),

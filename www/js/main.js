@@ -10,6 +10,7 @@ import { Feed } from './feed.js';
 import { notice } from './cards.js';
 import { initFavs, render as renderFavs } from './favsview.js';
 import { initSettings, render as renderSettings } from './settingsview.js';
+import { initModes, onMode } from './modes.js';
 
 let pkg = null;
 const feed = new Feed($('#view-feed'), $('#feed'), $('#feed-spacer'), $('#feed-sentinel'), $('#stories'));
@@ -89,6 +90,9 @@ const bootTimer = setInterval(() => { const l = bootEl?.querySelector('.boot-lin
 function bootDone() { clearInterval(bootTimer); bootEl?.classList.add('done'); setTimeout(() => bootEl?.remove(), 700); }
 async function boot() {
   stats.init();
+  // morning / day / evening: chosen by the clock now, switchable from the top bar
+  initModes($('#modebox'));
+  onMode((m) => { show('feed'); topbar.classList.remove('hide'); feed.setMode(m); });
   applyImmersive();
   loadKenney();
   await loadFavs().catch((e) => console.warn('favorites unavailable', e));
