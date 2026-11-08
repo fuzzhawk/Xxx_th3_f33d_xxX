@@ -103,3 +103,6 @@ body[data-mode=morning] .mind.guide { filter: brightness(1.05); }
 .mind.world h3 { font-family: var(--serif); font-size: 26px; margin: 4px 0 6px; font-weight: 600; }
 .mind.world p { margin: 6px 0 0; font-size: 15px; line-height: 1.5; }
 .mind.world .kicker { color: #9fc4c8; }
+
+/* the garden card: no pills, no "tap to play", no words; the canvas is the whole card */
+.stage.garden .hud, .stage.garden .tapplay, .stage.garden .autobtn { display: none !important; }

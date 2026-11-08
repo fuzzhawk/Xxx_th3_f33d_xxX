@@ -12,53 +12,80 @@ export function mindPost(kind, mode, seed = Math.floor(Math.random() * 2 ** 31))
 export const MIND_HANDLE = { body: ['body.breath', 'Feel it · breathe into it'], affirm: ['good.morning', 'A small reminder'], hello: ['the.feed', 'Today'], guide: ['dream.guide', 'Tonight’s practice'], scene: ['dream.scene', 'Rehearse this dream'], world: ['other.worlds', 'A world to dream of'] };
 
 // ------------------------------------------------ body and breath
-// [key, line, [points on the figure], radius]
+// [key, line, [points as (x from the centre line, y)], radius] on a 300-unit-tall figure
 const BODY = [
-  ['jaw', 'Your jaw. Let your teeth part a little.', [[180, 66]], 16],
-  ['shoulders', 'Your shoulders. Let them drop as you breathe out.', [[140, 100], [220, 100]], 18],
-  ['hands', 'Your hands. Feel the air on your palms.', [[112, 198], [248, 198]], 15],
-  ['feet', 'Your feet. Notice the ground holding you up.', [[158, 284], [202, 284]], 15],
-  ['belly', 'Your belly. Let it soften and rise as you breathe in.', [[180, 156]], 24],
-  ['heart', 'Your heart. It kept time all night without being asked.', [[168, 122]], 16],
-  ['lungs', 'Your lungs. Fill them slowly, from the bottom up.', [[160, 124], [200, 124]], 19],
-  ['eyes', 'Your eyes. Let them rest on something far away.', [[171, 47], [189, 47]], 9],
-  ['forehead', 'Your forehead. Smooth it, as if someone brushed it with a thumb.', [[180, 35]], 15],
-  ['tongue', 'Your tongue. Let it rest on the floor of your mouth.', [[180, 62]], 10],
-  ['throat', 'Your throat. Swallow once and feel it open.', [[180, 86]], 12],
-  ['spine', 'Your spine. Grow a little taller, like a stem toward light.', [[180, 110], [180, 140], [180, 170]], 12],
-  ['hips', 'Your hips. Let your weight settle into them.', [[180, 188]], 24],
-  ['knees', 'Your knees. Unlock them, just slightly.', [[163, 236], [197, 236]], 12],
-  ['fingers', 'Your fingers. Spread them wide, then let them curl.', [[110, 212], [250, 212]], 12],
-  ['scalp', 'Your scalp. Feel where your hair begins.', [[180, 28]], 18],
-  ['ears', 'Your ears. Find the farthest sound you can hear.', [[155, 50], [205, 50]], 9],
-  ['face', 'Your face. Let it be still for three breaths.', [[180, 52]], 22],
-  ['chest', 'Your chest. Let it widen on the in-breath.', [[180, 122]], 24],
-  ['arms', 'Your arms. Let them hang heavy.', [[124, 150], [236, 150]], 14],
-  ['toes', 'Your toes. Wiggle them, then let them rest.', [[154, 292], [206, 292]], 10],
-  ['back', 'Your lower back. Breathe into it as if it had lungs.', [[180, 172]], 22],
-  ['calves', 'Your calves. Let them be soft.', [[162, 260], [198, 260]], 12],
-  ['neck', 'The back of your neck. Let your head float.', [[180, 82]], 13]
+  ['jaw', 'Your jaw. Let your teeth part a little.', [[0, 45]], 12],
+  ['shoulders', 'Your shoulders. Let them drop as you breathe out.', [[-35, 73], [35, 73]], 15],
+  ['hands', 'Your hands. Feel the air on your palms.', [[-49, 186], [49, 186]], 13],
+  ['feet', 'Your feet. Notice the ground holding you up.', [[-18, 286], [18, 286]], 12],
+  ['belly', 'Your belly. Let it soften and rise as you breathe in.', [[0, 150]], 22],
+  ['heart', 'Your heart. It kept time all night without being asked.', [[8, 104]], 13],
+  ['lungs', 'Your lungs. Fill them slowly, from the bottom up.', [[-13, 108], [13, 108]], 16],
+  ['eyes', 'Your eyes. Let them rest on something far away.', [[-6, 25], [6, 25]], 6],
+  ['forehead', 'Your forehead. Smooth it, as if someone brushed it with a thumb.', [[0, 16]], 11],
+  ['tongue', 'Your tongue. Let it rest on the floor of your mouth.', [[0, 39]], 8],
+  ['throat', 'Your throat. Swallow once and feel it open.', [[0, 55]], 9],
+  ['spine', 'Your spine. Grow a little taller, like a stem toward light.', [[0, 88], [0, 120], [0, 152]], 10],
+  ['hips', 'Your hips. Let your weight settle into them.', [[0, 174]], 24],
+  ['knees', 'Your knees. Unlock them, just slightly.', [[-17, 230], [17, 230]], 11],
+  ['fingers', 'Your fingers. Spread them wide, then let them curl.', [[-49, 196], [49, 196]], 10],
+  ['scalp', 'Your scalp. Feel where your hair begins.', [[0, 10]], 14],
+  ['ears', 'Your ears. Find the farthest sound you can hear.', [[-16, 27], [16, 27]], 7],
+  ['face', 'Your face. Let it be still for three breaths.', [[0, 29]], 17],
+  ['chest', 'Your chest. Let it widen on the in-breath.', [[0, 106]], 22],
+  ['arms', 'Your arms. Let them hang heavy.', [[-43, 126], [43, 126]], 12],
+  ['toes', 'Your toes. Wiggle them, then let them rest.', [[-21, 292], [21, 292]], 8],
+  ['back', 'Your lower back. Breathe into it as if it had lungs.', [[0, 160]], 20],
+  ['calves', 'Your calves. Let them be soft.', [[-18, 254], [18, 254]], 10],
+  ['neck', 'The back of your neck. Let your head float.', [[0, 58]], 10]
 ];
 const BREATH = [['breathe in', 4], ['hold', 2], ['breathe out', 6]];
 const CYCLE = BREATH.reduce((s, [, t]) => s + t, 0);
 
-function drawFigure(c, w, h) {
-  const k = h / 300;
-  c.save(); c.translate(w / 2 - 180 * k, 0); c.scale(k, k);
-  c.lineCap = 'round'; c.lineJoin = 'round';
-  c.strokeStyle = 'rgba(255,255,255,.55)'; c.fillStyle = 'rgba(255,255,255,.28)';
-  // limbs as soft thick strokes
-  c.lineWidth = 15;
-  for (const [x0, y0, x1, y1, x2, y2] of [[136, 104, 122, 150, 112, 198], [224, 104, 238, 150, 248, 198]]) { c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(x1, y1, x2, y2); c.stroke(); }
-  c.lineWidth = 20;
-  for (const [x0, x1] of [[166, 158], [194, 202]]) { c.beginPath(); c.moveTo(x0, 192); c.quadraticCurveTo(x0 - 3, 240, x1, 284); c.stroke(); }
-  // torso
-  c.beginPath(); c.moveTo(134, 98); c.quadraticCurveTo(180, 90, 226, 98); c.quadraticCurveTo(214, 140, 210, 172); c.quadraticCurveTo(216, 190, 212, 200);
-  c.lineTo(148, 200); c.quadraticCurveTo(144, 190, 150, 172); c.quadraticCurveTo(146, 140, 134, 98); c.closePath(); c.fill(); c.lineWidth = 2; c.stroke();
-  // neck and head
-  c.fillRect(172, 70, 16, 24);
-  c.beginPath(); c.ellipse(180, 48, 23, 27, 0, 0, Math.PI * 2); c.fill(); c.stroke();
-  c.restore();
+// One closed outline of a standing figure (about seven and a half heads tall), right half from the
+// crown down to the crotch; the left half mirrors it. Smoothed with a Catmull-Rom curve.
+const HALF = [[0, 6], [9, 7], [15, 13], [17, 22], [16, 32], [13, 41], [9, 47], [7.5, 53], [8, 59], [16, 63], [30, 67], [39, 71], [44, 79], [46, 92],
+  [47, 110], [48, 128], [49, 145], [50, 162], [52, 174], [54, 184], [53, 194], [49, 201], [45, 196], [43, 185], [42, 172], [40, 156], [38, 140], [35, 122], [32, 104],
+  [31, 118], [28, 136], [26, 150], [29, 164], [33, 180], [32, 200], [29, 222], [26, 236], [27, 252], [24, 270], [21, 280], [26, 287], [27, 293], [18, 295], [12, 293], [12, 282],
+  [13, 266], [13, 250], [11, 234], [10, 214], [7, 194], [3, 186], [0, 184]];
+const OUTLINE = (() => {
+  const pts = [...HALF, ...HALF.slice(1, -1).reverse().map(([x, y]) => [-x, y])], out = [], n = pts.length;
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    for (let k = 0; k < 8; k++) {
+      const t = k / 8, t2 = t * t, t3 = t2 * t;
+      out.push([0, 1].map((a) => 0.5 * (2 * p1[a] + (-p0[a] + p2[a]) * t + (2 * p0[a] - 5 * p1[a] + 4 * p2[a] - p3[a]) * t2 + (-p0[a] + 3 * p1[a] - 3 * p2[a] + p3[a]) * t3)));
+    }
+  }
+  return out;
+})();
+const OUT_LEN = (() => { const L = [0]; for (let i = 1; i <= OUTLINE.length; i++) { const a = OUTLINE[i - 1], b = OUTLINE[i % OUTLINE.length]; L.push(L[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); } return L; })();
+// the outline as a canvas path, scaled k and centred at cx
+function outlinePath(c, cx, k) { c.beginPath(); OUTLINE.forEach(([x, y], i) => (i ? c.lineTo(cx + x * k, y * k) : c.moveTo(cx + x * k, y * k))); c.closePath(); }
+// point at fraction f (0..1) of the way around the outline
+function along(f) {
+  const total = OUT_LEN[OUT_LEN.length - 1], d = ((f % 1) + 1) % 1 * total;
+  let lo = 0, hi = OUT_LEN.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (OUT_LEN[m] <= d) lo = m; else hi = m; }
+  const a = OUTLINE[lo % OUTLINE.length], b = OUTLINE[(lo + 1) % OUTLINE.length], u = (d - OUT_LEN[lo]) / ((OUT_LEN[lo + 1] - OUT_LEN[lo]) || 1);
+  return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+}
+// the ghostly figure, painted once per size: a soft blurred halo, a shaded fill and a fine line
+function ghost(w, h, hue) {
+  const dpr = Math.min(2, devicePixelRatio || 1), cv = document.createElement('canvas');
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const c = cv.getContext('2d'), k = (h * 0.94) / 300, cx = w / 2;
+  c.setTransform(dpr, 0, 0, dpr, 0, h * 0.03 * dpr);
+  const fill = c.createLinearGradient(0, 0, 0, 300 * k);
+  fill.addColorStop(0, 'rgba(255,255,255,.62)'); fill.addColorStop(0.55, `hsla(${(hue + 200) % 360},60%,96%,.42)`); fill.addColorStop(1, 'rgba(255,255,255,.12)');
+  c.filter = 'blur(10px)'; outlinePath(c, cx, k); c.fillStyle = 'rgba(255,255,255,.55)'; c.fill();
+  c.filter = 'blur(2.5px)'; outlinePath(c, cx, k); c.fillStyle = fill; c.fill();
+  // a little inner shading so the form reads: darker towards the edges
+  c.filter = 'blur(6px)'; outlinePath(c, cx, k); c.lineWidth = 9; c.strokeStyle = `hsla(${(hue + 220) % 360},30%,55%,.18)`; c.stroke();
+  c.filter = 'blur(3px)'; outlinePath(c, cx, k); c.lineWidth = 4; c.strokeStyle = 'rgba(255,255,255,.75)'; c.stroke();
+  c.filter = 'blur(0.6px)'; outlinePath(c, cx, k); c.lineWidth = 1.2; c.strokeStyle = 'rgba(255,255,255,.95)'; c.stroke();
+  c.filter = 'none';
+  return cv;
 }
 
 function bodyView(p) {
@@ -66,34 +93,46 @@ function bodyView(p) {
   const cv = el('canvas.mind-canvas'), phase = el('span.pace', 'breathe in · 4');
   const box = el('div.mind.bodycard', { style: { '--h': hue } }, el('div.media-in', cv),
     el('div.mind-text', el('div.kicker', 'Body · breath'), el('p.line', line), el('div.pacer', phase, el('small', ' · in 4 · hold 2 · out 6'))));
-  let raf = 0, t0 = 0;
+  let raf = 0, t0 = 0, g = null, gw = 0;
   const frame = (now) => {
-    const t = ((now - t0) / 1000) % CYCLE;
+    const secs = (now - t0) / 1000, t = secs % CYCLE;
     let acc = 0, ph = 0, f = 0;
     for (const [i, [, d]] of BREATH.entries()) { if (t < acc + d) { ph = i; f = (t - acc) / d; break; } acc += d; }
     const [name, dur] = BREATH[ph], left = Math.ceil(dur - f * dur);
     const s = ph === 0 ? 0.25 + 0.75 * Math.sin((f * Math.PI) / 2) : ph === 1 ? 1 : 0.25 + 0.75 * Math.cos((f * Math.PI) / 2);
     const txt = `${name} · ${left}`;
     if (phase.textContent !== txt) phase.textContent = txt;
-    const dpr = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth || 360, h = Math.round(w * 0.78);
+    const dpr = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth || 360, h = Math.round(w * 0.8);
     if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
-    const c = cv.getContext('2d');
+    if (!g || gw !== w) { g = ghost(w, h, hue); gw = w; }
+    const c = cv.getContext('2d'), k = (h * 0.94) / 300, cx = w / 2, oy = h * 0.03;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const g = c.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, `hsl(${hue},38%,82%)`); g.addColorStop(1, `hsl(${(hue + 50) % 360},32%,76%)`);
-    c.fillStyle = g; c.fillRect(0, 0, w, h);
-    // breathing ring behind the figure
-    const k = h / 300, cx = w / 2;
-    c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 1.5;
-    c.beginPath(); c.arc(cx, h * 0.52, (60 + 70 * s) * k, 0, Math.PI * 2); c.stroke();
-    drawFigure(c, w, h);
-    // the part glows and swells with the breath
+    const bg = c.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, `hsl(${hue},38%,80%)`); bg.addColorStop(1, `hsl(${(hue + 50) % 360},32%,72%)`);
+    c.fillStyle = bg; c.fillRect(0, 0, w, h);
+    // the figure swells a touch with the breath
+    const sc = 1 + 0.012 * s;
+    c.save(); c.translate(cx, h * 0.55); c.scale(sc, sc); c.translate(-cx, -h * 0.55);
+    c.drawImage(g, 0, 0, w, h);
+    // the part glows and grows with the breath
     for (const [x, y] of pts) {
-      const X = cx + (x - 180) * k, Y = y * k, r = rad * k * (1.2 + 1.4 * s);
+      const X = cx + x * k, Y = oy + y * k, r = rad * k * (1.3 + 1.5 * s);
       const rg = c.createRadialGradient(X, Y, 0, X, Y, r);
-      rg.addColorStop(0, `hsla(${(hue + 180) % 360},90%,70%,${0.55 + 0.35 * s})`); rg.addColorStop(1, `hsla(${(hue + 180) % 360},90%,70%,0)`);
+      rg.addColorStop(0, `hsla(${(hue + 180) % 360},90%,72%,${0.5 + 0.4 * s})`); rg.addColorStop(1, `hsla(${(hue + 180) % 360},90%,72%,0)`);
       c.fillStyle = rg; c.beginPath(); c.arc(X, Y, r, 0, Math.PI * 2); c.fill();
     }
+    // a tracer of light travels the outline, once around every breath
+    c.globalCompositeOperation = 'lighter';
+    const head = secs / CYCLE;
+    for (let i = 0; i < 34; i++) {
+      const [x, y] = along(head - i * 0.0018), a = (1 - i / 34) ** 1.8;
+      c.fillStyle = `rgba(255,255,250,${0.8 * a})`; c.beginPath(); c.arc(cx + x * k, oy + y * k, 1.4 * a + 0.4, 0, Math.PI * 2); c.fill();
+    }
+    const [hx, hy] = along(head), hg = c.createRadialGradient(cx + hx * k, oy + hy * k, 0, cx + hx * k, oy + hy * k, 8);
+    hg.addColorStop(0, 'rgba(255,255,245,.6)'); hg.addColorStop(1, 'rgba(255,255,245,0)');
+    c.fillStyle = hg; c.fillRect(cx + hx * k - 8, oy + hy * k - 8, 16, 16);
+    c.globalCompositeOperation = 'source-over';
+    c.restore();
     raf = requestAnimationFrame(frame);
   };
   return { body: box, label: key, activate: () => { if (!raf) { t0 = performance.now(); raf = requestAnimationFrame(frame); } }, deactivate: () => { cancelAnimationFrame(raf); raf = 0; } };

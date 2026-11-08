@@ -5,6 +5,7 @@
 // Cloud Stair, once uncovered, climbs to the sky islands. The light follows the feed: pastel spring
 // in the morning, lively weather in the day, dusk in the evening. On autopilot the gardener only
 // waters, wanders and visits the animals; planting, clearing, building and exploring are yours.
+// There is no text anywhere: everything is told with light, sparkles, hearts and small icons.
 import { Game, W, H, roundRect } from './engine.js';
 import { Actor } from '../crystal/sprites.js';
 import { getMode } from '../modes.js';
@@ -28,7 +29,7 @@ export class Garden extends Game {
     this.hero = { actor: new Actor(this.skin.crystal(0, 'Fantasy'), { mode: 'eight', walkSpeed: 10, runSpeed: 70 }), path: [], task: null, busy: 0, x: 0, y: 0 };
     Wd.loadGarden().then((g) => {
       this.enter(g.realm);
-      if (g.firstVisit) { this.say('Welcome to your garden'); this.say('Tap the ground to plant · tap tall grass to clear it'); this.say('There is a lot out there: lakes, hills, caves, and more'); g.firstVisit = 0; }
+      if (g.firstVisit) { this.hint = 9; g.firstVisit = 0; }
       else if (g.migrated) { this.say('Your garden has grown into a whole world'); this.say('Explore: lakes, forests, hills with caves, and something in the sky'); g.migrated = 0; }
       else if (g.away?.length) { this.say('While you were away…'); for (const m of g.away) this.say(m); g.away = []; }
       else this.greet();
@@ -71,12 +72,8 @@ export class Garden extends Game {
   }
   stop() { const live = this.live; super.stop(); if (this.ready && live) { this.Rm.hero = { x: this.hero.x, y: this.hero.y }; Wd.saveGarden(); } }
   get live() { return this.ready && Garden.active === this; }
-  hud() {
-    if (!this.ready) return 'waking the garden…';
-    let planted = 0, animals = 0, found = 0, ruins = 0;
-    for (const Rm of Object.values(Wd.G.R)) { for (const p of Rm.plants) if (!p.n) planted++; animals += Rm.animals.length; for (const r of Rm.ruins) { ruins++; if (r.found) found++; } }
-    return `✿ ${planted} · 🐾 ${animals} · ◈ ${found}/${ruins}`;
-  }
+  hud() { return ''; }   // nothing to read: the garden speaks in pictures
+
   say(text) { this.msgs.push({ text, t: 0 }); if (this.msgs.length > 7) this.msgs.splice(0, this.msgs.length - 7); }
 
   // ---------------------------------------------- map helpers
@@ -172,6 +169,8 @@ export class Garden extends Game {
       return true;
     }
     if (hit(this.ui?.ruins)) {
+      const Rm0 = this.Rm, hx0 = this.hero.x / T, hy0 = this.hero.y / T, u0 = Rm0.ruins.filter((u) => !u.found).sort((p, q) => Math.hypot(p.x - hx0, p.y - hy0) - Math.hypot(q.x - hx0, q.y - hy0))[0];
+      if (u0) { const a = Math.atan2(u0.y + u0.h / 2 - hy0, u0.x + u0.w / 2 - hx0); for (let i = 1; i <= 9; i++) this.fx.push({ kind: 'trail', x: this.hero.x + Math.cos(a) * i * 13, y: this.hero.y - 4 + Math.sin(a) * i * 13, t: -i * 0.12, life: 2.2 }); }
       const Rm = this.Rm, hx = this.hero.x / T, hy = this.hero.y / T, left = Rm.ruins.filter((u) => !u.found).sort((p, q) => Math.hypot(p.x - hx, p.y - hy) - Math.hypot(q.x - hx, q.y - hy));
       if (!left.length) this.say(Rm.name === 'surface' ? 'Every ruin in the meadows is found. The caves and the sky hold more' : 'Every ruin here has been found');
       else { const u = left[0], dir = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'][Math.round(((Math.atan2(u.y - hy, u.x - hx) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8], far = Math.hypot(u.x - hx, u.y - hy); this.say(`Something old lies ${far > 30 ? 'far' : far > 14 ? 'a way' : 'just'} to the ${dir}`); }
@@ -278,6 +277,7 @@ export class Garden extends Game {
       Rm.plants = Rm.plants.filter((p) => !(p.x >= r.x - 1 && p.x <= r.x + r.w && p.y >= r.y - 1 && p.y <= r.y + r.h));
       g.inv.seeds[r.seed] = (g.inv.seeds[r.seed] || 0) + 3;
       Wd.invalidate(Rm, r.x - 2, r.y - 2, r.x + r.w + 1, r.y + r.h + 1);
+      for (let i = 0; i < 3; i++) this.fx.push({ kind: 'glow', x: r.x * T + r.w * 8, y: r.y * T + r.h * 8, t: -i * 0.35, life: 1.6 });
       this.say(`You uncovered ${r.name}!`); this.say(r.lore);
       if (r.t === 'cloudstair') this.say('Walk up the stair to climb to the sky islands');
       this.say(`Inside: 3 ${PLANTS[r.seed].name.toLowerCase()} seeds`);
@@ -468,7 +468,8 @@ export class Garden extends Game {
       const g = c.createLinearGradient(0, 0, 0, H);
       g.addColorStop(0, this.mode === 'evening' ? '#3a2a3a' : '#e8f4ea'); g.addColorStop(1, this.mode === 'evening' ? '#1a1418' : '#cfe8d2');
       c.fillStyle = g; c.fillRect(0, 0, W, H);
-      this.text(c, 'waking the garden…', W / 2, H / 2, 14, this.mode === 'evening' ? '#e8d8c8' : '#4a6a4e');
+      const sp = Wd.plantSprite('daisy', 2, false), k = 2.4 + Math.sin(performance.now() / 500) * 0.2;
+      c.save(); c.translate(W / 2, H / 2 + 14); c.scale(k, k); c.drawImage(sp.cv, -sp.w / 2, -sp.h); c.restore();
       return;
     }
     const Rm = this.Rm, realm = Rm.name, cx = Math.round(this.cam.x - VW / 2), cy = Math.round(this.cam.y - VH / 2), t = this.t, wind = this.weather.wind;
@@ -526,7 +527,9 @@ export class Garden extends Game {
       const k = f.t / f.life, x = f.x - cx + (f.vx || 0) * f.t, y = f.y - cy + (f.vy || 0) * f.t + (f.kind === 'leaf' || f.kind === 'dot' ? 60 * f.t * f.t : 0);
       c.globalAlpha = Math.max(0, 1 - k);
       if (f.kind === 'ring') { c.strokeStyle = '#fff'; c.lineWidth = 1.5; c.beginPath(); c.ellipse(x, y, 4 + k * 10, 2 + k * 5, 0, 0, 7); c.stroke(); }
-      else if (f.kind === 'heart') { c.fillStyle = '#ff7a9a'; c.font = '10px sans-serif'; c.textAlign = 'center'; c.fillText('♥', x, y); }
+      else if (f.kind === 'heart') { c.fillStyle = '#ff7a9a'; const X = Math.round(x) - 3, Y = Math.round(y) - 3; c.fillRect(X + 1, Y, 2, 1); c.fillRect(X + 4, Y, 2, 1); c.fillRect(X, Y + 1, 7, 2); c.fillRect(X + 1, Y + 3, 5, 1); c.fillRect(X + 2, Y + 4, 3, 1); c.fillRect(X + 3, Y + 5, 1, 1); }
+      else if (f.kind === 'glow') { const r = 10 + k * 70; c.strokeStyle = '#fff6c8'; c.lineWidth = 2; c.beginPath(); c.ellipse(x, y, r, r * 0.5, 0, 0, 7); c.stroke(); c.globalAlpha *= 0.5; c.beginPath(); c.ellipse(x, y, r * 0.6, r * 0.3, 0, 0, 7); c.stroke(); }
+      else if (f.kind === 'trail') { const fade = Math.sin(Math.min(1, k) * Math.PI); c.globalAlpha = fade * 0.9; c.fillStyle = '#fff6c8'; c.beginPath(); c.arc(x, y, 1.8, 0, 7); c.fill(); }
       else if (f.kind === 'drop') { c.fillStyle = '#7ac8f0'; c.fillRect(x, y, 1, 3); }
       else { c.fillStyle = f.c || '#fff'; c.fillRect(x, y, 2, 2); }
     }
@@ -627,38 +630,51 @@ export class Garden extends Game {
   }
   drawUI(c) {
     const g = Wd.G, Rm = this.Rm, dark = this.mode === 'evening' || Rm.name === 'cave';
-    const ink = dark ? '#f3e6d4' : '#3c3430', bg = dark ? 'rgba(30,20,30,.72)' : this.mode === 'morning' ? 'rgba(244,248,240,.86)' : 'rgba(255,255,255,.84)';
-    // map of what you have explored, around you
-    const mm = Wd.minimap(Rm), S = 64, mx = W - S - 8, my = 8, half = S / 2, hx = Math.floor(this.hero.x / T), hy = Math.floor(this.hero.y / T);
+    const bg = dark ? 'rgba(28,20,32,.5)' : 'rgba(255,255,255,.5)', ink = dark ? 'rgba(243,230,212,.85)' : 'rgba(60,70,60,.7)';
+    // a small map of what you have explored, around you
+    const mm = Wd.minimap(Rm), S = 56, mx = W - S - 10, my = 10, half = S / 2, hx = Math.floor(this.hero.x / T), hy = Math.floor(this.hero.y / T);
     const sx0 = Math.max(0, Math.min(Rm.w - S, hx - half)), sy0 = Math.max(0, Math.min(Rm.h - S, hy - half));
-    c.fillStyle = bg; roundRect(c, mx - 3, my - 3, S + 6, S + 18, 8); c.fill();
-    c.save(); roundRect(c, mx, my, S, S, 5); c.clip(); c.drawImage(mm.cv, sx0, sy0, S, S, mx, my, S, S); c.restore();
-    c.fillStyle = '#ff5a6a'; c.fillRect(mx + hx - sx0 - 1, my + hy - sy0 - 1, 3, 3); c.fillStyle = '#fff'; c.fillRect(mx + hx - sx0, my + hy - sy0, 1, 1);
-    c.fillStyle = ink; c.font = '600 8.5px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(REALM_NAME[Rm.name], mx + S / 2, my + S + 7);
-    this.ui = { map: { x: mx - 3, y: my - 3, w: S + 6, h: S + 18 } };
-    // messages, above the buttons
-    const m = this.msgs[0];
-    if (m) {
-      c.font = '600 11px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      const text = m.text.length > 62 ? `${m.text.slice(0, 60)}…` : m.text, w = Math.min(W - 20, c.measureText(text).width + 22), a = Math.min(1, m.t * 4, (5.5 - m.t) * 2);
-      c.globalAlpha = Math.max(0, a); c.fillStyle = bg; roundRect(c, W / 2 - w / 2, H - 72, w, 22, 11); c.fill();
-      c.fillStyle = ink; c.fillText(text, W / 2, H - 61); c.globalAlpha = 1;
+    c.fillStyle = bg; roundRect(c, mx - 3, my - 3, S + 6, S + 6, 9); c.fill();
+    c.save(); roundRect(c, mx, my, S, S, 6); c.clip(); c.globalAlpha = 0.85; c.drawImage(mm.cv, sx0, sy0, S, S, mx, my, S, S); c.restore();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(mx + hx - sx0 + 0.5, my + hy - sy0 + 0.5, 1.8 + Math.sin(this.t * 3) * 0.4, 0, 7); c.fill();
+    this.ui = { map: { x: mx - 3, y: my - 3, w: S + 6, h: S + 6 } };
+    // round buttons with no words: the seed you will plant (its ring fills with how many you have),
+    // your food (an apple, the same kind of ring), and a compass that points to something still hidden
+    const by = H - 30, R0 = 19;
+    const disc = (x) => { c.fillStyle = bg; c.beginPath(); c.arc(x, by, R0, 0, 7); c.fill(); };
+    const ring = (x, f, col) => { c.strokeStyle = dark ? 'rgba(255,255,255,.14)' : 'rgba(0,0,0,.08)'; c.lineWidth = 2.5; c.beginPath(); c.arc(x, by, R0 - 2, 0, 7); c.stroke(); if (f > 0) { c.strokeStyle = col; c.beginPath(); c.arc(x, by, R0 - 2, -Math.PI / 2, -Math.PI / 2 + Math.min(1, f) * Math.PI * 2); c.stroke(); } };
+    const k = g.inv.pick, n = g.inv.seeds[k] || 0;
+    disc(30);
+    if (PLANTS[k]) { const s = Wd.plantSprite(k, 3, true), sc = Math.min(1.4, 24 / s.h); c.save(); c.translate(30, by + 11); c.scale(sc, sc); c.globalAlpha = n ? 1 : 0.35; c.drawImage(s.cv, -s.w / 2, -s.h); c.restore(); }
+    ring(30, n / 12, '#8fd08a');
+    disc(76);
+    c.fillStyle = g.inv.food ? '#e2453f' : 'rgba(226,69,63,.35)'; c.beginPath(); c.arc(76, by + 1, 6.5, 0, 7); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(73, by - 3, 2, 2); c.fillStyle = '#5f9a4e'; c.fillRect(76, by - 9, 2, 4); c.fillRect(77, by - 8, 3, 1);
+    ring(76, g.inv.food / 12, '#ef7a6a');
+    const cxp = W - 30, left = Rm.ruins.filter((u) => !u.found), hx1 = this.hero.x / T, hy1 = this.hero.y / T;
+    disc(cxp);
+    c.strokeStyle = ink; c.lineWidth = 1; c.beginPath(); c.arc(cxp, by, R0 - 6, 0, 7); c.stroke();
+    if (left.length) {
+      const u = left.sort((p, q) => Math.hypot(p.x - hx1, p.y - hy1) - Math.hypot(q.x - hx1, q.y - hy1))[0], a = Math.atan2(u.y + u.h / 2 - hy1, u.x + u.w / 2 - hx1) + Math.sin(this.t * 1.5) * 0.04;
+      c.save(); c.translate(cxp, by); c.rotate(a);
+      c.fillStyle = '#ffd66a'; c.beginPath(); c.moveTo(11, 0); c.lineTo(-3, -4); c.lineTo(-3, 4); c.fill();
+      c.fillStyle = ink; c.beginPath(); c.moveTo(-9, 0); c.lineTo(-3, -3); c.lineTo(-3, 3); c.fill(); c.restore();
+    } else { c.fillStyle = '#ffd66a'; for (let i = 0; i < 4; i++) { c.save(); c.translate(cxp, by); c.rotate(i * Math.PI / 2 + this.t * 0.3); c.beginPath(); c.moveTo(0, -9); c.lineTo(2, 0); c.lineTo(-2, 0); c.fill(); c.restore(); } }
+    Object.assign(this.ui, { seed: { x: 30 - R0, y: by - R0, w: R0 * 2, h: R0 * 2 }, ruins: { x: cxp - R0, y: by - R0, w: R0 * 2, h: R0 * 2 } });
+    // first visit: two soft ripples show where to tap (grass to plant, tall grass to clear)
+    if (this.hint > 0) {
+      this.hint -= 1 / 60;
+      const a = Math.min(1, this.hint / 2), Z0 = Z, cx0 = this.cam.x - VW / 2, cy0 = this.cam.y - VH / 2;
+      const spots = [[this.hero.x + 24, this.hero.y + 20]];
+      const fw = this.frontierNear(); if (fw) spots.push(fw);
+      for (const [wx, wy] of spots) for (let i = 0; i < 2; i++) { const ph = ((this.t * 0.7 + i * 0.5) % 1), x = (wx - cx0) * Z0, y = (wy - cy0) * Z0; c.globalAlpha = a * (1 - ph) * 0.9; c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.beginPath(); c.ellipse(x, y, 6 + ph * 20, 3 + ph * 10, 0, 0, 7); c.stroke(); }
+      c.globalAlpha = 1;
     }
-    // seed button, food, ruins
-    const k = g.inv.pick, n = g.inv.seeds[k] || 0, sb = { x: 8, y: H - 42, w: 150, h: 34 };
-    c.fillStyle = bg; roundRect(c, sb.x, sb.y, sb.w, sb.h, 17); c.fill();
-    if (PLANTS[k]) { const s = Wd.plantSprite(k, 3, true), sc = Math.min(1.2, 26 / s.h); c.save(); c.translate(sb.x + 20, sb.y + 30); c.scale(sc, sc); c.drawImage(s.cv, -s.w / 2, -s.h); c.restore(); }
-    c.fillStyle = ink; c.font = '700 11px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'middle';
-    c.fillText(PLANTS[k]?.name || 'Seeds', sb.x + 38, sb.y + 12);
-    c.font = '500 10px system-ui, sans-serif'; c.globalAlpha = 0.75; c.fillText(`${n} seed${n === 1 ? '' : 's'} · tap to change`, sb.x + 38, sb.y + 24); c.globalAlpha = 1;
-    const fb = { x: sb.x + sb.w + 6, y: sb.y, w: 62, h: 34 };
-    c.fillStyle = bg; roundRect(c, fb.x, fb.y, fb.w, fb.h, 17); c.fill();
-    c.fillStyle = '#e2453f'; c.beginPath(); c.arc(fb.x + 17, fb.y + 18, 6, 0, 7); c.fill(); c.fillStyle = '#5f9a4e'; c.fillRect(fb.x + 17, fb.y + 9, 2, 4);
-    c.fillStyle = ink; c.font = '700 12px system-ui, sans-serif'; c.fillText(`×${g.inv.food}`, fb.x + 28, fb.y + 18);
-    const rb = { x: W - 74, y: sb.y, w: 66, h: 34 }, found = Rm.ruins.filter((r) => r.found).length;
-    c.fillStyle = bg; roundRect(c, rb.x, rb.y, rb.w, rb.h, 17); c.fill();
-    c.fillStyle = ink; c.font = '700 12px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText(`◈ ${found}/${Rm.ruins.length}`, rb.x + rb.w / 2, rb.y + 13);
-    c.font = '500 9px system-ui, sans-serif'; c.globalAlpha = 0.75; c.fillText('ruins · hint', rb.x + rb.w / 2, rb.y + 25); c.globalAlpha = 1;
-    Object.assign(this.ui, { seed: sb, ruins: rb });
+  }
+  // the nearest tall grass to the hero (world pixels), for the first-visit ripple
+  frontierNear() {
+    const Rm = this.Rm, hx = Math.floor(this.hero.x / T), hy = Math.floor(this.hero.y / T);
+    for (let r = 1; r < 12; r++) for (let y = hy - r; y <= hy + r; y++) for (let x = hx - r; x <= hx + r; x++) if (inside(Rm, x, y) && Rm.wild[ix(Rm, x, y)] && (Math.abs(x - hx) === r || Math.abs(y - hy) === r)) return [x * T + 8, y * T + 8];
+    return null;
   }
 }

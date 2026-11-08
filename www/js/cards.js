@@ -37,7 +37,7 @@ const handleFor = (post, ctx) => {
   switch (post.cat) {
     case 'wiki': return [`wiki.${post.sub}`, `${ctx.topics?.wiki?.[post.sub] || post.sub} · Wikipedia`];
     case 'video': return [post.channel ? post.channel.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'tube' : `tube.${post.sub}`, `${ctx.topics?.video?.[post.sub] || 'Video'}${post.dur ? ` · ${post.dur}` : ''}${/^\d{4}/.test(post.date || '') ? ` · ${post.date.slice(0, 4)}` : ''}`];
-    case 'game': return post.sub === 'garden' ? ['your.garden', 'Grows while you’re away · tap to tend'] : ['arcade', `${ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
+    case 'game': return post.sub === 'garden' ? ['your.garden', ''] : ['arcade', `${ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
     case 'meme': return [post.sub === 'kym' ? 'knowyourmeme' : 'meme.lord', post.sub === 'kym' ? 'Know Your Meme' : 'remix'];
     case 'product': return ['infomercial.tv', 'Sponsored · not available in stores'];
     case 'psych': return ['the.trip', `${post.sub} · generative`];
@@ -215,10 +215,11 @@ function game(p, ctx) {
   const hud = el('div.hud', mode, score);
   const autobtn = el('button.pillbtn.autobtn', { html: `${icon('replay')}<span>Autopilot</span>` });
   const tapplay = el('div.pillbtn.tapplay', { html: `${icon('play', 'fill')}<span>Tap to play</span>` });
-  const stage = el('div.stage', canvas, hud, autobtn, tapplay);
+  const garden = p.sub === 'garden';
+  const stage = el(`div.stage${garden ? '.garden' : ''}`, canvas, hud, autobtn, tapplay);
   const media = el('div.media', stage);
-  const hint = el('span.muted', GAME_HINT[p.sub] || '');
-  const card = post('game', p, ctx, { media, caption: capt(p.sub === 'garden' ? 'your.garden' : 'arcade', `${p.title} · `, hint), mediaInteractive: true });
+  const hint = el('span.muted', garden ? '' : GAME_HINT[p.sub] || '');
+  const card = post('game', p, ctx, { media, caption: garden ? null : capt('arcade', `${p.title} · `, hint), mediaInteractive: true });
   let g = null, idle;
   const Cls = GAMES[p.sub] || GAMES.plinko;
   const ensure = () => {
@@ -234,7 +235,7 @@ function game(p, ctx) {
     stage.classList.toggle('playing', on);
     mode.textContent = on ? 'YOU' : g.autoOK ? 'AUTO' : 'READY';
     mode.className = `pill ${on ? 'live' : 'auto'}`;
-    hint.textContent = on ? `${GAME_HINT[p.sub] || ''} · scroll from outside the game` : GAME_HINT[p.sub] || '';
+    if (!garden) hint.textContent = on ? `${GAME_HINT[p.sub] || ''} · scroll from outside the game` : GAME_HINT[p.sub] || '';
     if (on && !g.running) g.start();
     bump();
   };
