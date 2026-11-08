@@ -17,6 +17,40 @@ const Z = 1.5, VW = W / Z, VH = H / Z, CP = CH * T;
 const MODES = ['morning', 'day', 'evening'];
 // Seed & Sage's walking: speed in world px/s at full stick, and the stick's radius (card units)
 const HERO_SPEED = 112, STICK_R = 40;
+// what the philosophers say: the only words in the garden
+const QUOTES = [
+  ['The soul becomes dyed with the colour of its thoughts.', 'Marcus Aurelius'], ['Very little is needed to make a happy life.', 'Marcus Aurelius'],
+  ['Look well into thyself; there is a source of strength which will always spring up if thou wilt always look.', 'Marcus Aurelius'],
+  ['No man ever steps in the same river twice.', 'Heraclitus'], ['The way up and the way down are one and the same.', 'Heraclitus'],
+  ['Nature does not hurry, yet everything is accomplished.', 'Lao Tzu'], ['A journey of a thousand miles begins beneath one’s feet.', 'Lao Tzu'],
+  ['Knowing others is intelligence; knowing yourself is true wisdom.', 'Lao Tzu'], ['Be still, and the earth will speak to you.', 'a Navajo saying'],
+  ['It is not that we have a short time to live, but that we waste a lot of it.', 'Seneca'], ['We suffer more often in imagination than in reality.', 'Seneca'],
+  ['Wherever there is a human being, there is an opportunity for a kindness.', 'Seneca'], ['No great thing is created suddenly.', 'Epictetus'],
+  ['First say to yourself what you would be; then do what you have to do.', 'Epictetus'], ['The unexamined life is not worth living.', 'Socrates'],
+  ['Wonder is the feeling of a philosopher, and philosophy begins in wonder.', 'Plato'], ['The roots of education are bitter, but the fruit is sweet.', 'Aristotle'],
+  ['In all things of nature there is something of the marvellous.', 'Aristotle'], ['Let us cultivate our garden.', 'Voltaire'],
+  ['I went to the woods because I wished to live deliberately.', 'Thoreau'], ['Heaven is under our feet as well as over our heads.', 'Thoreau'],
+  ['Adopt the pace of nature: her secret is patience.', 'Emerson'], ['The earth laughs in flowers.', 'Emerson'], ['To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment.', 'attributed to Emerson'],
+  ['What you seek is seeking you.', 'Rumi'], ['Let yourself be silently drawn by the strange pull of what you really love.', 'Rumi'],
+  ['The wound is the place where the light enters you.', 'Rumi'], ['Do not seek to follow in the footsteps of the wise; seek what they sought.', 'Matsuo Bashō'],
+  ['Every day is a journey, and the journey itself is home.', 'Matsuo Bashō'], ['To see a world in a grain of sand, and a heaven in a wild flower.', 'William Blake'],
+  ['The tree which moves some to tears of joy is in the eyes of others only a green thing that stands in the way.', 'William Blake'],
+  ['Come forth into the light of things; let Nature be your teacher.', 'Wordsworth'], ['Not knowing when the dawn will come, I open every door.', 'Emily Dickinson'],
+  ['Forever is composed of nows.', 'Emily Dickinson'], ['I am large, I contain multitudes.', 'Walt Whitman'], ['Keep your face always toward the sunshine.', 'Walt Whitman'],
+  ['The mind is everything. What you think you become.', 'attributed to the Buddha'], ['Peace comes from within. Do not seek it without.', 'attributed to the Buddha'],
+  ['Happiness is when what you think, what you say, and what you do are in harmony.', 'Gandhi'], ['There is more to life than increasing its speed.', 'Gandhi'],
+  ['Life can only be understood backwards; but it must be lived forwards.', 'Kierkegaard'], ['He who has a why to live can bear almost any how.', 'Nietzsche'],
+  ['One must still have chaos in oneself to give birth to a dancing star.', 'Nietzsche'], ['Patience is bitter, but its fruit is sweet.', 'Rousseau'],
+  ['The present moment is filled with joy and happiness. If you are attentive, you will see it.', 'attributed to the Buddha'], ['Whatever you do, do it with all your might.', 'Cicero'],
+  ['If you have a garden and a library, you have everything you need.', 'Cicero'], ['Silence is the sleep that nourishes wisdom.', 'Francis Bacon'],
+  ['Everything has beauty, but not everyone sees it.', 'Confucius'], ['It does not matter how slowly you go as long as you do not stop.', 'Confucius'],
+  ['The quieter you become, the more you are able to hear.', 'attributed to Rumi'], ['Muddy water, let stand, becomes clear.', 'Lao Tzu'],
+  ['To plant a garden is to believe in tomorrow.', 'an old saying'], ['He that plants trees loves others besides himself.', 'Thomas Fuller'],
+  ['Time spent among trees is never time wasted.', 'an old saying'], ['A society grows great when old men plant trees in whose shade they know they shall never sit.', 'a Greek proverb'],
+  ['The clearest way into the Universe is through a forest wilderness.', 'John Muir'], ['In every walk with nature one receives far more than he seeks.', 'John Muir'],
+  ['The mountains are calling and I must go.', 'John Muir'], ['Look deep into nature, and then you will understand everything better.', 'attributed to Einstein']
+];
+const ALTS = { deep: -2, cave: -1, canyon: -1, surface: 0, canopy: 1, mountain: 1, sky: 2 }, LIFT_UP = (from, to) => (ALTS[to] ?? 0) > (ALTS[from] ?? 0);
 const N8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 // Water that moves: a small height-field ripple simulation over the visible water (2-pixel cells).
@@ -155,7 +189,7 @@ export class Garden extends Game {
   // ---------------------------------------------- map helpers
   computeBlock() {
     const Rm = this.Rm, b = new Uint8Array(Rm.w * Rm.h);
-    for (const p of Rm.plants) if (PLANTS[p.k].type === 'tree' && stageOf(p) >= 2) b[ix(Rm, p.x, p.y)] = 1;
+    for (const p of Rm.plants) { if (PLANTS[p.k].giant) { for (let dx = -1; dx <= 1; dx++) if (inside(Rm, p.x + dx, p.y)) b[ix(Rm, p.x + dx, p.y)] = 1; } else if (PLANTS[p.k].type === 'tree' && stageOf(p) >= 2) b[ix(Rm, p.x, p.y)] = 1; }
     for (const r of Rm.ruins) {
       if (!r.found) continue;
       if (r.t === 'stones') { for (const [dx, dy] of [[0, 0], [2, 0], [0, 2], [2, 2]]) b[ix(Rm, r.x + dx, r.y + dy)] = 1; continue; }
@@ -198,7 +232,7 @@ export class Garden extends Game {
     this.hero.task = task;
     return true;
   }
-  plantAt(x, y) { const Rm = this.Rm; return Rm.plants.find((p) => p.x === x && p.y === y) || Rm.plants.find((p) => PLANTS[p.k].type === 'tree' && stageOf(p) === 3 && Math.abs(p.x - x) <= 1 && y <= p.y && y >= p.y - 2); }
+  plantAt(x, y) { const L = Wd.plantsIn(this.Rm, x - 1, y, x + 1, y + 2); return L.find((p) => p.x === x && p.y === y) || L.find((p) => PLANTS[p.k].type === 'tree' && stageOf(p) === 3 && Math.abs(p.x - x) <= 1 && y <= p.y && y >= p.y - 2); }
 
   // ---------------------------------------------- input
   // Movement is Seed & Sage's: drag anywhere and a floating stick appears where you pressed; how far
@@ -237,6 +271,16 @@ export class Garden extends Game {
     const Rm = this.Rm, wx = x / Z + this.cam.x - VW / 2, wy = y / Z + this.cam.y - VH / 2, tx = Math.floor(wx / T), ty = Math.floor(wy / T);
     if (!inside(Rm, tx, ty)) return;
     this.fx.push({ kind: 'ring', x: wx, y: wy, t: 0, life: 0.5 });
+    const who = (this.npcs || []).filter((n) => Math.hypot(n.x - wx, n.y - 10 - wy) < 18).sort((p, q) => Math.hypot(p.x - wx, p.y - wy) - Math.hypot(q.x - wx, q.y - wy))[0];
+    if (who && Math.hypot(who.x - this.hero.x, who.y - this.hero.y) < 3 * T) {
+      const h = this.hero; h.actor.face(who.x < h.x ? 'W' : 'E'); who.actor.face(h.x < who.x ? 'W' : 'E'); who.path = []; who.task = null;
+      if (who.sage) {
+        const q = QUOTES[(this.quoteN = ((this.quoteN ?? Math.floor(Math.random() * QUOTES.length)) + 1 + Math.floor(Math.random() * 5)) % QUOTES.length)];
+        this.quote = { n: who, text: q[0], by: q[1], t: 0, life: 6 + q[0].length / 18 };
+        who.actor.emote('nod', 1.2); who.busy = 1.4; who.follow = this.t + 8 + Math.random() * 6;
+      } else { who.actor.emote('wave', 0.9); who.busy = 0.9; who.follow = this.t + 15; }
+      return;
+    }
     const a = Rm.animals.filter((o) => Math.hypot(o.x - wx, o.y - 4 - wy) < 14 && !(ANIMALS[o.k].night && this.mode !== 'evening')).sort((p, q) => Math.hypot(p.x - wx, p.y - wy) - Math.hypot(q.x - wx, q.y - wy))[0];
     if (a) { this.reach(Math.floor(a.x / T), Math.floor(a.y / T), { kind: 'animal', a }, 2); return; }
     const i = ix(Rm, tx, ty), g = Rm.ground[i];
@@ -255,7 +299,7 @@ export class Garden extends Game {
       this.reach(tx, ty, { kind: 'build', x: tx, y: ty }, 1);
       return;
     }
-    if (g === ROCK) { this.say(Rm.name === 'cave' ? 'The cave wall is solid here' : 'Solid rock. Look for a cave mouth in the hills'); return; }
+    if (g === ROCK) { this.say(Rm.kind === 'cave' ? 'The cave wall is solid here' : 'Solid rock. Look for a cave mouth in the hills'); return; }
     this.reach(tx, ty, { kind: 'plant-here', x: tx, y: ty }, 2);
   }
   frontierToward(x, y, tx, ty) {
@@ -281,12 +325,13 @@ export class Garden extends Game {
   // sow from their own seed bags, water what is thirsty, fuss over the animals and wave when you
   // pass. They come and go with each visit; what they plant stays.
   spawnNPCs() {
-    const Rm = this.Rm, n = Rm.name === 'surface' ? 3 : 1;
+    const Rm = this.Rm, n = Rm.kind === 'surface' ? 3 : 1, sages = Rm.kind === 'surface' ? 2 : 1;
     this.npcs = [];
-    for (let k = 0; k < n; k++) {
-      const at = this.npcSpot(5, 13);
+    for (let k = 0; k < n + sages; k++) {
+      const at = this.npcSpot(5, 15);
       if (!at) break;
-      this.npcs.push({ k, actor: new Actor(this.skin.crystal(k + 1, 'Fantasy'), { mode: 'eight', walkSpeed: 8, runSpeed: 70 }), x: at[0] * T + 8, y: at[1] * T + 12, path: [], wait: 1 + Math.random() * 3, busy: 0, vx: 0, vy: 0, sowT: 12 + Math.random() * 25, greetT: 0, task: null });
+      const sage = k >= n;
+      this.npcs.push({ k, sage, actor: new Actor(this.skin.crystal(sage ? 20 + k : k + 1, 'Fantasy'), { mode: 'eight', walkSpeed: 8, runSpeed: 70 }), x: at[0] * T + 8, y: at[1] * T + 12, path: [], wait: 1 + Math.random() * 3, busy: 0, vx: 0, vy: 0, sowT: 12 + Math.random() * 25, greetT: 0, task: null, follow: 0 });
     }
   }
   // an open tile some distance from the hero (or from a gardener)
@@ -301,7 +346,8 @@ export class Garden extends Game {
   stepNPC(n, dt) {
     const h = this.hero, Rm = this.Rm;
     let vx = 0, vy = 0;
-    if (n.busy > 0) { n.busy -= dt; if (n.busy <= 0) n.actor.cancel(); }
+    if (n.busy > 0) { n.busy -= dt; if (n.busy <= 0) { n.busy = 0; n.actor.cancel(); } }
+    else if (n.follow > this.t) { /* following you: handled below */ }
     else if (n.path.length) {
       const [px, py] = n.path[0], dx = px - n.x, dy = py - n.y, d = Math.hypot(dx, dy), deep = Rm.wild[ix(Rm, Math.floor(n.x / T), Math.floor((n.y - 2) / T))], sp = 30 * (deep ? 0.65 : 1);
       if (d < 1.5) n.path.shift();
@@ -310,7 +356,17 @@ export class Garden extends Game {
     } else if (n.task) { const t = n.task; n.task = null; this.npcAct(n, t); }
     else if ((n.wait -= dt) <= 0) this.npcThink(n);
     // a wave when you come by (not too often)
-    if (!n.busy && this.t > n.greetT && Math.hypot(h.x - n.x, h.y - n.y) < 34) { n.greetT = this.t + 45; n.path = []; n.task = null; n.actor.face(h.x < n.x ? 'W' : 'E'); n.actor.emote('wave', 1); n.busy = 1; n.wait = 1.5; }
+    if (n.busy <= 0 && this.t > n.greetT && Math.hypot(h.x - n.x, h.y - n.y) < 34) { n.greetT = this.t + 45; n.path = []; n.task = null; n.actor.face(h.x < n.x ? 'W' : 'E'); n.actor.emote(n.sage ? 'nod' : 'wave', 1); n.busy = 1; n.wait = 1.5; if (Math.random() < 0.45) n.follow = this.t + 10 + Math.random() * 8; }
+    if (n.follow > this.t && n.busy <= 0) {
+      // walking along a little behind you
+      n.path = []; n.task = null;
+      const fx = h.x + (n.x < h.x ? -22 : 22) - n.x, fy = h.y + 4 - n.y, d = Math.hypot(fx, fy);
+      if (d > 8) {
+        const sp = Math.min(HERO_SPEED * 0.95, 30 + d * 1.2), mx = (fx / d) * sp * dt, my = (fy / d) * sp * dt, ok = (x, y) => this.walkable(Math.floor(x / T), Math.floor((y - 2) / T));
+        if (ok(n.x + mx, n.y)) n.x += mx; if (ok(n.x, n.y + my)) n.y += my;
+        vx = (fx / d) * sp; vy = (fy / d) * sp; this.underfoot(n, dt, true);
+      }
+    }
     n.sowT -= dt; n.vx = vx; n.vy = vy;
     n.actor.update(dt, { vx, vy });
   }
@@ -320,6 +376,14 @@ export class Garden extends Game {
     n.path = p.slice(1).map(([x, y]) => [x * T + 8, y * T + 12]); n.task = task;
   }
   npcThink(n) {
+    if (n.sage) {
+      // a philosopher: long pauses, a slow walk, a thought now and then
+      if (Math.random() < 0.55) { n.actor.emote(Math.random() < 0.6 ? 'think' : 'nod', 2); n.busy = 2; n.wait = 2 + Math.random() * 4; return; }
+      const spot = this.npcSpot(2, 6, n);
+      if (spot) this.npcGo(n, (x, y) => x === spot[0] && y === spot[1], null);
+      n.wait = 3 + Math.random() * 5;
+      return;
+    }
     const Rm = this.Rm, R = Math.random, nx = Math.floor(n.x / T), ny = Math.floor((n.y - 2) / T), g = Wd.G;
     const day = Wd.dayKey(), log = (g.npcSown ||= { day, n: 0 });
     if (log.day !== day) { log.day = day; log.n = 0; }
@@ -330,7 +394,7 @@ export class Garden extends Game {
         const x = nx + Math.round((R() - 0.5) * 8), y = ny + Math.round((R() - 0.5) * 8);
         if (!inside(Rm, x, y) || !this.open(x, y) || Rm.wild[ix(Rm, x, y)]) continue;
         const gr = Rm.ground[ix(Rm, x, y)];
-        if (![GRASS, FLOWERS, FOREST, PATH].includes(gr) || this.occ?.has(ix(Rm, x, y)) || Rm.plants.filter((p) => Math.abs(p.x - x) <= 2 && Math.abs(p.y - y) <= 2).length > 2) continue;
+        if (![GRASS, FLOWERS, FOREST, PATH].includes(gr) || this.occ?.has(ix(Rm, x, y)) || Wd.plantsIn(Rm, x - 2, y - 2, x + 2, y + 2).length > 2) continue;
         const kind = this.npcSeed(gr, x, y);
         if (!kind) continue;
         this.npcGo(n, this.near(x, y, 1), { kind: 'sow', x, y, k: kind });
@@ -339,7 +403,7 @@ export class Garden extends Game {
     }
     // water: something young and thirsty nearby
     if (r < 0.65) {
-      const p = Rm.plants.find((q) => stageOf(q) < 3 && Math.abs(q.x - nx) < 7 && Math.abs(q.y - ny) < 7 && now() - (q.w || 0) > 120e3);
+      const p = Wd.plantsIn(Rm, nx - 6, ny - 6, nx + 6, ny + 6).find((q) => stageOf(q) < 3 && !PLANTS[q.k].giant && now() - (q.w || 0) > 120e3);
       if (p) { this.npcGo(n, this.near(p.x, p.y, 1), { kind: 'water', p }); return; }
     }
     // fuss over an animal
@@ -361,10 +425,10 @@ export class Garden extends Game {
   }
   npcSeed(gr, x, y) {
     const Rm = this.Rm, R = Math.random;
-    if (Rm.name === 'cave') return 'glowshroom';
-    if (Rm.name === 'sky') return ['skyorchid', 'cosmos', 'daisy'][Math.floor(R() * 3)];
+    if (Rm.kind === 'cave') return 'glowshroom';
+    if (Rm.kind === 'sky') return ['skyorchid', 'cosmos', 'daisy'][Math.floor(R() * 3)];
     const trees = ['apple', 'cherry', 'birch', 'oak', 'willow'];
-    if (gr === FOREST && R() < 0.3 && !Rm.plants.some((p) => PLANTS[p.k].type === 'tree' && Math.hypot(p.x - x, p.y - y) < 3)) return trees[Math.floor(R() * trees.length)];
+    if (gr === FOREST && R() < 0.3 && !Wd.plantsIn(Rm, x - 3, y - 3, x + 3, y + 3).some((p) => ['tree', 'giant'].includes(PLANTS[p.k].type) && Math.hypot(p.x - x, p.y - y) < 3)) return trees[Math.floor(R() * trees.length)];
     const small = COMMON.filter((k) => PLANTS[k].type !== 'tree');
     return small[Math.floor(R() * small.length)];
   }
@@ -387,12 +451,12 @@ export class Garden extends Game {
   // which seed to sow on a tile, chosen for you: what suits the spot, then what you have most of,
   // turning through your seeds so a run of taps plants a mixed bed
   seedFor(x, y) {
-    const g = Wd.G, Rm = this.Rm, cave = Rm.name === 'cave', gr = Rm.ground[ix(Rm, x, y)];
+    const g = Wd.G, Rm = this.Rm, cave = Rm.kind === 'cave', gr = Rm.ground[ix(Rm, x, y)];
     const wet = N8.slice(0, 4).some(([dx, dy]) => inside(Rm, x + dx, y + dy) && Rm.ground[ix(Rm, x + dx, y + dy)] === WATER);
     const ok = Object.keys(g.inv.seeds).filter((k) => g.inv.seeds[k] > 0 && PLANTS[k] && !!PLANTS[k].cave === cave &&
-      !(PLANTS[k].type === 'tree' && Rm.plants.some((p) => PLANTS[p.k].type === 'tree' && Math.hypot(p.x - x, p.y - y) < 2.5)));
+      !(PLANTS[k].type === 'tree' && Wd.plantsIn(Rm, x - 3, y - 3, x + 3, y + 3).some((p) => ['tree', 'giant'].includes(PLANTS[p.k].type) && Math.hypot(p.x - x, p.y - y) < 2.5)));
     if (!ok.length) return null;
-    const suits = (k) => (wet && k === 'reed' ? 3 : 0) + (gr === Wd.FOREST && (k === 'fern' || PLANTS[k].type === 'tree') ? 2 : 0) + (gr === Wd.FLOWERS && PLANTS[k].type === 'flower' ? 1 : 0) + (Rm.name === 'sky' && k === 'skyorchid' ? 2 : 0) + (k === this.lastSown ? -2 : 0);
+    const suits = (k) => (wet && k === 'reed' ? 3 : 0) + (gr === Wd.FOREST && (k === 'fern' || PLANTS[k].type === 'tree') ? 2 : 0) + (gr === Wd.FLOWERS && PLANTS[k].type === 'flower' ? 1 : 0) + (Rm.kind === 'sky' && k === 'skyorchid' ? 2 : 0) + (k === this.lastSown ? -2 : 0);
     ok.sort((a, b) => suits(b) - suits(a) || g.inv.seeds[b] - g.inv.seeds[a]);
     return (this.lastSown = ok[0]);
   }
@@ -410,14 +474,14 @@ export class Garden extends Game {
         Wd.invalidate(Rm, task.x - 1, task.y - 1, task.x + 1, task.y + 1);
         for (let k = 0; k < 6; k++) this.rip.poke(task.x * T + 2 + Math.random() * 12, task.y * T + 2 + Math.random() * 12, 5);
         this.rip.dirty = true;
-        this.puff(task.x * T + 8, task.y * T + 8, Rm.name === 'sky' ? '#ffffff' : '#c8a070', 10);
-        this.say(Rm.name === 'sky' ? 'You called a cloud to step on' : Rm.name === 'cave' ? 'Laid planks across the pool' : 'Built a little plank bridge');
+        this.puff(task.x * T + 8, task.y * T + 8, Rm.kind === 'sky' ? '#ffffff' : '#c8a070', 10);
+        this.say(Rm.kind === 'sky' ? 'You called a cloud to step on' : Rm.kind === 'cave' ? 'Laid planks across the pool' : 'Built a little plank bridge');
         Wd.saveGarden(true);
       });
     } else if (task.kind === 'portal') {
       const p = task.p;
       a.emote(p.to === 'sky' ? 'surprise' : 'nod', 0.8); h.busy = 0.5;
-      this.fade = { t: 0, p, col: p.to === 'cave' || Rm.name === 'cave' ? '#07050c' : '#ffffff' };
+      this.fade = { t: 0, p, col: p.kind === 'lift' ? (LIFT_UP(Rm.name, p.to) ? '#f2f6ff' : '#0a0810') : p.to === 'cave' || Rm.kind === 'cave' ? '#07050c' : '#ffffff' };
     } else if (task.kind === 'plant-here') {
       const gr = Rm.ground[ix(Rm, task.x, task.y)];
       if (Rm.plants.some((p) => p.x === task.x && p.y === task.y) || !this.open(task.x, task.y) || [STONE, PORTAL, BRIDGE].includes(gr)) return;
@@ -452,11 +516,11 @@ export class Garden extends Game {
       const o = task.a, A = ANIMALS[o.k];
       a.face(o.x < h.x ? 'W' : 'E');
       if (A.eats && g.inv.food > 0) {
-        a.emote('love', 0.7); h.busy = 0.5; g.inv.food--; o.f = t; o.wait = 1.5;
+        a.emote('love', 0.7); h.busy = 0.5; g.inv.food--; o.f = t; o.wait = 1.5; o.follow = this.t + 15;
         this.hearts(o.x, o.y - 10); this.say(`You fed the ${o.baby ? 'baby ' : ''}${o.k === 'cloudsheep' ? 'cloud sheep' : o.k}`);
         this.breed(o);
       } else {
-        a.emote(A.eats ? 'wave' : 'love', 0.7); h.busy = 0.45; o.wait = 1.2; this.hearts(o.x, o.y - 8);
+        a.emote(A.eats ? 'wave' : 'love', 0.7); h.busy = 0.45; o.wait = 1.2; o.follow = this.t + 12; this.hearts(o.x, o.y - 8);
         if (A.eats && !g.inv.food) this.say('No food left: pick berries or apples');
       }
       Wd.saveGarden(true);
@@ -475,6 +539,13 @@ export class Garden extends Game {
       if (stageOf(p) === 3) this.hero.actor.emote('cheer', 1.2);
       this.computeBlock();
     } else if (!quiet && boost < 0.02) this.say('Already watered: it needs time now');
+  }
+  // the chunks around the view grow their wild plants and residents the first time you come near
+  growNear() {
+    const Rm = this.Rm, c0x = Math.floor((this.cam.x - VW) / (T * CH)), c1x = Math.floor((this.cam.x + VW) / (T * CH)), c0y = Math.floor((this.cam.y - VH) / (T * CH)), c1y = Math.floor((this.cam.y + VH) / (T * CH));
+    let grew = false;
+    for (let cy = c0y; cy <= c1y; cy++) for (let cx = c0x; cx <= c1x; cx++) if (Wd.populate(Wd.G, Rm, cx, cy)) grew = true;
+    if (grew) { this.computeBlock(); for (const a of Rm.animals) if (a.tx === undefined) this.brain(a); }
   }
   // walking onto a cave mouth, ladder or the Cloud Stair takes you through (not the one you arrived on)
   portalUnderfoot() {
@@ -498,17 +569,17 @@ export class Garden extends Game {
   trample(x, y, hero) {
     const Rm = this.Rm, i = ix(Rm, x, y), R = Math.random;
     if (Rm.wild[i]) {
-      if (Rm.name === 'cave' && R() < 0.35) return;   // rubble is a little tougher than grass
+      if (Rm.kind === 'cave' && R() < 0.35) return;   // rubble is a little tougher than grass
       // two levels a step: one walk through even the tallest grass leaves a clear trail
       if (Rm.wild[i] <= 2) { this.clear(x, y, { narrow: true, quiet: !hero }); return; }
       Rm.wild[i] -= 2; this.grass.delete(i);
-      const P = palFor(Rm.name, this.mode), cols = Rm.name === 'cave' ? P.rubble : Rm.name === 'sky' ? ['#ffffff', '#f0f4ff', '#e8eef8'] : P.wild;
+      const P = palFor(Rm.name, this.mode), cols = Rm.kind === 'cave' ? P.rubble : Rm.kind === 'sky' ? ['#ffffff', '#f0f4ff', '#e8eef8'] : P.wild;
       for (let k = 0; k < 4; k++) this.fx.push({ kind: 'leaf', x: x * T + 8, y: y * T + 8, vx: (R() - 0.5) * 50, vy: -20 - R() * 30, t: 0, life: 0.6, c: cols[(R() * 3) | 0] });
       Wd.invalidate(Rm, x, y, x, y);
       return;
     }
     const g = Rm.ground[i];
-    if (Rm.name !== 'surface' || !(g === GRASS || g === FLOWERS || g === FOREST) || this.occ?.has(i)) return;
+    if (Rm.kind !== 'surface' || !(g === GRASS || g === FLOWERS || g === FOREST) || this.occ?.has(i)) return;
     const wear = (Rm.wear ||= new Uint8Array(Rm.w * Rm.h));
     if (++wear[i] >= 9) { Rm.ground[i] = PATH; this.grass.delete(i); Wd.invalidate(Rm, x, y, x, y); }
   }
@@ -518,7 +589,7 @@ export class Garden extends Game {
     Rm.wild[i] = 0; this.grass.delete(i);
     // each swing opens a little space around it (a footstep only its own tile)
     if (!narrow) for (const [dx, dy] of N8) { const nx = x + dx, ny = y + dy; if (!inside(Rm, nx, ny)) continue; const j = ix(Rm, nx, ny); if (Rm.wild[j] === 1 && R() < 0.75) Rm.wild[j] = 0; else if (Rm.wild[j] === 2 && R() < 0.35) Rm.wild[j] = 1; }
-    const P = palFor(Rm.name, this.mode), cols = Rm.name === 'cave' ? P.rubble : Rm.name === 'sky' ? ['#ffffff', '#f0f4ff', '#e8eef8'] : P.wild;
+    const P = palFor(Rm.name, this.mode), cols = Rm.kind === 'cave' ? P.rubble : Rm.kind === 'sky' ? ['#ffffff', '#f0f4ff', '#e8eef8'] : P.wild;
     for (let k = 0; k < (narrow ? 5 : 10); k++) this.fx.push({ kind: 'leaf', x: x * T + 8, y: y * T + 6, vx: (R() - 0.5) * 70, vy: -30 - R() * 50, t: 0, life: 0.9, c: cols[(R() * 3) | 0] });
     const r = Rm.ruins.find((u) => !u.found && x >= u.x - 1 && x <= u.x + u.w && y >= u.y - 1 && y <= u.y + u.h);
     if (r) {
@@ -527,7 +598,7 @@ export class Garden extends Game {
         if (!inside(Rm, xx, yy)) continue;
         const j = ix(Rm, xx, yy), inFoot = yy >= r.y && yy < r.y + r.h && xx >= r.x && xx < r.x + r.w;
         Rm.wild[j] = 0;
-        if (Rm.ground[j] !== WATER && Rm.ground[j] !== VOID && Rm.ground[j] !== ROCK) Rm.ground[j] = inFoot || r.t === 'glyphs' ? STONE : Rm.name === 'surface' ? PATH : Rm.ground[j];
+        if (Rm.ground[j] !== WATER && Rm.ground[j] !== VOID && Rm.ground[j] !== ROCK) Rm.ground[j] = inFoot || r.t === 'glyphs' ? STONE : Rm.kind === 'surface' ? PATH : Rm.ground[j];
       }
       Rm.plants = Rm.plants.filter((p) => !(p.x >= r.x - 1 && p.x <= r.x + r.w && p.y >= r.y - 1 && p.y <= r.y + r.h));
       g.inv.seeds[r.seed] = (g.inv.seeds[r.seed] || 0) + 3;
@@ -539,7 +610,7 @@ export class Garden extends Game {
       this.hero.actor.emote('surprise', 1.5);
       this.puff(r.x * T + r.w * 8, r.y * T + r.h * 8, '#fff2b0', 24);
     } else if (!quiet && R() < (narrow ? 0.08 : 0.16)) {
-      const k = Rm.name === 'cave' ? 'glowshroom' : Rm.name === 'sky' ? (R() < 0.5 ? 'skyorchid' : 'cosmos') : COMMON[(R() * 8) | 0];
+      const k = Rm.kind === 'cave' ? 'glowshroom' : Rm.kind === 'sky' ? (R() < 0.5 ? 'skyorchid' : 'cosmos') : COMMON[(R() * 8) | 0];
       g.inv.seeds[k] = (g.inv.seeds[k] || 0) + 1; this.say(k === 'glowshroom' ? 'Found glowshroom spores in the rubble' : `Found a ${PLANTS[k].name.toLowerCase()} seed`);
     }
     Wd.invalidate(Rm, x - 1, y - 1, x + 1, y + 1);
@@ -573,9 +644,9 @@ export class Garden extends Game {
       if (Rm.seen[i]) continue;
       Rm.seen[i] = 1; Wd.miniPaint(Rm, x, y);
       const g = Rm.ground[i];
-      if (Rm.name === 'surface' && g === WATER && !Rm.saidLake) { Rm.saidLake = 1; this.say('A lake! Tap the water beside the shore to build a bridge'); }
-      if (Rm.name === 'surface' && g === PORTAL && !Rm.saidCave) { Rm.saidCave = 1; this.say('A cave mouth in the hillside…'); }
-      if (Rm.name === 'cave' && g === WATER && !Rm.saidLake) { Rm.saidLake = 1; this.say('An underground pool, perfectly still'); }
+      if (Rm.kind === 'surface' && g === WATER && !Rm.saidLake) { Rm.saidLake = 1; this.say('A lake! Tap the water beside the shore to build a bridge'); }
+      if (Rm.kind === 'surface' && g === PORTAL && !Rm.saidCave) { Rm.saidCave = 1; this.say('A cave mouth in the hillside…'); }
+      if (Rm.kind === 'cave' && g === WATER && !Rm.saidLake) { Rm.saidLake = 1; this.say('An underground pool, perfectly still'); }
     }
   }
 
@@ -585,28 +656,36 @@ export class Garden extends Game {
     const Rm = this.Rm, tx = Math.floor(x / T), ty = Math.floor(y / T);
     if (tx < 1 || ty < 1 || tx >= Rm.w - 1 || ty >= Rm.h - 1) return false;
     const A = ANIMALS[a.k], i = ix(Rm, tx, ty), g = Rm.ground[i];
-    if (A.fly) return Rm.name !== 'cave' || g !== ROCK;
+    if (A.fly) return Rm.kind !== 'cave' || g !== ROCK;
     if (A.water) return g === WATER;
     if (A.shore) return !Rm.wild[i] && g !== WATER && g !== ROCK && N8.some(([dx, dy]) => inside(Rm, tx + dx * 2, ty + dy * 2) && Rm.ground[ix(Rm, tx + dx * 2, ty + dy * 2)] === WATER);
     return !Rm.wild[i] && g !== WATER && g !== ROCK && g !== VOID && !this.block[i];
   }
   stepAnimal(a, dt) {
-    const Rm = this.Rm, A = ANIMALS[a.k], lively = Rm.name === 'cave' ? 0.8 : this.mode === 'day' ? 1.35 : this.mode === 'evening' ? 0.75 : 1;
+    const Rm = this.Rm, A = ANIMALS[a.k], lively = Rm.kind === 'cave' ? 0.8 : this.mode === 'day' ? 1.35 : this.mode === 'evening' ? 0.75 : 1;
     if (A.night && this.mode !== 'evening') return;
     a.ph += dt * (A.fly ? 9 : 5) * lively;
+    // tagging along behind you for a while (after a pat or a snack, or just because)
+    const h = this.hero;
+    if (!A.fly && !A.water && !(a.follow > this.t) && Math.random() < dt * 0.04 && Math.hypot(h.x - a.x, h.y - a.y) < 30) a.follow = this.t + 6 + Math.random() * 6;
+    if (a.follow > this.t && !A.fly && !A.water) {
+      const fx = h.x + (a.x < h.x ? -16 : 16) - a.x, fy = h.y + 2 - a.y;
+      if (Math.hypot(fx, fy) > 6) { a.wait = 0; a.tx = a.x + fx; a.ty = a.y + fy; }
+      else { a.tx = a.x; a.ty = a.y; a.vx = a.vy = 0; return; }
+    }
     if (a.wait > 0) { a.wait -= dt; a.vx = a.vy = 0; return; }
     const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy);
     if (d < 2) {
       a.wait = (A.fly ? 0.3 : 0.8) + Math.random() * (A.fly ? 1.5 : 3) / lively;
       let nx = a.x + (Math.random() - 0.5) * (A.fly ? 120 : 90), ny = a.y + (Math.random() - 0.5) * (A.fly ? 100 : 70);
-      const mine = Rm.plants;
+      const mine = Wd.plantsIn(Rm, Math.floor(a.x / T) - 14, Math.floor(a.y / T) - 14, Math.floor(a.x / T) + 14, Math.floor(a.y / T) + 14);
       if (['butterfly', 'bee', 'dragonfly', 'glowworm'].includes(a.k) && mine.length) { const p = mine[(Math.random() * mine.length) | 0]; if (Math.hypot(p.x * T - a.x, p.y * T - a.y) < 220) { nx = p.x * T + 8; ny = p.y * T - 4; } }
       if (['songbird', 'owl', 'squirrel'].includes(a.k) && Math.random() < 0.5) { const p = mine[(Math.random() * mine.length) | 0]; if (p && PLANTS[p.k].type === 'tree' && Math.hypot(p.x * T - a.x, p.y * T - a.y) < 260) { nx = p.x * T + 8 + (Math.random() - 0.5) * 10; ny = p.y * T - (stageOf(p) === 3 ? 30 : 16); } }
       if (this.mode === 'day' && !A.fly && Math.random() < 0.25) { const f = Rm.animals.find((o) => o !== a && o.k === a.k && Math.hypot(o.x - a.x, o.y - a.y) < 160); if (f) { nx = f.x + (Math.random() - 0.5) * 20; ny = f.y + (Math.random() - 0.5) * 20; a.wait = 0; } }
       if (this.okFor(a, nx, ny)) { a.tx = nx; a.ty = ny; }
       return;
     }
-    const sp = A.speed * lively * (a.baby ? 0.85 : 1) * (A.fly ? 1 + Math.sin(a.ph) * 0.3 : 1);
+    const sp = A.speed * lively * (a.baby ? 0.85 : 1) * (A.fly ? 1 + Math.sin(a.ph) * 0.3 : 1) * (a.follow > this.t ? 2.2 : 1);
     const mx = (dx / d) * Math.min(d, sp * dt), my = (dy / d) * Math.min(d, sp * dt);
     if (!A.fly && !this.okFor(a, a.x + mx, a.y + my)) { a.tx = a.x; a.ty = a.y; return; }
     a.x += mx; a.y += my; a.vx = mx / dt; a.vy = my / dt;
@@ -632,7 +711,7 @@ export class Garden extends Game {
         f.done = true;
         Rm.hero = { x: h.x, y: h.y };
         this.enter(f.p.to, [f.p.tx, f.p.ty]);
-        if (f.p.to === 'surface') this.say(Rm.name === 'cave' ? 'Back out into the daylight' : 'Down the Cloud Stair to the meadows');
+        if (f.p.to === 'surface') this.say(Rm.kind === 'cave' ? 'Back out into the daylight' : 'Down the Cloud Stair to the meadows');
         Wd.saveGarden(true);
       }
       if (f.t >= 0.9) this.fade = null;
@@ -674,7 +753,7 @@ export class Garden extends Game {
     this.cam.y = Math.max(VH / 2, Math.min(cR.h * T - VH / 2, this.cam.y));
     if (!this.live) return;
     this.seenAcc += dt;
-    if (this.seenAcc > 0.3) { this.seenAcc = 0; this.markSeen(); }
+    if (this.seenAcc > 0.3) { this.seenAcc = 0; this.markSeen(); this.growNear(); }
     // now and then a wisp of light drifts off toward something still hidden
     this.wispAcc = (this.wispAcc ?? 30) + dt;
     if (this.wispAcc > 45) { this.wispAcc = 0; this.wisp(); }
@@ -709,7 +788,7 @@ export class Garden extends Game {
     if (this.saveAcc > 20) { this.saveAcc = 0; cR.hero = { x: h.x, y: h.y }; Wd.saveGarden(); }
   }
   stepWeather(dt) {
-    const w = this.weather, realm = this.Rm.name;
+    const w = this.weather, realm = this.Rm.kind;
     w.t += dt;
     if (this.mode === 'day' && realm !== 'cave' && w.t > w.until) {
       // lively days: gusts, passing showers with a rainbow after, bright spells
@@ -738,7 +817,7 @@ export class Garden extends Game {
     this.autoWait = 1.5 + Math.random() * 2.5;
     const Rm = this.Rm, h = this.hero, hx = h.x / T, hy = h.y / T, t = now(), roll = Math.random();
     // tend: water what is thirsty and close; otherwise visit an animal, a ruin, or wander
-    const thirsty = Rm.plants.filter((p) => !p.n && t - (p.w || 0) > 15 * 60e3 && stageOf(p) < 3 && Math.hypot(p.x - hx, p.y - hy) < 10).sort((p, q) => Math.hypot(p.x - hx, p.y - hy) - Math.hypot(q.x - hx, q.y - hy));
+    const thirsty = Wd.plantsIn(Rm, hx - 10, hy - 10, hx + 10, hy + 10).filter((p) => !p.n && t - (p.w || 0) > 15 * 60e3 && stageOf(p) < 3 && Math.hypot(p.x - hx, p.y - hy) < 10).sort((p, q) => Math.hypot(p.x - hx, p.y - hy) - Math.hypot(q.x - hx, q.y - hy));
     if (thirsty.length && roll < 0.6) { this.goTo(this.near(thirsty[0].x, thirsty[0].y, 1), { kind: 'water', p: thirsty[0] }); return; }
     const pets = Rm.animals.filter((a) => !ANIMALS[a.k].fly && !ANIMALS[a.k].water && Math.hypot(a.x / T - hx, a.y / T - hy) < 8);
     if (pets.length && roll < 0.8) { const a = pets[(Math.random() * pets.length) | 0]; this.goTo(this.near(Math.floor(a.x / T), Math.floor(a.y / T), 1), { kind: 'pet', a }); return; }
@@ -752,7 +831,7 @@ export class Garden extends Game {
 
   // ---------------------------------------------- physics: grass on springs, swaying plants, falling leaves
   windAt(x, t) {
-    if (this.Rm.name === 'cave') return 0;
+    if (this.Rm.kind === 'cave') return 0;
     const w = this.weather.wind;
     return w * (0.16 + 0.1 * Math.sin(t * 1.6 + x * 0.035) + 0.05 * Math.sin(t * 3.1 + x * 0.11)) * (this.weather.kind === 'gust' ? 1.6 : 1);
   }
@@ -780,7 +859,7 @@ export class Garden extends Game {
   }
   stepPlants(dt) {
     const sw = this.sway ||= new WeakMap(), mv = this.movers(), t = this.t;
-    for (const p of this.Rm.plants) {
+    for (const p of Wd.plantsIn(this.Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6)) {
       const x = p.x * T + 8, y = p.y * T + 14;
       if (Math.abs(x - this.cam.x) > VW * 0.7 || Math.abs(y - this.cam.y) > VH * 0.7 || stageOf(p) === 0) continue;
       let s = sw.get(p); if (!s) { s = { a: 0, v: 0 }; sw.set(p, s); }
@@ -801,10 +880,10 @@ export class Garden extends Game {
     if (this.leaves.length < 90) this.leaves.push({ x: p.x * T + 8 + (Math.random() - 0.5) * 22, y: p.y * T + 12 + Math.random() * 10, z: 18 + Math.random() * 16, vx: 0, vy: 0, fall: 7 + Math.random() * 7, ph: Math.random() * 6.28, t: 0, col, rest: false, life: 0 });
   }
   stepLeaves(dt) {
-    const h = this.hero, wind = this.Rm.name === 'cave' ? 0 : this.weather.wind;
+    const h = this.hero, wind = this.Rm.kind === 'cave' ? 0 : this.weather.wind;
     // trees shed now and then, more in a gust
-    if (this.Rm.name !== 'cave' && Math.random() < dt * wind * (this.weather.kind === 'gust' ? 3 : 0.8)) {
-      const trees = this.Rm.plants.filter((p) => PLANTS[p.k].type === 'tree' && stageOf(p) === 3 && Math.abs(p.x * T - this.cam.x) < VW * 0.6 && Math.abs(p.y * T - this.cam.y) < VH * 0.6);
+    if (this.Rm.kind !== 'cave' && Math.random() < dt * wind * (this.weather.kind === 'gust' ? 3 : 0.8)) {
+      const trees = Wd.plantsIn(this.Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6).filter((p) => PLANTS[p.k].type === 'tree' && stageOf(p) === 3 && Math.abs(p.x * T - this.cam.x) < VW * 0.6 && Math.abs(p.y * T - this.cam.y) < VH * 0.6);
       if (trees.length) this.dropLeaf(trees[(Math.random() * trees.length) | 0]);
     }
     const hs = Math.hypot(h.vx || 0, h.vy || 0);
@@ -839,7 +918,7 @@ export class Garden extends Game {
       return;
     }
     this.buf ||= Object.assign(document.createElement('canvas'), { width: VW, height: VH });
-    const b = this.buf.getContext('2d'), Rm = this.Rm, realm = Rm.name, cx = Math.round(this.cam.x - VW / 2), cy = Math.round(this.cam.y - VH / 2), t = this.t, P = palFor(realm, this.mode);
+    const b = this.buf.getContext('2d'), Rm = this.Rm, realm = Rm.kind, cx = Math.round(this.cam.x - VW / 2), cy = Math.round(this.cam.y - VH / 2), t = this.t, P = palFor(Rm.name, this.mode);
     b.setTransform(1, 0, 0, 1, 0, 0); b.imageSmoothingEnabled = false; b.globalAlpha = 1; b.globalCompositeOperation = 'source-over';
     if (realm === 'sky') this.drawSkyBg(b); else { b.fillStyle = realm === 'cave' ? '#0d0a12' : '#3a4a3a'; b.fillRect(0, 0, VW, VH); }
     const x0 = Math.floor(cx / CP), x1 = Math.floor((cx + VW) / CP), y0 = Math.floor(cy / CP), y1 = Math.floor((cy + VH) / CP);
@@ -861,11 +940,13 @@ export class Garden extends Game {
       else if (r.t !== 'glyphs') { const x = r.x * T + r.w * 8, y = (r.y + r.h) * T - 1; if (vis(x, y)) items.push([y, 'ruin', { t: r.t, x, y }]); }
     }
     for (const d of Rm.decor) if (d.t === 'crystal') { const x = d.x * T + 8, y = d.y * T + 14; if (vis(x, y)) items.push([y, 'crystal', d]); }
-    for (const p of Rm.plants) { const x = p.x * T + 8, y = p.y * T + 14; if (vis(x, y)) items.push([y, 'plant', p]); }
+    for (const p of Wd.plantsIn(this.Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6)) { const x = p.x * T + 8, y = p.y * T + 14; if (vis(x, y, PLANTS[p.k].giant ? 120 : 48)) items.push([y, PLANTS[p.k].giant ? 'giant' : 'plant', p]); }
+    for (const d of Rm.decor) if (d.t === 'lift') { const x = d.x * T + 8, y = d.y * T + 15; if (vis(x, y)) items.push([y - 1, 'lift', d]); }
     for (const a of Rm.animals) { if (ANIMALS[a.k].night && this.mode !== 'evening') continue; if (vis(a.x, a.y)) items.push([a.y + (ANIMALS[a.k].fly ? 30 : 0), 'animal', a]); }
     items.push([this.hero.y, 'hero']);
     for (const n of this.npcs || []) if (vis(n.x, n.y)) items.push([n.y, 'npc', n]);
     items.sort((p, q) => p[0] - q[0]);
+    const canopies = [];
     for (const [, kind, o] of items) {
       if (kind === 'plant') {
         const st = stageOf(o), s = Wd.plantSprite(o.k, st, o.fr > 0), x = o.x * T + 8 - cx, y = o.y * T + 14 - cy, a = sw?.get(o)?.a || 0;
@@ -878,7 +959,13 @@ export class Garden extends Game {
           for (let r0 = 0; r0 < rows; r0 += step) { const hgt = Math.min(step, rows - r0), up = (rows - r0) / rows; b.drawImage(s.cv, 0, r0, s.w, hgt, Math.round(x - s.w / 2 + a * up * up * rows * 0.5), Math.round(y - s.h + r0), s.w, hgt); }
         }
         b.globalAlpha = 1;
-      } else if (kind === 'ruin') { const s = Wd.ruinSprite(o.t, P); b.drawImage(s.cv, Math.round(o.x - cx - s.w / 2), Math.round(o.y - cy - s.h)); }
+      } else if (kind === 'giant') {
+        const S = Wd.giantSprites(o.x * 7 + o.y), x = Math.round(o.x * T + 8 - cx), y = Math.round(o.y * T + 14 - cy);
+        b.fillStyle = 'rgba(10,30,15,.18)'; b.beginPath(); b.ellipse(x, y - 4, 58, 22, 0, 0, 7); b.fill();
+        b.drawImage(S.trunk.cv, x - (S.trunk.w >> 1), y - S.trunk.h + 2);
+        canopies.push([o, S, x, y]);
+      } else if (kind === 'lift') { const s = Wd.liftSprite(o.up); b.drawImage(s.cv, Math.round(o.x * T + 8 - cx - s.w / 2), Math.round(o.y * T + 15 - cy - s.h + 6)); }
+      else if (kind === 'ruin') { const s = Wd.ruinSprite(o.t, P); b.drawImage(s.cv, Math.round(o.x - cx - s.w / 2), Math.round(o.y - cy - s.h)); }
       else if (kind === 'crystal') { const s = Wd.crystalSprite(o.c); b.drawImage(s.cv, o.x * T + 2 - cx, o.y * T + 15 - cy - s.h); }
       else if (kind === 'animal') {
         const A = ANIMALS[o.k], f = Math.sin(o.ph) > 0 ? 1 : 0, s = Wd.animalSprite(o.k, A.fly || A.hop || o.wait <= 0 ? f : 0), k = o.baby ? 0.65 : 1;
@@ -893,6 +980,13 @@ export class Garden extends Game {
         b.fillStyle = 'rgba(0,0,0,.18)'; b.fillRect(Math.round(w.x - cx) - 6, Math.round(w.y - cy) - 1, 12, 2);
         w.actor.draw(b, Math.round(w.x - cx), Math.round(w.y - cy), 1);
       }
+    }
+    // the ancient trees' crowns, over everything; thin to a veil when you walk beneath one
+    const ca = (this.canopyA ||= new WeakMap()), hx = this.hero.x - cx, hy = this.hero.y - cy - 10;
+    for (const [o, S, x, y] of canopies) {
+      const top = y - S.trunk.h - S.canopy.h * 0.55, under = Math.abs(hx - x) < 56 && hy > top - 4 && hy < y - 4;
+      const a = ca.get(o) ?? 1, to = under ? 0.32 : 1, na = a + (to - a) * 0.12; ca.set(o, na);
+      b.globalAlpha = na; b.drawImage(S.canopy.cv, x - (S.canopy.w >> 1) + Math.round(Math.sin(t * 0.5 + o.x) * 1.2), Math.round(top)); b.globalAlpha = 1;
     }
     // falling leaves and petals
     for (const l of this.leaves) if (!l.rest) { b.fillStyle = l.col; b.fillRect(Math.round(l.x - cx), Math.round(l.y - l.z - cy), Math.sin(l.t * 6 + l.ph) > 0 ? 2 : 1, 1); }
@@ -919,8 +1013,8 @@ export class Garden extends Game {
   }
   // the grass: blades on springs, three crisp segments each, leaning with the wind and whoever walks by
   drawGrass(b, cx, cy, P) {
-    const Rm = this.Rm, t = this.t, sky = Rm.name === 'sky';
-    if (Rm.name === 'cave' || !this.grass.size) return;
+    const Rm = this.Rm, t = this.t, sky = Rm.kind === 'sky';
+    if (Rm.kind === 'cave' || !this.grass.size) return;
     const tufts = this.tuftCols ||= {};
     const key = `${Rm.name}${this.mode}`;
     tufts[key] ||= sky ? [Wd.tone(P.grass[0], -0.16), Wd.tone(P.grass[2], 0.1), P.grass[0], P.grass[0]] : [Wd.tone(P.grass[0], -0.24), Wd.tone(P.grass[2], 0.1), Wd.tone(P.forest[0], -0.26), Wd.tone(P.forest[2], 0.08)];
@@ -944,7 +1038,7 @@ export class Garden extends Game {
   // the dream layer: a darker, cooler grade and a soft bloom so the lights smear a little, as in a
   // half-remembered place (the fog itself lives in the world: see stepFog)
   drawAtmos(b, cx, cy) {
-    const realm = this.Rm.name, mode = this.mode, t = this.t, A = ATMOS[realm === 'cave' ? 'cave' : mode] || ATMOS.day;
+    const realm = this.Rm.kind, mode = this.mode, t = this.t, A = ATMOS[realm === 'cave' ? 'cave' : mode] || ATMOS.day;
     b.globalCompositeOperation = 'multiply'; b.globalAlpha = A.dimA; b.fillStyle = A.dim; b.fillRect(0, 0, VW, VH);
     b.globalCompositeOperation = 'saturation'; b.globalAlpha = A.desat; b.fillStyle = '#808080'; b.fillRect(0, 0, VW, VH);
     b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1;
@@ -964,7 +1058,7 @@ export class Garden extends Game {
   // puffs on springs; whoever walks through pushes them aside and they drift closed behind.
   // Denser over water and in the forest, densest at dawn; in the sky they are the clouds.
   stepFog(dt) {
-    const Rm = this.Rm, realm = Rm.name, A = ATMOS[realm === 'cave' ? 'cave' : this.mode] || ATMOS.day, w = this.weather;
+    const Rm = this.Rm, realm = Rm.kind, A = ATMOS[realm === 'cave' ? 'cave' : this.mode] || ATMOS.day, w = this.weather;
     const want = Math.round(A.fog * (realm === 'sky' ? 1.5 : 1) * (w.kind === 'rain' ? 1.3 : 1)), fog = (this.fog ||= []);
     const mx0 = this.cam.x - VW / 2 - 90, my0 = this.cam.y - VH / 2 - 90, mw = VW + 180, mh = VH + 180;
     const drift = realm === 'cave' ? 0.6 : 2 + w.wind * 6, ang = Math.sin(this.t * 0.013) * 0.5;
@@ -998,7 +1092,7 @@ export class Garden extends Game {
   }
   drawFog(b, cx, cy) {
     if (!this.fog?.length) return;
-    const realm = this.Rm.name, A = ATMOS[realm === 'cave' ? 'cave' : this.mode] || ATMOS.day, col = realm === 'sky' ? A.cloudCol || A.mistCol : A.mistCol;
+    const realm = this.Rm.kind, A = ATMOS[realm === 'cave' ? 'cave' : this.mode] || ATMOS.day, col = realm === 'sky' ? A.cloudCol || A.mistCol : A.mistCol;
     for (const f of this.fog) for (const p of f.puffs) {
       const s = puffTex(Math.round(p.r / 3) * 3, col), x = Math.round(f.x + p.ox + p.dx - cx - s.width / 2), y = Math.round(f.y + p.oy + p.dy - cy - s.height / 2);
       if (x > VW || y > VH || x + s.width < 0 || y + s.height < 0) continue;
@@ -1019,9 +1113,21 @@ export class Garden extends Game {
   }
   // the open sky under the islands: gradient, drifting cloud banks, far islands and now and then a sky whale
   drawSkyBg(b) {
-    const P = palFor('sky', this.mode), t = this.t, g = b.createLinearGradient(0, 0, 0, VH);
+    const P = palFor(this.Rm.name, this.mode), t = this.t, g = b.createLinearGradient(0, 0, 0, VH);
     g.addColorStop(0, P.bg[0]); g.addColorStop(1, P.bg[1]);
     b.fillStyle = g; b.fillRect(0, 0, VW, VH);
+    if (this.Rm.name === 'canopy') {
+      // the treetops: the forest floor far below, trunks falling away into the dark, light coming
+      // down in shafts, and the crowns of other trees drifting past
+      for (let i = 0; i < 9; i++) { const x = ((i * 53 - this.cam.x * 0.25) % (VW + 60) + VW + 60) % (VW + 60) - 30; b.fillStyle = `rgba(20,14,10,${0.35 + (i % 3) * 0.12})`; b.fillRect(Math.round(x), 0, 6 + (i % 4) * 3, VH); }
+      b.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 4; i++) { const x = ((i * 97 - this.cam.x * 0.4 + t * 2) % (VW + 80) + VW + 80) % (VW + 80) - 40; b.fillStyle = 'rgba(200,230,150,.05)'; b.beginPath(); b.moveTo(x, 0); b.lineTo(x + 22, 0); b.lineTo(x + 52, VH); b.lineTo(x + 20, VH); b.fill(); }
+      b.globalCompositeOperation = 'source-over';
+      b.fillStyle = P.cloud;
+      for (let i = 0; i < 6; i++) { const x = ((i * 141 - this.cam.x * 0.5) % (VW + 200) + VW + 200) % (VW + 200) - 100, y = ((i * 87 - this.cam.y * 0.5) % (VH + 70) + VH + 70) % (VH + 70) - 35; b.globalAlpha = 0.35; for (const [dx, dy, r] of [[0, 0, 24], [20, 5, 18], [-18, 6, 16]]) { b.beginPath(); b.ellipse(Math.round(x + dx), Math.round(y + dy), r, Math.round(r * 0.6), 0, 0, 7); b.fill(); } }
+      b.globalAlpha = 1;
+      return;
+    }
     for (let i = 0; i < 4; i++) {
       const x = ((i * 105 - this.cam.x * 0.12 + t * 2) % (VW + 110) + VW + 110) % (VW + 110) - 55, y = 40 + ((i * 65 - this.cam.y * 0.12) % VH + VH) % VH;
       b.fillStyle = 'rgba(120,110,140,.25)'; b.fillRect(Math.round(x - 10 - i * 3), Math.round(y), 20 + i * 6, 4);
@@ -1041,7 +1147,7 @@ export class Garden extends Game {
     b.globalAlpha = 1;
   }
   drawLight(b, cx, cy) {
-    const t = this.t, w = this.weather, realm = this.Rm.name, sx = (x) => x - cx, sy = (y) => y - cy;
+    const t = this.t, w = this.weather, realm = this.Rm.kind, sx = (x) => x - cx, sy = (y) => y - cy;
     const glow = (x, y, r, col, a) => { const rg = b.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, col.replace('A', a)); rg.addColorStop(1, col.replace('A', 0)); b.fillStyle = rg; b.fillRect(x - r, y - r, r * 2, r * 2); };
     if (realm === 'cave') {
       // darkness, with the lantern, glowshrooms, crystals and shafts of daylight cut out of it
@@ -1053,9 +1159,10 @@ export class Garden extends Game {
       hole(sx(this.hero.x), sy(this.hero.y - 10), 104 + Math.sin(t * 7) * 2);
       for (const n of this.npcs || []) hole(sx(n.x), sy(n.y - 10), 46 + Math.sin(t * 6 + n.k) * 2, 0.9);
       const lights = [];
-      for (const p of this.Rm.plants) if (PLANTS[p.k].glow && stageOf(p) >= 2) lights.push([p.x * T + 8, p.y * T + 6, 27, '#8ff0d8']);
+      for (const p of Wd.plantsIn(this.Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6)) if (PLANTS[p.k].glow && stageOf(p) >= 2) lights.push([p.x * T + 8, p.y * T + 6, 27, '#8ff0d8']);
       for (const dc of this.Rm.decor) if (dc.t === 'crystal') lights.push([dc.x * T + 8, dc.y * T + 6, 31, dc.c]);
       for (const p of this.Rm.portals) lights.push([p.x * T + 8, p.y * T + 8, 54, '#fff0c8']);
+      for (const d of this.Rm.decor) if (d.t === 'lift') lights.push([d.x * T + 8, d.y * T + 8, 60, d.up ? '#bfe8ff' : '#ffd8a0']);
       for (const r of this.Rm.ruins) if (r.found) lights.push([r.x * T + r.w * 8, r.y * T + r.h * 8, r.t === 'crystalheart' ? 94 : 47, r.t === 'crystalheart' ? '#9ff0f0' : '#b8c8ff']);
       for (const [x, y, r] of lights) { const X = sx(x), Y = sy(y); if (X > -r && Y > -r && X < VW + r && Y < VH + r) hole(X, Y, r * (1 + Math.sin(t * 2 + x) * 0.05), 0.85); }
       b.drawImage(this.dark, 0, 0);
@@ -1066,6 +1173,16 @@ export class Garden extends Game {
       b.globalCompositeOperation = 'source-over';
       return;
     }
+    b.globalCompositeOperation = 'lighter';
+    for (const d of this.Rm.decor) {
+      if (d.t !== 'lift' || !d.up) continue;
+      const X = sx(d.x * T + 8), Y = sy(d.y * T + 12);
+      if (X < -20 || X > VW + 20 || Y < -10 || Y > VH + 120) continue;
+      const gr = b.createLinearGradient(0, Y - 110, 0, Y), k = 0.16 + Math.sin(t * 1.6 + d.x) * 0.05;
+      gr.addColorStop(0, 'rgba(190,230,255,0)'); gr.addColorStop(1, `rgba(190,230,255,${k})`);
+      b.fillStyle = gr; b.fillRect(X - 6, Y - 110, 12, 110);
+    }
+    b.globalCompositeOperation = 'source-over';
     if (this.mode === 'morning') {
       const g = b.createLinearGradient(0, 0, VW, VH);
       g.addColorStop(0, 'rgba(255,200,220,.16)'); g.addColorStop(0.5, 'rgba(255,240,220,0)'); g.addColorStop(1, 'rgba(190,220,255,.12)');
@@ -1086,7 +1203,7 @@ export class Garden extends Game {
       sun.addColorStop(0, 'rgba(255,160,110,.32)'); sun.addColorStop(1, 'rgba(255,160,110,0)');
       b.fillStyle = sun; b.fillRect(0, 0, VW, VH);
       b.globalCompositeOperation = 'lighter';
-      for (const p of this.Rm.plants) { const Pp = PLANTS[p.k]; if (!Pp.glow || stageOf(p) < 2) continue; const x = sx(p.x * T + 8), y = sy(p.y * T + 14 - (Pp.type === 'tree' ? 22 : 8)); if (x < -30 || y < -30 || x > VW + 30 || y > VH + 30) continue; glow(x, y, Pp.type === 'tree' ? 20 : 9, 'rgba(255,230,160,A)', 0.35 + Math.sin(t * 2 + p.x) * 0.08); }
+      for (const p of Wd.plantsIn(this.Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6)) { const Pp = PLANTS[p.k]; if (!Pp.glow || stageOf(p) < 2) continue; const x = sx(p.x * T + 8), y = sy(p.y * T + 14 - (Pp.type === 'tree' ? 22 : 8)); if (x < -30 || y < -30 || x > VW + 30 || y > VH + 30) continue; glow(x, y, Pp.type === 'tree' ? 20 : 9, 'rgba(255,230,160,A)', 0.35 + Math.sin(t * 2 + p.x) * 0.08); }
       for (const r of this.Rm.ruins) { if (!r.found || !['shrine', 'obelisk', 'glyphs', 'fountain', 'well', 'cloudstair', 'starharp', 'windtemple'].includes(r.t)) continue; glow(sx(r.x * T + r.w * 8), sy(r.y * T + r.h * 8), 27, r.t === 'shrine' ? 'rgba(255,210,120,A)' : 'rgba(150,210,255,A)', 0.3 + Math.sin(t * 1.3 + r.x) * 0.08); }
       for (const p of this.Rm.portals) if (p.kind === 'mouth') glow(sx(p.x * T + 8), sy(p.y * T + 10), 15, 'rgba(255,200,140,A)', 0.18);
       glow(sx(this.hero.x), sy(this.hero.y - 12), 24, 'rgba(255,220,150,A)', 0.25);
@@ -1108,6 +1225,27 @@ export class Garden extends Game {
   }
   // no buttons, maps or words on the card: only, on a first visit, two soft ripples where to tap
   drawUI(c) {
+    const q = this.quote;
+    if (q) {
+      q.t += 1 / 60;
+      if (q.t > q.life || !this.npcs?.includes(q.n)) this.quote = null;
+      else {
+        const a = Math.min(1, q.t * 3, (q.life - q.t) * 1.5), sx = (q.n.x - this.cam.x + VW / 2) * Z, sy = (q.n.y - this.cam.y + VH / 2) * Z;
+        c.save(); c.globalAlpha = Math.max(0, a);
+        c.font = 'italic 13px Georgia, serif';
+        const words = q.text.split(' '), lines = []; let line = '';
+        for (const w of words) { const tr = line ? `${line} ${w}` : w; if (c.measureText(tr).width > 210 && line) { lines.push(line); line = w; } else line = tr; }
+        lines.push(line);
+        const bw = Math.min(232, Math.max(...lines.map((l) => c.measureText(l).width)) + 22), bh = lines.length * 17 + 30;
+        const bx = Math.max(8, Math.min(W - bw - 8, sx - bw / 2)), by = Math.max(8, sy - 52 - bh);
+        c.fillStyle = 'rgba(24,20,30,.78)'; c.beginPath(); c.roundRect?.(bx, by, bw, bh, 10); if (!c.roundRect) c.rect(bx, by, bw, bh); c.fill();
+        c.beginPath(); c.moveTo(Math.max(bx + 14, Math.min(bx + bw - 14, sx)) - 6, by + bh); c.lineTo(Math.max(bx + 14, Math.min(bx + bw - 14, sx)), by + bh + 8); c.lineTo(Math.max(bx + 14, Math.min(bx + bw - 14, sx)) + 6, by + bh); c.fill();
+        c.fillStyle = '#f3ead8'; c.textBaseline = 'top';
+        lines.forEach((l, i) => c.fillText(l, bx + 11, by + 9 + i * 17));
+        c.font = '11px system-ui, sans-serif'; c.fillStyle = 'rgba(243,234,216,.62)'; c.fillText(`— ${q.by}`, bx + 11, by + 12 + lines.length * 17);
+        c.restore();
+      }
+    }
     if (this.stick) {
       const st = this.stick, dx = st.x - st.ox, dy = st.y - st.oy, d = Math.hypot(dx, dy), k = Math.min(d, STICK_R) / (d || 1);
       c.strokeStyle = 'rgba(232,240,227,.22)'; c.lineWidth = 1.5; c.beginPath(); c.arc(st.ox, st.oy, STICK_R, 0, 7); c.stroke();

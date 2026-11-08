@@ -81,3 +81,22 @@ Running list of wiring the lead must do before the final push.
   - Caves are now the blend of the three fields, cut at 46% floor, with separate halls joined by wandering tunnels. A garden whose cave hasn't been entered yet gets the new cave on load (`regenCave`, `G.caveGen = 2`).
 - **Photo ground textures:** `tools/fetch-textures.mjs` (config `tools/data/textures.json`, workflow `.github/workflows/textures.yml`) pulls CC0 textures from Poly Haven, with ambientCG as the fallback. Each becomes a seamless 64 px greyscale detail tile centred on mid-grey in `www/assets/textures/` (`index.json` lists sets and credits). `texture()` lays them over the painted ground with `overlay`, so palette and light still decide the colour. With no textures, the ground is simply painted. `tone()`/`mixHex()` now return hex and accept rgb(), so tints chain (chaining was silently producing invalid colours).
 - **Other gardeners** (`spawnNPCs`/`stepNPC`/`npcThink`/`npcAct`): three in the meadows, one in the caves (with a lamp) and one in the sky. They wander (sometimes through tall grass, making trails), sow (at most 24 a day, `G.npcSown`; plants marked `by: 'npc'`), water young plants, pet animals and wave when you pass. They respawn with each visit; their plants stay.
+
+## Vitriol, Cave Crawler, Seed & Sage walking, a fifty-times world (2026-11-09)
+- **Whole games in the feed** (`cards.js` `EXT_GAMES`/`extGame`, `feed.js`): Vitriol (vendored from fuzzhawk/-vitriol, branch `claude/procedural-shooter-game-hp5wkx`, GPL-3.0, in `www/ext/vitriol`) and Cave Crawler (`www/ext/cave-crawler.html`, from your upload). They alternate in the day feed every ~17 posts. Each runs in an iframe loaded on activate and dropped on deactivate.
+  - `www/ext/vitriol/embed.js` (only with `?embed`) starts STORY on autopilot and adds a portrait camera that follows the operative and zooms with the action. Vitriol is watch-only: no touch controls.
+  - Cave Crawler's appended embed script picks a delver, plays itself (digs, loots, plays cards with targets, answers chests and waystones) and zooms on the delver. A tap on the card hands it over.
+- **Seed & Sage movement** (from fuzzhawk/weird_game `js/surface.js`), and nothing else from it:
+  - A floating stick: drag anywhere, speed scales with the pull, and the anchor trails your finger past a 40-unit radius. `HERO_SPEED` 112.
+  - The hero moves in sub-steps with a four-corner footing check (`standable`/`moveHero`).
+  - Taps act only within reach (`reach()`). Portals are taken by walking onto them (`portalUnderfoot`).
+- **World v3** (`garden-world.js`): realms surface 900², canyon 384², mountain 384², cave 192², deep 256², sky 192², canopy 192² (`SIZE`/`KIND`).
+  - Behaviour follows `Rm.kind` (surface / cave / sky); palettes follow the name, with the new levels derived by `shiftPal`.
+  - Nine surface biomes from coarse noise (`biomeAt`, `BIOME_TINT`) shape the ground and what grows.
+  - Wild plants and animals are made per 16×16 chunk the first time you come near (`populate`, `Rm.pop`). Saves are run-length binary (`rle`); a 900² world saves to about 0.7 MB.
+  - Giant trees (`PLANTS.giant`, `giantSprites`): trunks block three tiles, and crowns draw on top, thinning to a veil when you're beneath.
+  - Lifts (`link`, `liftSprite`, portal kind `lift`): hills to the mountains, canyon rims down, mountain summits to the sky, cave shafts to the deep, giant trees to the canopy.
+  - Upgrade (`upgrade3`, `fromV1`): an older garden is embedded in the middle of the new meadows. Its cave and sky are kept if visited; otherwise the new ones are linked to its mouths and stair.
+- Fixed on the way: `genCave` computed a quantile per tile (a full sort each time): fine at 64², about a minute at 256².
+- **People**: gardeners plus philosophers (2 in meadow-like realms, 1 elsewhere). Tapping a philosopher within reach shows a quote from `QUOTES` (public domain) in a bubble: the only text in the garden. People sometimes walk along with you after a greeting, and animals follow after a pat or a snack (`follow`).
+- Plants are looked up by 16-tile cells (`plantIndex`/`plantsIn`) instead of scanning every plant.
