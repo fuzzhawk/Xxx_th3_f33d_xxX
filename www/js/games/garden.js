@@ -15,6 +15,8 @@ import * as Wd from './garden-world.js';
 const { T, CH, HR, GRASS, FOREST, FLOWERS, SAND, WATER, PATH, STONE, BRIDGE, ROCK, PORTAL, VOID, PLANTS, ANIMALS, COMMON, REALM_NAME, stageOf, FRUIT_CAP, ix, inside, now, palFor } = Wd;
 const Z = 1.5, VW = W / Z, VH = H / Z, CP = CH * T;
 const MODES = ['morning', 'day', 'evening'];
+// Seed & Sage's walking: speed in world px/s at full stick, and the stick's radius (card units)
+const HERO_SPEED = 112, STICK_R = 40;
 const N8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 // Water that moves: a small height-field ripple simulation over the visible water (2-pixel cells).
@@ -122,7 +124,7 @@ export class Garden extends Game {
     const first = !Rm.visited;
     Rm.visited = 1;
     if (at) Rm.hero = { x: at[0] * T + 8, y: at[1] * T + 12 };
-    this.hero.x = Rm.hero.x; this.hero.y = Rm.hero.y; this.hero.path = []; this.hero.task = null;
+    this.hero.x = Rm.hero.x; this.hero.y = Rm.hero.y; this.hero.path = []; this.hero.task = null; this.hero.portalArmed = false; this.stick = null;
     this.cam.x = this.hero.x; this.cam.y = this.hero.y - 16;
     for (const a of Rm.animals) if (a.tx === undefined) this.brain(a);
     this.amb = Array.from({ length: realm === 'cave' ? 22 : this.mode === 'evening' ? 26 : 18 }, () => ({ x: Math.random() * VW, y: Math.random() * VH, p: Math.random() * 6.28, s: 0.5 + Math.random() }));
@@ -199,41 +201,62 @@ export class Garden extends Game {
   plantAt(x, y) { const Rm = this.Rm; return Rm.plants.find((p) => p.x === x && p.y === y) || Rm.plants.find((p) => PLANTS[p.k].type === 'tree' && stageOf(p) === 3 && Math.abs(p.x - x) <= 1 && y <= p.y && y >= p.y - 2); }
 
   // ---------------------------------------------- input
-  // while you play, the card sends presses and releases (not taps): a short press is a tap, a drag
-  // steers the hero toward your finger
-  down(x, y) { this.press = { x, y, drag: false }; }
+  // Movement is Seed & Sage's: drag anywhere and a floating stick appears where you pressed; how far
+  // you pull sets the pace, and pulling past its rim drags the stick along behind your finger. A
+  // short press is a tap, which only reaches things within arm's length.
+  down(x, y) { this.press = { x, y, t: performance.now(), moved: 0, lx: x, ly: y }; }
   move(x, y) {
     const p = this.press;
     if (!p || !this.ready || this.fade) return;
-    if (!p.drag && Math.hypot(x - p.x, y - p.y) > 12) { p.drag = true; const h = this.hero; h.path = []; h.task = null; h.actor.cancel(); h.busy = 0; }
-    if (p.drag) this.steer = { x, y };
+    p.moved += Math.abs(x - p.lx) + Math.abs(y - p.ly); p.lx = x; p.ly = y;
+    if (!this.stick && p.moved > 8) { this.stick = { ox: p.x, oy: p.y, x, y }; const h = this.hero; h.path = []; h.task = null; h.actor.cancel(); h.busy = 0; }
+    if (this.stick) { this.stick.x = x; this.stick.y = y; }
   }
-  up(x, y) { const p = this.press; this.press = null; this.steer = null; if (p && !p.drag) this.tap(x, y); }
+  up(x, y) {
+    const p = this.press; this.press = null;
+    if (this.stick) { this.stick = null; return; }
+    if (p && p.moved < 10 && performance.now() - p.t < 450) this.tap(x, y);
+  }
+  // within arm's reach (tiles): act on it now, facing it; further away, the tap just ripples
+  reach(tx, ty, task, r = 2) {
+    const h = this.hero, hx = Math.floor(h.x / T), hy = Math.floor((h.y - 2) / T);
+    if (Math.max(Math.abs(hx - tx), Math.abs(hy - ty)) > r) return false;
+    h.actor.cancel(); h.busy = 0; h.path = []; h.task = task;
+    h.actor.face(tx * T + 8 < h.x ? 'W' : 'E');
+    return true;
+  }
+  // Seed & Sage's step: small sub-steps, each axis on its own, so the hero slides along whatever
+  // is in the way instead of sticking to it
+  standable(x, y) { for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; if (!this.walkable(Math.floor((x + Math.cos(a) * 4.5) / T), Math.floor((y - 3 + Math.sin(a) * 4.5) / T))) return false; } return true; }
+  moveHero(dx, dy) {
+    const h = this.hero, n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 3)), sx = dx / n, sy = dy / n;
+    for (let k = 0; k < n; k++) { if (sx && this.standable(h.x + sx, h.y)) h.x += sx; if (sy && this.standable(h.x, h.y + sy)) h.y += sy; }
+  }
   tap(x, y) {
     if (!this.ready || this.fade) return;
     const Rm = this.Rm, wx = x / Z + this.cam.x - VW / 2, wy = y / Z + this.cam.y - VH / 2, tx = Math.floor(wx / T), ty = Math.floor(wy / T);
     if (!inside(Rm, tx, ty)) return;
     this.fx.push({ kind: 'ring', x: wx, y: wy, t: 0, life: 0.5 });
     const a = Rm.animals.filter((o) => Math.hypot(o.x - wx, o.y - 4 - wy) < 14 && !(ANIMALS[o.k].night && this.mode !== 'evening')).sort((p, q) => Math.hypot(p.x - wx, p.y - wy) - Math.hypot(q.x - wx, q.y - wy))[0];
-    if (a) { this.goTo(this.near(Math.floor(a.x / T), Math.floor(a.y / T), 1), { kind: 'animal', a }); return; }
+    if (a) { this.reach(Math.floor(a.x / T), Math.floor(a.y / T), { kind: 'animal', a }, 2); return; }
     const i = ix(Rm, tx, ty), g = Rm.ground[i];
     // a way down, up or back
     const ruin = Rm.ruins.find((r) => r.found && tx >= r.x && tx < r.x + r.w && ty >= r.y - 1 && ty < r.y + r.h);
     const portal = Rm.portals.find((p) => (p.x === tx && p.y === ty) || (ruin && ruin.t === 'cloudstair' && p.kind === 'stair'));
-    if (portal && (!portal.ruin || ruin?.found)) { this.goTo((x0, y0) => x0 === portal.x && y0 === portal.y, { kind: 'portal', p: portal }); return; }
+    if (portal && (!portal.ruin || ruin?.found)) { this.reach(portal.x, portal.y, { kind: 'portal', p: portal }, 1); return; }
     const plant = this.plantAt(tx, ty);
-    if (plant) { this.goTo(this.near(plant.x, plant.y, 1), { kind: 'plant', p: plant }); return; }
-    if (ruin) { this.goTo(this.near(ruin.x, ruin.y, 2), { kind: 'ruin', r: ruin }); return; }
-    // tall grass, rubble or mist: walk straight in; it gives way underfoot and leaves a trail
-    if (Rm.wild[i]) { this.goTo((x0, y0) => x0 === tx && y0 === ty, null); return; }
+    if (plant) { this.reach(plant.x, plant.y, { kind: 'plant', p: plant }, 2); return; }
+    if (ruin) { this.reach(tx, ty, { kind: 'ruin', r: ruin }, 3); return; }
+    // tall grass, rubble or mist: walk into it (drag); it gives way underfoot and leaves a trail
+    if (Rm.wild[i]) return;
     if (g === WATER || g === VOID) {
       // build out over the water (or the cloud sea) from the shore
       if (!N8.slice(0, 4).some(([dx, dy]) => this.open(tx + dx, ty + dy) || (inside(Rm, tx + dx, ty + dy) && Rm.ground[ix(Rm, tx + dx, ty + dy)] === BRIDGE))) { this.say(g === VOID ? 'Build out from an island edge: tap the cloud sea right beside it' : 'Build out from the shore: tap the water right beside the land'); return; }
-      this.goTo((x0, y0) => Math.abs(x0 - tx) + Math.abs(y0 - ty) === 1, { kind: 'build', x: tx, y: ty });
+      this.reach(tx, ty, { kind: 'build', x: tx, y: ty }, 1);
       return;
     }
     if (g === ROCK) { this.say(Rm.name === 'cave' ? 'The cave wall is solid here' : 'Solid rock. Look for a cave mouth in the hills'); return; }
-    this.goTo(this.near(tx, ty, 1), { kind: 'plant-here', x: tx, y: ty });
+    this.reach(tx, ty, { kind: 'plant-here', x: tx, y: ty }, 2);
   }
   frontierToward(x, y, tx, ty) {
     const Rm = this.Rm;
@@ -453,6 +476,16 @@ export class Garden extends Game {
       this.computeBlock();
     } else if (!quiet && boost < 0.02) this.say('Already watered: it needs time now');
   }
+  // walking onto a cave mouth, ladder or the Cloud Stair takes you through (not the one you arrived on)
+  portalUnderfoot() {
+    const h = this.hero, Rm = this.Rm, tx = Math.floor(h.x / T), ty = Math.floor((h.y - 2) / T);
+    const p = Rm.portals.find((q) => q.x === tx && q.y === ty);
+    if (!p) { h.portalArmed = true; return; }
+    if (!h.portalArmed || this.fade || h.task || this.auto) return;
+    if (p.ruin && !Rm.ruins.find((r) => r.t === 'cloudstair')?.found) return;
+    h.portalArmed = false; this.stick = null; this.press = null;
+    this.act({ kind: 'portal', p });
+  }
   // feet on the ground: tall grass, rubble and mist give way a level at a time (quickly), and grass
   // walked over again and again wears into a path
   underfoot(w, dt, moving) {
@@ -609,14 +642,16 @@ export class Garden extends Game {
     // actions never hold the hero still: the pose plays only while standing, walking cancels it
     if (h.busy > 0) { h.busy -= dt; if (h.busy <= 0) h.actor.cancel(); }
     const deep = this.Rm.wild[ix(this.Rm, Math.floor(h.x / T), Math.floor((h.y - 2) / T))] || 0, slow = deep ? 0.62 : 1;
-    if (this.steer) {
-      // follow the finger, sliding along whatever is in the way
-      const wx = this.steer.x / Z + this.cam.x - VW / 2, wy = this.steer.y / Z + this.cam.y - VH / 2 + 6, dx = wx - h.x, dy = wy - h.y, d = Math.hypot(dx, dy), sp = 70 * slow;
-      if (d > 5) {
+    if (this.stick) {
+      const st = this.stick;
+      let dx = st.x - st.ox, dy = st.y - st.oy;
+      const d = Math.hypot(dx, dy);
+      if (d > STICK_R) { const ex = (d - STICK_R) / d; st.ox += dx * ex; st.oy += dy * ex; dx = st.x - st.ox; dy = st.y - st.oy; }
+      if (d > 3) {
         if (h.actor.a.action) { h.actor.cancel(); h.busy = 0; }
-        const stp = Math.min(d, sp * dt), mx = (dx / d) * stp, my = (dy / d) * stp, ok = (x, y) => this.walkable(Math.floor(x / T), Math.floor((y - 2) / T));
-        if (ok(h.x + mx, h.y + my)) { h.x += mx; h.y += my; } else if (ok(h.x + mx, h.y)) h.x += mx; else if (ok(h.x, h.y + my)) h.y += my;
-        vx = (dx / d) * sp; vy = (dy / d) * sp;
+        const m = Math.min(d / STICK_R, 1), dd = Math.hypot(dx, dy) || 1, sp = HERO_SPEED * slow * m;
+        vx = (dx / dd) * sp; vy = (dy / dd) * sp;
+        this.moveHero(vx * dt, vy * dt);
       }
     } else if (h.path.length) {
       const [px0, py0] = h.path[0], dx = px0 - h.x, dy = py0 - h.y, d = Math.hypot(dx, dy), sp = (this.auto ? 46 : 70) * slow;
@@ -624,6 +659,7 @@ export class Garden extends Game {
       else { if (h.actor.a.action) { h.actor.cancel(); h.busy = 0; } const stp = Math.min(d, sp * dt); vx = (dx / d) * sp; vy = (dy / d) * sp; h.x += (dx / d) * stp; h.y += (dy / d) * stp; }
     } else if (h.task && h.busy <= 0) { const t = h.task; h.task = null; this.act(t); }
     this.underfoot(h, dt, vx || vy);
+    this.portalUnderfoot();
     h.vx = vx; h.vy = vy;
     h.actor.update(dt, { vx, vy });
     // footprints in sand and on paths
@@ -1072,6 +1108,11 @@ export class Garden extends Game {
   }
   // no buttons, maps or words on the card: only, on a first visit, two soft ripples where to tap
   drawUI(c) {
+    if (this.stick) {
+      const st = this.stick, dx = st.x - st.ox, dy = st.y - st.oy, d = Math.hypot(dx, dy), k = Math.min(d, STICK_R) / (d || 1);
+      c.strokeStyle = 'rgba(232,240,227,.22)'; c.lineWidth = 1.5; c.beginPath(); c.arc(st.ox, st.oy, STICK_R, 0, 7); c.stroke();
+      c.fillStyle = 'rgba(240,232,214,.28)'; c.beginPath(); c.arc(st.ox + dx * k, st.oy + dy * k, 12, 0, 7); c.fill();
+    }
     // first visit: two soft ripples show where to tap (grass to plant, tall grass to clear)
     if (this.hint > 0) {
       this.hint -= 1 / 60;
