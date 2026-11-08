@@ -32,13 +32,18 @@ function modesGroup() {
   const range = el('input', { type: 'range', min: '0', max: '75', step: '1', value: String(pct) });
   range.oninput = () => { settings.blueLight = +range.value / 100; val.textContent = `${range.value}%`; applyFilter(); };
   range.onchange = () => saveSettings();
+  const pa = Math.round((settings.gardenPlantAlpha ?? 0.88) * 100), paVal = el('b', `${pa}%`);
+  const plantRange = el('input', { type: 'range', min: '80', max: '95', step: '1', value: String(pa) });
+  plantRange.oninput = () => { settings.gardenPlantAlpha = +plantRange.value / 100; paVal.textContent = `${plantRange.value}%`; };
+  plantRange.onchange = () => saveSettings();
   const btn = (m) => el(`button.btn${getMode() === m ? '.primary' : ''}`, { onclick: () => { setMode(m, { manual: true }); toast(`${MODE_LABEL[m]} mode`); } }, `${MODE_ICON[m]} ${MODE_LABEL[m]}`);
   return group('Morning & evening', 'Morning: body, breath, gratitude, living things. Evening: dreams, poems, night thoughts. Both have your garden.',
     el('div.btnrow', MODES.map(btn)),
     toggle('autoMode', 'Pick the mode by the clock', 'Evening 11 pm – 5 am, morning 5 – 11 am, the regular feed the rest of the day'),
     toggle('blueLightOn', 'Blue-light filter in evening mode', null, () => applyFilter()),
     el('div.field', el('label', 'Filter strength', el('small', 'Also on the slider in the top bar during evening mode')), el('div.rangebox', range, val)),
-    toggle('gardenInFeed', 'Garden in the day feed', 'Your garden turns up between posts, with livelier weather'));
+    toggle('gardenInFeed', 'Garden in the day feed', 'Your garden turns up between posts, with livelier weather'),
+    el('div.field', el('label', 'Garden plant opacity', el('small', 'How solid the flowers, shrubs and grass look; each plant varies a little within 80–95%')), el('div.rangebox', plantRange, paVal)));
 }
 
 export async function render() {

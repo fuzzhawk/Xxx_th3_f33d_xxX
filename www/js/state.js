@@ -39,7 +39,8 @@ export const DEFAULTS = {
   lastMode: 'day',
   blueLight: 0.35,         // evening blue-light filter strength (0–0.75)
   blueLightOn: true,
-  gardenInFeed: true       // garden cards in the day feed too
+  gardenInFeed: true,      // garden cards in the day feed too
+  gardenPlantAlpha: 0.88   // how solid the garden's ground plants look (0.80–0.95)
 };
 
 export const settings = Object.assign(structuredClone(DEFAULTS), lsGet('settings', {}));

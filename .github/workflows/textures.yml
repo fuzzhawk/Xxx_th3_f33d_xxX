@@ -1,13 +1,13 @@
-name: Fetch garden plants
+name: Fetch garden textures
 
-# Pulls CC0 plant sprites from Kenney packs into www/assets/plants (the garden shows a different
-# handful each day), commits them to the branch and rebuilds the APK.
+# Pulls CC0 photo textures (Poly Haven, then ambientCG) for the garden's ground into
+# www/assets/textures, commits them to the branch and rebuilds the APK.
 on:
   push:
     paths:
-      - 'tools/fetch-plants.mjs'
-      - 'tools/data/plants.json'
-      - '.github/workflows/plants.yml'
+      - 'tools/fetch-textures.mjs'
+      - 'tools/data/textures.json'
+      - '.github/workflows/textures.yml'
   workflow_dispatch:
 
 permissions:
@@ -22,15 +22,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Download plant sprites
-        run: node tools/fetch-plants.mjs 2>&1 | tee plants.log
-      - name: Commit plants
+      - name: JPEG decoder
+        run: npm i --no-save --no-package-lock jpeg-js@0.4.4
+      - name: Download textures
+        run: node tools/fetch-textures.mjs 2>&1 | tee textures.log
+      - name: Commit textures
         run: |
           git config user.name "the-feed-bot"
           git config user.email "the-feed-bot@users.noreply.github.com"
-          git add www/assets/plants
+          git add www/assets/textures
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
-          git commit -m "Garden plant sprites from Kenney (CC0)"
+          git commit -m "Garden ground textures (CC0, Poly Haven / ambientCG)"
           for i in 1 2 3; do git pull --rebase origin "${{ github.ref_name }}" && git push origin HEAD:"${{ github.ref_name }}" && break; sleep 5; done
 
   apk:
