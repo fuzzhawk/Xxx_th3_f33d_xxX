@@ -103,3 +103,39 @@ Running list of wiring the lead must do before the final push.
 - **Cell life** (`www/js/cells.js`, mind kind `cells`, morning and evening): a procedural microscope view. A vessel swells with each beat; red cells tumble through it and white cells roll along its wall. Oxygen and glucose drift out to hungry cells, which glow, grow and divide (toward the wound if they're near it). The wound starts with a gap and debris, and mends. Morning: 54→72 bpm and a waking brightness. Evening: 60→48 bpm, violet light and faster repair.
 - **Dreamscape** (`www/js/dreamscape.js`): the other.worlds card's 3D background. It flies a looping path past floating islands (ruins, braziers with flickering flames) and through stone-ring tunnels, with far giant creatures and a curious swarm. It uses the vendored three.js and one shared 280×224 renderer; the scene is built on activate and disposed on deactivate. Without WebGL it falls back to the painted world.
 - **App icon:** a brain with an eye (`www/icon.svg`, `www/icons/*`, `assets/icon-*.png`, `assets/splash*.png`). The APK build regenerates the launcher icons from `assets/`.
+
+## Garden: framerate, swimming, ten kinds of country, findable ways up and down (2026-11-09)
+- **Framerate** (headless profile, walking: draw 6.8 → 3.7 ms a frame):
+  - Tall grass no longer sways. It's painted into the map chunks with a static fringe of blades (`paintWild`).
+  - Short grass is one cached sprite per tile at one of 7 lean angles (`clumpAt`/`clumpSprite`), instead of ~12 rects per tile.
+  - The colour grade is one cached multiply layer (time of day, sunset wash, rain dimness and vignette) plus one screen layer (`drawGrade`/`makeGrade`). It replaces several full-screen passes a frame.
+  - The film grain is gone. Ripples skip when no water is in view.
+  - The chunk ahead of you is painted one frame early, so walking on never waits for a repaint.
+  - Quality steps down by itself when frames run slow (`this.q`): bloom goes first, then the colour drain.
+- **Walking:**
+  - Tall grass, rubble and mist never block or slow you; they still wear into trails.
+  - Water is swum: 72% speed, a new `swim` crawl in the crystal sprite engine (`ANIMS.swim`, animator input `swim: true`, `'stroke'` events), and the sprite cut at the waterline with ripple rings (`drawWalker`).
+  - Bridge building is removed.
+  - Sprite sheets are re-baked once for the new rows (`VER` c3).
+- **Hero animation as in Cave Crawler:**
+  - Its animator settings (walk from 7.5 px/s, run from 55, a frame every 5 / 6.5 px) and pace (90 px/s).
+  - The animator gets the velocity you ask for, with the facing eased slightly.
+  - A footstep dust puff and its soft pixel shadow.
+  - The camera snaps so the hero and ground move by whole pixels together; this was the 1-px shiver.
+  - The old glitch: tall grass slowed you to 69 px/s, just under the 70 run threshold, so walk and run swapped each time you crossed a tall-grass tile.
+- **No overlay animations:** fireflies, morning sparkles, gust streaks, cave dust motes, drifting cloud shadows, the rainbow and the grain are removed. Rain falls in the world; snow falls over the frost country and the mountains; both scroll with the camera. Lights (spire beams, dusk glows, the cave lantern) are world-anchored.
+- **Ten kinds of country** (`BIOMES`, `biomePal`, `biomeMap`): meadow, old woods, flower downs, marsh, heath, autumn wood, dunes, ancient grove, frost fields, fungal glade.
+  - Each has its own day palette (morning and evening are derived), its own texture set (`tex`; six new sets in `tools/data/textures.json`, with fallbacks until the textures workflow fetches them), its own mist colour and thickness, short-grass density, and wild plants and animals.
+  - Borders are noise-warped and dithered.
+  - New wild plants: maple, snow pine, giant mushroom, cactus, heather.
+  - New ground: `ICE` (frozen water, walkable) and `CHASM` (gorges, painted with red strata and rope bridges).
+- **The meadows v4** (`genSurface4`):
+  - Three rivers.
+  - Marsh pools.
+  - Seven gorges, each with a lift down to the canyons at its rim.
+  - Sky spires: tall stone horns with a crystal and a column of light visible from far off. Eleven go up to the mountains and two up to the sky.
+  - Baskets up four ancient trees into the canopy (`liftSprite('spire'|'shaft'|'vine')`).
+  - One gorge, one cave mouth, one spire and one giant tree are always within about 20–45 tiles of the start.
+  - Old roads (a spanning tree of all the ways out) join them, with plank bridges over water and gorges.
+  - Tall grass covers about 8% of the land instead of more than half; rubble and mist are also thinner in the other realms.
+- **Upgrade** (`upgrade4`): a v3 world is rebuilt from its own seed. Sown plants and arrived animals move to the nearest good spot to where they were. Seeds, food and the garden's age carry over.

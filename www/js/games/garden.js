@@ -1,22 +1,23 @@
 // Garden: one shared world, saved on the phone, that grows in real time. Every garden card opens the
-// same world. Tap to walk; plant, water and harvest; feed the animals (fed pairs have young); clear
-// tall grass, rubble and mist to explore. The meadows have lakes (build plank bridges out to the
-// islands), forests, flower fields and rocky hills; cave mouths lead down into the dark caverns; the
-// Cloud Stair, once uncovered, climbs to the sky islands. The light follows the feed: pastel spring
-// in the morning, lively weather in the day, dusk in the evening. On autopilot the gardener only
-// waters, wanders and visits the animals; planting, clearing, building and exploring are yours.
-// There is no text anywhere: everything is told with light, sparkles, hearts and small icons.
+// same world. Drag to walk (tall grass parts underfoot without slowing you; water is swum); tap near
+// things to plant, water and harvest, feed the animals (fed pairs have young) and talk to the sages.
+// The meadows hold ten kinds of country joined by old roads that lead to the ways up and down: cave
+// mouths, gorges with lifts to the canyons, sky spires to the mountains and the sky islands, and
+// baskets up the ancient trees. The light follows the feed: pastel morning, lively day, dusk.
+// There is no text except what the philosophers say: everything else is told with light and motion.
 import { Game, W, H } from './engine.js';
 import { Actor } from '../crystal/sprites.js';
 import { getMode } from '../modes.js';
 import { settings } from '../state.js';
 import * as Wd from './garden-world.js';
 
-const { T, CH, HR, GRASS, FOREST, FLOWERS, SAND, WATER, PATH, STONE, BRIDGE, ROCK, PORTAL, VOID, PLANTS, ANIMALS, COMMON, REALM_NAME, stageOf, FRUIT_CAP, ix, inside, now, palFor } = Wd;
+const { T, CH, HR, GRASS, FOREST, FLOWERS, SAND, WATER, PATH, STONE, BRIDGE, ROCK, PORTAL, VOID, CHASM, ICE, PLANTS, ANIMALS, COMMON, REALM_NAME, stageOf, FRUIT_CAP, ix, inside, now, palFor } = Wd;
 const Z = 1.5, VW = W / Z, VH = H / Z, CP = CH * T;
 const MODES = ['morning', 'day', 'evening'];
-// Seed & Sage's walking: speed in world px/s at full stick, and the stick's radius (card units)
-const HERO_SPEED = 112, STICK_R = 40;
+// Seed & Sage's stick (its radius in card units), at Cave Crawler's pace: 90 px/s at full stick, and
+// Cave Crawler's animator settings (walk from 7.5 px/s, run from 55, a frame every 5 / 6.5 px), so
+// the feet keep time with the ground. Swimming is a little slower.
+const HERO_SPEED = 90, STICK_R = 40, SWIM = 0.72, GAIT = { mode: 'eight', walkSpeed: 7.5, runSpeed: 55, walkStride: 5, runStride: 6.5 };
 // what the philosophers say: the only words in the garden
 const QUOTES = [
   ['The soul becomes dyed with the colour of its thoughts.', 'Marcus Aurelius'], ['Very little is needed to make a happy life.', 'Marcus Aurelius'],
@@ -97,10 +98,10 @@ class Ripples {
       this.ox = ox; this.oy = oy; this.dirty = true;
     }
     if (this.dirty) {
-      this.dirty = false;
+      this.dirty = false; this.any = false;
       for (let j = 0; j < this.h; j++) for (let i = 0; i < this.w; i++) {
-        const tx = ((this.ox + i) * 2 + 1) >> 4, ty = ((this.oy + j) * 2 + 1) >> 4;
-        this.m[j * this.w + i] = inside(Rm, tx, ty) && Rm.ground[ix(Rm, tx, ty)] === WATER ? 1 : 0;
+        const tx = ((this.ox + i) * 2 + 1) >> 4, ty = ((this.oy + j) * 2 + 1) >> 4, wet = inside(Rm, tx, ty) && Rm.ground[ix(Rm, tx, ty)] === WATER;
+        this.m[j * this.w + i] = wet ? 1 : 0; if (wet) this.any = true;
       }
     }
   }
@@ -111,11 +112,13 @@ class Ripples {
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const k = (j + dy) * this.w + i + dx; if (this.m[k]) this.a[k] += s * Math.exp(-(dx * dx + dy * dy) / 1.2); }
   }
   step() {
+    if (!this.any) return;   // no water in view: nothing to ripple
     const { w, h, a, b, m } = this;
     for (let j = 1; j < h - 1; j++) for (let i = 1; i < w - 1; i++) { const k = j * w + i; b[k] = m[k] ? ((a[k - 1] + a[k + 1] + a[k - w] + a[k + w]) * 0.5 - b[k]) * 0.975 : 0; }
     this.a = b; this.b = a;
   }
   draw(c, cx, cy, light, dark) {
+    if (!this.any) return;
     const { w, h, a, m } = this, i0 = Math.max(1, Math.floor(cx / 2) - this.ox), j0 = Math.max(1, Math.floor(cy / 2) - this.oy), i1 = Math.min(w - 1, i0 + VW / 2 + 2), j1 = Math.min(h - 1, j0 + VH / 2 + 2);
     for (const [col, sign] of [[light, 1], [dark, -1]]) {
       c.fillStyle = col;
@@ -132,13 +135,15 @@ export class Garden extends Game {
     this.ready = false;
     this.cam = { x: 0, y: 0 };
     this.msgs = []; this.fx = []; this.pending = [];
-    this.weather = { kind: 'calm', t: 0, until: 8 + Math.random() * 10, rain: [], wind: 1 };
+    this.weather = { kind: 'calm', t: 0, until: 8 + Math.random() * 10, wind: 1 };
+    this.precip = [];   // rain and snow, in the world (they scroll with it)
+    this.q = 2;         // drawing quality: 2 everything, 1 no bloom, 0 no bloom or colour drain (slow phones)
     this.autoWait = 1.5; this.lastArrival = 0; this.lastSeed = 0; this.growAcc = 0; this.seenAcc = 0; this.saveAcc = 0;
-    this.hero = { actor: new Actor(this.skin.crystal(0, 'Fantasy'), { mode: 'eight', walkSpeed: 10, runSpeed: 70 }), path: [], task: null, busy: 0, x: 0, y: 0 };
+    this.hero = { actor: new Actor(this.skin.crystal(0, 'Fantasy'), GAIT), path: [], task: null, busy: 0, x: 0, y: 0, fx: 0, fy: 1 };
     Wd.loadGarden().then((g) => {
       this.enter(g.realm);
       if (g.firstVisit) { this.hint = 9; g.firstVisit = 0; }
-      else if (g.migrated) { this.say('Your garden has grown into a whole world'); this.say('Explore: lakes, forests, hills with caves, and something in the sky'); g.migrated = 0; }
+      else if (g.migrated || g.reshaped) { g.migrated = 0; g.reshaped = 0; }
       else if (g.away?.length) { this.say('While you were away…'); for (const m of g.away) this.say(m); g.away = []; }
       else this.greet();
     });
@@ -148,7 +153,7 @@ export class Garden extends Game {
     if (r === 'cave') this.say('Cool air and the drip of water');
     else if (r === 'sky') this.say(['Wind and wide sky', 'Clouds drift under your feet'][Math.floor(Math.random() * 2)]);
     else if (this.mode === 'morning') this.say(['Good morning, garden', 'Dew on everything', 'The bees are up early'][Math.floor(Math.random() * 3)]);
-    else if (this.mode === 'evening') this.say(['The garden at dusk', 'Fireflies are out', 'Everything is settling down'][Math.floor(Math.random() * 3)]);
+    else if (this.mode === 'evening') this.say(['The garden at dusk', 'The first stars', 'Everything is settling down'][Math.floor(Math.random() * 3)]);
   }
   // step into a realm (on load, or through a cave mouth or the Cloud Stair)
   enter(realm, at = null) {
@@ -161,18 +166,18 @@ export class Garden extends Game {
     this.hero.x = Rm.hero.x; this.hero.y = Rm.hero.y; this.hero.path = []; this.hero.task = null; this.hero.portalArmed = false; this.stick = null;
     this.cam.x = this.hero.x; this.cam.y = this.hero.y - 16;
     for (const a of Rm.animals) if (a.tx === undefined) this.brain(a);
-    this.amb = Array.from({ length: realm === 'cave' ? 22 : this.mode === 'evening' ? 26 : 18 }, () => ({ x: Math.random() * VW, y: Math.random() * VH, p: Math.random() * 6.28, s: 0.5 + Math.random() }));
-    this.grass = new Map(); this.leaves = []; this.prints = []; this.rip ||= new Ripples(); this.fog = []; this.fogInit = false;
+    this.grass = new Map(); this.leaves = []; this.prints = []; this.rip ||= new Ripples(); this.fog = []; this.fogInit = false; this.precip = [];
     this.npcs = null;   // spawned once the map is ready (below)
     this.computeBlock();
     this.markSeen();
     this.spawnNPCs();
     this.ready = true;
     if (first && realm === 'cave') { this.say('Down into the caverns. Your lantern lights the way'); this.say('Clear the rubble to explore · glowshrooms grow only down here'); }
-    if (first && realm === 'sky') { this.say('Up among the sky islands!'); this.say('Tap the cloud sea beside an island to step onto a cloud'); }
+    if (first && realm === 'sky') this.say('Up among the sky islands!');
   }
   start() {
     super.start();
+    this.lastDraw = 0;
     if (this.ready && Garden.active !== this) {
       // back to the garden after a while in the feed: time has passed out there too
       if (now() - Wd.G.saved > 5 * 60e3) { const m = Wd.catchUp(Wd.G); if (m.length) { this.say('Since you last looked…'); m.forEach((x) => this.say(x)); } }
@@ -203,9 +208,11 @@ export class Garden extends Game {
     for (const d of Rm.decor) occ.add(ix(Rm, d.x, d.y));
     for (const r of Rm.ruins) if (r.found) for (let y = r.y - 1; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (inside(Rm, x, y)) occ.add(ix(Rm, x, y));
   }
-  open(x, y) { const Rm = this.Rm; if (!inside(Rm, x, y)) return false; const i = ix(Rm, x, y), g = Rm.ground[i]; return !Rm.wild[i] && g !== WATER && g !== ROCK && g !== VOID && !this.block[i]; }
-  // can feet go here? tall grass, rubble and mist give way underfoot, so they count
-  walkable(x, y) { const Rm = this.Rm; if (!inside(Rm, x, y)) return false; const i = ix(Rm, x, y), g = Rm.ground[i]; return g !== WATER && g !== ROCK && g !== VOID && !this.block[i]; }
+  open(x, y) { const Rm = this.Rm; if (!inside(Rm, x, y)) return false; const i = ix(Rm, x, y), g = Rm.ground[i]; return !Rm.wild[i] && g !== WATER && g !== ROCK && g !== VOID && g !== CHASM && g !== ICE && !this.block[i]; }
+  // can feet go here? tall grass, rubble and mist give way underfoot and water is swum, so they count
+  walkable(x, y) { const Rm = this.Rm; if (!inside(Rm, x, y)) return false; const i = ix(Rm, x, y), g = Rm.ground[i]; return g !== ROCK && g !== VOID && g !== CHASM && !this.block[i]; }
+  // in the water (swimming) at a world point
+  wet(x, y) { const Rm = this.Rm, tx = Math.floor(x / T), ty = Math.floor((y - 2) / T); return inside(Rm, tx, ty) && Rm.ground[ix(Rm, tx, ty)] === WATER; }
   path(goal, from = this.hero) {
     const Rm = this.Rm, sx = Math.floor(from.x / T), sy = Math.floor((from.y - 2) / T);
     const prev = new Int32Array(Rm.w * Rm.h).fill(-2), q = [ix(Rm, sx, sy)];
@@ -291,15 +298,8 @@ export class Garden extends Game {
     const plant = this.plantAt(tx, ty);
     if (plant) { this.reach(plant.x, plant.y, { kind: 'plant', p: plant }, 2); return; }
     if (ruin) { this.reach(tx, ty, { kind: 'ruin', r: ruin }, 3); return; }
-    // tall grass, rubble or mist: walk into it (drag); it gives way underfoot and leaves a trail
-    if (Rm.wild[i]) return;
-    if (g === WATER || g === VOID) {
-      // build out over the water (or the cloud sea) from the shore
-      if (!N8.slice(0, 4).some(([dx, dy]) => this.open(tx + dx, ty + dy) || (inside(Rm, tx + dx, ty + dy) && Rm.ground[ix(Rm, tx + dx, ty + dy)] === BRIDGE))) { this.say(g === VOID ? 'Build out from an island edge: tap the cloud sea right beside it' : 'Build out from the shore: tap the water right beside the land'); return; }
-      this.reach(tx, ty, { kind: 'build', x: tx, y: ty }, 1);
-      return;
-    }
-    if (g === ROCK) { this.say(Rm.kind === 'cave' ? 'The cave wall is solid here' : 'Solid rock. Look for a cave mouth in the hills'); return; }
+    // tall grass, rubble or mist: just walk through it (drag); water: swim it; rock and gorges: no
+    if (Rm.wild[i] || [WATER, VOID, ROCK, CHASM, ICE].includes(g)) return;
     this.reach(tx, ty, { kind: 'plant-here', x: tx, y: ty }, 2);
   }
   frontierToward(x, y, tx, ty) {
@@ -331,7 +331,7 @@ export class Garden extends Game {
       const at = this.npcSpot(5, 15);
       if (!at) break;
       const sage = k >= n;
-      this.npcs.push({ k, sage, actor: new Actor(this.skin.crystal(sage ? 20 + k : k + 1, 'Fantasy'), { mode: 'eight', walkSpeed: 8, runSpeed: 70 }), x: at[0] * T + 8, y: at[1] * T + 12, path: [], wait: 1 + Math.random() * 3, busy: 0, vx: 0, vy: 0, sowT: 12 + Math.random() * 25, greetT: 0, task: null, follow: 0 });
+      this.npcs.push({ k, sage, actor: new Actor(this.skin.crystal(sage ? 20 + k : k + 1, 'Fantasy'), GAIT), x: at[0] * T + 8, y: at[1] * T + 12, path: [], wait: 1 + Math.random() * 3, busy: 0, vx: 0, vy: 0, sowT: 12 + Math.random() * 25, greetT: 0, task: null, follow: 0 });
     }
   }
   // an open tile some distance from the hero (or from a gardener)
@@ -339,7 +339,7 @@ export class Garden extends Game {
     const Rm = this.Rm, hx = Math.floor(from.x / T), hy = Math.floor((from.y - 2) / T);
     for (let k = 0; k < 60; k++) {
       const a = Math.random() * 6.283, r = r0 + Math.random() * (r1 - r0), x = Math.round(hx + Math.cos(a) * r), y = Math.round(hy + Math.sin(a) * r);
-      if (this.walkable(x, y) && Rm.ground[ix(Rm, x, y)] !== PORTAL) return [x, y];
+      if (this.walkable(x, y) && ![PORTAL, WATER, ICE].includes(Rm.ground[ix(Rm, x, y)])) return [x, y];
     }
     return null;
   }
@@ -349,7 +349,7 @@ export class Garden extends Game {
     if (n.busy > 0) { n.busy -= dt; if (n.busy <= 0) { n.busy = 0; n.actor.cancel(); } }
     else if (n.follow > this.t) { /* following you: handled below */ }
     else if (n.path.length) {
-      const [px, py] = n.path[0], dx = px - n.x, dy = py - n.y, d = Math.hypot(dx, dy), deep = Rm.wild[ix(Rm, Math.floor(n.x / T), Math.floor((n.y - 2) / T))], sp = 30 * (deep ? 0.65 : 1);
+      const [px, py] = n.path[0], dx = px - n.x, dy = py - n.y, d = Math.hypot(dx, dy), sp = 30 * (n.swim ? SWIM : 1);
       if (d < 1.5) n.path.shift();
       else { const st = Math.min(d, sp * dt); vx = (dx / d) * sp; vy = (dy / d) * sp; n.x += (dx / d) * st; n.y += (dy / d) * st; }
       this.underfoot(n, dt, vx || vy);
@@ -362,13 +362,13 @@ export class Garden extends Game {
       n.path = []; n.task = null;
       const fx = h.x + (n.x < h.x ? -22 : 22) - n.x, fy = h.y + 4 - n.y, d = Math.hypot(fx, fy);
       if (d > 8) {
-        const sp = Math.min(HERO_SPEED * 0.95, 30 + d * 1.2), mx = (fx / d) * sp * dt, my = (fy / d) * sp * dt, ok = (x, y) => this.walkable(Math.floor(x / T), Math.floor((y - 2) / T));
+        const sp = Math.min(HERO_SPEED * 0.95, 30 + d * 1.2) * (n.swim ? SWIM : 1), mx = (fx / d) * sp * dt, my = (fy / d) * sp * dt, ok = (x, y) => this.walkable(Math.floor(x / T), Math.floor((y - 2) / T));
         if (ok(n.x + mx, n.y)) n.x += mx; if (ok(n.x, n.y + my)) n.y += my;
         vx = (fx / d) * sp; vy = (fy / d) * sp; this.underfoot(n, dt, true);
       }
     }
-    n.sowT -= dt; n.vx = vx; n.vy = vy;
-    n.actor.update(dt, { vx, vy });
+    n.sowT -= dt; n.vx = vx; n.vy = vy; n.swim = this.wet(n.x, n.y);
+    for (const ev of n.actor.update(dt, { vx, vy, swim: n.swim })) this.stepFx(n, ev);
   }
   npcGo(n, goal, task) {
     const p = this.path(goal, n);
@@ -465,20 +465,7 @@ export class Garden extends Game {
   act(task) {
     const h = this.hero, a = h.actor, t = now(), g = Wd.G, Rm = this.Rm;
     if (task.kind === 'clear') { a.attack(); h.busy = 0.45; this.later(0.35, () => this.clear(task.x, task.y)); }
-    else if (task.kind === 'build') {
-      a.cast(); h.busy = 0.5;
-      this.later(0.4, () => {
-        const i = ix(Rm, task.x, task.y);
-        if (Rm.ground[i] !== WATER && Rm.ground[i] !== VOID) return;
-        Rm.ground[i] = BRIDGE;
-        Wd.invalidate(Rm, task.x - 1, task.y - 1, task.x + 1, task.y + 1);
-        for (let k = 0; k < 6; k++) this.rip.poke(task.x * T + 2 + Math.random() * 12, task.y * T + 2 + Math.random() * 12, 5);
-        this.rip.dirty = true;
-        this.puff(task.x * T + 8, task.y * T + 8, Rm.kind === 'sky' ? '#ffffff' : '#c8a070', 10);
-        this.say(Rm.kind === 'sky' ? 'You called a cloud to step on' : Rm.kind === 'cave' ? 'Laid planks across the pool' : 'Built a little plank bridge');
-        Wd.saveGarden(true);
-      });
-    } else if (task.kind === 'portal') {
+    else if (task.kind === 'portal') {
       const p = task.p;
       a.emote(p.to === 'sky' ? 'surprise' : 'nod', 0.8); h.busy = 0.5;
       this.fade = { t: 0, p, col: p.kind === 'lift' ? (LIFT_UP(Rm.name, p.to) ? '#f2f6ff' : '#0a0810') : p.to === 'cave' || Rm.kind === 'cave' ? '#07050c' : '#ffffff' };
@@ -528,6 +515,17 @@ export class Garden extends Game {
     else if (task.kind === 'pet') { a.emote('love', 0.6); h.busy = 0.4; this.hearts(task.a.x, task.a.y - 8); task.a.wait = 1; }
   }
   later(s, fn) { this.pending.push({ at: this.t + s, fn }); }
+  // the colours of the ground at a tile: the kind of country's own in the meadows
+  palAt(tx, ty) { const Rm = this.Rm; return Rm.name === 'surface' ? Wd.biomePal(Wd.biomeAt(Rm, tx, ty), this.mode) : palFor(Rm.name, this.mode); }
+  // a puff of dust at each footfall (as in Cave Crawler); a ring on the water at each stroke
+  stepFx(w, ev) {
+    if (ev === 'footstep' && !w.swim) {
+      const Rm = this.Rm, tx = Math.floor(w.x / T), ty = Math.floor((w.y - 2) / T);
+      if (!inside(Rm, tx, ty) || Math.abs(w.x - this.cam.x) > VW || Math.abs(w.y - this.cam.y) > VH) return;
+      const g = Rm.ground[ix(Rm, tx, ty)], P = this.palAt(tx, ty), base = Rm.kind === 'cave' ? P.floor[2] : Rm.kind === 'sky' ? P.grass[2] : g === SAND ? P.sand : g === PATH || g === BRIDGE ? P.path : P.grass[2];
+      for (let k = 0; k < 2; k++) this.fx.push({ kind: 'dust', x: w.x + (Math.random() - 0.5) * 7, y: w.y - 1, vx: (Math.random() - 0.5) * 10, vy: -5 - Math.random() * 7, t: 0, life: 0.35 + Math.random() * 0.15, c: Wd.tone(base, 0.25) });
+    } else if (ev === 'stroke') { this.rip.poke(w.x, w.y - 1, 4); this.fx.push({ kind: 'wake', x: w.x, y: w.y - 1, t: 0, life: 0.7 }); }
+  }
   water(p, quiet = false) {
     const P = PLANTS[p.k], before = stageOf(p), t = now();
     const boost = t - (p.w || 0) < 30e3 ? 0.01 : P.type === 'tree' ? 0.05 : P.type === 'shrub' ? 0.08 : 0.12;
@@ -644,7 +642,7 @@ export class Garden extends Game {
       if (Rm.seen[i]) continue;
       Rm.seen[i] = 1; Wd.miniPaint(Rm, x, y);
       const g = Rm.ground[i];
-      if (Rm.kind === 'surface' && g === WATER && !Rm.saidLake) { Rm.saidLake = 1; this.say('A lake! Tap the water beside the shore to build a bridge'); }
+      if (Rm.kind === 'surface' && g === WATER && !Rm.saidLake) { Rm.saidLake = 1; this.say('A lake, cool enough to swim'); }
       if (Rm.kind === 'surface' && g === PORTAL && !Rm.saidCave) { Rm.saidCave = 1; this.say('A cave mouth in the hillside…'); }
       if (Rm.kind === 'cave' && g === WATER && !Rm.saidLake) { Rm.saidLake = 1; this.say('An underground pool, perfectly still'); }
     }
@@ -659,7 +657,7 @@ export class Garden extends Game {
     if (A.fly) return Rm.kind !== 'cave' || g !== ROCK;
     if (A.water) return g === WATER;
     if (A.shore) return !Rm.wild[i] && g !== WATER && g !== ROCK && N8.some(([dx, dy]) => inside(Rm, tx + dx * 2, ty + dy * 2) && Rm.ground[ix(Rm, tx + dx * 2, ty + dy * 2)] === WATER);
-    return !Rm.wild[i] && g !== WATER && g !== ROCK && g !== VOID && !this.block[i];
+    return !Rm.wild[i] && g !== WATER && g !== ROCK && g !== VOID && g !== CHASM && !this.block[i];
   }
   stepAnimal(a, dt) {
     const Rm = this.Rm, A = ANIMALS[a.k], lively = Rm.kind === 'cave' ? 0.8 : this.mode === 'day' ? 1.35 : this.mode === 'evening' ? 0.75 : 1;
@@ -720,7 +718,9 @@ export class Garden extends Game {
     let vx = 0, vy = 0;
     // actions never hold the hero still: the pose plays only while standing, walking cancels it
     if (h.busy > 0) { h.busy -= dt; if (h.busy <= 0) h.actor.cancel(); }
-    const deep = this.Rm.wild[ix(this.Rm, Math.floor(h.x / T), Math.floor((h.y - 2) / T))] || 0, slow = deep ? 0.62 : 1;
+    // tall grass never slows you; water does a little (you swim it)
+    h.swim = this.wet(h.x, h.y);
+    const slow = h.swim ? SWIM : 1;
     if (this.stick) {
       const st = this.stick;
       let dx = st.x - st.ox, dy = st.y - st.oy;
@@ -740,11 +740,22 @@ export class Garden extends Game {
     this.underfoot(h, dt, vx || vy);
     this.portalUnderfoot();
     h.vx = vx; h.vy = vy;
-    h.actor.update(dt, { vx, vy });
-    // footprints in sand and on paths
-    if (vx || vy) {
-      h.stride = (h.stride || 0) + Math.hypot(vx, vy) * dt;
-      if (h.stride > 7) { h.stride = 0; h.foot = !h.foot; const g0 = this.Rm.ground[ix(this.Rm, Math.floor(h.x / T), Math.floor((h.y - 2) / T))]; if (g0 === Wd.SAND || g0 === PATH) (this.prints ||= []).push({ x: h.x + (h.foot ? 2 : -2), y: h.y, t: 0 }); }
+    // Cave Crawler's way: the animator gets the velocity you are asking for, so stride and facing
+    // follow the stick at once (frames advance by distance, so the feet keep time with the ground);
+    // the facing is eased a touch so it does not flicker between two of the eight directions
+    const sp = Math.hypot(vx, vy);
+    if (sp > 1) { const k = Math.min(1, dt * 14); h.fx += (vx / sp - h.fx) * k; h.fy += (vy / sp - h.fy) * k; }
+    const fl = Math.hypot(h.fx, h.fy) || 1;
+    for (const ev of h.actor.update(dt, { vx: (h.fx / fl) * sp, vy: (h.fy / fl) * sp, swim: h.swim })) this.stepFx(h, ev);
+    if (h.swim && sp > 1 && Math.random() < dt * 8) this.rip.poke(h.x + (Math.random() - 0.5) * 8, h.y - 1, 1.6);
+    // footprints in sand, snow and on paths
+    if (sp && !h.swim) {
+      h.stride = (h.stride || 0) + sp * dt;
+      if (h.stride > 7) {
+        h.stride = 0; h.foot = !h.foot;
+        const tx = Math.floor(h.x / T), ty = Math.floor((h.y - 2) / T), g0 = this.Rm.ground[ix(this.Rm, tx, ty)];
+        if (g0 === Wd.SAND || g0 === PATH || (g0 !== WATER && Wd.biomeAt(this.Rm, tx, ty) === Wd.B_FROST && this.Rm.name === 'surface')) (this.prints ||= []).push({ x: h.x + (h.foot ? 2 : -2), y: h.y, t: 0, snow: g0 !== Wd.SAND && g0 !== PATH });
+      }
     }
     const cR = this.Rm;
     this.cam.x += (h.x - this.cam.x) * Math.min(1, dt * 3);
@@ -788,27 +799,30 @@ export class Garden extends Game {
     if (this.saveAcc > 20) { this.saveAcc = 0; cR.hero = { x: h.x, y: h.y }; Wd.saveGarden(); }
   }
   stepWeather(dt) {
-    const w = this.weather, realm = this.Rm.kind;
+    const w = this.weather, Rm = this.Rm, realm = Rm.kind;
     w.t += dt;
     if (this.mode === 'day' && realm !== 'cave' && w.t > w.until) {
-      // lively days: gusts, passing showers with a rainbow after, bright spells
-      const next = w.kind === 'rain' ? 'rainbow' : (realm === 'sky' ? ['gust', 'sun', 'gust', 'calm'] : ['gust', 'rain', 'sun', 'gust', 'calm'])[Math.floor(Math.random() * (realm === 'sky' ? 4 : 5))];
-      w.kind = next; w.t = 0; w.until = next === 'rain' ? 14 : next === 'rainbow' ? 9 : next === 'gust' ? 7 : 12 + Math.random() * 10;
-      if (next === 'rain') this.say('A spring shower passes over');
-      if (next === 'rainbow') this.say('A rainbow!');
+      // lively days: gusts, passing showers, bright spells
+      const next = w.kind === 'rain' ? 'sun' : (realm === 'sky' ? ['gust', 'sun', 'gust', 'calm'] : ['gust', 'rain', 'sun', 'gust', 'calm'])[Math.floor(Math.random() * (realm === 'sky' ? 4 : 5))];
+      w.kind = next; w.t = 0; w.until = next === 'rain' ? 16 : next === 'gust' ? 7 : 12 + Math.random() * 10;
     }
     // a gentle wind: enough to stir the grass and walk the fog along, never a gale
     const target = realm === 'cave' ? 0 : this.mode === 'evening' ? 0.32 : this.mode === 'morning' ? 0.42 : w.kind === 'gust' ? 1.3 : w.kind === 'rain' ? 0.85 : 0.55;
     w.wind += (target - w.wind) * Math.min(1, dt * 0.25);
-    if (w.kind === 'rain' && this.mode === 'day' && realm === 'surface') {
-      for (let i = 0; i < 4; i++) w.rain.push({ x: Math.random() * (VW + 40) - 20, y: -8, v: 180 + Math.random() * 80 });
-      for (let i = 0; i < 2; i++) this.rip.poke(this.cam.x + (Math.random() - 0.5) * VW, this.cam.y + (Math.random() - 0.5) * VH, 3);
-    }
     if (realm !== 'cave' && Math.random() < w.wind * 0.25) this.rip.poke(this.cam.x + (Math.random() - 0.5) * VW, this.cam.y + (Math.random() - 0.5) * VH, 1.1 * w.wind);
-    for (const r of w.rain) r.y += r.v * dt;
-    w.rain = w.rain.filter((r) => r.y < VH);
-    const evening = this.mode === 'evening' || realm === 'cave';
-    for (const p of this.amb) { p.p += dt * p.s; p.x += Math.sin(p.p) * 4 * dt + w.wind * (evening ? 1.5 : 7) * dt; p.y += (evening ? Math.cos(p.p * 0.7) * 3.5 : 6 + p.s * 4) * dt * (realm === 'cave' ? 0.4 : 1); if (p.x > VW + 6) p.x = -6; if (p.x < -6) p.x = VW + 6; if (p.y > VH + 6) { p.y = -6; p.x = Math.random() * VW; } if (p.y < -6) p.y = VH + 6; }
+    // rain and snow fall in the world round where you are looking, so they scroll with it (no
+    // overlay): showers on lively days, snow over the frost country and the mountains
+    const hx = Math.floor(this.hero.x / T), hy = Math.floor(this.hero.y / T);
+    const snow = Rm.name === 'mountain' || (Rm.name === 'surface' && Wd.biomeAt(Rm, hx, hy) === Wd.B_FROST);
+    const rain = !snow && w.kind === 'rain' && this.mode === 'day' && realm === 'surface';
+    const pr = this.precip, x0 = this.cam.x - VW / 2 - 30, y0 = this.cam.y - VH / 2 - 40;
+    if (rain) for (let n = 0; n < 4; n++) pr.push({ x: x0 + Math.random() * (VW + 60), y: y0 + Math.random() * (VH + 90), z: 60 + Math.random() * 60, vz: 210 + Math.random() * 70, rain: 1 });
+    if (snow && Math.random() < dt * 34) pr.push({ x: x0 + Math.random() * (VW + 60), y: y0 + Math.random() * (VH + 90), z: 50 + Math.random() * 50, vz: 11 + Math.random() * 9, ph: Math.random() * 6.28 });
+    for (const p of pr) {
+      p.z -= p.vz * dt; p.x += w.wind * (p.rain ? 12 : 14) * dt + (p.rain ? 0 : Math.sin(this.t * 1.6 + p.ph) * 7 * dt);
+      if (p.z <= 0 && p.rain) { if (this.wet(p.x, p.y + 2)) this.rip.poke(p.x, p.y, 2.4); else if (Math.random() < 0.3) this.fx.push({ kind: 'splash', x: p.x, y: p.y, t: 0, life: 0.22 }); }
+    }
+    this.precip = pr.length ? pr.filter((p) => p.z > 0 && p.x > x0 - 60 && p.x < x0 + VW + 120 && p.y > y0 - 60 && p.y < y0 + VH + 150) : pr;
   }
   autopilot(dt) {
     if (!this.ready || this.fade || this.hero.path.length || this.hero.task || this.hero.busy > 0) return;
@@ -849,7 +863,7 @@ export class Garden extends Game {
       if (!inside(Rm, tx, ty)) continue;
       const i = ix(Rm, tx, ty);
       let g = Gm.get(i);
-      if (!g) { const b = Wd.bladesFor(Rm, tx, ty); if (!b || !b.length) continue; g = { a: 0, v: 0, b, i }; Gm.set(i, g); }
+      if (!g) { const p = Wd.clumpAt(Rm, tx, ty); if (p < 0) continue; g = { a: 0, v: 0, p, i }; Gm.set(i, g); }
       const x = tx * T + 8, y = ty * T + 11;
       let f = (this.windAt(x + y * 0.3, t) - g.a) * 40 - g.v * 5;
       for (const [mx, my, vx, vy, m] of mv) { const dx = x - mx, dy = y - my, d2 = dx * dx + dy * dy; if (d2 > 225) continue; const sp = Math.min(1, Math.hypot(vx, vy) / 40); f += Math.sign(dx || vx || 1) * (1 - Math.sqrt(d2) / 15) * (0.3 + sp) * 300 * m; }
@@ -917,8 +931,18 @@ export class Garden extends Game {
       c.save(); c.translate(W / 2, H / 2 + 14); c.scale(k, k); c.drawImage(sp.cv, -sp.w / 2, -sp.h); c.restore();
       return;
     }
+    // a phone that cannot keep up gets a lighter picture: the bloom goes first, then the colour drain
+    const nowT = performance.now();
+    if (this.lastDraw) {
+      this.fdAvg = (this.fdAvg ?? 16) * 0.95 + Math.min(100, nowT - this.lastDraw) * 0.05;
+      if (this.fdAvg > 24 && this.q > 0 && nowT - (this.qT || 0) > 3000) { this.q--; this.qT = nowT; this.fdAvg = 16; }
+    } else this.qT = nowT;
+    this.lastDraw = nowT;
     this.buf ||= Object.assign(document.createElement('canvas'), { width: VW, height: VH });
-    const b = this.buf.getContext('2d'), Rm = this.Rm, realm = Rm.kind, cx = Math.round(this.cam.x - VW / 2), cy = Math.round(this.cam.y - VH / 2), t = this.t, P = palFor(Rm.name, this.mode);
+    const b = this.buf.getContext('2d'), Rm = this.Rm, realm = Rm.kind, t = this.t, P = palFor(Rm.name, this.mode), h = this.hero;
+    // the camera, snapped so the ground and the hero move by whole pixels together: the hero's
+    // rounded position plus the camera's (rounded) lag behind it, so the hero never shivers
+    const cx = Math.max(0, Math.min(Rm.w * T - VW, Math.round(h.x) + Math.round(this.cam.x - h.x) - VW / 2)), cy = Math.max(0, Math.min(Rm.h * T - VH, Math.round(h.y) + Math.round(this.cam.y - h.y) - VH / 2));
     b.setTransform(1, 0, 0, 1, 0, 0); b.imageSmoothingEnabled = false; b.globalAlpha = 1; b.globalCompositeOperation = 'source-over';
     if (realm === 'sky') this.drawSkyBg(b); else { b.fillStyle = realm === 'cave' ? '#0d0a12' : '#3a4a3a'; b.fillRect(0, 0, VW, VH); }
     const x0 = Math.floor(cx / CP), x1 = Math.floor((cx + VW) / CP), y0 = Math.floor(cy / CP), y1 = Math.floor((cy + VH) / CP);
@@ -927,9 +951,9 @@ export class Garden extends Game {
     if (realm !== 'sky') this.rip.draw(b, cx, cy, realm === 'cave' ? 'rgba(170,215,255,.45)' : 'rgba(255,255,255,.7)', realm === 'cave' ? 'rgba(0,0,10,.35)' : 'rgba(10,40,80,.22)');
     for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++) if (ok(gx, gy)) b.drawImage(Wd.chunk(Rm, this.mode, gx, gy).wc, gx * CP - cx, gy * CP - cy);
     // footprints, then the live grass
-    for (const f of this.prints) { b.globalAlpha = 0.35 * (1 - f.t / 5); b.fillStyle = '#5a4630'; b.fillRect(Math.round(f.x - cx), Math.round(f.y - cy), 2, 1); }
+    for (const f of this.prints) { b.globalAlpha = (f.snow ? 0.5 : 0.35) * (1 - f.t / 5); b.fillStyle = f.snow ? '#8a9ab4' : '#5a4630'; b.fillRect(Math.round(f.x - cx), Math.round(f.y - cy), 2, 1); }
     b.globalAlpha = 1;
-    this.drawGrass(b, cx, cy, P);
+    this.drawGrass(b, cx, cy);
     for (const l of this.leaves) if (l.rest) { b.globalAlpha = Math.min(1, l.life / 2); b.fillStyle = l.col; b.fillRect(Math.round(l.x - cx), Math.round(l.y - cy), 2, 1); }
     b.globalAlpha = 1;
     // things, back to front
@@ -941,9 +965,9 @@ export class Garden extends Game {
     }
     for (const d of Rm.decor) if (d.t === 'crystal') { const x = d.x * T + 8, y = d.y * T + 14; if (vis(x, y)) items.push([y, 'crystal', d]); }
     for (const p of Wd.plantsIn(this.Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6)) { const x = p.x * T + 8, y = p.y * T + 14; if (vis(x, y, PLANTS[p.k].giant ? 120 : 48)) items.push([y, PLANTS[p.k].giant ? 'giant' : 'plant', p]); }
-    for (const d of Rm.decor) if (d.t === 'lift') { const x = d.x * T + 8, y = d.y * T + 15; if (vis(x, y)) items.push([y - 1, 'lift', d]); }
+    for (const d of Rm.decor) if (d.t === 'lift') { const x = d.x * T + 8, y = d.y * T + 14; if (vis(x, y, 100)) items.push([y, 'lift', d]); }
     for (const a of Rm.animals) { if (ANIMALS[a.k].night && this.mode !== 'evening') continue; if (vis(a.x, a.y)) items.push([a.y + (ANIMALS[a.k].fly ? 30 : 0), 'animal', a]); }
-    items.push([this.hero.y, 'hero']);
+    items.push([h.y, 'hero']);
     for (const n of this.npcs || []) if (vis(n.x, n.y)) items.push([n.y, 'npc', n]);
     items.sort((p, q) => p[0] - q[0]);
     const canopies = [];
@@ -964,7 +988,11 @@ export class Garden extends Game {
         b.fillStyle = 'rgba(10,30,15,.18)'; b.beginPath(); b.ellipse(x, y - 4, 58, 22, 0, 0, 7); b.fill();
         b.drawImage(S.trunk.cv, x - (S.trunk.w >> 1), y - S.trunk.h + 2);
         canopies.push([o, S, x, y]);
-      } else if (kind === 'lift') { const s = Wd.liftSprite(o.up); b.drawImage(s.cv, Math.round(o.x * T + 8 - cx - s.w / 2), Math.round(o.y * T + 15 - cy - s.h + 6)); }
+      } else if (kind === 'lift') {
+        // the pad (or the well, or the basket) sits on the lift's tile
+        const st = Wd.liftStyle(o), s = Wd.liftSprite(st), foot = st === 'spire' ? 87 : st === 'vine' ? 64 : 39;
+        b.drawImage(s.cv, Math.round(o.x * T + 8 - cx - s.w / 2), Math.round(o.y * T + 10 - cy - foot));
+      }
       else if (kind === 'ruin') { const s = Wd.ruinSprite(o.t, P); b.drawImage(s.cv, Math.round(o.x - cx - s.w / 2), Math.round(o.y - cy - s.h)); }
       else if (kind === 'crystal') { const s = Wd.crystalSprite(o.c); b.drawImage(s.cv, o.x * T + 2 - cx, o.y * T + 15 - cy - s.h); }
       else if (kind === 'animal') {
@@ -975,26 +1003,25 @@ export class Garden extends Game {
         b.save(); b.translate(x, Math.round(y - hop - fly)); if (o.dir < 0) b.scale(-1, 1);
         if (k !== 1) b.drawImage(s.cv, -Math.floor(s.w * k / 2), -Math.round(s.h * k), Math.round(s.w * k), Math.round(s.h * k)); else b.drawImage(s.cv, -Math.floor(s.w / 2), -s.h);
         b.restore();
-      } else if (kind === 'hero' || kind === 'npc') {
-        const w = kind === 'hero' ? this.hero : o;
-        b.fillStyle = 'rgba(0,0,0,.18)'; b.fillRect(Math.round(w.x - cx) - 6, Math.round(w.y - cy) - 1, 12, 2);
-        w.actor.draw(b, Math.round(w.x - cx), Math.round(w.y - cy), 1);
-      }
+      } else if (kind === 'hero' || kind === 'npc') this.drawWalker(b, kind === 'hero' ? h : o, Math.round((kind === 'hero' ? h : o).x - cx), Math.round((kind === 'hero' ? h : o).y - cy));
     }
     // the ancient trees' crowns, over everything; thin to a veil when you walk beneath one
-    const ca = (this.canopyA ||= new WeakMap()), hx = this.hero.x - cx, hy = this.hero.y - cy - 10;
+    const ca = (this.canopyA ||= new WeakMap()), hx = h.x - cx, hy = h.y - cy - 10;
     for (const [o, S, x, y] of canopies) {
       const top = y - S.trunk.h - S.canopy.h * 0.55, under = Math.abs(hx - x) < 56 && hy > top - 4 && hy < y - 4;
       const a = ca.get(o) ?? 1, to = under ? 0.32 : 1, na = a + (to - a) * 0.12; ca.set(o, na);
       b.globalAlpha = na; b.drawImage(S.canopy.cv, x - (S.canopy.w >> 1) + Math.round(Math.sin(t * 0.5 + o.x) * 1.2), Math.round(top)); b.globalAlpha = 1;
     }
-    // falling leaves and petals
+    // falling leaves and petals, little effects, then rain and snow (all in the world)
     for (const l of this.leaves) if (!l.rest) { b.fillStyle = l.col; b.fillRect(Math.round(l.x - cx), Math.round(l.y - l.z - cy), Math.sin(l.t * 6 + l.ph) > 0 ? 2 : 1, 1); }
     for (const f of this.fx) {
       if (f.t < 0) continue;
       const k = f.t / f.life, x = Math.round(f.x - cx + (f.vx || 0) * f.t), y = Math.round(f.y - cy + (f.vy || 0) * f.t + (f.kind === 'leaf' || f.kind === 'dot' ? 60 * f.t * f.t : 0));
       b.globalAlpha = Math.max(0, 1 - k);
       if (f.kind === 'ring') { b.fillStyle = '#ffffff'; const r = 3 + k * 8; for (let a = 0; a < 6.28; a += 0.5) b.fillRect(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r * 0.5), 1, 1); }
+      else if (f.kind === 'wake') { b.fillStyle = '#eef8ff'; const r = 6 + k * 9; b.globalAlpha = 0.7 * (1 - k); for (let a = 0; a < 6.28; a += 0.35) b.fillRect(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r * 0.32), 1, 1); }
+      else if (f.kind === 'splash') { b.fillStyle = 'rgba(220,235,255,.8)'; b.fillRect(x - 1, y - 1, 1, 1); b.fillRect(x + 1, y - 1, 1, 1); b.fillRect(x, y, 1, 1); }
+      else if (f.kind === 'dust') { b.globalAlpha = 0.55 * (1 - k); b.fillStyle = f.c; b.fillRect(x, y, k < 0.5 ? 2 : 1, 1); }
       else if (f.kind === 'heart') { b.fillStyle = '#ff7a9a'; const X = x - 3, Y = y - 3; b.fillRect(X + 1, Y, 2, 1); b.fillRect(X + 4, Y, 2, 1); b.fillRect(X, Y + 1, 7, 2); b.fillRect(X + 1, Y + 3, 5, 1); b.fillRect(X + 2, Y + 4, 3, 1); b.fillRect(X + 3, Y + 5, 1, 1); }
       else if (f.kind === 'glow') { const r = 8 + k * 46; b.fillStyle = '#fff6c8'; for (let a = 0; a < 6.28; a += 0.18) b.fillRect(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r * 0.5), 2, 1); }
       else if (f.kind === 'trail') { b.globalAlpha = Math.sin(Math.min(1, k) * Math.PI) * 0.9; b.fillStyle = '#fff6c8'; b.fillRect(x - 1, y - 1, 2, 2); }
@@ -1002,46 +1029,75 @@ export class Garden extends Game {
       else { b.fillStyle = f.c || '#fff'; b.fillRect(x, y, 2, 2); }
     }
     b.globalAlpha = 1;
+    if (this.precip.length) {
+      b.fillStyle = 'rgba(205,225,250,.62)';
+      for (const p of this.precip) if (p.rain) b.fillRect(Math.round(p.x - cx), Math.round(p.y - p.z - cy), 1, 4);
+      b.fillStyle = '#ffffff';
+      for (const p of this.precip) if (!p.rain) { const s = p.vz > 16 ? 2 : 1; b.fillRect(Math.round(p.x - cx), Math.round(p.y - p.z - cy), s, s); }
+    }
     this.drawFog(b, cx, cy);
     this.drawLight(b, cx, cy);
-    this.drawAtmos(b, cx, cy);
-    this.drawGrain(b);
+    this.drawGrade(b);
     // up to the card, chunky pixels
     c.drawImage(this.buf, 0, 0, W, H);
     this.drawUI(c);
     if (this.fade) { const f = this.fade, a = f.t < 0.45 ? f.t / 0.45 : 1 - (f.t - 0.45) / 0.45; c.globalAlpha = Math.max(0, Math.min(1, a)); c.fillStyle = f.col; c.fillRect(0, 0, W, H); c.globalAlpha = 1; }
+    // paint one chunk just outside the view ahead of time (the way you are heading first), so walking
+    // on never waits for a whole chunk to be painted
+    if (!this.fade) {
+      let best = null, bs = -Infinity;
+      for (let gy = y0 - 1; gy <= y1 + 1; gy++) for (let gx = x0 - 1; gx <= x1 + 1; gx++) {
+        if ((gx >= x0 && gx <= x1 && gy >= y0 && gy <= y1) || !ok(gx, gy) || Wd.chunkReady(Rm, this.mode, gx, gy)) continue;
+        const sc = (gx - (x0 + x1) / 2) * (h.vx || 0) + (gy - (y0 + y1) / 2) * (h.vy || 0);
+        if (sc > bs) { bs = sc; best = [gx, gy]; }
+      }
+      if (best) Wd.chunk(Rm, this.mode, best[0], best[1]);
+    }
   }
-  // the grass: blades on springs, three crisp segments each, leaning with the wind and whoever walks by
-  drawGrass(b, cx, cy, P) {
-    const Rm = this.Rm, t = this.t, sky = Rm.kind === 'sky';
+  // a walker: Cave Crawler's soft pixel shadow and the sprite; in deep water, swimming, sunk to the
+  // chest and cut at the waterline (faint below it), with a ring of ripples round them
+  drawWalker(b, w, X, Y) {
+    if (!w.swim) {
+      b.drawImage(this.shadowSprite ||= (() => { const cv = Object.assign(document.createElement('canvas'), { width: 13, height: 5 }), c = cv.getContext('2d'); c.fillStyle = 'rgba(0,0,0,.43)'; for (let j = 0; j < 5; j++) for (let i = 0; i < 13; i++) { const dx = (i + 0.5 - 6.5) / 6.5, dy = (j + 0.5 - 2.5) / 2.5; if (dx * dx + dy * dy <= 1) c.fillRect(i, j, 1, 1); } return cv; })(), X - 6, Y - 3);
+      w.actor.draw(b, X, Y, 1);
+      return;
+    }
+    const bob = Math.sin(this.t * 3.2 + (w.k || 0)) > 0.4 ? 1 : 0, wl = Y - 1;
+    b.save(); b.beginPath(); b.rect(X - 24, wl - 44, 48, 44); b.clip(); w.actor.draw(b, X, Y + 8 + bob, 1); b.restore();
+    b.save(); b.beginPath(); b.rect(X - 24, wl, 48, 14); b.clip(); w.actor.draw(b, X, Y + 8 + bob, 1, { alpha: 0.2 }); b.restore();
+    b.fillStyle = 'rgba(236,248,255,.8)';
+    for (let a = 0; a < 6.28; a += 0.45) b.fillRect(Math.round(X + Math.cos(a + this.t) * 8), Math.round(wl + Math.sin(a + this.t) * 2.2), 1, 1);
+  }
+  // the short grass: a clump sprite per tile at the lean its spring has reached (tall grass is painted
+  // into the map and does not move)
+  drawGrass(b, cx, cy) {
+    const Rm = this.Rm, t = this.t, surf = Rm.name === 'surface', half = Wd.LEANS >> 1;
     if (Rm.kind === 'cave' || !this.grass.size) return;
-    const tufts = this.tuftCols ||= {};
-    const key = `${Rm.name}${this.mode}`;
-    tufts[key] ||= sky ? [Wd.tone(P.grass[0], -0.16), Wd.tone(P.grass[2], 0.1), P.grass[0], P.grass[0]] : [Wd.tone(P.grass[0], -0.24), Wd.tone(P.grass[2], 0.1), Wd.tone(P.forest[0], -0.26), Wd.tone(P.forest[2], 0.08)];
-    const tc = tufts[key], wildCols = sky ? [P.grass[2], P.grass[0]] : [P.blade, P.wild[0]];
+    const P0 = surf ? null : palFor(Rm.name, this.mode);
     b.globalAlpha = Math.max(0.8, Math.min(0.95, settings.gardenPlantAlpha ?? 0.88));
     for (const g of this.grass.values()) {
       if (t - g.seen > 0.1) continue;
       const tx = g.i % Rm.w, ty = (g.i / Rm.w) | 0, X = tx * T - cx, Y = ty * T - cy;
-      if (X < -16 || Y < -10 || X > VW + 16 || Y > VH + 24) continue;
-      const wild = Rm.wild[g.i] > 0, forest = Rm.ground[g.i] === Wd.FOREST;
-      for (const [bx, by, h, sh] of g.b) {
-        const lean = g.a * (0.75 + ((bx * 7 + by) % 5) * 0.12), x = X + bx, y = Y + by, h3 = Math.max(1, Math.round(h / 3));
-        b.fillStyle = wild ? wildCols[sh] : tc[(forest ? 2 : 0) + sh];
-        b.fillRect(x, y - h3, 1, h3);
-        b.fillRect(x + Math.round(lean * h * 0.25), y - 2 * h3, 1, h3);
-        b.fillRect(x + Math.round(lean * h * 0.7), y - h, 1, Math.max(1, h - 2 * h3));
-      }
+      if (X < -16 || Y < -10 || X > VW + 16 || Y > VH + 24 || Rm.wild[g.i]) continue;
+      const lean = Math.max(0, Math.min(Wd.LEANS - 1, Math.round((g.a / 1.1) * half) + half));
+      b.drawImage(Wd.clumpSprite(P0 || Wd.biomePal(Wd.biomeAt(Rm, tx, ty), this.mode), Rm.ground[g.i] === FOREST, g.p, lean), X - 5, Y - 2);
     }
     b.globalAlpha = 1;
   }
-  // the dream layer: a darker, cooler grade and a soft bloom so the lights smear a little, as in a
-  // half-remembered place (the fog itself lives in the world: see stepFog)
-  drawAtmos(b, cx, cy) {
-    const realm = this.Rm.kind, mode = this.mode, t = this.t, A = ATMOS[realm === 'cave' ? 'cave' : mode] || ATMOS.day;
-    b.globalCompositeOperation = 'multiply'; b.globalAlpha = A.dimA; b.fillStyle = A.dim; b.fillRect(0, 0, VW, VH);
-    b.globalCompositeOperation = 'saturation'; b.globalAlpha = A.desat; b.fillStyle = '#808080'; b.fillRect(0, 0, VW, VH);
-    b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1;
+  // The light's colour over everything, cheaply: one cached multiply layer (the time of day's grade,
+  // the evening's sunset wash, a rainy dimness and the vignette together), the colour drained a
+  // little, one cached screen layer (a morning blush, the low sun) and a soft bloom so the lights
+  // smear as in a half-remembered place. Slow phones drop the bloom, then the drain (this.q).
+  drawGrade(b) {
+    const realm = this.Rm.kind, mode = this.mode, w = this.weather, A = ATMOS[realm === 'cave' ? 'cave' : mode] || ATMOS.day;
+    const rain = w.kind === 'rain' && mode === 'day' && realm === 'surface', sun = w.kind === 'sun' && mode === 'day' && realm !== 'cave';
+    const key = `${realm}|${mode}|${rain ? 'r' : ''}${sun ? 's' : ''}`;
+    if (this.gradeKey !== key) { this.gradeKey = key; this.grade = this.makeGrade(realm, mode, A, rain, sun); }
+    b.globalCompositeOperation = 'multiply'; b.drawImage(this.grade.mul, 0, 0);
+    if (this.q >= 1) { b.globalCompositeOperation = 'saturation'; b.globalAlpha = A.desat; b.fillStyle = '#808080'; b.fillRect(0, 0, VW, VH); b.globalAlpha = 1; }
+    if (this.grade.scr) { b.globalCompositeOperation = 'screen'; b.drawImage(this.grade.scr, 0, 0); }
+    b.globalCompositeOperation = 'source-over';
+    if (this.q < 2) return;
     // bloom: a quarter-size copy, multiplied by itself twice so only the bright things (lanterns,
     // blossoms, water glints, mist) glow, then smoothed back up and screened over
     this.bloom ||= Object.assign(document.createElement('canvas'), { width: VW / 4, height: VH / 4 });
@@ -1054,12 +1110,40 @@ export class Garden extends Game {
     b.drawImage(this.bloom, 0, 0, VW, VH);
     b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1; b.imageSmoothingEnabled = false;
   }
+  makeGrade(realm, mode, A, rain, sun) {
+    const cv = () => Object.assign(document.createElement('canvas'), { width: VW, height: VH });
+    const mul = cv(), m = mul.getContext('2d');
+    m.fillStyle = '#ffffff'; m.fillRect(0, 0, VW, VH); m.globalCompositeOperation = 'multiply';
+    if (mode === 'evening' && realm !== 'cave') {
+      const g = m.createLinearGradient(0, 0, 0, VH);
+      g.addColorStop(0, '#ffc7a0'); g.addColorStop(0.5, '#efa9c6'); g.addColorStop(1, '#8f88d8');
+      m.globalAlpha = realm === 'sky' ? 0.6 : 0.8; m.fillStyle = g; m.fillRect(0, 0, VW, VH);
+    }
+    m.globalAlpha = A.dimA; m.fillStyle = A.dim; m.fillRect(0, 0, VW, VH);
+    if (rain) { m.globalAlpha = 0.3; m.fillStyle = '#8a9ab4'; m.fillRect(0, 0, VW, VH); }
+    m.globalAlpha = 1;
+    const v = m.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VH * 0.78);
+    v.addColorStop(0, '#ffffff'); v.addColorStop(1, '#b6aec2'); m.fillStyle = v; m.fillRect(0, 0, VW, VH);
+    let scr = null;
+    const glow = (x, y, r, col) => { scr ||= cv(); const q = scr.getContext('2d'), g = q.createRadialGradient(x, y, 6, x, y, r); g.addColorStop(0, col); g.addColorStop(1, col.replace(/[\d.]+\)$/, '0)')); q.fillStyle = g; q.fillRect(0, 0, VW, VH); };
+    if (mode === 'morning' && realm !== 'cave') { scr = cv(); const q = scr.getContext('2d'), g = q.createLinearGradient(0, 0, VW, VH); g.addColorStop(0, 'rgba(255,200,220,.18)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(190,220,255,.14)'); q.fillStyle = g; q.fillRect(0, 0, VW, VH); }
+    if (mode === 'evening' && realm !== 'cave') {
+      scr = cv(); const q = scr.getContext('2d'), g = q.createLinearGradient(0, 0, 0, VH);
+      g.addColorStop(0, 'rgba(255,140,150,.13)'); g.addColorStop(1, 'rgba(90,70,190,.12)'); q.fillStyle = g; q.fillRect(0, 0, VW, VH);
+      glow(VW * 0.8, -14, 200, 'rgba(255,160,110,.3)');
+    }
+    if (sun) glow(VW * 0.85, 0, 210, 'rgba(255,240,180,.28)');
+    return { mul, scr };
+  }
   // fog and cloud: patches that sit in the world and drift slowly downwind. Each is a cluster of soft
   // puffs on springs; whoever walks through pushes them aside and they drift closed behind.
   // Denser over water and in the forest, densest at dawn; in the sky they are the clouds.
   stepFog(dt) {
-    const Rm = this.Rm, realm = Rm.kind, A = ATMOS[realm === 'cave' ? 'cave' : this.mode] || ATMOS.day, w = this.weather;
-    const want = Math.round(A.fog * (realm === 'sky' ? 1.5 : 1) * (w.kind === 'rain' ? 1.3 : 1)), fog = (this.fog ||= []);
+    const Rm = this.Rm, realm = Rm.kind, A = ATMOS[realm === 'cave' ? 'cave' : this.mode] || ATMOS.day, w = this.weather, surf = Rm.name === 'surface';
+    // each kind of country has its own mist: thick and green-grey in the marsh and the old groves, a
+    // thin warm haze over the dunes, violet in the fungal glades, white over the snow
+    const here = surf ? Wd.BIOMES[Wd.biomeAt(Rm, Math.floor(this.hero.x / T), Math.floor(this.hero.y / T))] : null;
+    const want = Math.round(A.fog * (realm === 'sky' ? 1.5 : 1) * (w.kind === 'rain' ? 1.3 : 1) * (here ? here.fogK : 1)), fog = (this.fog ||= []);
     const mx0 = this.cam.x - VW / 2 - 90, my0 = this.cam.y - VH / 2 - 90, mw = VW + 180, mh = VH + 180;
     const drift = realm === 'cave' ? 0.6 : 2 + w.wind * 6, ang = Math.sin(this.t * 0.013) * 0.5;
     // keep a field of patches around the view; new ones drift in from upwind
@@ -1070,8 +1154,10 @@ export class Garden extends Game {
         const g = inside(Rm, tx, ty) ? Rm.ground[ix(Rm, tx, ty)] : -1, sc = Math.random() + (g === WATER ? 1.2 : g === FOREST ? 0.8 : 0) + (inside(Rm, tx, ty) && Rm.wild[ix(Rm, tx, ty)] ? 0.4 : 0);
         if (sc > bs) { bs = sc; best = [x, y]; }
       }
-      const r = 1 + Math.random(), n0 = 4 + Math.floor(Math.random() * 5);
-      fog.push({ x: best[0], y: best[1], a: 0, life: 40 + Math.random() * 60, puffs: Array.from({ length: n0 }, () => ({ ox: (Math.random() - 0.5) * 64 * r, oy: (Math.random() - 0.5) * 30 * r, r: 14 + Math.random() * 16 * r, dx: 0, dy: 0, vx: 0, vy: 0 })) });
+      const r = 1 + Math.random(), n0 = 4 + Math.floor(Math.random() * 5), base = realm === 'sky' ? A.cloudCol || A.mistCol : A.mistCol;
+      const bt = surf ? Wd.BIOMES[Wd.biomeAt(Rm, Math.max(0, Math.min(Rm.w - 1, Math.floor(best[0] / T))), Math.max(0, Math.min(Rm.h - 1, Math.floor(best[1] / T))))].fog : null;
+      const col = bt ? base.map((v, k) => Math.round((v * 0.45 + bt[k] * 0.55) / 8) * 8) : base;
+      fog.push({ x: best[0], y: best[1], a: 0, col, life: 40 + Math.random() * 60, puffs: Array.from({ length: n0 }, () => ({ ox: (Math.random() - 0.5) * 64 * r, oy: (Math.random() - 0.5) * 30 * r, r: 14 + Math.random() * 16 * r, dx: 0, dy: 0, vx: 0, vy: 0 })) });
     }
     this.fogInit = true;
     const mv = this.movers();
@@ -1094,22 +1180,11 @@ export class Garden extends Game {
     if (!this.fog?.length) return;
     const realm = this.Rm.kind, A = ATMOS[realm === 'cave' ? 'cave' : this.mode] || ATMOS.day, col = realm === 'sky' ? A.cloudCol || A.mistCol : A.mistCol;
     for (const f of this.fog) for (const p of f.puffs) {
-      const s = puffTex(Math.round(p.r / 3) * 3, col), x = Math.round(f.x + p.ox + p.dx - cx - s.width / 2), y = Math.round(f.y + p.oy + p.dy - cy - s.height / 2);
+      const s = puffTex(Math.round(p.r / 3) * 3, f.col || col), x = Math.round(f.x + p.ox + p.dx - cx - s.width / 2), y = Math.round(f.y + p.oy + p.dy - cy - s.height / 2);
       if (x > VW || y > VH || x + s.width < 0 || y + s.height < 0) continue;
       b.globalAlpha = f.a * A.fogA * (realm === 'sky' ? 1.25 : 1); b.drawImage(s, x, y);
     }
     b.globalAlpha = 1;
-  }
-  // film grain and a soft vignette, for the lo-fi look
-  drawGrain(b) {
-    if (!this.grain) {
-      this.grain = [0, 1, 2].map(() => { const cv = Object.assign(document.createElement('canvas'), { width: VW, height: VH }), g = cv.getContext('2d'); for (let i = 0; i < VW * VH * 0.05; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.08)'; g.fillRect((Math.random() * VW) | 0, (Math.random() * VH) | 0, 1, 1); } return cv; });
-      const v = Object.assign(document.createElement('canvas'), { width: VW, height: VH }), g = v.getContext('2d'), rg = g.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VH * 0.78);
-      rg.addColorStop(0, 'rgba(20,14,28,0)'); rg.addColorStop(1, 'rgba(20,14,28,.32)'); g.fillStyle = rg; g.fillRect(0, 0, VW, VH);
-      this.vignette = v;
-    }
-    b.drawImage(this.grain[Math.floor(this.t * 12) % 3], 0, 0);
-    b.drawImage(this.vignette, 0, 0);
   }
   // the open sky under the islands: gradient, drifting cloud banks, far islands and now and then a sky whale
   drawSkyBg(b) {
@@ -1146,8 +1221,11 @@ export class Garden extends Game {
     }
     b.globalAlpha = 1;
   }
+  // lights that live in the world: the lantern's circle in the dark caves, the columns of light over
+  // the sky spires (tall enough to be seen from well off, the way to the mountains), and at dusk the
+  // glowing plants, shrines and cave mouths. Nothing floats over the picture.
   drawLight(b, cx, cy) {
-    const t = this.t, w = this.weather, realm = this.Rm.kind, sx = (x) => x - cx, sy = (y) => y - cy;
+    const t = this.t, Rm = this.Rm, realm = Rm.kind, sx = (x) => x - cx, sy = (y) => y - cy;
     const glow = (x, y, r, col, a) => { const rg = b.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, col.replace('A', a)); rg.addColorStop(1, col.replace('A', 0)); b.fillStyle = rg; b.fillRect(x - r, y - r, r * 2, r * 2); };
     if (realm === 'cave') {
       // darkness, with the lantern, glowshrooms, crystals and shafts of daylight cut out of it
@@ -1159,69 +1237,36 @@ export class Garden extends Game {
       hole(sx(this.hero.x), sy(this.hero.y - 10), 104 + Math.sin(t * 7) * 2);
       for (const n of this.npcs || []) hole(sx(n.x), sy(n.y - 10), 46 + Math.sin(t * 6 + n.k) * 2, 0.9);
       const lights = [];
-      for (const p of Wd.plantsIn(this.Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6)) if (PLANTS[p.k].glow && stageOf(p) >= 2) lights.push([p.x * T + 8, p.y * T + 6, 27, '#8ff0d8']);
-      for (const dc of this.Rm.decor) if (dc.t === 'crystal') lights.push([dc.x * T + 8, dc.y * T + 6, 31, dc.c]);
-      for (const p of this.Rm.portals) lights.push([p.x * T + 8, p.y * T + 8, 54, '#fff0c8']);
-      for (const d of this.Rm.decor) if (d.t === 'lift') lights.push([d.x * T + 8, d.y * T + 8, 60, d.up ? '#bfe8ff' : '#ffd8a0']);
-      for (const r of this.Rm.ruins) if (r.found) lights.push([r.x * T + r.w * 8, r.y * T + r.h * 8, r.t === 'crystalheart' ? 94 : 47, r.t === 'crystalheart' ? '#9ff0f0' : '#b8c8ff']);
+      for (const p of Wd.plantsIn(Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6)) if (PLANTS[p.k].glow && stageOf(p) >= 2) lights.push([p.x * T + 8, p.y * T + 6, 27, '#8ff0d8']);
+      for (const dc of Rm.decor) if (dc.t === 'crystal') lights.push([dc.x * T + 8, dc.y * T + 6, 31, dc.c]);
+      for (const p of Rm.portals) lights.push([p.x * T + 8, p.y * T + 8, 54, '#fff0c8']);
+      for (const dc of Rm.decor) if (dc.t === 'lift') lights.push([dc.x * T + 8, dc.y * T - (Wd.liftStyle(dc) === 'spire' ? 30 : 4), 64, dc.up ? '#bfe8ff' : '#ffd8a0']);
+      for (const r of Rm.ruins) if (r.found) lights.push([r.x * T + r.w * 8, r.y * T + r.h * 8, r.t === 'crystalheart' ? 94 : 47, r.t === 'crystalheart' ? '#9ff0f0' : '#b8c8ff']);
       for (const [x, y, r] of lights) { const X = sx(x), Y = sy(y); if (X > -r && Y > -r && X < VW + r && Y < VH + r) hole(X, Y, r * (1 + Math.sin(t * 2 + x) * 0.05), 0.85); }
       b.drawImage(this.dark, 0, 0);
       b.globalCompositeOperation = 'lighter';
-      for (const [x, y, r, col] of lights) { const X = sx(x), Y = sy(y); if (X > -r && Y > -r && X < VW + r && Y < VH + r) glow(X, Y, r * 0.5, `rgba(${parseInt(col.slice(1, 3), 16)},${parseInt(col.slice(3, 5), 16)},${parseInt(col.slice(5, 7), 16)},A)`, 0.25); }
-      for (const p of this.amb) { b.fillStyle = `rgba(200,230,255,${0.25 + Math.sin(p.p * 2) * 0.2})`; b.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
-      for (const a of this.Rm.animals) if (a.k === 'glowworm') glow(sx(a.x), sy(a.y - 12), 7, 'rgba(210,255,150,A)', 0.6);
+      for (const [x, y, r, col] of lights) { const X = sx(x), Y = sy(y); if (X > -r && Y > -r && X < VW + r && Y < VH + r) glow(X, Y, r * 0.5, `rgba(${parseInt(col.slice(1, 3), 16)},${parseInt(col.slice(3, 5), 16)},${parseInt(col.slice(5, 7), 16)},A)`, 0.3); }
+      for (const a of Rm.animals) if (a.k === 'glowworm') glow(sx(a.x), sy(a.y - 12), 7, 'rgba(210,255,150,A)', 0.7);
       b.globalCompositeOperation = 'source-over';
       return;
     }
     b.globalCompositeOperation = 'lighter';
-    for (const d of this.Rm.decor) {
-      if (d.t !== 'lift' || !d.up) continue;
-      const X = sx(d.x * T + 8), Y = sy(d.y * T + 12);
-      if (X < -20 || X > VW + 20 || Y < -10 || Y > VH + 120) continue;
-      const gr = b.createLinearGradient(0, Y - 110, 0, Y), k = 0.16 + Math.sin(t * 1.6 + d.x) * 0.05;
-      gr.addColorStop(0, 'rgba(190,230,255,0)'); gr.addColorStop(1, `rgba(190,230,255,${k})`);
-      b.fillStyle = gr; b.fillRect(X - 6, Y - 110, 12, 110);
+    for (const d of Rm.decor) {
+      if (d.t !== 'lift' || Wd.liftStyle(d) !== 'spire') continue;
+      const X = sx(d.x * T + 8), Y = sy(d.y * T - 36), H0 = 420;
+      if (X < -24 || X > VW + 24 || Y < -30 || Y > VH + H0) continue;
+      const k = 0.2 + Math.sin(t * 1.6 + d.x) * 0.05, gr = b.createLinearGradient(0, Y - H0, 0, Y);
+      gr.addColorStop(0, 'rgba(190,230,255,0)'); gr.addColorStop(0.7, `rgba(190,230,255,${k * 0.6})`); gr.addColorStop(1, `rgba(200,236,255,${k})`);
+      b.fillStyle = gr; b.fillRect(X - 6, Y - H0, 12, H0); b.fillRect(X - 2, Y - H0, 4, H0);
+      glow(X, Y, 18, 'rgba(170,230,255,A)', 0.4 + Math.sin(t * 2.2 + d.y) * 0.1);
+    }
+    if (this.mode === 'evening') {
+      for (const p of Wd.plantsIn(Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6)) { const Pp = PLANTS[p.k]; if (!Pp.glow || stageOf(p) < 2) continue; const x = sx(p.x * T + 8), y = sy(p.y * T + 14 - (Pp.type === 'tree' ? 22 : 8)); if (x < -30 || y < -30 || x > VW + 30 || y > VH + 30) continue; glow(x, y, Pp.type === 'tree' ? 20 : 9, 'rgba(255,230,160,A)', 0.5 + Math.sin(t * 2 + p.x) * 0.1); }
+      for (const r of Rm.ruins) { if (!r.found || !['shrine', 'obelisk', 'glyphs', 'fountain', 'well', 'cloudstair', 'starharp', 'windtemple'].includes(r.t)) continue; glow(sx(r.x * T + r.w * 8), sy(r.y * T + r.h * 8), 27, r.t === 'shrine' ? 'rgba(255,210,120,A)' : 'rgba(150,210,255,A)', 0.42 + Math.sin(t * 1.3 + r.x) * 0.1); }
+      for (const p of Rm.portals) if (p.kind === 'mouth') glow(sx(p.x * T + 8), sy(p.y * T + 10), 15, 'rgba(255,200,140,A)', 0.26);
+      glow(sx(this.hero.x), sy(this.hero.y - 12), 24, 'rgba(255,220,150,A)', 0.32);
     }
     b.globalCompositeOperation = 'source-over';
-    if (this.mode === 'morning') {
-      const g = b.createLinearGradient(0, 0, VW, VH);
-      g.addColorStop(0, 'rgba(255,200,220,.16)'); g.addColorStop(0.5, 'rgba(255,240,220,0)'); g.addColorStop(1, 'rgba(190,220,255,.12)');
-      b.fillStyle = g; b.fillRect(0, 0, VW, VH);
-      for (const [i, p] of this.amb.entries()) { if (i % 2) continue; b.fillStyle = p.s > 1 ? '#ffc4d8' : '#fff4f8'; b.globalAlpha = 0.9; b.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
-      b.globalAlpha = 1;
-    } else if (this.mode === 'evening') {
-      b.globalCompositeOperation = 'multiply';
-      const g = b.createLinearGradient(0, 0, 0, VH);
-      g.addColorStop(0, '#ffc7a0'); g.addColorStop(0.5, '#efa9c6'); g.addColorStop(1, '#8f88d8');
-      b.globalAlpha = realm === 'sky' ? 0.6 : 0.8; b.fillStyle = g; b.fillRect(0, 0, VW, VH); b.globalAlpha = 1;
-      b.globalCompositeOperation = 'overlay';
-      const tint = b.createLinearGradient(0, 0, 0, VH);
-      tint.addColorStop(0, 'rgba(255,140,150,.22)'); tint.addColorStop(1, 'rgba(90,70,190,.22)');
-      b.fillStyle = tint; b.fillRect(0, 0, VW, VH);
-      b.globalCompositeOperation = 'screen';
-      const sun = b.createRadialGradient(VW * 0.8, -14, 6, VW * 0.8, -14, 200);
-      sun.addColorStop(0, 'rgba(255,160,110,.32)'); sun.addColorStop(1, 'rgba(255,160,110,0)');
-      b.fillStyle = sun; b.fillRect(0, 0, VW, VH);
-      b.globalCompositeOperation = 'lighter';
-      for (const p of Wd.plantsIn(this.Rm, Math.floor((this.cam.x - VW / 2) / T) - 4, Math.floor((this.cam.y - VH / 2) / T) - 4, Math.ceil((this.cam.x + VW / 2) / T) + 4, Math.ceil((this.cam.y + VH / 2) / T) + 6)) { const Pp = PLANTS[p.k]; if (!Pp.glow || stageOf(p) < 2) continue; const x = sx(p.x * T + 8), y = sy(p.y * T + 14 - (Pp.type === 'tree' ? 22 : 8)); if (x < -30 || y < -30 || x > VW + 30 || y > VH + 30) continue; glow(x, y, Pp.type === 'tree' ? 20 : 9, 'rgba(255,230,160,A)', 0.35 + Math.sin(t * 2 + p.x) * 0.08); }
-      for (const r of this.Rm.ruins) { if (!r.found || !['shrine', 'obelisk', 'glyphs', 'fountain', 'well', 'cloudstair', 'starharp', 'windtemple'].includes(r.t)) continue; glow(sx(r.x * T + r.w * 8), sy(r.y * T + r.h * 8), 27, r.t === 'shrine' ? 'rgba(255,210,120,A)' : 'rgba(150,210,255,A)', 0.3 + Math.sin(t * 1.3 + r.x) * 0.08); }
-      for (const p of this.Rm.portals) if (p.kind === 'mouth') glow(sx(p.x * T + 8), sy(p.y * T + 10), 15, 'rgba(255,200,140,A)', 0.18);
-      glow(sx(this.hero.x), sy(this.hero.y - 12), 24, 'rgba(255,220,150,A)', 0.25);
-      for (const p of this.amb) { const a = 0.4 + Math.sin(p.p * 3) * 0.4; if (a < 0.1) continue; glow(p.x, p.y, 4, 'rgba(220,255,140,A)', a); b.fillStyle = `rgba(240,255,190,${a})`; b.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
-      b.globalCompositeOperation = 'source-over';
-    } else {
-      if (realm === 'surface') { b.fillStyle = 'rgba(30,40,60,.07)'; for (let i = 0; i < 3; i++) { const x = ((i * 127 + t * 8) % (VW + 200)) - 100; b.beginPath(); b.ellipse(x, 53 + i * 87, 80, 33, 0.2, 0, 7); b.fill(); } }
-      if (w.kind === 'rain') { b.fillStyle = `rgba(40,60,90,${Math.min(0.18, w.t * 0.04)})`; b.fillRect(0, 0, VW, VH); }
-      b.fillStyle = 'rgba(210,230,255,.75)';
-      for (const r of w.rain) { b.fillRect(Math.round(r.x), Math.round(r.y), 1, 3); b.fillRect(Math.round(r.x) - 1, Math.round(r.y) + 3, 1, 2); }
-      if (w.kind === 'rainbow') {
-        const a = Math.min(1, w.t / 2, (w.until - w.t) / 2) * 0.35;
-        ['#ff6b6b', '#ffa94d', '#ffe066', '#69db7c', '#4dabf7', '#9775fa'].forEach((col, i) => { b.strokeStyle = col; b.globalAlpha = a; b.lineWidth = 3; b.beginPath(); b.arc(VW * 0.7, VH * 0.95, 200 - i * 3, Math.PI * 1.1, Math.PI * 1.75); b.stroke(); });
-        b.globalAlpha = 1;
-      }
-      if (w.kind === 'sun') { const g = b.createRadialGradient(VW * 0.85, 0, 6, VW * 0.85, 0, 210); g.addColorStop(0, `rgba(255,240,180,${Math.min(0.3, w.t * 0.1)})`); g.addColorStop(1, 'rgba(255,240,180,0)'); b.fillStyle = g; b.fillRect(0, 0, VW, VH); }
-      if (w.kind === 'gust') for (const p of this.amb) { b.fillStyle = realm === 'sky' ? '#ffffff' : '#9ccf7a'; b.fillRect(Math.round(p.x), Math.round(p.y), 2, 1); }
-    }
   }
   // no buttons, maps or words on the card: only, on a first visit, two soft ripples where to tap
   drawUI(c) {

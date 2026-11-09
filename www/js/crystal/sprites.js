@@ -10,7 +10,7 @@ import { personaFor, personaToCrystal } from '../persona.js';
 export const S = globalThis.FF5Sprites;
 export const FW = 40, FH = 40, AX = 20, AY = 37;
 export const ERAS = ['Fantasy', 'Present day', 'Sci-fi'];
-const VER = 'c2';
+const VER = 'c3';   // c3: the swim animation
 const ANIM_NAMES = Object.keys(S.animations);
 const ALL_DIRS = S.directions.slice();
 
@@ -105,7 +105,7 @@ export class Actor {
     this.s = { anim: 'idle', dir: opts.dir || (this.mode === 'side' ? 'E' : 'S'), frame: 0, events: [] };
     this.flash = 0;
   }
-  // dt in seconds; st: { vx, vy, grounded, airVy, lowHealth }. Returns the events.
+  // dt in seconds; st: { vx, vy, grounded, airVy, lowHealth, swim }. Returns the events.
   update(dt, st = {}) {
     this.s = this.a.update(dt, { vx: 0, vy: 0, grounded: true, ...st });
     if (this.flash > 0) this.flash -= dt;

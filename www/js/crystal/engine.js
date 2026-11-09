@@ -7,14 +7,14 @@
  *       // sheet.width/height/data = RGBA pixels; sheet.meta = fps, loop, events, rows per anim x dir
  *   const anim = S.createAnimator({mode:'eight'});        // 'side' for platformers, 'four' for 4-dir RPGs
  *   // every tick:
- *   const s = anim.update(dt, {vx, vy, grounded, airVy, lowHealth});
+ *   const s = anim.update(dt, {vx, vy, grounded, airVy, lowHealth, swim});
  *   const r = S.sheetRect(sheet.meta, s.anim, s.dir, s.frame);   // source rect + foot anchor
- *   for (const e of s.events) ...                         // 'footstep' 'takeoff' 'land' 'swing' 'hit' 'fire' 'cast' 'hurt' 'thud' 'done:<anim>'
+ *   for (const e of s.events) ...                         // 'footstep' 'takeoff' 'land' 'swing' 'hit' 'fire' 'cast' 'hurt' 'thud' 'stroke' 'done:<anim>'
  *   // verbs: anim.attack() shoot() cast()/stopCast() hurt() ko() revive() jump() emote(name, secs) face(dir)
  *
  * Frames are 40x40, feet anchored at (20, 37). Directions: S SW W NW N NE E SE.
  * Animations (S.animations[k].use explains when to play each one):
- *   idle walk run jump land attack shoot cast flinch knockdown kneel
+ *   idle walk run jump land attack shoot cast flinch knockdown kneel swim
  *   wave cheer nod shake laugh surprise sad think angry love          (emotes)
  */
 (function(root){"use strict";
@@ -386,7 +386,12 @@ const ANIMS={
   sad:{name:'Sad',fps:3,loop:true,n:2,emote:1,f:k=>pose({lean:14,head:[0,-1,0.8],eyes:'closed',drop:1-k,aP:{sw:5,ab:6,el:5},aN:{sw:5,ab:6,el:5},lift:-0.4})},
   think:{name:'Think',fps:3,loop:true,n:2,emote:1,f:k=>pose({head:[k?1:0,k?-0.6:0,0],drop:k,eyes:k?'closed':'open',aP:{sw:70,ab:12,el:k?140:115},aN:{sw:35,ab:10,el:95},lean:k?6:0})},
   angry:{name:'Angry',fps:8,loop:true,n:2,emote:1,f:k=>pose({lean:8,drop:k,aP:{sw:30,ab:35,el:95},aN:{sw:30,ab:35,el:95},lP:{sw:-8,ab:8},lN:{sw:8,ab:8},head:[0,-0.3,0.4]})},
-  love:{name:'Love',fps:4,loop:true,n:2,emote:1,f:k=>pose({eyes:'closed',head:[k?0.6:-0.6,0,0],aP:{sw:40,ab:6,el:115},aN:{sw:40,ab:6,el:115},drop:k})}
+  love:{name:'Love',fps:4,loop:true,n:2,emote:1,f:k=>pose({eyes:'closed',head:[k?0.6:-0.6,0,0],aP:{sw:40,ab:6,el:115},aN:{sw:40,ab:6,el:115},drop:k})},
+  // a front crawl: one arm reaches over and forward while the other pulls back under the water, then
+  // they swap; the legs flutter behind and the head turns to breathe on the recovery
+  swim:{name:'Swim',fps:7,loop:true,n:6,f:k=>{const s=k<3?1:-1,j=k%3;
+    const A=[{sw:40,ab:165,el:10,eab:170},{sw:95,ab:45,el:12},{sw:25,ab:28,el:40}][j],B=[{sw:20,ab:30,el:45},{sw:25,ab:115,el:70},{sw:35,ab:150,el:30,eab:160}][j],kick=j===1?1:-1;
+    return pose({lean:14,drop:j===1?1:0,lift:0.3,trail:0.2,head:[j===1?0.9*s:0,0,0],eyes:j===1?'closed':'open',aP:s>0?A:B,aN:s>0?B:A,lP:{sw:-30-12*kick,kn:14,ab:4},lN:{sw:-30+12*kick,kn:20,ab:4}});}}
 };
 const ANIM_KEYS=Object.keys(ANIMS);
 
@@ -743,7 +748,8 @@ const ANIM_DOC={
   sad:      {priority:2,loop:true, emote:true, use:'Failure, bad news, mourning.'},
   think:    {priority:2,loop:true, emote:true, use:'Puzzle, shop browsing, waiting on a choice.'},
   angry:    {priority:2,loop:true, emote:true, use:'Hostile dialogue, aggro warning before combat.'},
-  love:     {priority:2,loop:true, emote:true, use:'Gift received, affection, recruit / join party.'}
+  love:     {priority:2,loop:true, emote:true, use:'Gift received, affection, recruit / join party.'},
+  swim:     {priority:0,loop:true, events:{0:'stroke',3:'stroke'}, use:'In deep water in place of idle/walk/run: pass swim:true to the animator. Strokes slowly while treading water, briskly while moving. Draw only the part above the waterline.'}
 };
 
 /* Direction from a screen-space vector (x right, y down). mode 'eight' for top-down games,
@@ -763,7 +769,7 @@ function sheetRect(meta,anim,dir,frame){const a=meta.animations[anim];if(!a)retu
 
 /* createAnimator: a small state machine that turns game state into {anim, dir, frame, events}.
      const a = FF5Sprites.createAnimator({mode:'eight', walkSpeed:20, runSpeed:55});
-     each tick:  const s = a.update(dt, {vx, vy, grounded, airVy, lowHealth});
+     each tick:  const s = a.update(dt, {vx, vy, grounded, airVy, lowHealth, swim});
                  draw sheetRect(meta, s.anim, s.dir, s.frame); handle s.events ('hit','fire','footstep','land','takeoff',...)
      verbs:      a.attack()  a.shoot()  a.cast() / a.stopCast()  a.hurt()  a.ko()  a.revive()   state: a.dir  a.action  a.isKO
                  a.jump()  -> plays the crouch, then emits 'takeoff': apply your jump impulse then
@@ -808,6 +814,10 @@ function createAnimator(opt){
           out.push('done:'+A);st.act=null;}
         else{const frame=ANIM_DOC[A].loop?f%n:Math.min(f,n-1);return{anim:A,dir:st.dir,frame,events:out,ko:st.ko};}
       }
+      // swimming: the crawl, by time (slow strokes treading water, brisk ones on the move)
+      if(inp.swim){st.swimT=(st.swimT||0)+dt*(sp>=opt.walkSpeed?1:0.4);const n=nF('swim'),frame=Math.floor(st.swimT*fps('swim'))%n;
+        if(st.locoAnim!=='swim'){st.locoAnim='swim';st.locoFrame=frame;}else if(frame!==st.locoFrame){fireEvents('swim',frame,out);st.locoFrame=frame;}
+        return{anim:'swim',dir:st.dir,frame,events:out};}
       // jump anticipation, then airborne frames by vertical speed
       if(st.crouch>0){if(st.crouchNew){out.push('crouch');st.crouchNew=false;}st.crouch-=dt;if(st.crouch<=0)out.push('takeoff');return{anim:'jump',dir:st.dir,frame:0,events:out};}
       if(!grounded){const v=+inp.airVy||0;return{anim:'jump',dir:st.dir,frame:v<opt.riseVy?1:v>opt.fallVy?3:2,events:out};}

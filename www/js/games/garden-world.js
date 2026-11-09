@@ -1,13 +1,13 @@
-// The garden's world: three realms saved on the phone. The meadows (a big map of meadow, forest,
-// flower fields, lakes with islands and rocky hills), the caverns below (reached by cave mouths in
-// the hills) and the sky islands above (reached by the Cloud Stair, once you uncover it). Also the
-// sprites, the generators, saving, real-time catch-up and the painted map chunks.
+// The garden's world, saved on the phone: the meadows (a 900-tile map of ten kinds of country, with
+// rivers, lakes and islands, rocky hills, gorges and old roads), the caverns and the deep below them,
+// the canyons down the gorges, the mountains and the sky islands above, and the treetops of the
+// ancient trees. Also the sprites, the generators, saving, real-time catch-up and the painted chunks.
 import { W, H, noiseMap } from './engine.js';
 import { mulberry32 } from '../util.js';
 import { idbGet, idbSet } from '../store.js';
 
 export const T = 16, CH = 16, HR = 3600e3, KEY = 'garden-v2', OLD = 'garden-v1';
-export const GRASS = 0, WATER = 2, PATH = 3, SAND = 4, STONE = 5, BRIDGE = 6, ROCK = 7, PORTAL = 8, FOREST = 9, FLOWERS = 10, VOID = 11;
+export const GRASS = 0, WATER = 2, PATH = 3, SAND = 4, STONE = 5, BRIDGE = 6, ROCK = 7, PORTAL = 8, FOREST = 9, FLOWERS = 10, VOID = 11, CHASM = 12, ICE = 13;
 // realm sizes in tiles (a world about fifty times the first garden's area) and what each realm is
 // like underfoot: meadow-like ground, cave dark, or islands in open air
 export const SIZE = { surface: 900, canyon: 384, mountain: 384, cave: 192, deep: 256, sky: 192, canopy: 192 };
@@ -42,7 +42,13 @@ export const PLANTS = {
   lanterntree: { type: 'tree', hours: 20, name: 'Lantern tree', leaf: '#3f6f5a', fruit: '#ffd76a', glow: '#ffd76a', food: true },
   spirittree: { type: 'tree', hours: 36, name: 'Spirit tree', leaf: '#5fc0b0', glow: '#bff7ea' },
   // the ancient trees of the deep woods: only found, never sown; some carry a lift into the canopy
-  giant: { type: 'giant', hours: 1e6, name: 'Ancient tree', leaf: '#3f7a4a', giant: true }
+  giant: { type: 'giant', hours: 1e6, name: 'Ancient tree', leaf: '#3f7a4a', giant: true },
+  // what grows wild in the other kinds of country (their seeds can be gathered and sown anywhere)
+  maple: { type: 'tree', hours: 30, name: 'Maple', leaf: '#d8692e' },
+  snowpine: { type: 'tree', hours: 32, name: 'Snow pine', leaf: '#3f6f5e', pine: true, snow: true },
+  bigshroom: { type: 'tree', hours: 20, name: 'Giant mushroom', leaf: '#8a6ad0', cap: '#8a6ad0', glow: '#c8a8ff', shroomTree: true },
+  cactus: { type: 'shrub', hours: 12, name: 'Cactus', leaf: '#5f9a5a', bloom: '#ff7aa8', cactus: true },
+  heather: { type: 'shrub', hours: 8, name: 'Heather', leaf: '#6a7a5a', bloom: '#c07ad8' }
 };
 export const COMMON = ['daisy', 'tulip', 'poppy', 'lavender', 'bluebell', 'cosmos', 'sunflower', 'berrybush', 'rosebush', 'hydrangea', 'apple', 'cherry', 'willow', 'birch', 'oak'];
 export const stageOf = (p) => (p.g < 0.12 ? 0 : p.g < 0.4 ? 1 : p.g < 0.8 ? 2 : 3);
@@ -131,21 +137,79 @@ export const palFor = (realm, mode) => {
   if (!derived.has(key) && DERIVE[realm]) derived.set(key, DERIVE[realm](mode));
   return derived.get(key) || PAL.surface.day;
 };
-// biomes of the meadows, laid out in broad regions (8-tile cells): each tints the grass and
-// decides what grows. 0 meadow · 1 woodland · 2 flower downs · 3 wetland · 4 heath · 5 autumn wood
-// · 6 birch grove · 7 orchard · 8 ancient grove (giant trees)
-export const BIOME_TINT = [null, ['#3f7a44', 0.12], ['#d8c86a', 0.17], ['#3f8a7a', 0.22], ['#b49a62', 0.32], ['#c47a34', 0.4], ['#c0dc80', 0.22], ['#9ac060', 0.12], ['#244c30', 0.28]];
-export function biomeAt(Rm, x, y) {
-  if (Rm.name !== 'surface') return 0;
-  if (!Rm.biome) {
-    const C = Math.ceil(Rm.w / 8), R = mulberry32(Rm.seed ^ 0xb10e), t = noiseMap(R, C, 3, 3), m = noiseMap(R, C, 3, 4), q = noiseMap(R, C, 2, 5), out = new Uint8Array(C * C);
-    for (let i = 0; i < C * C; i++) {
-      const T0 = t[i], M0 = m[i], Q = q[i];
-      out[i] = M0 > 0.62 ? (T0 > 0.6 ? 5 : T0 < 0.38 ? 6 : Q > 0.66 ? 8 : 1) : M0 < 0.36 ? (T0 > 0.55 ? 4 : 2) : Q > 0.7 ? 3 : Q < 0.3 ? 7 : 0;
-    }
-    Rm.biome = out; Rm.biomeC = C;
+// ------------------------------------------------ the ten kinds of country
+// Each has its own colours (given for the day; morning and evening are worked out from them), its
+// own photo texture set (www/assets/textures; a set not fetched yet falls back to a neighbour), its
+// own mist, how much short grass stands on it, and what grows and lives there (see populate).
+//   wet: lower ground (more water)   wood: more or less forest   blades: short grass per tile
+const pal = (grass, forest, wild, blade, path, sand, water, water2, stone, stone2, moss, rock, rock2, rock3, plank, dot, more = {}) => ({ grass, forest, wild, blade, path, sand, water, water2, stone, stone2, moss, rock, rock2, rock3, plank, dot, ...more });
+export const BIOMES = [
+  { id: 'meadow', wet: 0, wood: 0, blades: 1, fog: [222, 232, 228], fogK: 1, tex: { grass: 'grass', forest: 'forest', path: 'path', sand: 'sand', rock: 'rock' },
+    pal: pal(['#88cb70', '#7cc265', '#93d27a'], ['#5e9e54', '#56944d', '#66a85b'], ['#5ea55b', '#51974f', '#438843'], '#74b766', '#dcc196', '#ecd7a6', '#5aaee6', '#9dd6f6', '#bcb5ab', '#9d958b', '#6ea85c', '#a6a29a', '#7f7a72', '#c4c0b8', '#b88a5a', ['#ff6b8a', '#ffd23f', '#ffffff', '#b28dff']) },
+  { id: 'woods', wet: 0, wood: 0.13, blades: 0.8, fog: [200, 222, 206], fogK: 1.3, tex: { grass: 'moss', forest: 'forest', path: 'mud', sand: 'sand', rock: 'rock' }, litter: ['#7a5a36', '#5f4a2c'],
+    pal: pal(['#5f9a5c', '#56905a', '#68a462'], ['#3f7448', '#386a41', '#467d4e'], ['#3f7a4a', '#356c40', '#2c5e37'], '#5a9a5c', '#b89a72', '#cdb894', '#4f8fb8', '#86b8d8', '#9fa39a', '#7d8279', '#5a9a52', '#8c9089', '#676b64', '#aeb2aa', '#8a6a48', ['#e8e0ff', '#ffe9a8', '#bfe0ff', '#ffffff']) },
+  { id: 'downs', wet: 0.01, wood: -0.1, blades: 1.2, fog: [238, 230, 200], fogK: 0.7, tex: { grass: 'clover', forest: 'moss', path: 'path', sand: 'sand', rock: 'rock' }, flowers: 2,
+    pal: pal(['#a8cf6a', '#9cc45e', '#b4d876'], ['#7aa64e', '#709a46', '#84b056'], ['#8ab352', '#7ca547', '#6c963c'], '#a2c860', '#e2c890', '#f0dca4', '#62b4e0', '#a6dcf4', '#c8bea8', '#a89e88', '#94bc5c', '#b4ab98', '#8e8674', '#d0c8b6', '#c09058', ['#ff5a7a', '#ffd23f', '#ffffff', '#ff9a3c', '#c08aff', '#ff7ad8']) },
+  { id: 'marsh', wet: -0.045, wood: -0.02, blades: 0.9, fog: [196, 222, 214], fogK: 1.8, tex: { grass: 'mud', forest: 'moss', path: 'mud', sand: 'mud', rock: 'rock' }, litter: ['#5a6a4a', '#6a5a3e'],
+    pal: pal(['#7aa678', '#6f9a6f', '#86b080'], ['#55806a', '#4c7660', '#5e8a72'], ['#5d8a62', '#527d58', '#46704d'], '#7aa070', '#9c8a66', '#b4a882', '#4a8a8c', '#7ab8b0', '#9aa094', '#788074', '#6a9a5a', '#8a8e84', '#666b62', '#a8aca2', '#7a6648', ['#f0f0d0', '#d0e8a0', '#ffffff', '#a8d0f0']) },
+  { id: 'heath', wet: 0.015, wood: -0.13, blades: 0.7, fog: [222, 210, 230], fogK: 1.1, tex: { grass: 'heath', forest: 'heath', path: 'path', sand: 'sand', rock: 'rock' }, litter: ['#b07ac8', '#8a5aa0'],
+    pal: pal(['#a08a9e', '#968094', '#ac96a8'], ['#6f7a5a', '#667150', '#788362'], ['#8a6a8e', '#7c5e80', '#6c5070'], '#a58aa8', '#c4a888', '#d8c4a0', '#5a8cc0', '#94bce0', '#aaa4a0', '#888280', '#8a9a6a', '#a09a98', '#7a7472', '#bcb6b4', '#9a7458', ['#d880e8', '#f0b0f8', '#ffe0ff', '#b860d0']) },
+  { id: 'autumn', wet: 0, wood: 0.12, blades: 0.6, fog: [236, 214, 190], fogK: 1, tex: { grass: 'leaves', forest: 'leaves', path: 'path', sand: 'sand', rock: 'rock' }, litter: ['#e07a2a', '#c0502a', '#e8b030'],
+    pal: pal(['#b49a58', '#a88e4e', '#c0a664'], ['#a8683a', '#9c5e34', '#b47242'], ['#b07a3a', '#a06c32', '#8e5e2a'], '#c09650', '#c8a47a', '#e0c494', '#5a94c0', '#96c4e0', '#b4aa9e', '#92887c', '#9a9a52', '#a49a8e', '#7e746a', '#c2b8ac', '#a0704a', ['#ff7a3a', '#ffd23f', '#e8502a', '#ffffff']) },
+  { id: 'dunes', wet: 0.035, wood: -0.3, blades: 0.25, fog: [244, 226, 196], fogK: 0.5, tex: { grass: 'dune', forest: 'dune', path: 'sand', sand: 'dune', rock: 'rock' }, dry: 1,
+    pal: pal(['#d8bc80', '#ceb276', '#e0c68c'], ['#a8a060', '#9e9656', '#b2aa6a'], ['#b8a060', '#aa9254', '#9a8448'], '#c8b070', '#e8cc98', '#ecd29a', '#4aa8c8', '#8ed8e8', '#d4c0a0', '#b09c7c', '#a8a868', '#c49a6a', '#9a7048', '#dcb488', '#a87a4a', ['#ff8a5a', '#ffe08a', '#ffffff', '#e85a8a']) },
+  { id: 'ancient', wet: 0, wood: 0.16, blades: 0.7, fog: [186, 214, 210], fogK: 1.7, tex: { grass: 'moss', forest: 'moss', path: 'forest', sand: 'sand', rock: 'rock' }, litter: ['#3a5a3a', '#6a5a3a'],
+    pal: pal(['#4f8a6a', '#468062', '#589474'], ['#2f6050', '#295748', '#356858'], ['#36705a', '#2e6350', '#265646'], '#4f8a6e', '#9a8a6c', '#b8aa88', '#3f7ea8', '#76aed0', '#8e9690', '#6c7470', '#4f8a5a', '#7c8682', '#5a6460', '#9ca6a2', '#6a5038', ['#bff7ea', '#e0fff8', '#a8e0ff', '#ffffff']) },
+  { id: 'frost', wet: 0, wood: 0.02, blades: 0, fog: [232, 240, 250], fogK: 1.4, tex: { grass: 'snow', forest: 'snow', path: 'path', sand: 'snow', rock: 'rock' }, snow: 1,
+    pal: pal(['#e4ecf2', '#dae4ec', '#eef4f8'], ['#b8c8cc', '#aebfc4', '#c4d2d6'], ['#c8d8e0', '#bccdd6', '#b0c2cc'], '#d0dce4', '#b8b0a8', '#d8dce0', '#6a9ac0', '#a8cce4', '#a8acb4', '#888c96', '#9ab0a8', '#8e96a4', '#6a7280', '#b4bcc8', '#8a7060', ['#ffffff', '#cfe8ff', '#e8f4ff'], { ice: '#b8dcf0', ice2: '#e8f6fd' }) },
+  { id: 'fungal', wet: 0.005, wood: 0.1, blades: 0.5, fog: [196, 184, 232], fogK: 1.5, tex: { grass: 'moss', forest: 'forest', path: 'path', sand: 'sand', rock: 'rock' }, litter: ['#8ff0d8', '#c8a8ff'], spores: 1,
+    pal: pal(['#6a6a9a', '#62628e', '#7474a6'], ['#4a4a7a', '#424270', '#525286'], ['#5a5090', '#4e4682', '#423c74'], '#7a78b0', '#a08ab0', '#b0a0c0', '#3a7aa0', '#6ac0d0', '#9a94aa', '#78728a', '#5a9a8a', '#827c96', '#605a74', '#a29cb6', '#6a5070', ['#8ff0d8', '#c8a8ff', '#ffb8e8', '#9fd8ff']) }
+];
+export const B_MEADOW = 0, B_WOODS = 1, B_DOWNS = 2, B_MARSH = 3, B_HEATH = 4, B_AUTUMN = 5, B_DUNES = 6, B_ANCIENT = 7, B_FROST = 8, B_FUNGAL = 9;
+// morning is paler and cooler, evening dusky; the light grade (garden.js) does the rest
+const MODE_MIX = { morning: ['#f0f8ff', 0.37], day: null, evening: ['#6e6e82', 0.35] };
+const biomePals = new Map();
+export function biomePal(b, mode) {
+  const key = `${b}|${mode}`;
+  let P = biomePals.get(key);
+  if (P) return P;
+  const B = BIOMES[b] || BIOMES[0], m = MODE_MIX[mode];
+  const mv = (v, k) => (typeof v === 'string' && v[0] === '#' ? mixHex(v, m[0], k) : Array.isArray(v) ? v.map((x) => mv(x, k)) : v);
+  P = m ? Object.fromEntries(Object.entries(B.pal).map(([k, v]) => [k, mv(v, k === 'dot' ? m[1] * 0.4 : m[1])])) : { ...B.pal };
+  biomePals.set(key, P);
+  return P;
+}
+// smooth value noise from a hash (no tables): for wiggling the borders between kinds of country
+function hash2(x, y, s) { let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+function vnoise(x, y, s) {
+  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const a = hash2(x0, y0, s), b = hash2(x0 + 1, y0, s), c = hash2(x0, y0 + 1, s), d = hash2(x0 + 1, y0 + 1, s);
+  return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+}
+// which kind of country each tile is: broad regions from heat, damp and strangeness (8-tile cells,
+// ranked so every kind gets its share), their borders warped and dithered so they meet organically.
+// Worked out from the seed, never saved.
+export function biomeMap(Rm) {
+  if (Rm.bio) return Rm.bio;
+  const N = Rm.w, C = Math.ceil(N / 8), R = mulberry32(Rm.seed ^ 0xb10e);
+  const rank = (a) => { const idx = Array.from(a.keys()).sort((p, q) => a[p] - a[q]), out = new Float32Array(a.length); idx.forEach((k, r) => { out[k] = r / a.length; }); return out; };
+  const t = rank(noiseMap(R, C, 3, 4)), m = rank(noiseMap(R, C, 3, 5)), q = rank(noiseMap(R, C, 2, 7)), cell = new Uint8Array(C * C), M = C >> 1;
+  for (let i = 0; i < C * C; i++) {
+    const T0 = t[i], M0 = m[i], Q = q[i], cx = i % C, cy = (i / C) | 0;
+    cell[i] = Math.hypot(cx - M, cy - M) < 2.6 ? B_MEADOW
+      : Q > 0.93 ? B_FUNGAL : Q < 0.07 ? B_ANCIENT : T0 < 0.15 ? B_FROST : T0 > 0.84 && M0 < 0.55 ? B_DUNES
+      : M0 > 0.8 ? B_MARSH : M0 > 0.56 ? (T0 < 0.5 ? B_WOODS : B_AUTUMN) : M0 < 0.26 ? (T0 < 0.5 ? B_HEATH : B_DOWNS) : B_MEADOW;
   }
-  return Rm.biome[(y >> 3) * Rm.biomeC + (x >> 3)];
+  const out = new Uint8Array(N * N), s1 = Rm.seed & 0xffff, s2 = s1 ^ 0x5a5a;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const wx = x + (vnoise(x * 0.045, y * 0.045, s1) - 0.5) * 18 + (vnoise(x * 0.2, y * 0.2, s2) - 0.5) * 5 + (hash2(x, y, s1 + 7) - 0.5) * 2.4, wy = y + (vnoise(x * 0.045, y * 0.045, s2) - 0.5) * 18 + (vnoise(x * 0.2, y * 0.2, s1) - 0.5) * 5 + (hash2(x, y, s2 + 7) - 0.5) * 2.4;
+    out[y * N + x] = cell[Math.max(0, Math.min(C - 1, Math.floor(wy / 8))) * C + Math.max(0, Math.min(C - 1, Math.floor(wx / 8)))];
+  }
+  return (Rm.bio = out);
+}
+export function biomeAt(Rm, x, y) {
+  if (Rm.name !== 'surface' || !inside(Rm, x, y)) return Rm.name === 'mountain' ? B_FROST : 0;
+  return biomeMap(Rm)[y * Rm.w + x];
 }
 
 // ------------------------------------------------ tiny pixel sprite helpers
@@ -227,6 +291,13 @@ export function plantSprite(k, st, fruit) {
     }
   } else if (P.type === 'shrub') {
     if (st === 1) { [cv, c] = mk(8, 7); ell(c, 4, 4.5, 3, 2.4, P.leaf); }
+    else if (P.cactus) {
+      // a saguaro: a ribbed column with an arm or two, a pink flower on top when grown
+      const big = st === 3, h = big ? 22 : 13;
+      [cv, c] = mk(14, h);
+      px(c, 5, 2, tone(P.leaf, -0.25), 4, h - 2); px(c, 5, 2, P.leaf, 3, h - 2); px(c, 6, 3, tone(P.leaf, 0.22), 1, h - 5); ell(c, 7, 2.5, 2, 1.6, P.leaf);
+      if (big) { px(c, 1, 8, P.leaf, 2, 6); px(c, 1, 13, P.leaf, 5, 2); px(c, 11, 5, P.leaf, 2, 6); px(c, 8, 10, P.leaf, 5, 2); px(c, 6, 0, P.bloom, 2, 2); }
+    }
     else if (P.fern) {
       const big = st === 3, w = big ? 18 : 12, h = big ? 12 : 8;
       [cv, c] = mk(w, h);
@@ -241,8 +312,17 @@ export function plantSprite(k, st, fruit) {
       if (big && (P.bloom || (P.fruit && fruit))) for (let i = 0; i < 9; i++) { const x = 2 + R() * (w - 4), y = 2 + R() * (h - 4); px(c, x | 0, y | 0, P.bloom || P.fruit, 2, 2); px(c, x | 0, y | 0, tone(P.bloom || P.fruit, 0.4)); }
     }
   } else {
-    if (st === 1) { [cv, c] = mk(8, 12); px(c, 4, 4, '#8a6a4a', 1, 8); ell(c, 2.5, 5, 1.8, 1, leaf); ell(c, 5.5, 3.5, 1.8, 1, P.leaf); }
-    else if (P.pine) {
+    if (st === 1) { [cv, c] = mk(8, 12); px(c, 4, 4, P.shroomTree ? '#e8e0d0' : '#8a6a4a', 1, 8); if (P.shroomTree) ell(c, 4.5, 4, 3, 2, P.cap); else { ell(c, 2.5, 5, 1.8, 1, leaf); ell(c, 5.5, 3.5, 1.8, 1, P.leaf); } }
+    else if (P.shroomTree) {
+      // a mushroom as tall as a tree: a pale stem, a broad cap with spots, glowing gills beneath
+      const big = st === 3, w = big ? 34 : 18, h = big ? 40 : 22, sw = big ? 6 : 3, capH = big ? 13 : 7;
+      [cv, c] = mk(w, h);
+      px(c, w / 2 - sw / 2, capH - 2, '#e8e0d0', sw, h - capH + 2); px(c, w / 2 - sw / 2, capH - 2, '#c8bca8', 1, h - capH + 2);
+      ell(c, w / 2, capH, w / 2 - 1, capH * 0.45, P.glow);
+      ell(c, w / 2, capH - 2, w / 2 - 0.5, capH * 0.62, tone(P.cap, -0.2)); ell(c, w / 2, capH - 3, w / 2 - 1.5, capH * 0.55, P.cap);
+      const R = mulberry32(st * 31 + 7);
+      for (let i = 0; i < (big ? 7 : 3); i++) px(c, (w / 2 - w / 3 + R() * (w / 1.6)) | 0, (2 + R() * (capH - 4)) | 0, '#f4ecff', 2, 1);
+    } else if (P.pine) {
       const big = st === 3, w = big ? 26 : 14, h = big ? 44 : 24;
       [cv, c] = mk(w, h);
       px(c, w / 2 - 1, h - (big ? 8 : 5), '#6a4a34', 2, big ? 8 : 5);
@@ -251,6 +331,8 @@ export function plantSprite(k, st, fruit) {
         const tw = (w / 2 - 1) * (1 - i / (tiers + 0.6)), ty = h - (big ? 8 : 5) - i * (big ? 9 : 5.5);
         c.fillStyle = tone(P.leaf, -0.2); c.beginPath(); c.moveTo(w / 2 - tw, ty); c.lineTo(w / 2, ty - (big ? 14 : 8)); c.lineTo(w / 2 + tw, ty); c.fill();
         c.fillStyle = P.leaf; c.beginPath(); c.moveTo(w / 2 - tw + 1, ty - 1); c.lineTo(w / 2, ty - (big ? 14 : 8)); c.lineTo(w / 2 + tw * 0.3, ty - 1); c.fill();
+        // snow lying on each tier
+        if (P.snow) { c.fillStyle = '#f4f8fc'; c.beginPath(); c.moveTo(w / 2 - tw * 0.55, ty - (big ? 5 : 3)); c.lineTo(w / 2, ty - (big ? 14 : 8)); c.lineTo(w / 2 + tw * 0.5, ty - (big ? 5 : 3)); c.lineTo(w / 2, ty - (big ? 8 : 5)); c.fill(); }
       }
     } else {
       const big = st === 3, w = big ? 34 : 18, h = big ? 46 : 26, tw = big ? 4 : 2, th = big ? 16 : 10;
@@ -365,17 +447,53 @@ export function giantSprites(seed = 0) {
   spriteCache.set(key, out);
   return out;
 }
-// a lift: a ring of standing stones round a pad; going up, a column of light; going down, a shaft
-export function liftSprite(up) {
-  const key = `lift|${up ? 1 : 0}`;
+// the lifts, built to be seen from far off:
+//   spire  going up: two slim stone horns curving together over a pad, a crystal floating between
+//          them (the game draws its column of light into the sky)
+//   shaft  going down: a stone well with a timber head-frame, a winch and a rope into the dark
+//   vine   into the treetops: a basket on ropes hanging from the canopy of an ancient tree
+export function liftStyle(d) { return d.style || (d.up ? 'spire' : 'shaft'); }
+export function liftSprite(style) {
+  const key = `lift|${style}`;
   if (spriteCache.has(key)) return spriteCache.get(key);
-  const [cv, c] = mk(36, 34);
-  c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(18, 28, 15, 5, 0, 0, 7); c.fill();
-  c.fillStyle = '#8e8a84'; c.beginPath(); c.ellipse(18, 27, 13, 5, 0, 0, 7); c.fill();
-  c.fillStyle = up ? '#cfe9ff' : '#141018'; c.beginPath(); c.ellipse(18, 27, 8, 3, 0, 0, 7); c.fill();
-  for (const x of [5, 31]) { c.fillStyle = '#6e6a66'; c.fillRect(x - 2, 10, 4, 17); c.fillStyle = '#a8a39b'; c.fillRect(x - 2, 10, 2, 17); c.fillStyle = up ? '#9fe8ff' : '#e8b060'; c.fillRect(x - 1, 14, 2, 2); }
-  c.fillStyle = '#6e6a66'; c.fillRect(3, 8, 30, 3);
-  const s = { cv: crisp(cv), w: 38, h: 36 };
+  let cv, c;
+  if (style === 'spire') {
+    [cv, c] = mk(40, 92);
+    c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(20, 86, 17, 5, 0, 0, 7); c.fill();
+    c.fillStyle = '#8e8a84'; c.beginPath(); c.ellipse(20, 85, 15, 5, 0, 0, 7); c.fill();
+    c.fillStyle = '#bfe6ff'; c.beginPath(); c.ellipse(20, 85, 9, 3, 0, 0, 7); c.fill();
+    for (const side of [-1, 1]) {
+      // a horn: thick at the base, thinning as it curves in toward the other
+      for (let y = 84; y > 8; y--) {
+        const u = (84 - y) / 76, x = 20 + side * (14 - 10 * u * u), w = Math.max(1, Math.round(5 - u * 3.5));
+        c.fillStyle = '#6e6a66'; c.fillRect(Math.round(x - w / 2), y, w, 1);
+        c.fillStyle = side < 0 ? '#b0aba3' : '#8e8a84'; c.fillRect(Math.round(x - w / 2), y, 1, 1);
+        if (y % 11 === 0) { c.fillStyle = '#9fe8ff'; c.fillRect(Math.round(x - 0.5), y, 1, 2); }
+      }
+    }
+    c.fillStyle = '#e8fbff'; c.beginPath(); c.moveTo(20, 30); c.lineTo(25, 40); c.lineTo(20, 50); c.lineTo(15, 40); c.closePath(); c.fill();
+    c.fillStyle = '#7fd8f8'; c.beginPath(); c.moveTo(20, 30); c.lineTo(25, 40); c.lineTo(20, 50); c.closePath(); c.fill();
+    c.fillStyle = '#ffffff'; c.fillRect(18, 35, 2, 3);
+  } else if (style === 'vine') {
+    [cv, c] = mk(28, 70);
+    c.strokeStyle = '#7a6a48'; c.lineWidth = 1;
+    for (const x of [6, 22]) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x + (x < 14 ? 2 : -2), 52); c.stroke(); }
+    c.fillStyle = '#4f8a4c'; for (let y = 4; y < 50; y += 7) { c.fillRect(5 + (y % 3), y, 3, 2); c.fillRect(20 - (y % 3), y + 3, 3, 2); }
+    c.fillStyle = '#6a4a30'; c.fillRect(4, 52, 20, 9); c.fillStyle = '#8a6440'; for (let x = 5; x < 23; x += 3) c.fillRect(x, 53, 2, 7);
+    c.fillStyle = '#a07a4e'; c.fillRect(3, 51, 22, 2);
+    c.fillStyle = 'rgba(0,0,0,.22)'; c.beginPath(); c.ellipse(14, 66, 11, 3, 0, 0, 7); c.fill();
+  } else {
+    [cv, c] = mk(40, 46);
+    c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(20, 40, 17, 5, 0, 0, 7); c.fill();
+    c.fillStyle = '#7c7872'; c.beginPath(); c.ellipse(20, 38, 15, 6, 0, 0, 7); c.fill();
+    c.fillStyle = '#a8a39b'; c.beginPath(); c.ellipse(20, 37, 15, 5.5, 0, 0, 7); c.fill();
+    c.fillStyle = '#0c0a10'; c.beginPath(); c.ellipse(20, 37, 10, 3.5, 0, 0, 7); c.fill();
+    for (const [x, d] of [[5, 1], [35, -1]]) { c.fillStyle = '#6a4a30'; c.beginPath(); c.moveTo(x, 38); c.lineTo(x + 2, 38); c.lineTo(20 + d * 2, 4); c.lineTo(20 + d * 1, 4); c.fill(); }
+    c.fillStyle = '#8a6440'; c.fillRect(9, 6, 22, 3); c.fillStyle = '#5a3e28'; c.fillRect(17, 3, 6, 6);
+    c.fillStyle = '#d8c8a0'; c.fillRect(20, 9, 1, 26);
+    c.fillStyle = '#e8b060'; c.fillRect(8, 30, 2, 2); c.fillRect(30, 30, 2, 2);
+  }
+  const s = { cv: crisp(cv), w: cv.width + 2, h: cv.height + 2 };
   spriteCache.set(key, s);
   return s;
 }
@@ -465,77 +583,7 @@ function placeRuins(Rm, R, list, ok, dmin, dmax, cx, cy) {
 function natural(Rm, k, x, y, extra = {}) { Rm.plants.push({ k, x, y, g: 1, w: 0, fr: PLANTS[k].food ? 2 : 0, sd: 0, n: 1, ...extra }); }
 function critter(G, Rm, k, x, y) { Rm.animals.push({ id: G.nextId++, k, x: x * T + 8, y: y * T + 8, b: now() - 48 * HR, f: 0, baby: 0, n: 1 }); }
 
-// the meadows: meadow, forest, flower fields, lakes with islands, rocky hills with cave mouths
-function genSurface(G, R, avoid = () => false) {
-  const Rm = mkRealm('surface', G.seed), N = Rm.w, M = N / 2;
-  const hN = noiseMap(R, N, 5, 3), mN = noiseMap(R, N, 4, 4), wN = noiseMap(R, N, 4, 6);
-  const qWater = quant(hN, 0.15), qSand = quant(hN, 0.18), qRock = quant(hN, 0.88), qForest = quant(mN, 0.72), qFlowers = quant(mN, 0.2);
-  const qW1 = quant(wN, 0.42), qW2 = quant(wN, 0.62), qW3 = quant(wN, 0.82);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const i = ix(Rm, x, y), d = Math.hypot(x - M, y - M), edge = Math.min(x, y, N - 1 - x, N - 1 - y);
-    let h = hN[i];
-    if (d < 13) h = h + (0.5 - h) * Math.min(1, (1 - d / 13) * 1.4);       // flat ground at the start
-    const g = d < 7.5 ? GRASS : edge < 2 ? ROCK : h < qWater ? WATER : h < qSand ? SAND : h > qRock || edge < 4 && R() < 0.7 ? ROCK : mN[i] > qForest ? FOREST : mN[i] < qFlowers ? FLOWERS : GRASS;
-    Rm.ground[i] = g;
-    const w = wN[i];
-    Rm.wild[i] = d < 7 || g === WATER || g === ROCK ? 0 : Math.min(3, (w > qW3 ? 3 : w > qW2 ? 2 : w > qW1 ? 1 : 0) + (g === FOREST && w > qW1 * 0.9 ? 1 : 0));
-  }
-  // cave mouths: rock faces with open ground in front
-  const mouths = [];
-  for (let tries = 0; tries < 6000 && mouths.length < 4; tries++) {
-    const x = 4 + Math.floor(R() * (N - 8)), y = 4 + Math.floor(R() * (N - 8)), d = Math.hypot(x - M, y - M);
-    if (d < 14 || d > 56 || avoid(x, y)) continue;
-    if (Rm.ground[ix(Rm, x, y)] !== ROCK || Rm.ground[ix(Rm, x, y - 1)] !== ROCK || Rm.ground[ix(Rm, x - 1, y)] !== ROCK || Rm.ground[ix(Rm, x + 1, y)] !== ROCK) continue;
-    const front = Rm.ground[ix(Rm, x, y + 1)];
-    if (front === ROCK || front === WATER) continue;
-    if (mouths.some((m) => Math.hypot(m.x - x, m.y - y) < 18)) continue;
-    Rm.ground[ix(Rm, x, y)] = PORTAL;
-    for (let k = 1; k <= 2; k++) { const j = ix(Rm, x, y + k); if (Rm.ground[j] !== WATER) { Rm.wild[j] = 0; if (Rm.ground[j] === ROCK) Rm.ground[j] = GRASS; } }
-    mouths.push({ x, y });
-  }
-  // a little island in the biggest lake, reached by building a bridge
-  const land = (x, y) => inside(Rm, x, y) && Rm.ground[ix(Rm, x, y)] !== WATER;
-  for (let tries = 0; tries < 3000; tries++) {
-    const x = 6 + Math.floor(R() * (N - 12)), y = 6 + Math.floor(R() * (N - 12));
-    let deep = true;
-    for (let yy = y - 5; yy <= y + 5 && deep; yy++) for (let xx = x - 5; xx <= x + 5; xx++) if (land(xx, yy)) { deep = false; break; }
-    if (!deep || avoid(x, y)) continue;
-    for (let yy = y - 2; yy <= y + 2; yy++) for (let xx = x - 2; xx <= x + 2; xx++) { const q = Math.hypot(xx - x, yy - y); if (q <= 2.3) { Rm.ground[ix(Rm, xx, yy)] = q < 1.6 ? GRASS : SAND; Rm.wild[ix(Rm, xx, yy)] = q < 1.6 ? 1 : 0; } }
-    natural(Rm, 'willow', x, y);
-    Rm.decor.push({ t: 'island', x, y });
-    break;
-  }
-  const ok = (x, y) => inside(Rm, x, y) && ![WATER, ROCK, PORTAL].includes(Rm.ground[ix(Rm, x, y)]) && !avoid(x, y) && Math.hypot(x - M, y - M) > 8;
-  placeRuins(Rm, R, RUINS.surface, ok, 10, 50, M, M);
-  for (const r of Rm.ruins) for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) Rm.ground[ix(Rm, xx, yy)] = GRASS;
-  // what already grows here, and who already lives here
-  const free = (x, y) => !Rm.wild[ix(Rm, x, y)] || Rm.wild[ix(Rm, x, y)] < 3;
-  const taken = new Set(Rm.plants.map((p) => `${p.x},${p.y}`));
-  const trees = new Set();
-  const ruinAt = (x, y) => Rm.ruins.some((r) => x >= r.x - 1 && x <= r.x + r.w && y >= r.y - 1 && y <= r.y + r.h);
-  for (let y = 3; y < N - 3; y++) for (let x = 3; x < N - 3; x++) {
-    const i = ix(Rm, x, y), g = Rm.ground[i], d = Math.hypot(x - M, y - M);
-    if (d < 7 || avoid(x, y) || ruinAt(x, y) || taken.has(`${x},${y}`)) continue;
-    const r = R();
-    if (g === FOREST && r < 0.2 && free(x, y) && !trees.has(`${x - 1},${y}`) && !trees.has(`${x},${y - 1}`) && !trees.has(`${x - 1},${y - 1}`) && !trees.has(`${x + 1},${y - 1}`)) { natural(Rm, R() < 0.5 ? 'pine' : R() < 0.5 ? 'oak' : 'birch', x, y); trees.add(`${x},${y}`); }
-    else if (g === FOREST && r < 0.32) natural(Rm, 'fern', x, y);
-    else if ((g === SAND || g === GRASS) && r < 0.2 && near4.some(([dx, dy]) => Rm.ground[ix(Rm, x + dx, y + dy)] === WATER)) natural(Rm, 'reed', x, y);
-    else if (g === GRASS && r < 0.012 && d > 10) natural(Rm, R() < 0.5 ? 'apple' : 'cherry', x, y);
-    else if (g === FLOWERS && r < 0.06) natural(Rm, COMMON[Math.floor(R() * 7)], x, y);
-  }
-  const spot = (pred) => { for (let t = 0; t < 2000; t++) { const x = 3 + Math.floor(R() * (N - 6)), y = 3 + Math.floor(R() * (N - 6)); if (Math.hypot(x - M, y - M) > 12 && !avoid(x, y) && pred(Rm.ground[ix(Rm, x, y)], x, y)) return [x, y]; } return null; };
-  for (const [k, n, pred] of [['deer', 3, (g) => g === FOREST], ['rabbit', 4, (g) => g === GRASS || g === FLOWERS], ['duck', 4, (g) => g === WATER], ['frog', 2, (g) => g === SAND], ['songbird', 4, (g) => g === FOREST], ['squirrel', 2, (g) => g === FOREST], ['butterfly', 4, (g) => g === FLOWERS]]) {
-    for (let i = 0; i < n; i++) { const p = spot(pred); if (p) critter(G, Rm, k, p[0], p[1]); }
-  }
-  // the start: a few flowers and a young cherry
-  for (const [k, x, y, g] of [['daisy', -2, 1, 0.95], ['daisy', -3, 2, 0.9], ['tulip', 2, 2, 0.5], ['cherry', 3, -3, 0.45]]) Rm.plants.push({ k, x: M + x, y: M + y, g, w: 0, fr: 0, sd: 0 });
-  critter(G, Rm, 'butterfly', M - 1, M); critter(G, Rm, 'butterfly', M + 2, M - 1);
-  Rm.hero = { x: M * T + 8, y: (M + 1) * T + 12 };
-  Rm.mouths = mouths;
-  return Rm;
-}
-
-// the caverns: cellular caves with pools, rubble to clear, glowshrooms and crystals
+// the caverns: three layers of the cave automaton, pools, glowshrooms and crystals
 function genCave(G, R, mouths, name = 'cave', upTo = 'surface') {
   const Rm = mkRealm(name, G.seed ^ (name === 'cave' ? 0x5bd1 : 0x4e77)), N = Rm.w;
   // three layers of the cave automaton blended: great halls (coarse), side chambers (middling) and
@@ -576,7 +624,7 @@ function genCave(G, R, mouths, name = 'cave', upTo = 'surface') {
     for (let k = 0; k < q.length; k++) { const c = q[k], x = c % N, y = (c / N) | 0; n++; for (const [dx, dy] of near4) { const j = (y + dy) * N + x + dx; if (!wall[j] && reg[j] < 0) { reg[j] = i; q.push(j); } } }
     if (n > bestN) { bestN = n; best = i; }
   }
-  const pN = noiseMap(R, N, 3, Math.max(4, N / 16 | 0)), rN = noiseMap(R, N, 3, Math.max(5, N / 13 | 0)), qPool = quant(pN, 0.08), qR = quant(rN, 0.7), qR2 = quant(rN, 0.85);
+  const pN = noiseMap(R, N, 3, Math.max(4, N / 16 | 0)), rN = noiseMap(R, N, 3, Math.max(5, N / 13 | 0)), qPool = quant(pN, 0.08), qR = quant(rN, 0.85), qR2 = quant(rN, 0.94);
   for (let i = 0; i < N * N; i++) {
     const open = !wall[i] && reg[i] === best;
     Rm.ground[i] = open ? (pN[i] < qPool ? WATER : GRASS) : ROCK;
@@ -624,7 +672,7 @@ function genSky(G, R, name = 'sky') {
   for (const o of isl) for (let y = Math.floor(o.y - o.r - 2); y <= o.y + o.r + 2; y++) for (let x = Math.floor(o.x - o.r - 2); x <= o.x + o.r + 2; x++) {
     if (!inside(Rm, x, y)) continue;
     const d = Math.hypot(x - o.x, y - o.y) / o.r + (nN[ix(Rm, x, y)] - 0.5) * 0.7;
-    if (d < 1) { Rm.ground[ix(Rm, x, y)] = GRASS; Rm.wild[ix(Rm, x, y)] = d > 0.45 && R() < 0.55 ? 1 + (R() < 0.3 ? 1 : 0) : 0; }
+    if (d < 1) { Rm.ground[ix(Rm, x, y)] = GRASS; Rm.wild[ix(Rm, x, y)] = d > 0.6 && R() < 0.28 ? 1 + (R() < 0.25 ? 1 : 0) : 0; }
   }
   // cloud paths along a spanning tree of the islands
   const joined = [0];
@@ -698,98 +746,202 @@ function clearAt(Rm, x, y) {
   Rm.plants = Rm.plants.filter((p) => Math.abs(p.x - x) > 1 || p.y < y - 1 || p.y > y + 2);
 }
 // a lift (a sky elevator going up, a shaft going down) at a in A and b in B, each leading to the other
-function link(A, a, B, b) {
+function link(A, a, B, b, style) {
   if (!a || !b) return;
   clearAt(A, a.x, a.y); clearAt(B, b.x, b.y);
   A.portals.push({ x: a.x, y: a.y, to: B.name, tx: b.x, ty: b.y + 1, kind: 'lift' });
   B.portals.push({ x: b.x, y: b.y, to: A.name, tx: a.x, ty: a.y + 1, kind: 'lift' });
-  A.decor.push({ t: 'lift', x: a.x, y: a.y, up: ALT[B.name] > ALT[A.name] ? 1 : 0, to: B.name });
-  B.decor.push({ t: 'lift', x: b.x, y: b.y, up: ALT[A.name] > ALT[B.name] ? 1 : 0, to: A.name });
+  A.decor.push({ t: 'lift', x: a.x, y: a.y, up: ALT[B.name] > ALT[A.name] ? 1 : 0, to: B.name, style });
+  B.decor.push({ t: 'lift', x: b.x, y: b.y, up: ALT[A.name] > ALT[B.name] ? 1 : 0, to: A.name, style });
 }
 
-// the meadows, fifty times the first garden: broad biomes, lakes with islands, rocky hills with cave
-// mouths and lifts to the mountains, canyon rims with lifts down, and groves of giant trees
-function genSurface3(G, R, avoid = () => false) {
+// The meadows, built to be explored: ten kinds of country in broad regions; rivers and lakes (you can
+// swim them now), marsh pools and frozen tarns; rocky hills with cave mouths; gorges whose rims have
+// lifts down to the canyons; sky spires up to the mountains and the sky islands; groves of ancient
+// trees with baskets up into the treetops; and old roads joining the start to all of it, so there is
+// always a way to follow. One of each kind of way out lies within a short walk of the start.
+function genSurface4(G, R, avoid = () => false) {
   const Rm = mkRealm('surface', G.seed), N = Rm.w, M = N >> 1, k = N / 128, b = (v) => Math.max(2, Math.round(v * k));
-  const hN = noiseMap(R, N, 5, b(3)), mN = noiseMap(R, N, 4, b(4)), wN = noiseMap(R, N, 4, b(6));
-  const qWater = quantS(hN, 0.13), qSand = quantS(hN, 0.16), qRock = quantS(hN, 0.89), qForest = quantS(mN, 0.7), qFlowers = quantS(mN, 0.22);
-  const qW1 = quantS(wN, 0.42), qW2 = quantS(wN, 0.62), qW3 = quantS(wN, 0.82);
+  const bio = biomeMap(Rm), far = N * 0.46;
+  const hN = noiseMap(R, N, 5, b(3)), mN = noiseMap(R, N, 4, b(4)), wN = noiseMap(R, N, 4, b(6)), pN = noiseMap(R, N, 3, b(14));
+  const qWater = quantS(hN, 0.11), qSand = quantS(hN, 0.14), qRock = quantS(hN, 0.9), qForest = quantS(mN, 0.68), qFlowers = quantS(mN, 0.24), qPond = quantS(pN, 0.22), qDune = quantS(wN, 0.3);
+  // tall grass only on the lushest tenth or so of the land
+  const qW1 = quantS(wN, 0.87), qW2 = quantS(wN, 0.94), qW3 = quantS(wN, 0.98);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const i = ix(Rm, x, y), d = Math.hypot(x - M, y - M), edge = Math.min(x, y, N - 1 - x, N - 1 - y), bi = biomeAt(Rm, x, y);
-    let h = hN[i], m = mN[i];
+    const i = y * N + x, d = Math.hypot(x - M, y - M), edge = Math.min(x, y, N - 1 - x, N - 1 - y), bi = bio[i], B = BIOMES[bi];
+    let h = hN[i] + B.wet, m = mN[i] + B.wood;
     if (d < 13) h = h + (0.5 - h) * Math.min(1, (1 - d / 13) * 1.4);
-    if (bi === 3) h -= 0.035;                                  // wetland: more water
-    if (bi === 1 || bi === 5 || bi === 6 || bi === 8) m += 0.09; // the woods
-    if (bi === 2) m -= 0.1;                                    // flower downs
-    if (bi === 4) { m -= 0.12; h += 0.02; }                    // heath: open, dry, stony
-    const g = d < 7.5 ? GRASS : edge < 2 ? ROCK : h < qWater ? WATER : h < qSand || (bi === 4 && wN[i] > qW3) ? SAND : h > qRock || (edge < 4 && R() < 0.7) ? ROCK : m > qForest ? FOREST : m < qFlowers ? FLOWERS : GRASS;
+    let g = d < 7.5 ? GRASS : edge < 2 ? ROCK : h < qWater ? WATER : h < qSand ? SAND : h > qRock - (bi === B_FROST || bi === B_HEATH ? 0.025 : 0) || (edge < 4 && R() < 0.7) ? ROCK : m > qForest ? FOREST : m < qFlowers ? FLOWERS : GRASS;
+    if (bi === B_MARSH && g !== ROCK && d > 10 && pN[i] < qPond) g = WATER;
+    if (bi === B_DUNES && (g === GRASS || g === FLOWERS) && wN[i] > qDune) g = SAND;
+    if (bi === B_FROST && g === WATER) g = ICE;
     Rm.ground[i] = g;
     const w = wN[i];
-    Rm.wild[i] = d < 7 || g === WATER || g === ROCK ? 0 : Math.min(3, (w > qW3 ? 3 : w > qW2 ? 2 : w > qW1 ? 1 : 0) + (g === FOREST && w > qW1 * 0.9 ? 1 : 0));
+    Rm.wild[i] = d < 9 || g === WATER || g === ROCK || g === ICE || g === SAND ? 0 : w > qW3 ? 3 : w > qW2 ? 2 : w > qW1 ? 1 : 0;
   }
-  const far = N * 0.46, rockFace = (x, y) => Rm.ground[ix(Rm, x, y)] === ROCK && Rm.ground[ix(Rm, x, y - 1)] === ROCK && Rm.ground[ix(Rm, x - 1, y)] === ROCK && Rm.ground[ix(Rm, x + 1, y)] === ROCK && ![ROCK, WATER].includes(Rm.ground[ix(Rm, x, y + 1)]);
-  // cave mouths in the rock faces
+  const at = (x, y) => (inside(Rm, x, y) ? Rm.ground[ix(Rm, x, y)] : ROCK), set = (x, y, g) => { if (inside(Rm, x, y) && at(x, y) !== PORTAL) { Rm.ground[ix(Rm, x, y)] = g; Rm.wild[ix(Rm, x, y)] = 0; } };
+  const dir = () => R() * Math.PI * 2, nearStart = (d0, d1, a = dir()) => { const d = d0 + R() * (d1 - d0); return { x: Math.round(M + Math.cos(a) * d), y: Math.round(M + Math.sin(a) * d) }; };
+  // rivers: three, from edge to edge, meandering, steering round the start; frozen in the frost
+  for (const [x0, y0, x1, y1] of [[2, N * (0.2 + R() * 0.6), N - 3, N * (0.2 + R() * 0.6)], [N * (0.2 + R() * 0.6), 2, N * (0.2 + R() * 0.6), N - 3], [2, 2 + R() * N * 0.3, N - 3, N * (0.7 + R() * 0.28)]]) {
+    let x = x0, y = y0, wob = 0;
+    for (let st = 0; st < 3 * N; st++) {
+      wob = (wob + (R() - 0.5) * 0.35) * 0.96;
+      const a = Math.atan2(y1 - y, x1 - x) + wob + Math.sin(st * 0.035) * 0.55;
+      x += Math.cos(a); y += Math.sin(a);
+      const dm = Math.hypot(x - M, y - M);
+      if (dm < 20) { x += ((x - M) / dm) * 1.2; y += ((y - M) / dm) * 1.2; }
+      const cx = Math.round(x), cy = Math.round(y);
+      if (cx < 2 || cy < 2 || cx >= N - 2 || cy >= N - 2 || Math.hypot(x1 - x, y1 - y) < 2) break;
+      for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) {
+        const r2 = ox * ox + oy * oy, xx = cx + ox, yy = cy + oy, j = yy * N + xx;
+        if (r2 > 5 || at(xx, yy) === PORTAL || avoid(xx, yy)) continue;
+        const frozen = bio[j] === B_FROST;
+        if (r2 <= 2) set(xx, yy, frozen ? ICE : WATER);
+        else if (![WATER, ICE, ROCK].includes(at(xx, yy))) set(xx, yy, frozen ? at(xx, yy) : SAND);
+      }
+    }
+  }
+  // gorges down to the canyons: long winding clefts of red rock; one is near the start
+  const gorges = [], downs = [];
+  for (let t = 0; t < 4000 && gorges.length < 7; t++) {
+    const first = !gorges.length, p = first ? nearStart(30, 42) : { x: 20 + Math.floor(R() * (N - 40)), y: 20 + Math.floor(R() * (N - 40)) }, bi = bio[p.y * N + p.x];
+    if (!first && (Math.hypot(p.x - M, p.y - M) < 70 || Math.hypot(p.x - M, p.y - M) > far || gorges.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < 110) || (![B_DUNES, B_HEATH, B_DOWNS, B_MEADOW].includes(bi) && R() < 0.7))) continue;
+    if (avoid(p.x, p.y)) continue;
+    const len = first ? 26 + R() * 10 : 36 + R() * 34, a0 = dir(), pts = [];
+    let x = p.x - Math.cos(a0) * len / 2, y = p.y - Math.sin(a0) * len / 2, a = a0;
+    for (let st = 0; st < len; st++) {
+      a += (R() - 0.5) * 0.22; x += Math.cos(a); y += Math.sin(a);
+      const w = 1.3 + Math.sin((st / len) * Math.PI) * (first ? 1.6 : 2.4) + R() * 0.3;
+      pts.push([x, y, w, a]);
+      for (let yy = Math.floor(y - w - 1); yy <= y + w + 1; yy++) for (let xx = Math.floor(x - w - 1); xx <= x + w + 1; xx++) {
+        if (!inside(Rm, xx, yy) || Math.hypot(xx - M, yy - M) < 14 || avoid(xx, yy) || at(xx, yy) === PORTAL) continue;
+        if (Math.hypot(xx + 0.5 - x, yy + 0.5 - y) < w) set(xx, yy, CHASM);
+      }
+    }
+    gorges.push(p);
+    // the lift down stands on the rim, on open ground if there is any (else it is made: clearAt
+    // turns water or rock under it into ground)
+    let rim = null;
+    for (let pass = 0; pass < 2 && !rim; pass++) for (let q = 0; q < pts.length && !rim; q++) {
+      const [gx, gy, w, ga] = pts[(pts.length >> 1) + (q % 2 ? 1 : -1) * (q >> 1)] || pts[0];
+      for (const sd of [1, -1]) {
+        const nx = Math.round(gx - Math.sin(ga) * sd * (w + 2)), ny = Math.round(gy + Math.cos(ga) * sd * (w + 2));
+        if (nx < 4 || ny < 4 || nx >= N - 4 || ny >= N - 5 || [CHASM, PORTAL].includes(at(nx, ny)) || at(nx, ny + 1) === CHASM || at(nx, ny + 2) === CHASM) continue;
+        if (pass === 0 && ([WATER, ICE, ROCK].includes(at(nx, ny)) || [WATER, ROCK].includes(at(nx, ny + 1)))) continue;
+        rim = { x: nx, y: ny }; break;
+      }
+    }
+    if (rim) downs.push(rim);
+  }
+  // rocky hills: cave mouths in their faces; if none is near the start, an outcrop is raised there
+  const rockFace = (x, y) => at(x, y) === ROCK && at(x, y - 1) === ROCK && at(x - 1, y) === ROCK && at(x + 1, y) === ROCK && ![ROCK, WATER, CHASM].includes(at(x, y + 1));
+  const mouth = (x, y) => { Rm.ground[ix(Rm, x, y)] = PORTAL; for (let q = 1; q <= 2; q++) { const j = ix(Rm, x, y + q); if (Rm.ground[j] !== WATER) { Rm.wild[j] = 0; if ([ROCK, CHASM].includes(Rm.ground[j])) Rm.ground[j] = GRASS; } } };
   const mouths = [];
   for (let t = 0; t < 40000 && mouths.length < 18; t++) {
     const x = 4 + Math.floor(R() * (N - 8)), y = 4 + Math.floor(R() * (N - 8)), d = Math.hypot(x - M, y - M);
     if (d < 14 || d > far || avoid(x, y) || !rockFace(x, y) || mouths.some((m) => Math.hypot(m.x - x, m.y - y) < 30)) continue;
-    Rm.ground[ix(Rm, x, y)] = PORTAL;
-    for (let q = 1; q <= 2; q++) { const j = ix(Rm, x, y + q); if (Rm.ground[j] !== WATER) { Rm.wild[j] = 0; if (Rm.ground[j] === ROCK) Rm.ground[j] = GRASS; } }
-    mouths.push({ x, y });
+    mouth(x, y); mouths.push({ x, y });
+  }
+  if (!mouths.some((m) => Math.hypot(m.x - M, m.y - M) < 50)) {
+    for (let t = 0; t < 60; t++) {
+      const p = nearStart(30, 44);
+      if (avoid(p.x, p.y) || gorges.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < 22)) continue;
+      for (let yy = p.y - 5; yy <= p.y + 4; yy++) for (let xx = p.x - 7; xx <= p.x + 7; xx++) if (Math.hypot((xx - p.x) / 1.4, yy - p.y) + (hash2(xx, yy, 5) - 0.5) * 1.4 < 4.2) set(xx, yy, ROCK);
+      let my = p.y; while (at(p.x, my + 1) === ROCK) my++;
+      if (!rockFace(p.x, my)) continue;
+      mouth(p.x, my); mouths.unshift({ x: p.x, y: my });
+      break;
+    }
   }
   // islands in the bigger lakes
   const land = (x, y) => inside(Rm, x, y) && Rm.ground[ix(Rm, x, y)] !== WATER;
   let islands = 0;
-  for (let t = 0; t < 30000 && islands < 10; t++) {
+  for (let t = 0; t < 30000 && islands < 12; t++) {
     const x = 6 + Math.floor(R() * (N - 12)), y = 6 + Math.floor(R() * (N - 12));
     if (avoid(x, y) || Rm.decor.some((o) => o.t === 'island' && Math.hypot(o.x - x, o.y - y) < 40)) continue;
     let deep = true;
     for (let yy = y - 5; yy <= y + 5 && deep; yy++) for (let xx = x - 5; xx <= x + 5; xx++) if (land(xx, yy)) { deep = false; break; }
     if (!deep) continue;
-    for (let yy = y - 2; yy <= y + 2; yy++) for (let xx = x - 2; xx <= x + 2; xx++) { const q = Math.hypot(xx - x, yy - y); if (q <= 2.3) { Rm.ground[ix(Rm, xx, yy)] = q < 1.6 ? GRASS : SAND; Rm.wild[ix(Rm, xx, yy)] = q < 1.6 ? 1 : 0; } }
-    natural(Rm, 'willow', x, y);
+    for (let yy = y - 2; yy <= y + 2; yy++) for (let xx = x - 2; xx <= x + 2; xx++) { const q = Math.hypot(xx - x, yy - y); if (q <= 2.3) { Rm.ground[ix(Rm, xx, yy)] = q < 1.6 ? GRASS : SAND; Rm.wild[ix(Rm, xx, yy)] = 0; } }
+    natural(Rm, bio[y * N + x] === B_DUNES ? 'cactus' : 'willow', x, y);
     Rm.decor.push({ t: 'island', x, y }); islands++;
   }
-  const ok = (x, y) => inside(Rm, x, y) && ![WATER, ROCK, PORTAL].includes(Rm.ground[ix(Rm, x, y)]) && !avoid(x, y) && Math.hypot(x - M, y - M) > 8;
-  placeRuins(Rm, R, RUINS.surface, ok, 10, 120, M, M);
-  for (const r of Rm.ruins) for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) Rm.ground[ix(Rm, xx, yy)] = GRASS;
-  // giant trees: a trunk three tiles wide; the ancient groves are full of them
+  const ok = (x, y) => inside(Rm, x, y) && ![WATER, ROCK, PORTAL, CHASM, ICE].includes(Rm.ground[ix(Rm, x, y)]) && !avoid(x, y) && Math.hypot(x - M, y - M) > 8;
+  const clearOf = (x, y, r = 3) => { for (let yy = y - r; yy <= y + r; yy++) for (let xx = x - r; xx <= x + r; xx++) if (!ok(xx, yy)) return false; return true; };
+  // giant trees: a trunk three tiles wide; the ancient groves are full of them; one stands near the start
   const giants = [];
+  const giant = (x, y) => { for (let xx = x - 1; xx <= x + 1; xx++) for (let yy = y - 1; yy <= y + 1; yy++) Rm.wild[ix(Rm, xx, yy)] = 0; natural(Rm, 'giant', x, y); giants.push({ x, y }); };
   for (let y = 6; y < N - 6; y += 2) for (let x = 6; x < N - 6; x += 2) {
-    const bi = biomeAt(Rm, x, y), g = Rm.ground[ix(Rm, x, y)];
-    if (g !== FOREST || avoid(x, y) || R() > (bi === 8 ? 0.028 : 0.0016)) continue;
+    const bi = bio[y * N + x], g = Rm.ground[ix(Rm, x, y)];
+    if (g !== FOREST || avoid(x, y) || R() > (bi === B_ANCIENT ? 0.03 : bi === B_WOODS ? 0.003 : 0.0012)) continue;
     let room = true;
-    for (let yy = y - 4; yy <= y + 1 && room; yy++) for (let xx = x - 2; xx <= x + 2; xx++) if (!inside(Rm, xx, yy) || [WATER, ROCK, PORTAL].includes(Rm.ground[ix(Rm, xx, yy)])) { room = false; break; }
-    if (!room || giants.some((o) => Math.abs(o.x - x) < 6 && Math.abs(o.y - y) < 6) || Rm.ruins.some((u) => Math.abs(u.x - x) < 6 && Math.abs(u.y - y) < 6)) continue;
-    for (let xx = x - 1; xx <= x + 1; xx++) for (let yy = y - 1; yy <= y + 1; yy++) Rm.wild[ix(Rm, xx, yy)] = 0;
-    natural(Rm, 'giant', x, y); giants.push({ x, y });
+    for (let yy = y - 4; yy <= y + 1 && room; yy++) for (let xx = x - 2; xx <= x + 2; xx++) if (!inside(Rm, xx, yy) || [WATER, ROCK, PORTAL, CHASM, ICE].includes(Rm.ground[ix(Rm, xx, yy)])) { room = false; break; }
+    if (!room || giants.some((o) => Math.abs(o.x - x) < 6 && Math.abs(o.y - y) < 6)) continue;
+    giant(x, y);
   }
-  // lift sites: on rocky hills (up to the mountains) and at dry canyon rims (down)
-  const ups = [], downs = [];
-  for (let t = 0; t < 40000 && ups.length < 6; t++) {
-    const x = 4 + Math.floor(R() * (N - 8)), y = 4 + Math.floor(R() * (N - 8)), d = Math.hypot(x - M, y - M);
-    if (d < 20 || d > far || avoid(x, y) || !rockFace(x, y) || [...ups, ...mouths].some((m) => Math.hypot(m.x - x, m.y - y) < 40)) continue;
-    Rm.ground[ix(Rm, x, y)] = GRASS; ups.push({ x, y });
+  if (!giants.some((o) => Math.hypot(o.x - M, o.y - M) < 50)) {
+    for (let t = 0; t < 200; t++) {
+      const p = nearStart(30, 44);
+      if (!clearOf(p.x, p.y, 3) || gorges.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < 20)) continue;
+      // a little grove round it
+      for (let yy = p.y - 6; yy <= p.y + 6; yy++) for (let xx = p.x - 7; xx <= p.x + 7; xx++) if (ok(xx, yy) && Math.hypot((xx - p.x) / 1.15, yy - p.y) + (hash2(xx, yy, 9) - 0.5) * 2 < 6) Rm.ground[ix(Rm, xx, yy)] = FOREST;
+      giant(p.x, p.y);
+      break;
+    }
   }
-  for (let t = 0; t < 40000 && downs.length < 6; t++) {
-    const x = 6 + Math.floor(R() * (N - 12)), y = 6 + Math.floor(R() * (N - 12)), d = Math.hypot(x - M, y - M), bi = biomeAt(Rm, x, y);
-    if (d < 20 || d > far || avoid(x, y) || !(bi === 4 || bi === 2) || !ok(x, y) || downs.some((m) => Math.hypot(m.x - x, m.y - y) < 50)) continue;
-    downs.push({ x, y });
+  giants.sort((a, c) => Math.hypot(a.x - M, a.y - M) - Math.hypot(c.x - M, c.y - M));
+  // sky spires: up to the mountains (one a short walk away, more further out) and two to the sky
+  const spot = (d0, d1, list, sep) => { for (let t = 0; t < 4000; t++) { const p = d0 < 60 ? nearStart(d0, d1) : { x: 8 + Math.floor(R() * (N - 16)), y: 8 + Math.floor(R() * (N - 16)) }, d = Math.hypot(p.x - M, p.y - M); if (d < d0 || d > d1 || !clearOf(p.x, p.y, 2) || list.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < sep) || gorges.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < 14) || mouths.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < 8)) continue; return p; } return null; };
+  const ups = [], skyUps = [], all = () => [...ups, ...skyUps, ...downs, ...mouths, ...giants];
+  const u0 = spot(20, 30, [], 0); if (u0) ups.push(u0);
+  for (let n = 0; n < 10; n++) { const p = spot(60, far, all(), 70); if (p) ups.push(p); }
+  for (let n = 0; n < 2; n++) { const p = spot(80, 170, all(), 50); if (p) skyUps.push(p); }
+  // old roads: from the start to the nearest of each way out, then on between all of them (a
+  // spanning tree), wandering a little; planks over water and gorges, a cut through rock
+  const pois = [{ x: M, y: M + 2 }, ...ups.map((p) => ({ x: p.x, y: p.y + 1 })), ...skyUps.map((p) => ({ x: p.x, y: p.y + 1 })), ...downs.map((p) => ({ x: p.x, y: p.y + 1 })), ...mouths.map((p) => ({ x: p.x, y: p.y + 2 })), ...giants.slice(0, 4).map((p) => ({ x: p.x, y: p.y + 3 }))];
+  const pave = (x, y) => {
+    if (!inside(Rm, x, y) || avoid(x, y) || Math.hypot(x - M, y - M) < 3) return;
+    const i = ix(Rm, x, y), g = Rm.ground[i];
+    if (g === PORTAL || g === STONE || g === BRIDGE || g === ICE) return;
+    if (Rm.plants.some((p) => p.k === 'giant' && Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1)) return;
+    Rm.ground[i] = g === WATER || g === CHASM ? BRIDGE : PATH; Rm.wild[i] = 0;
+  };
+  const road = (a, c) => {
+    let x = a.x, y = a.y;
+    for (let st = 0; st < 6 * N && (x !== c.x || y !== c.y); st++) {
+      const dx = c.x - x, dy = c.y - y, ax = Math.abs(dx), ay = Math.abs(dy);
+      if (R() < 0.1 && ax + ay > 6) { if (ax > ay) y += R() < 0.5 ? 1 : -1; else x += R() < 0.5 ? 1 : -1; }
+      else if (R() < ax / (ax + ay)) x += Math.sign(dx); else y += Math.sign(dy);
+      pave(x, y);
+      // a second lane now and then, never on a bridge
+      if (R() < 0.3 && at(x, y) === PATH) { if (ax > ay) { if (![WATER, CHASM, PORTAL].includes(at(x, y + 1))) pave(x, y + 1); } else if (![WATER, CHASM, PORTAL].includes(at(x + 1, y))) pave(x + 1, y); }
+    }
+  };
+  const inTree = [0], rest = pois.map((_, n) => n).slice(1);
+  while (rest.length) {
+    let bi = -1, bj = -1, bd = Infinity;
+    for (const a of inTree) for (const c of rest) { const d = Math.abs(pois[a].x - pois[c].x) + Math.abs(pois[a].y - pois[c].y); if (d < bd) { bd = d; bi = a; bj = c; } }
+    road(pois[bi], pois[bj]); inTree.push(bj); rest.splice(rest.indexOf(bj), 1);
   }
+  // ruins, hidden in tall grass, off the roads
+  const okRuin = (x, y) => ok(x, y) && Rm.ground[ix(Rm, x, y)] !== PATH && Rm.ground[ix(Rm, x, y)] !== BRIDGE && !all().some((o) => Math.abs(o.x - x) < 4 && Math.abs(o.y - y) < 4);
+  placeRuins(Rm, R, RUINS.surface, okRuin, 10, 120, M, M);
+  for (const r of Rm.ruins) for (let yy = r.y; yy < r.y + r.h; yy++) for (let xx = r.x; xx < r.x + r.w; xx++) Rm.ground[ix(Rm, xx, yy)] = GRASS;
   // the start: a few flowers and a young cherry
   for (const [kk, x, y, g] of [['daisy', -2, 1, 0.95], ['daisy', -3, 2, 0.9], ['tulip', 2, 2, 0.5], ['cherry', 3, -3, 0.45]]) Rm.plants.push({ k: kk, x: M + x, y: M + y, g, w: 0, fr: 0, sd: 0 });
   critter(G, Rm, 'butterfly', M - 1, M); critter(G, Rm, 'butterfly', M + 2, M - 1);
   Rm.hero = { x: M * T + 8, y: (M + 1) * T + 12 };
-  Object.assign(Rm, { mouths, giants, liftUps: ups, liftDowns: downs });
+  Object.assign(Rm, { mouths, giants, liftUps: ups, liftDowns: downs, skyUps });
   return Rm;
 }
+
 // the canyons below: red rock walls from three layers of the cave automaton, a river winding along
 // the floor, scrub and dry flowers
 function genCanyon(G, R) {
   const Rm = mkRealm('canyon', G.seed ^ 0x6a1b), N = Rm.w;
   const f1 = caField(R, N, N, 9, 0.5, 5), f2 = caField(R, N, N, 3, 0.5, 4), f3 = caField(R, N, N, 1, 0.45, 2), wN = noiseMap(R, N, 4, 9);
   const f = new Float32Array(N * N); for (let i = 0; i < N * N; i++) f[i] = f1[i] * 0.55 + f2[i] * 0.3 + f3[i] * 0.15 + (R() - 0.5) * 0.04;
-  const thr = quantS(f, 0.52), qS = quantS(wN, 0.6), qW = quantS(wN, 0.72);
+  const thr = quantS(f, 0.52), qS = quantS(wN, 0.85), qW = quantS(wN, 0.94);
   for (let i = 0; i < N * N; i++) { const x = i % N, y = (i / N) | 0, edge = Math.min(x, y, N - 1 - x, N - 1 - y); Rm.ground[i] = edge < 2 || f[i] > thr ? ROCK : f[i] > thr - 0.05 ? SAND : GRASS; }
   joinRegions(Rm, R, (i) => Rm.ground[i] !== ROCK, (i) => { Rm.ground[i] = GRASS; });
   // the river: a meander from the west edge to the east, banks of sand
@@ -807,11 +959,11 @@ function genCanyon(G, R) {
 function genMountain(G, R) {
   const Rm = mkRealm('mountain', G.seed ^ 0x3f0d), N = Rm.w;
   const hN = noiseMap(R, N, 5, 9), mN = noiseMap(R, N, 4, 11), wN = noiseMap(R, N, 4, 14);
-  const qL = quantS(hN, 0.07), qSnow = quantS(hN, 0.7), qRidge = quantS(hN, 0.86), qF = quantS(mN, 0.66), qFl = quantS(mN, 0.2), qW = quantS(wN, 0.7);
+  const qL = quantS(hN, 0.07), qSnow = quantS(hN, 0.7), qRidge = quantS(hN, 0.86), qF = quantS(mN, 0.66), qFl = quantS(mN, 0.2), qW = quantS(wN, 0.86);
   for (let i = 0; i < N * N; i++) {
     const x = i % N, y = (i / N) | 0, edge = Math.min(x, y, N - 1 - x, N - 1 - y), h = hN[i];
     Rm.ground[i] = edge < 2 || h > qRidge ? ROCK : h < qL ? WATER : h > qSnow ? SAND : mN[i] > qF ? FOREST : mN[i] < qFl ? FLOWERS : GRASS;
-    Rm.wild[i] = [GRASS, FOREST, FLOWERS].includes(Rm.ground[i]) && wN[i] > qW ? 1 + (wN[i] > qW + 0.08 ? 1 : 0) : 0;
+    Rm.wild[i] = [GRASS, FOREST, FLOWERS].includes(Rm.ground[i]) && wN[i] > qW ? 1 + (wN[i] > qW + 0.06 ? 1 : 0) : 0;
   }
   joinRegions(Rm, R, (i) => Rm.ground[i] !== ROCK && Rm.ground[i] !== WATER, (i, why) => { if (why === 'pass') { Rm.ground[i] = SAND; Rm.wild[i] = 0; } else Rm.ground[i] = ROCK; });
   const home = spotIn(Rm, R, openGround(Rm)) || { x: N >> 1, y: N >> 1 };
@@ -834,28 +986,36 @@ export function populate(G, Rm, cx, cy) {
   const tree = (x, y) => [[-1, 0], [0, -1], [-1, -1], [1, -1]].some(([dx, dy]) => taken.has((y + dy) * Rm.w + x + dx));
   const wet = (x, y) => near4.some(([dx, dy]) => inside(Rm, x + dx, y + dy) && Rm.ground[ix(Rm, x + dx, y + dy)] === WATER);
   const pick = (a) => a[Math.floor(R() * a.length)];
-  const mid = Rm.name === 'surface' ? Rm.w >> 1 : -999;
+  const mid = Rm.name === 'surface' ? Rm.w >> 1 : -999, bio = Rm.name === 'surface' ? biomeMap(Rm) : null, FL = COMMON.slice(0, 7);
   for (let y = Math.max(3, y0); y < y1; y++) for (let x = Math.max(3, x0); x < x1; x++) {
     const i = ix(Rm, x, y), g = Rm.ground[i], r = R();
-    if (taken.has(i) || busy(x, y) || Math.hypot(x - mid, y - mid) < 7 || Rm.wild[i] >= 3) continue;
-    const bi = biomeAt(Rm, x, y);
+    if (taken.has(i) || busy(x, y) || Math.hypot(x - mid, y - mid) < 7 || Rm.wild[i] >= 3 || g === PATH) continue;
+    const bi = bio ? bio[i] : 0, F = g === FOREST, GR = g === GRASS || g === FLOWERS, tr = (p, list) => (r < p && !tree(x, y) ? pick(list) : null);
     let k = null;
-    if (Rm.name === 'mountain') k = g === FOREST ? (r < 0.25 ? 'pine' : r < 0.32 ? 'fern' : null) : (g === GRASS || g === FLOWERS) ? (r < (g === FLOWERS ? 0.07 : 0.015) ? pick(['bluebell', 'lavender', 'daisy', 'cosmos']) : null) : null;
-    else if (Rm.name === 'canyon') k = (g === SAND || g === GRASS) && wet(x, y) ? (r < 0.3 ? 'reed' : null) : g === GRASS ? (r < 0.018 ? pick(['poppy', 'sunflower', 'lavender']) : r < 0.024 ? 'berrybush' : null) : null;
-    else if (g === FOREST) {
-      const sp = bi === 5 ? ['oak', 'oak', 'apple'] : bi === 6 ? ['birch', 'birch', 'pine'] : bi === 8 ? ['pine', 'oak', 'willow'] : ['pine', 'oak', 'birch'];
-      k = r < 0.2 && !tree(x, y) ? pick(sp) : r < 0.32 ? 'fern' : bi === 8 && r < 0.36 ? 'hydrangea' : null;
-    } else if ((g === SAND || g === GRASS) && wet(x, y)) k = r < (bi === 3 ? 0.35 : 0.2) ? 'reed' : null;
-    else if (g === GRASS) k = bi === 7 && r < 0.03 && !tree(x, y) ? pick(['apple', 'cherry', 'apple']) : r < 0.005 && !tree(x, y) ? pick(['apple', 'cherry']) : bi === 4 && r < 0.03 ? pick(['lavender', 'berrybush', 'poppy']) : bi === 2 && r < 0.03 ? pick(COMMON.slice(0, 7)) : bi === 3 && r < 0.012 ? 'bluebell' : null;
-    else if (g === FLOWERS) k = r < 0.06 ? pick(COMMON.slice(0, 7)) : null;
+    if (Rm.name === 'mountain') k = F ? (r < 0.25 ? 'snowpine' : r < 0.3 ? 'pine' : r < 0.36 ? 'fern' : null) : GR ? (r < (g === FLOWERS ? 0.07 : 0.015) ? pick(['bluebell', 'lavender', 'daisy', 'cosmos']) : null) : null;
+    else if (Rm.name === 'canyon') k = (g === SAND || g === GRASS) && wet(x, y) ? (r < 0.3 ? 'reed' : null) : g === GRASS ? (r < 0.018 ? pick(['poppy', 'sunflower', 'lavender']) : r < 0.024 ? 'berrybush' : r < 0.032 ? 'cactus' : null) : null;
+    else if ((g === SAND || g === GRASS) && wet(x, y) && bi !== B_FROST) k = r < (bi === B_MARSH ? 0.35 : bi === B_DUNES ? 0.12 : 0.2) ? 'reed' : null;
+    else switch (bi) {
+      case B_WOODS: k = F ? tr(0.22, ['pine', 'oak', 'birch', 'pine']) || (r < 0.36 ? 'fern' : null) : GR ? (r < 0.03 ? 'fern' : tr(0.036, ['birch', 'oak'])) : null; break;
+      case B_DOWNS: k = g === FLOWERS ? (r < 0.12 ? pick(FL) : null) : g === GRASS ? (r < 0.045 ? pick([...FL, 'sunflower']) : tr(0.05, ['cherry'])) : F ? tr(0.15, ['cherry', 'apple', 'birch']) || (r < 0.22 ? 'rosebush' : null) : null; break;
+      case B_MARSH: k = GR ? (r < 0.015 ? 'bluebell' : tr(0.022, ['willow'])) : F ? tr(0.16, ['willow', 'birch']) || (r < 0.26 ? 'fern' : null) : null; break;
+      case B_HEATH: k = GR ? (r < 0.07 ? 'heather' : r < 0.085 ? 'lavender' : r < 0.092 ? 'berrybush' : null) : F ? tr(0.12, ['pine']) || (r < 0.2 ? 'heather' : null) : null; break;
+      case B_AUTUMN: k = F ? tr(0.22, ['maple', 'maple', 'oak', 'apple']) || (r < 0.3 ? 'berrybush' : null) : GR ? tr(0.012, ['maple']) || (r < 0.02 ? 'berrybush' : null) : null; break;
+      case B_DUNES: k = g === SAND || GR ? (r < 0.02 ? 'cactus' : null) : F ? (r < 0.08 ? 'cactus' : null) : null; break;
+      case B_ANCIENT: k = F ? tr(0.2, ['pine', 'oak', 'willow']) || (r < 0.32 ? 'fern' : r < 0.36 ? 'hydrangea' : null) : GR ? (r < 0.03 ? 'fern' : null) : null; break;
+      case B_FROST: k = F ? tr(0.24, ['snowpine']) : GR ? tr(0.008, ['snowpine']) || (r < 0.012 ? 'moonflower' : null) : null; break;
+      case B_FUNGAL: k = F ? tr(0.12, ['bigshroom']) || (r < 0.2 ? 'glowshroom' : tr(0.21, ['spirittree'])) : GR ? (r < 0.035 ? 'glowshroom' : r < 0.045 ? 'moonflower' : tr(0.05, ['bigshroom'])) : null; break;
+      default: k = F ? tr(0.2, ['pine', 'oak', 'birch']) || (r < 0.32 ? 'fern' : null) : g === GRASS ? tr(0.005, ['apple', 'cherry']) : g === FLOWERS ? (r < 0.06 ? pick(FL) : null) : null;
+    }
     if (k) { natural(Rm, k, x, y); taken.add(i); }
   }
   // a few residents
   const tally = { FOREST: 0, GRASS: 0, WATER: 0, SAND: 0, FLOWERS: 0 };
   for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) { const g = Rm.ground[ix(Rm, x, y)]; if (g === FOREST) tally.FOREST++; else if (g === GRASS) tally.GRASS++; else if (g === WATER) tally.WATER++; else if (g === SAND) tally.SAND++; else if (g === FLOWERS) tally.FLOWERS++; }
   const at = (want) => { for (let t = 0; t < 30; t++) { const x = x0 + Math.floor(R() * CH), y = y0 + Math.floor(R() * CH); if (inside(Rm, x, y) && Rm.ground[ix(Rm, x, y)] === want) return [x, y]; } return null; };
+  const cb = bio ? bio[ix(Rm, Math.min(Rm.w - 1, x0 + 8), Math.min(Rm.h - 1, y0 + 8))] : 0, many = cb === B_DUNES ? 0.4 : cb === B_FROST ? 0.6 : 1;
   const herd = Rm.name === 'mountain' ? [['deer', FOREST, 0.2], ['songbird', FOREST, 0.2], ['rabbit', GRASS, 0.15]] : Rm.name === 'canyon' ? [['rabbit', GRASS, 0.2], ['frog', SAND, 0.15], ['songbird', GRASS, 0.12], ['butterfly', GRASS, 0.12]]
-    : [['deer', FOREST, 0.12], ['songbird', FOREST, 0.15], ['squirrel', FOREST, 0.1], ['rabbit', GRASS, 0.12], ['butterfly', FLOWERS, 0.2], ['duck', WATER, 0.18], ['frog', SAND, 0.1], ['hedgehog', GRASS, 0.04], ['fox', FOREST, 0.02]];
+    : [['deer', FOREST, 0.12], ['songbird', FOREST, 0.15], ['squirrel', FOREST, 0.1], ['rabbit', GRASS, 0.12], ['butterfly', FLOWERS, 0.2], ['duck', WATER, cb === B_MARSH ? 0.4 : 0.18], ['frog', SAND, 0.1], ['frog', GRASS, cb === B_MARSH ? 0.25 : 0], ['hedgehog', GRASS, 0.04], ['fox', FOREST, cb === B_AUTUMN ? 0.08 : 0.02], ['owl', FOREST, cb === B_ANCIENT || cb === B_FUNGAL ? 0.12 : 0]].map(([a, b, c]) => [a, b, c * many]);
   for (const [kk, want, pr] of herd) {
     const key = want === FOREST ? 'FOREST' : want === GRASS ? 'GRASS' : want === WATER ? 'WATER' : want === SAND ? 'SAND' : 'FLOWERS';
     if (tally[key] > 10 && R() < pr) { const p = at(want); if (p) critter(G, Rm, kk, p[0], p[1]); }
@@ -866,9 +1026,9 @@ export function populate(G, Rm, cx, cy) {
 // a fresh world, or the new world around an old garden (keep: its cave and sky, already explored)
 function newGarden(avoid, keep = {}) {
   const seed = keep.seed ?? ((Math.random() * 2 ** 31) | 0), R = mulberry32(seed), t = now();
-  const G = { v: 3, seed, created: t, saved: t, realm: 'surface', nextId: keep.nextId || 1, R: {}, caveGen: 2,
+  const G = { v: 4, seed, created: t, saved: t, realm: 'surface', nextId: keep.nextId || 1, R: {}, caveGen: 2,
     inv: { seeds: { daisy: 6, tulip: 4, lavender: 3, sunflower: 2, cosmos: 3, berrybush: 2, apple: 1, birch: 1 }, food: 4, pick: 'daisy' }, log: [], firstVisit: 1 };
-  const S = genSurface3(G, R, avoid);
+  const S = genSurface4(G, R, avoid);
   let C;
   if (keep.cave) {
     C = keep.cave;
@@ -888,20 +1048,22 @@ function newGarden(avoid, keep = {}) {
   for (let n = 0; n < 2; n++) { const p = spotIn(C, R, (x, y) => C.ground[ix(C, x, y)] === GRASS && !C.wild[ix(C, x, y)] && !C.portals.some((q) => Math.hypot(q.x - x, q.y - y) < 8), shafts, 20); if (p) shafts.push(p); }
   const D = genCave(G, R, shafts, 'deep', 'cave');
   shafts.forEach((p, i) => { const u = D.Rm.portals[i]; if (!u) return; clearAt(C, p.x, p.y); C.portals.push({ x: p.x, y: p.y, to: 'deep', tx: u.x, ty: u.y + 1, kind: 'lift' }); C.decor.push({ t: 'lift', x: p.x, y: p.y, up: 0, to: 'deep' }); D.Rm.decor.push({ t: 'lift', x: u.x, y: u.y, up: 1, to: 'cave' }); });
-  // lifts: hills up to the mountains, rims down to the canyons, summits up to the sky, giant trees
-  // up into the canopy
+  // lifts: spires up to the mountains and the sky, gorge rims down to the canyons, summits up to the
+  // sky, baskets up the giant trees into the canopy
   const gOK = (Rm) => (x, y) => openGround(Rm)(x, y) && !Rm.wild[ix(Rm, x, y)];
-  const mtPts = [], cnPts = [];
-  for (const u of S.liftUps) { const p = spotIn(Mt, R, gOK(Mt), mtPts, 40); if (p) { mtPts.push(p); link(S, u, Mt, p); } }
+  const skyOK = (x, y) => K.ground[ix(K, x, y)] === GRASS && !K.wild[ix(K, x, y)] && !K.portals.some((q) => Math.hypot(q.x - x, q.y - y) < 6);
+  const mtPts = [], cnPts = [], kPts = [];
+  for (const u of S.liftUps) { const p = spotIn(Mt, R, gOK(Mt), mtPts, 34); if (p) { mtPts.push(p); link(S, u, Mt, p); } }
   for (const d of S.liftDowns) { const p = spotIn(Cn, R, gOK(Cn), cnPts, 40); if (p) { cnPts.push(p); link(S, d, Cn, p); } }
+  for (const u of S.skyUps) { const p = spotIn(K, R, skyOK, kPts, 12); if (p) { kPts.push(p); link(S, u, K, p); } }
   const summits = [];
-  for (let n = 0; n < 2; n++) { const p = spotIn(Mt, R, (x, y) => Mt.ground[ix(Mt, x, y)] === SAND, [...summits, ...mtPts], 40); if (!p) continue; summits.push(p); link(Mt, p, K, spotIn(K, R, (x, y) => K.ground[ix(K, x, y)] === GRASS && !K.wild[ix(K, x, y)], [], 6)); }
-  const giants = S.giants.slice().sort((a, b) => Math.hypot(a.x - S.w / 2, a.y - S.h / 2) - Math.hypot(b.x - S.w / 2, b.y - S.h / 2));
+  for (let n = 0; n < 2; n++) { const p = spotIn(Mt, R, (x, y) => Mt.ground[ix(Mt, x, y)] === SAND, [...summits, ...mtPts], 40); if (!p) continue; summits.push(p); link(Mt, p, K, spotIn(K, R, skyOK, kPts, 12)); }
+  const giants = S.giants;   // nearest the start first
   // the canopy's home portal goes down the nearest giant; three more giants have lifts too
   const home = Cp.portals[0];
   Cp.portals.length = 0; Cp.decor = Cp.decor.filter((o) => o.t !== 'lift'); Cp.ground[ix(Cp, home.x, home.y)] = GRASS;
-  giants.slice(0, 4).forEach((g, n) => link(S, { x: g.x, y: g.y + 2 }, Cp, n ? spotIn(Cp, R, (x, y) => Cp.ground[ix(Cp, x, y)] === GRASS && !Cp.wild[ix(Cp, x, y)], [], 12) : home));
-  for (const Rm of [S, Mt, Cn]) for (const k of ['mouths', 'giants', 'liftUps', 'liftDowns']) delete Rm[k];
+  giants.slice(0, 4).forEach((g, n) => link(S, { x: g.x, y: g.y + 2 }, Cp, n ? spotIn(Cp, R, (x, y) => Cp.ground[ix(Cp, x, y)] === GRASS && !Cp.wild[ix(Cp, x, y)], [], 12) : home, 'vine'));
+  for (const Rm of [S, Mt, Cn]) for (const k of ['mouths', 'giants', 'liftUps', 'liftDowns', 'skyUps']) delete Rm[k];
   G.R = { surface: S, cave: C, sky: K, canyon: Cn, mountain: Mt, deep: D.Rm, canopy: Cp };
   // the start and its neighbours are grown at once
   const M = (S.w >> 1) / CH | 0;
@@ -945,6 +1107,31 @@ function upgrade3(old) {
   return G;
 }
 
+// A v3 world is rebuilt from its own seed in the new shape (the ten kinds of country, rivers, gorges,
+// roads, the new ways up and down). What the gardener sowed, and the animals that came, move across
+// to the nearest good spot to where they were; seeds, food and the garden's age come too.
+function upgrade4(old) {
+  const G = newGarden(undefined, { seed: old.seed, nextId: old.nextId });
+  for (const [name, Rm] of Object.entries(G.R)) {
+    const O = old.R?.[name];
+    if (!O) continue;
+    Rm.plants = Rm.plants.filter((p) => p.n);   // the new start's flowers: the old garden brings its own
+    const taken = new Set(Rm.plants.map((p) => p.y * Rm.w + p.x));
+    const fits = (x, y, water) => {
+      if (!inside(Rm, x, y) || x < 2 || y < 2 || x >= Rm.w - 2 || y >= Rm.h - 2) return false;
+      const i = ix(Rm, x, y), g = Rm.ground[i];
+      if (water) return g === WATER;
+      return [GRASS, FOREST, FLOWERS, PATH, SAND].includes(g) && !Rm.wild[i] && !taken.has(i) && !Rm.portals.some((q) => Math.abs(q.x - x) <= 1 && Math.abs(q.y - y) <= 2) && !Rm.ruins.some((u) => x >= u.x - 1 && x <= u.x + u.w && y >= u.y - 1 && y <= u.y + u.h);
+    };
+    const nearest = (x, y, water) => { for (let r = 0; r <= 12; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && fits(x + dx, y + dy, water)) return [x + dx, y + dy]; return null; };
+    for (const p of O.plants || []) { if (p.n || !PLANTS[p.k]) continue; const at = nearest(p.x, p.y); if (!at) continue; taken.add(ix(Rm, at[0], at[1])); Rm.plants.push({ ...p, x: at[0], y: at[1] }); }
+    for (const a of O.animals || []) { if (a.n || !ANIMALS[a.k]) continue; const at = nearest(Math.floor(a.x / T), Math.floor(a.y / T), !!ANIMALS[a.k].water) || (ANIMALS[a.k].water ? null : nearest(Rm.hero.x / T | 0, Rm.hero.y / T | 0)); if (at) Rm.animals.push({ ...a, x: at[0] * T + 8, y: at[1] * T + 8 }); }
+    if (O.visited) Rm.visited = 1;
+  }
+  Object.assign(G, { created: old.created || G.created, saved: old.saved || G.saved, inv: old.inv || G.inv, log: old.log || [], npcSown: old.npcSown, firstVisit: 0, reshaped: 1 });
+  return G;
+}
+
 // ------------------------------------------------ saving
 // maps are saved run-length encoded ([count, value] byte pairs): a 900² meadow is mostly long runs
 function rle(a) {
@@ -953,7 +1140,7 @@ function rle(a) {
   return Uint8Array.from(out);
 }
 function unrle(b, n) { const out = new Uint8Array(n); let j = 0; for (let i = 0; i < b.length; i += 2) { out.fill(b[i + 1], j, j + b[i]); j += b[i]; } return out; }
-const packR = (Rm) => ({ ...Rm, tone: undefined, soil: undefined, wear: undefined, biome: undefined, pIdx: undefined, pIdxA: undefined, cv: undefined, mini: undefined, enc: 'rle', wild: rle(Rm.wild), ground: rle(Rm.ground), seen: rle(Rm.seen) });
+const packR = (Rm) => ({ ...Rm, tone: undefined, soil: undefined, wear: undefined, biome: undefined, bio: undefined, pIdx: undefined, pIdxA: undefined, cv: undefined, mini: undefined, enc: 'rle', wild: rle(Rm.wild), ground: rle(Rm.ground), seen: rle(Rm.seen) });
 const unpackR = (o) => {
   const n = o.w * o.h, kind = KIND[o.name] || o.name;
   if (o.enc === 'rle') return { ...o, kind, wild: unrle(o.wild, n), ground: unrle(o.ground, n), seen: unrle(o.seen, n), pop: o.pop ? Uint8Array.from(o.pop) : undefined };
@@ -966,9 +1153,11 @@ export async function loadGarden() {
   if (G) return G;
   loading ||= (async () => {
     let g = null;
-    try { const o = await idbGet('kv', KEY); if (o?.v === 2 || o?.v === 3) g = { ...o, R: Object.fromEntries(Object.entries(o.R).map(([k, v]) => [k, unpackR(v)])) }; } catch { /* a fresh one */ }
+    try { const o = await idbGet('kv', KEY); if (o?.v >= 2 && o?.v <= 4) g = { ...o, R: Object.fromEntries(Object.entries(o.R).map(([k, v]) => [k, unpackR(v)])) }; } catch { /* a fresh one */ }
     if (!g) { try { const o = await idbGet('kv', OLD); if (o?.v === 1) g = fromV1(o); } catch { /* a fresh one */ } }
-    if (g && g.v !== 3) { try { g = upgrade3(g); } catch (e) { console.error('garden upgrade', e); } }
+    // older gardens move into the newest world (v1/v2: as they were, into its middle; v3: rebuilt)
+    if (g && g.v < 3) { try { g = upgrade3(g); } catch (e) { console.error('garden upgrade', e); } }
+    else if (g && g.v === 3) { try { g = upgrade4(g); } catch (e) { console.error('garden upgrade', e); } }
     G = g || newGarden();
     G.away = catchUp(G);
     saveGarden(true);
@@ -1002,14 +1191,14 @@ export function census(Rm) {
   return s;
 }
 export const countKind = (Rm, k) => Rm.animals.filter((a) => a.k === k).length;
-export function walkable(Rm, x, y) { if (!inside(Rm, x, y)) return false; const i = ix(Rm, x, y), g = Rm.ground[i]; return !Rm.wild[i] && g !== WATER && g !== ROCK && g !== VOID; }
+export function walkable(Rm, x, y) { if (!inside(Rm, x, y)) return false; const g = Rm.ground[ix(Rm, x, y)]; return g !== ROCK && g !== VOID && g !== CHASM; }
 export function freeTile(Rm, x, y, r, water = false) {
   for (let i = 0; i < 50; i++) {
     const tx = Math.round(x + (Math.random() * 2 - 1) * r), ty = Math.round(y + (Math.random() * 2 - 1) * r);
     if (!inside(Rm, tx, ty) || tx < 1 || ty < 1 || tx >= Rm.w - 1 || ty >= Rm.h - 1) continue;
     const j = ix(Rm, tx, ty), g = Rm.ground[j];
     if (Rm.wild[j]) continue;
-    if (water ? g !== WATER : (g === WATER || g === ROCK || g === VOID || g === PORTAL || g === BRIDGE)) continue;
+    if (water ? g !== WATER : (g === WATER || g === ROCK || g === VOID || g === PORTAL || g === BRIDGE || g === CHASM || g === ICE)) continue;
     if (!water && Rm.plants.some((p) => p.x === tx && p.y === ty)) continue;
     if (Rm.ruins.some((u) => u.found && tx >= u.x && tx < u.x + u.w && ty >= u.y && ty < u.y + u.h)) continue;
     return [tx, ty];
@@ -1078,7 +1267,7 @@ export function catchUp(g) {
 }
 
 // ------------------------------------------------ painted map chunks (painted on demand, kept per realm and mode)
-const chunks = new Map(), CHUNK_MAX = 54;
+const chunks = new Map(), CHUNK_MAX = 60;
 function tileRand(x, y, k = 0) { return mulberry32((x * 7919 + y * 104729 + k * 31337) | 0); }
 function toneOf(Rm, i) { Rm.tone ||= noiseMap(mulberry32(Rm.seed ^ 77), Rm.w, 3, 4); return Rm.tone[i]; }
 // photo ground textures (www/assets/textures): greyscale detail laid over the painted colour with
@@ -1099,16 +1288,19 @@ export function loadTextures() {
   })();
   return texLoading;
 }
-const TEX_ALPHA = { grass: 0.55, moss: 0.55, forest: 0.6, sand: 0.5, path: 0.55, stone: 0.5, rock: 0.55, cave: 0.5, sky: 0.3, water: 0.35 };
+const TEX_ALPHA = { grass: 0.55, moss: 0.55, forest: 0.6, sand: 0.5, path: 0.55, stone: 0.5, rock: 0.55, cave: 0.5, sky: 0.3, water: 0.35, snow: 0.4, leaves: 0.6, heath: 0.58, mud: 0.55, dune: 0.5, clover: 0.55 };
+// a set that has not been fetched yet borrows the nearest one that has
+const TEX_FALLBACK = { moss: 'grass', forest: 'grass', snow: 'sand', leaves: 'forest', heath: 'grass', mud: 'path', dune: 'sand', clover: 'grass' };
 function texture(c, key, X, Y, x, y, so = 0, k = 1) {
-  const set = TEX?.[key] || (key === 'moss' ? TEX?.grass : key === 'forest' ? TEX?.grass : null);
+  let set = TEX?.[key], alpha = TEX_ALPHA[key] ?? 0.5;
+  for (let f = key; !set?.length && TEX_FALLBACK[f];) { f = TEX_FALLBACK[f]; set = TEX?.[f]; }
   if (!set?.length) return;
   const im = set[(so >> 1) % set.length], S = im.width, sx = ((x * T) % S + S) % S, sy = ((y * T) % S + S) % S;
-  c.save(); c.globalCompositeOperation = 'overlay'; c.globalAlpha = (TEX_ALPHA[key] ?? 0.5) * k;
+  c.save(); c.globalCompositeOperation = 'overlay'; c.globalAlpha = alpha * k;
   c.drawImage(im, sx, sy, Math.min(T, S - sx), Math.min(T, S - sy), X, Y, Math.min(T, S - sx), Math.min(T, S - sy));
   c.restore();
 }
-function paintGround(c, Rm, P, x, y, X, Y) {
+function paintGround(c, Rm, P, x, y, X, Y, mode) {
   const i = ix(Rm, x, y), R = tileRand(x, y), g = Rm.ground[i], realm = Rm.kind, at = (dx, dy) => (inside(Rm, x + dx, y + dy) ? Rm.ground[ix(Rm, x + dx, y + dy)] : realm === 'sky' ? VOID : ROCK);
   if (realm === 'sky') {
     if (g === VOID) {
@@ -1148,11 +1340,44 @@ function paintGround(c, Rm, P, x, y, X, Y) {
     if (g === PORTAL) { c.fillStyle = 'rgba(255,240,200,.25)'; c.beginPath(); c.ellipse(X + 8, Y + 8, 8, 6, 0, 0, 7); c.fill(); c.fillStyle = '#8a6a4a'; c.fillRect(X + 5, Y - 2, 1, 14); c.fillRect(X + 11, Y - 2, 1, 14); for (let k = 0; k < 4; k++) c.fillRect(X + 5, Y + k * 3, 7, 1); }
     return;
   }
-  // the meadows
+  // the meadows (and the canyons and mountains, painted the same way): each tile in its own kind of
+  // country's colours and texture set
+  const surf = Rm.name === 'surface', bi = surf ? biomeMap(Rm)[i] : 0, B = BIOMES[bi], tx = B.tex;
+  if (surf) P = biomePal(bi, mode);
+  if (g === CHASM) {
+    // a gorge: the far wall's red strata, darkness below, a lip of rock on the near side
+    c.fillStyle = '#1a1014'; c.fillRect(X, Y, T, T);
+    c.fillStyle = 'rgba(70,40,46,.5)'; c.fillRect(X + 3, Y, T - 6, T);
+    if (at(0, -1) !== CHASM && at(0, -1) !== BRIDGE) {
+      const wall = ['#c9805a', '#a8573a', '#8a4630', '#6a3424', '#4a2418'];
+      for (let k = 0; k < 5; k++) { c.fillStyle = wall[k]; c.fillRect(X, Y + k * 2.4 | 0, T, 3); }
+      for (let k = 0; k < 4; k++) { c.fillStyle = 'rgba(30,14,10,.55)'; c.fillRect(X + (R() * 15 | 0), Y + 1, 1, 6 + (R() * 6 | 0)); }
+    } else if (R() < 0.3) { c.fillStyle = 'rgba(150,200,230,.5)'; c.fillRect(X + 4 + (R() * 8 | 0), Y + 6 + (R() * 6 | 0), 2, 1); }
+    if (at(0, 1) !== CHASM && at(0, 1) !== BRIDGE) { c.fillStyle = P.rock3; c.fillRect(X, Y + T - 3, T, 3); c.fillStyle = P.rock2; c.fillRect(X, Y + T - 4, T, 1); }
+    if (at(-1, 0) !== CHASM && at(-1, 0) !== BRIDGE) { c.fillStyle = P.rock2; c.fillRect(X, Y, 2, T); }
+    if (at(1, 0) !== CHASM && at(1, 0) !== BRIDGE) { c.fillStyle = P.rock2; c.fillRect(X + T - 2, Y, 2, T); }
+    return;
+  }
+  if (g === ICE) {
+    c.fillStyle = P.ice || '#b8dcf0'; c.fillRect(X, Y, T, T); texture(c, 'snow', X, Y, x, y, 0, 0.4);
+    c.fillStyle = 'rgba(90,130,170,.45)'; const cx0 = X + (R() * 12 | 0), cy0 = Y + (R() * 12 | 0); for (let k = 0; k < 5; k++) c.fillRect(cx0 + k, cy0 + (k >> 1), 1, 1);
+    c.fillStyle = P.ice2 || '#e8f6fd'; for (let k = 0; k < 2; k++) c.fillRect(X + 1 + (R() * 13 | 0), Y + 1 + (R() * 13 | 0), 3, 1);
+    for (const [dx, dy] of near4) { const n = at(dx, dy); if (n === ICE || n === BRIDGE || n === WATER) continue; c.fillStyle = P.grass[2]; c.fillRect(X + (dx === 1 ? T - 2 : 0), Y + (dy === 1 ? T - 2 : 0), dx ? 2 : T, dy ? 2 : T); }
+    return;
+  }
   if (g === WATER || g === BRIDGE) {
+    if (g === BRIDGE && near4.some(([dx, dy]) => at(dx, dy) === CHASM)) {
+      // a rope bridge over a gorge
+      c.fillStyle = '#1a1014'; c.fillRect(X, Y, T, T);
+      const across = at(-1, 0) === CHASM || at(1, 0) === CHASM;
+      c.fillStyle = tone(P.plank, -0.35);
+      if (across) { c.fillRect(X + 2, Y, 12, T); c.fillStyle = P.plank; for (let k = 0; k < 4; k++) c.fillRect(X + 2, Y + k * 4, 12, 3); c.fillStyle = '#d8c8a0'; c.fillRect(X + 1, Y, 1, T); c.fillRect(X + 14, Y, 1, T); }
+      else { c.fillRect(X, Y + 2, T, 12); c.fillStyle = P.plank; for (let k = 0; k < 4; k++) c.fillRect(X + k * 4, Y + 2, 3, 12); c.fillStyle = '#d8c8a0'; c.fillRect(X, Y + 1, T, 1); c.fillRect(X, Y + 14, T, 1); }
+      return;
+    }
     c.fillStyle = P.water; c.fillRect(X, Y, T, T); texture(c, 'water', X, Y, x, y, 0, 0.35);
     for (const [dx, dy] of near4) { const n = at(dx, dy); if (n === WATER || n === BRIDGE) continue; c.fillStyle = P.water2; c.fillRect(X + (dx === 1 ? T - 3 : 0), Y + (dy === 1 ? T - 3 : 0), dx ? 3 : T, dy ? 3 : T); }
-    if (g === WATER && R() < 0.05) { c.fillStyle = '#6aa860'; c.beginPath(); c.arc(X + 4 + R() * 8, Y + 4 + R() * 8, 2.5, 0.4, Math.PI * 2); c.fill(); }
+    if (g === WATER && R() < (bi === B_MARSH ? 0.2 : 0.05)) { c.fillStyle = bi === B_MARSH ? '#7aa858' : '#6aa860'; c.beginPath(); c.arc(X + 4 + R() * 8, Y + 4 + R() * 8, 2.5, 0.4, Math.PI * 2); c.fill(); }
     if (g === BRIDGE) { c.fillStyle = tone(P.plank, -0.3); c.fillRect(X, Y + 1, T, 14); c.fillStyle = P.plank; for (let k = 0; k < 4; k++) c.fillRect(X + k * 4, Y + 1, 3, 13); }
     return;
   }
@@ -1161,14 +1386,15 @@ function paintGround(c, Rm, P, x, y, X, Y) {
     const n = toneOf(Rm, i), so = soilOf(Rm)[i];
     let rc = mixHex(P.rock, n > 0.5 ? P.rock3 : P.rock2, Math.abs(n - 0.5) * 0.9);
     if (so & 1) rc = tone(rc, 0.06); if (so & 2) rc = mixHex(rc, P.moss, 0.18);
-    c.fillStyle = rc; c.fillRect(X, Y, T, T); texture(c, 'rock', X, Y, x, y, so);
+    c.fillStyle = rc; c.fillRect(X, Y, T, T); texture(c, tx.rock, X, Y, x, y, so);
     for (let k = 0; k < 2; k++) {
       const bx = X + 3 + R() * 10, by = Y + 3 + R() * 9, r = 2 + R() * 3;
       c.fillStyle = P.rock2; c.beginPath(); c.ellipse(bx, by + 1, r, r * 0.75, 0, 0, 7); c.fill();
       c.fillStyle = P.rock3; c.beginPath(); c.ellipse(bx - 0.6, by - 0.4, r * 0.7, r * 0.5, 0, 0, 7); c.fill();
     }
     c.fillStyle = tone(P.rock2, -0.15); c.fillRect(X + (R() * 12 | 0), Y + (R() * 12 | 0), 3, 1);
-    if (R() < ((so & 2) ? 0.55 : 0.12)) { c.fillStyle = P.moss; c.fillRect(X + (R() * 12 | 0), Y + (R() * 12 | 0), 3, 2); }
+    if (B.snow) { c.fillStyle = '#f4f8fc'; c.fillRect(X + 2 + (R() * 8 | 0), Y + 1 + (R() * 6 | 0), 5, 2); }
+    else if (R() < ((so & 2) ? 0.55 : 0.12)) { c.fillStyle = P.moss; c.fillRect(X + (R() * 12 | 0), Y + (R() * 12 | 0), 3, 2); }
     const s = at(0, 1);
     if (s !== ROCK && s !== PORTAL) { c.fillStyle = P.rock2; c.fillRect(X, Y + 8, T, 8); for (let k = 0; k < 3; k++) { c.fillStyle = tone(P.rock2, -0.2); c.fillRect(X + (R() * 14 | 0), Y + 9, 1, 6); } }
     if (g === PORTAL) {
@@ -1181,31 +1407,42 @@ function paintGround(c, Rm, P, x, y, X, Y) {
     return;
   }
   // soil from the three automaton layers: dry drifts, mossy hollows, small clumps of clover or pebbles
-  const n = toneOf(Rm, i), base = g === FOREST ? P.forest : P.grass, so = soilOf(Rm)[i], dry = so & 1, mossy = so & 2, clump = so & 4;
+  const n = toneOf(Rm, i), base = g === FOREST ? P.forest : P.grass, so = soilOf(Rm)[i], dry = so & 1, mossy = so & 2, clump = so & 4, green = g === GRASS || g === FOREST || g === FLOWERS;
   let gc = g === SAND ? P.sand : g === PATH ? P.path : g === STONE ? P.stone : mixHex(base[1], base[n > 0.5 ? 2 : 0], Math.abs(n - 0.5) * 1.6);
-  if (g === GRASS || g === FOREST || g === FLOWERS) { if (dry) gc = mixHex(gc, P.sand, g === FOREST ? 0.1 : 0.2); if (mossy) gc = mixHex(gc, P.moss, 0.28); const bt = BIOME_TINT[biomeAt(Rm, x, y)]; if (bt) gc = mixHex(gc, bt[0], bt[1]); }
+  if (green && !B.snow) { if (dry) gc = mixHex(gc, P.sand, g === FOREST ? 0.1 : 0.2); if (mossy) gc = mixHex(gc, P.moss, B.dry ? 0.1 : 0.28); }
   else if (g === PATH || g === SAND) { if (dry) gc = tone(gc, 0.05); if (mossy) gc = mixHex(gc, P.moss, g === SAND ? 0.08 : 0.15); }
   c.fillStyle = gc; c.fillRect(X, Y, T, T);
-  texture(c, g === SAND ? 'sand' : g === PATH ? 'path' : g === STONE ? 'stone' : g === FOREST ? 'forest' : mossy ? 'moss' : 'grass', X, Y, x, y, so);
+  texture(c, g === SAND ? tx.sand : g === PATH ? tx.path : g === STONE ? 'stone' : g === FOREST ? tx.forest : mossy && tx.grass === 'grass' ? 'moss' : tx.grass, X, Y, x, y, so);
   if (g === STONE) { c.fillStyle = P.stone2; c.fillRect(X, Y + T - 1, T, 1); c.fillRect(X + T - 1, Y, 1, T); if (R() < 0.5) { c.fillStyle = P.moss; c.fillRect(X + (R() * 10 | 0), Y + (R() * 10 | 0), 4, 2); } return; }
-  if (g === GRASS || g === FOREST || g === FLOWERS) {
-    for (let k = 0; k < 9; k++) { c.fillStyle = R() < 0.5 ? base[0] : base[2]; c.fillRect(X + (R() * 16 | 0), Y + (R() * 15 | 0), 1, 2); }
-    if (g === FOREST) for (let k = 0; k < (clump ? 6 : 3); k++) { c.fillStyle = R() < 0.5 ? '#b08a50' : '#8a6a3a'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 2, 1); }
-    else if (clump) for (let k = 0; k < 3; k++) {
+  if (green && B.snow) {
+    // snow: blue shadows, glints, the odd twig or frost flower; needles under the pines
+    for (let k = 0; k < 4; k++) { c.fillStyle = R() < 0.5 ? tone(base[0], -0.08) : '#ffffff'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 2, 1); }
+    if (g === FOREST) for (let k = 0; k < 4; k++) { c.fillStyle = R() < 0.5 ? '#4a6a5a' : '#6a5a48'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 1 + (R() * 2 | 0), 1); }
+    if (g === FLOWERS || R() < 0.08) { c.fillStyle = R() < 0.5 ? '#9fd0ff' : '#ffffff'; const fx = X + 2 + (R() * 11 | 0), fy = Y + 2 + (R() * 11 | 0); c.fillRect(fx - 1, fy, 3, 1); c.fillRect(fx, fy - 1, 1, 3); }
+    return;
+  }
+  if (green) {
+    for (let k = 0; k < (B.dry ? 5 : 9); k++) { c.fillStyle = R() < 0.5 ? base[0] : base[2]; c.fillRect(X + (R() * 16 | 0), Y + (R() * 15 | 0), 1, 2); }
+    if (B.litter) for (let k = 0; k < (g === FOREST ? 5 : 2); k++) { c.fillStyle = B.litter[(R() * B.litter.length) | 0]; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 2, 1); }
+    if (g === FOREST && !B.litter) for (let k = 0; k < (clump ? 6 : 3); k++) { c.fillStyle = R() < 0.5 ? '#b08a50' : '#8a6a3a'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 2, 1); }
+    else if (clump && g !== FOREST) for (let k = 0; k < 3; k++) {
       // clover where it is lush, pebbles where it is dry
       const px = X + 2 + (R() * 12 | 0), py = Y + 2 + (R() * 12 | 0);
-      if (dry) { c.fillStyle = P.stone2; c.fillRect(px, py, 2, 1); c.fillStyle = P.stone; c.fillRect(px, py - 1, 1, 1); }
+      if (dry || B.dry) { c.fillStyle = P.stone2; c.fillRect(px, py, 2, 1); c.fillStyle = P.stone; c.fillRect(px, py - 1, 1, 1); }
       else { c.fillStyle = tone(base[0], -0.12); c.fillRect(px - 1, py, 1, 1); c.fillRect(px + 1, py, 1, 1); c.fillRect(px, py - 1, 1, 1); }
     }
-    const nf = g === FLOWERS ? (R() < 0.75 ? 1 + (R() * 2 | 0) : 0) : R() < 0.22 ? 1 : 0;
+    if (B.spores) for (let k = 0; k < 2; k++) { c.fillStyle = R() < 0.5 ? '#9ff8e0' : '#e0c8ff'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 1, 1); }
+    const nf = g === FLOWERS ? (R() < 0.75 ? 1 + (R() * (B.flowers || 1.5) | 0) + (B.flowers ? 1 : 0) : 0) : R() < (B.dry ? 0.06 : 0.22) ? 1 : 0;
     for (let k = 0; k < nf; k++) { const col = P.dot[Math.floor(R() * P.dot.length)], fx = X + 2 + (R() * 11 | 0), fy = Y + 2 + (R() * 11 | 0); c.fillStyle = col; c.fillRect(fx - 1, fy, 3, 1); c.fillRect(fx, fy - 1, 1, 3); c.fillStyle = '#f6d35b'; c.fillRect(fx, fy, 1, 1); }
     if (y > 0 && Rm.wild[ix(Rm, x, y - 1)]) { c.fillStyle = 'rgba(30,60,30,.16)'; c.fillRect(X, Y, T, 4); c.fillStyle = 'rgba(30,60,30,.08)'; c.fillRect(X, Y + 4, T, 3); }
   } else {
     for (let k = 0; k < 5; k++) { c.fillStyle = 'rgba(0,0,0,.06)'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 2, 1); }
+    // dunes: wind ripples across the sand
+    if (g === SAND && B.dry) for (let k = 0; k < 3; k++) { const yy = Y + 3 + k * 5 + (R() * 2 | 0); c.fillStyle = tone(P.sand, -0.1); c.fillRect(X, yy, 6 + (R() * 6 | 0), 1); c.fillStyle = tone(P.sand, 0.12); c.fillRect(X + 4 + (R() * 6 | 0), yy - 1, 6, 1); }
     if (clump && (g === PATH || g === SAND)) for (let k = 0; k < 3; k++) { c.fillStyle = R() < 0.5 ? P.stone2 : P.stone; c.fillRect(X + 1 + (R() * 13 | 0), Y + 1 + (R() * 13 | 0), 2, 1); }
   }
 }
-function paintWild(c, Rm, P, x, y, X, Y) {
+function paintWild(c, Rm, P, x, y, X, Y, mode) {
   if (!inside(Rm, x, y)) return;
   const d = Rm.wild[ix(Rm, x, y)];
   if (!d) return;
@@ -1227,46 +1464,70 @@ function paintWild(c, Rm, P, x, y, X, Y) {
     c.fillStyle = 'rgba(200,215,235,.35)'; c.beginPath(); c.ellipse(X + 8, Y + 13, 8 + d, 2.5, 0, 0, 7); c.fill();
     return;
   }
-  const forest = Rm.ground[ix(Rm, x, y)] === FOREST, bt = BIOME_TINT[biomeAt(Rm, x, y)], tint = (c) => (bt ? mixHex(c, bt[0], bt[1]) : c), wild = (forest ? [tone(P.wild[0], -0.12), tone(P.wild[1], -0.12), tone(P.wild[2], -0.14)] : P.wild).map(tint);
+  // tall grass, scrub or snowdrifts, in the country's own colours, painted once: mounds with a fringe
+  // of standing blades (they no longer sway, so nothing has to be redrawn as you walk)
+  const surf = Rm.name === 'surface', bi = surf ? biomeMap(Rm)[ix(Rm, x, y)] : 0, B = BIOMES[bi];
+  if (surf) P = biomePal(bi, mode);
+  const forest = Rm.ground[ix(Rm, x, y)] === FOREST, wild = forest ? [tone(P.wild[0], -0.12), tone(P.wild[1], -0.12), tone(P.wild[2], -0.14)] : P.wild;
   c.fillStyle = wild[Math.min(2, d)]; c.fillRect(X, Y, T, T);
   for (let k = 0; k < 2 + d; k++) {
     const cx = X + 3 + R() * 10, cy = Y + 4 + R() * 10, rx = 3.5 + d + R() * 2, ry = 3 + d * 0.6;
     c.fillStyle = wild[Math.min(2, d)]; c.beginPath(); c.ellipse(cx, cy + 1.5, rx, ry, 0, 0, 7); c.fill();
     c.fillStyle = wild[d - 1]; c.beginPath(); c.ellipse(cx, cy, rx - 0.5, ry - 0.5, 0, 0, 7); c.fill();
-    c.fillStyle = P.blade; c.beginPath(); c.ellipse(cx - rx * 0.3, cy - ry * 0.35, rx * 0.45, ry * 0.4, 0, 0, 7); c.fill();
+    c.fillStyle = B.snow ? '#ffffff' : P.blade; c.beginPath(); c.ellipse(cx - rx * 0.3, cy - ry * 0.35, rx * 0.45, ry * 0.4, 0, 0, 7); c.fill();
   }
-  if (R() < (forest ? 0.2 : 0.45)) { const col = P.dot[Math.floor(R() * P.dot.length)], fx = X + 2 + (R() * 12 | 0), fy = Y + (R() * 10 | 0); c.fillStyle = col; c.fillRect(fx - 1, fy, 3, 2); c.fillRect(fx, fy - 1, 1, 4); }
+  if (!B.snow) for (let k = 0; k < 4 + d * 3; k++) {
+    const bx = X + 1 + (R() * 14 | 0), by = Y + 5 + (R() * 10 | 0), h = 2 + d + (R() * 3 | 0);
+    c.fillStyle = R() < 0.5 ? P.blade : tone(wild[Math.max(0, d - 1)], -0.12); c.fillRect(bx, by - h, 1, h);
+    if (R() < 0.4) c.fillRect(bx + (R() < 0.5 ? -1 : 1), by - h - 1, 1, 1);
+  }
+  if (R() < (forest ? 0.2 : B.dry ? 0.15 : 0.45)) { const col = P.dot[Math.floor(R() * P.dot.length)], fx = X + 2 + (R() * 12 | 0), fy = Y + (R() * 10 | 0); c.fillStyle = col; c.fillRect(fx - 1, fy, 3, 2); c.fillRect(fx, fy - 1, 1, 4); }
 }
-// the blades of grass standing on a tile: [x, y, height, shade] in tile pixels (drawn live, they bend)
-export function bladesFor(Rm, x, y) {
-  const i = ix(Rm, x, y), d = Rm.wild[i], g = Rm.ground[i];
-  if (Rm.kind === 'cave') return null;
-  const tall = d > 0, grassy = g === 0 || g === FOREST || g === FLOWERS;
-  if (!tall && !grassy) return null;
-  const R = tileRand(x, y, 9), out = [];
-  if (tall) {
-    const n = Rm.kind === 'sky' ? 0 : 3 + d * 2;
-    for (let k = 0; k < n; k++) out.push([R() * T | 0, 6 + (R() * 10 | 0), 5 + d * 2 + (R() * 4 | 0), R() < 0.6 ? 1 : 0]);
-    return out;
-  }
-  // short meadow grass grows in little clumps: most tiles have one, a few have two, some are bare
-  const clumps = R() < 0.25 ? 0 : R() < 0.7 ? 1 : 2;
-  for (let c = 0; c < clumps; c++) {
+// Short grass: most green tiles carry a clump or two of blades, one of a few patterns, drawn live
+// from small cached sprites at a handful of lean angles, so the meadow sways and parts round your
+// feet for the price of one image per tile. Tall grass is painted into the map and does not move.
+export const CLUMPS = 8, LEANS = 7;
+export function clumpAt(Rm, x, y) {
+  const i = ix(Rm, x, y), g = Rm.ground[i];
+  if (Rm.kind === 'cave' || Rm.wild[i] || !(g === GRASS || g === FOREST || g === FLOWERS)) return -1;
+  const dens = Rm.name === 'surface' ? BIOMES[biomeMap(Rm)[i]].blades : 1;
+  if (hash2(x, y, 911) >= 0.75 * Math.min(1.25, dens)) return -1;
+  return Math.floor(hash2(x, y, 313) * (dens > 1 ? CLUMPS : CLUMPS - 2));   // the last two patterns (two clumps) only in lush country
+}
+const clumpCache = new Map();
+export function clumpSprite(P, forest, p, lean) {
+  const fo = forest && P.forest, key = `${P.grass[0]}|${fo ? P.forest[0] : ''}|${p}|${lean}`;
+  let cv = clumpCache.get(key);
+  if (cv) return cv;
+  const R = mulberry32(p * 7919 + 13), cols = fo ? [tone(P.forest[0], -0.26), tone(P.forest[2], 0.08)] : [tone(P.grass[0], -0.24), tone(P.grass[2], 0.1)], a = ((lean - (LEANS >> 1)) / (LEANS >> 1)) * 1.1;
+  let c;
+  [cv, c] = mk(T + 10, T + 4);
+  for (let q = 0; q < (p >= CLUMPS - 2 ? 2 : 1); q++) {
     const cx = 2 + (R() * 11 | 0), cy = 5 + (R() * 10 | 0), n = 3 + (R() * 3 | 0);
-    for (let k = 0; k < n; k++) { const mid = 1 - Math.abs(k - (n - 1) / 2) / n; out.push([cx + k - (n >> 1), cy + (R() < 0.3 ? 1 : 0), 2 + Math.round(mid * 3 + R() * 1.5), k % 2]); }
+    for (let k = 0; k < n; k++) {
+      const mid = 1 - Math.abs(k - (n - 1) / 2) / n, h = 2 + Math.round(mid * 3 + R() * 1.5), bx = cx + k - (n >> 1), by = cy + (R() < 0.3 ? 1 : 0);
+      const ln = a * (0.75 + ((bx * 7 + by) % 5) * 0.12), h3 = Math.max(1, Math.round(h / 3)), x = bx + 5, y = by + 2;
+      c.fillStyle = cols[k % 2];
+      c.fillRect(x, y - h3, 1, h3); c.fillRect(x + Math.round(ln * h * 0.25), y - 2 * h3, 1, h3); c.fillRect(x + Math.round(ln * h * 0.7), y - h, 1, Math.max(1, h - 2 * h3));
+    }
   }
-  return out;
+  clumpCache.set(key, cv);
+  if (clumpCache.size > 2400) clumpCache.delete(clumpCache.keys().next().value);
+  return cv;
 }
+const chunkKey = (Rm, mode, cx, cy) => `${Rm.name}|${Rm.kind === 'cave' ? '' : mode}|${cx},${cy}`;
+// is this chunk painted and current? (for painting the next ones ahead of time, one a frame)
+export function chunkReady(Rm, mode, cx, cy) { const k = chunks.get(chunkKey(Rm, mode, cx, cy)); return !!k && k.ver === ((Rm.cv ||= new Map()).get(`${cx},${cy}`) || 0); }
 export function chunk(Rm, mode, cx, cy) {
-  const key = `${Rm.name}|${Rm.name === 'cave' ? '' : mode}|${cx},${cy}`, ver = (Rm.cv ||= new Map()).get(`${cx},${cy}`) || 0;
+  const key = chunkKey(Rm, mode, cx, cy), ver = (Rm.cv ||= new Map()).get(`${cx},${cy}`) || 0;
   let k = chunks.get(key);
   if (k && k.ver === ver) { chunks.delete(key); chunks.set(key, k); return k; }
   if (!k) { const [gc, g] = mk(CH * T, CH * T), [wc, w] = mk(CH * T, CH * T); k = { gc, g, wc, w }; }
   const P = palFor(Rm.name, mode), X0 = cx * CH, Y0 = cy * CH;
   k.g.clearRect(0, 0, CH * T, CH * T); k.w.clearRect(0, 0, CH * T, CH * T);
-  for (let y = Y0; y < Y0 + CH; y++) for (let x = X0; x < X0 + CH; x++) if (inside(Rm, x, y)) paintGround(k.g, Rm, P, x, y, (x - X0) * T, (y - Y0) * T);
+  for (let y = Y0; y < Y0 + CH; y++) for (let x = X0; x < X0 + CH; x++) if (inside(Rm, x, y)) paintGround(k.g, Rm, P, x, y, (x - X0) * T, (y - Y0) * T, mode);
   // tall grass leans into the row above and over its sides, so paint a ring of neighbours too
-  for (let y = Y0; y <= Y0 + CH; y++) for (let x = X0 - 1; x <= X0 + CH; x++) paintWild(k.w, Rm, P, x, y, (x - X0) * T, (y - Y0) * T);
+  for (let y = Y0; y <= Y0 + CH; y++) for (let x = X0 - 1; x <= X0 + CH; x++) paintWild(k.w, Rm, P, x, y, (x - X0) * T, (y - Y0) * T, mode);
   k.ver = ver;
   chunks.delete(key); chunks.set(key, k);
   while (chunks.size > CHUNK_MAX) chunks.delete(chunks.keys().next().value);
@@ -1289,7 +1550,7 @@ export function minimap(Rm) {
   for (let y = 0; y < Rm.h; y++) for (let x = 0; x < Rm.w; x++) if (Rm.seen[ix(Rm, x, y)]) miniPaint(Rm, x, y);
   return Rm.mini;
 }
-const MINI = { [GRASS]: '#8fcf7a', [WATER]: '#5aa8e0', [PATH]: '#d8c098', [SAND]: '#e8d6a6', [STONE]: '#c8c0b8', [BRIDGE]: '#c09060', [ROCK]: '#8a8690', [PORTAL]: '#20181c', [FOREST]: '#5a9a58', [FLOWERS]: '#c8d890', [VOID]: '#b8d8f4' };
+const MINI = { [GRASS]: '#8fcf7a', [WATER]: '#5aa8e0', [PATH]: '#d8c098', [SAND]: '#e8d6a6', [STONE]: '#c8c0b8', [BRIDGE]: '#c09060', [ROCK]: '#8a8690', [PORTAL]: '#20181c', [FOREST]: '#5a9a58', [FLOWERS]: '#c8d890', [VOID]: '#b8d8f4', [CHASM]: '#3a1e1a', [ICE]: '#c8e6f4' };
 export function miniPaint(Rm, x, y) {
   if (!Rm.mini || !inside(Rm, x, y)) return;
   const i = ix(Rm, x, y), g = Rm.ground[i], c = Rm.mini.c;

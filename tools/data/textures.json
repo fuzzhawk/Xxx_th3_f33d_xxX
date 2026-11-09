@@ -1,5 +1,5 @@
 {
-  "note": "CC0 photo textures for the garden's ground, fetched by tools/fetch-textures.mjs into www/assets/textures/ (64 px greyscale detail tiles). A texture fits a set when one of its 'any' words is a whole word of its own id or name (tags are not used: they match far too loosely), none of the 'not' words appear in its id, name, tags or categories, and, unless 'madeByPeople' is set, none of its categories are man-made (roofing, wood, concrete, fabric, plastic...). Poly Haven (polyhaven.com, CC0) first, ambientCG (ambientcg.com, CC0) as the fallback.",
+  "note": "CC0 photo textures for the garden's ground, fetched by tools/fetch-textures.mjs into www/assets/textures/ (64 px greyscale detail tiles). A texture fits a set when one of its 'any' words is a whole word of its own id or name (tags are not used: they match far too loosely), none of the 'not' words appear in its id, name, tags or categories, and, unless 'madeByPeople' is set, none of its categories are man-made (roofing, wood, concrete, fabric, plastic...). Poly Haven (polyhaven.com, CC0) first, ambientCG (ambientcg.com, CC0) as the fallback. The extra sets give each kind of country in the meadows its own ground (garden-world.js BIOMES[].tex); a set that finds nothing falls back to a neighbour in the game.",
   "size": 64,
   "sets": {
     "grass": {
@@ -153,6 +153,127 @@
       ],
       "keep": 2,
       "ambient": "Rock"
+    },
+    "snow": {
+      "any": [
+        "snow"
+      ],
+      "not": [
+        "rock",
+        "rocks",
+        "stone",
+        "road",
+        "brick",
+        "wall",
+        "asphalt"
+      ],
+      "keep": 2,
+      "ambient": "Snow"
+    },
+    "leaves": {
+      "any": [
+        "leaves",
+        "leaf",
+        "autumn",
+        "foliage"
+      ],
+      "not": [
+        "rock",
+        "brick",
+        "grass",
+        "wall",
+        "roof",
+        "fabric"
+      ],
+      "keep": 2,
+      "ambient": "Ground leaves"
+    },
+    "heath": {
+      "any": [
+        "dry grass",
+        "hay",
+        "field",
+        "heather",
+        "savanna",
+        "steppe",
+        "dry ground"
+      ],
+      "not": [
+        "rock",
+        "stone",
+        "brick",
+        "roof",
+        "thatch",
+        "straw",
+        "mud",
+        "leaves",
+        "snow"
+      ],
+      "keep": 2,
+      "ambient": "Grass dry"
+    },
+    "mud": {
+      "any": [
+        "mud",
+        "swamp",
+        "marsh",
+        "wet ground",
+        "puddle"
+      ],
+      "not": [
+        "brick",
+        "road",
+        "wall",
+        "rock",
+        "leaves",
+        "dry",
+        "cracked"
+      ],
+      "keep": 2,
+      "ambient": "Ground mud"
+    },
+    "dune": {
+      "any": [
+        "desert",
+        "dune",
+        "dunes",
+        "sand",
+        "sandy"
+      ],
+      "not": [
+        "beach",
+        "rock",
+        "rocks",
+        "stone",
+        "brick",
+        "coast",
+        "sandstone",
+        "aerial",
+        "wall"
+      ],
+      "keep": 2,
+      "ambient": "Ground sand"
+    },
+    "clover": {
+      "any": [
+        "clover",
+        "flowers",
+        "flower",
+        "field",
+        "lawn"
+      ],
+      "not": [
+        "rock",
+        "stone",
+        "brick",
+        "wall",
+        "roof",
+        "fabric",
+        "dry",
+        "snow"
+      ],
+      "keep": 2,
+      "ambient": "Grass"
     }
   }
 }
