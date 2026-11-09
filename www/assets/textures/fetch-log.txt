@@ -6,4 +6,10 @@ path: polyhaven.com/a/rocks_ground_02, polyhaven.com/a/brown_mud_dry
 stone: polyhaven.com/a/cobblestone_floor_04, polyhaven.com/a/monastery_stone_floor
 rock: polyhaven.com/a/coast_sand_rocks_02, polyhaven.com/a/aerial_rocks_02
 cave: polyhaven.com/a/rock_boulder_dry, polyhaven.com/a/rock_01
-total 16 textures
+snow: polyhaven.com/a/snow_02, polyhaven.com/a/snow_01
+leaves: polyhaven.com/a/forest_leaves_04, polyhaven.com/a/forest_leaves_03
+heath: none
+mud: none
+dune: polyhaven.com/a/gravelly_sand, polyhaven.com/a/sandy_gravel_02
+clover: polyhaven.com/a/yellow_flower_mulch, polyhaven.com/a/flower_scattered_dirt
+total 24 textures
