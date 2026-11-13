@@ -2039,7 +2039,7 @@ function segDist(px, py, ax, ay, bx, by) {
   return [Math.hypot(px - (ax + dx * u), py - (ay + dy * u)), u];
 }
 function later(sec, fn) { G.timers.push({ t: sec, fn }); }
-function shake(m) { G.shake = Math.max(G.shake, m); }
+function shake(m) { G.shake = Math.max(G.shake, m * ((window.__TIMESCALE || 1) < 1 ? 0.45 : 1)); }   // softer while it plays itself in a card
 function hitstop(n) { G.hitstop = Math.max(G.hitstop, n); }
 function flash(col, a) { G.flashCol = col; G.flashA = Math.max(G.flashA, a); }
 function fxText(x, y, str, col = '#fff', scale = 1) { G.texts.push({ x, y, str: String(str), col, t: 0, max: 0.9, scale, vx: rr(-0.3, 0.3) }); }
@@ -2396,7 +2396,8 @@ const store = { get(k, d) { try { const v = localStorage.getItem('cavecrawler.' 
 
 function resize() {
   const W = innerWidth, H = innerHeight;
-  SCALE = clamp(Math.round(Math.min(H / 300, W / 260)), 2, 5);
+  // in a feed card (?embed) the view is pulled back: about three quarters of the cave's width shows
+  SCALE = /[?&]embed/.test(location.search) ? clamp(Math.min(W / 300, H / 340), 1, 5) : clamp(Math.round(Math.min(H / 300, W / 260)), 2, 5);
   VWa = Math.ceil(W / SCALE); VHa = Math.ceil(H / SCALE);
   cv.width = VWa; cv.height = VHa; cv.style.width = VWa * SCALE + 'px'; cv.style.height = VHa * SCALE + 'px';
   lightCv.width = Math.ceil(VWa / 2); lightCv.height = Math.ceil(VHa / 2);
@@ -3155,7 +3156,7 @@ function drawPreviews(t) {
 let acc = 0, last = performance.now();
 function loop(now) {
   const el = Math.min(0.1, (now - last) / 1000); last = now;
-  if (STATE === 'play' && !G.paused) { acc += el; let n = 0; while (acc >= DT && n < 6) { acc -= DT; n++; if (G.hitstop > 0) { G.hitstop--; continue; } tick(); } if (n >= 6) acc = 0; }
+  if (STATE === 'play' && !G.paused) { acc += el * (window.__TIMESCALE || 1); let n = 0; while (acc >= DT && n < 6) { acc -= DT; n++; if (G.hitstop > 0) { G.hitstop--; continue; } tick(); } if (n >= 6) acc = 0; }
   else acc = 0;
   if (STATE === 'play') render(); else if (STATE === 'select') { drawPreviews(now); renderAttract(now); }
   requestAnimationFrame(loop);
@@ -3190,31 +3191,47 @@ boot();
 </script>
 <script>
 /* The Feed: Cave Crawler inside a card (only with ?embed).
-   Picks a delver and starts, then plays itself: digs ever deeper, sweeps up coins and gems, opens
-   chests and waystones (taking the first card on offer), keeps foes at arm's length and plays a
-   card whenever one has a target and the energy for it. The view zooms in on the delver when it is
-   quiet and eases out when foes close in. The first real touch hands the run over to you. */
+   Picks a delver and starts, then plays itself, unhurried: the clock runs a little slow, the delver
+   walks rather than darts, plays a card at most every second or so, and pauses over each chest or
+   waystone so you can see what it chose. It digs ever deeper, sweeps up coins and gems and keeps foes
+   at arm's length. The view is pulled back so most of the cave's width shows, with only a gentle
+   zoom when it is quiet, and the HUD and the card dock are compacted to fit a card. The first real
+   touch hands the run over to you (and the clock back to full speed). */
 (function () {
   if (!new URLSearchParams(location.search).has('embed')) return;
   document.documentElement.classList.add('embed');
   const st = document.createElement('style');
-  st.textContent = `html.embed #hint { display: none; } html.embed #overlay .panel { transform: scale(.82); transform-origin: 50% 30%; }
-    html.embed #game { transition: none; } html.embed.auto #dock { pointer-events: none; }`;
+  st.textContent = `html.embed #hint { display: none; }
+    html.embed #overlay .panel { transform: scale(.72); transform-origin: 50% 0; margin-top: 8px; }
+    html.embed #game { transition: none; } html.embed.auto #dock { pointer-events: none; }
+    html.embed { --gut-l: 8px; --gut-r: 8px; }
+    html.embed #hud { padding-top: 6px; gap: 6px; }
+    html.embed #hpbar { height: 14px; width: min(150px, 40vw); } html.embed #hptext { font-size: 10px; }
+    html.embed #depth { font-size: 17px; } html.embed #biome { font-size: 9px; } html.embed .coin { font-size: 13px; } html.embed .score { font-size: 10px; }
+    html.embed #pauseBtn { width: 28px; height: 28px; font-size: 11px; } html.embed #bossbar { top: 48px; } html.embed #bossname { font-size: 11px; }
+    html.embed #banner { top: 58px; } html.embed #banner h2 { font-size: 22px; } html.embed #banner p { font-size: 10px; }
+    html.embed #dock { padding-bottom: 6px; } html.embed #dockTop { gap: 6px; margin-bottom: 4px; }
+    html.embed .pile, html.embed #cycleBtn { padding: 2px 5px; font-size: 10px; gap: 4px; } html.embed .pile b { font-size: 11px; }
+    html.embed #energy { gap: 2px; } html.embed #energy i { width: 8px; height: 12px; } html.embed #energy b { font-size: 12px; margin-left: 3px; }
+    html.embed #hand { --cw: min(56px, calc((100vw - 40px) / 5)) !important; gap: 4px; }
+    html.embed #toast { font-size: 11px; padding: 4px 8px; }`;
   document.head.appendChild(st);
   SFX.on = false;
-  let auto = true, overlayT = 0, sideT = 0, side = 1, lastDepth = 0, stuckT = 0, zoom = 1;
+  let auto = true, overlayT = 0, sideT = 0, side = 1, lastDepth = 0, stuckT = 0, zoom = 1, cardT = 0, ix0 = 0, iy0 = -1;
+  window.__TIMESCALE = 0.72;
   document.documentElement.classList.add('auto');
+  addEventListener('load', () => dispatchEvent(new Event('resize')));
   const startRun = () => {
     if (STATE !== 'select' || !document.getElementById('startBtn')) return setTimeout(startRun, 200);
     const pick = Math.floor(Math.random() * CLASSES.length), b = document.querySelector(`[data-cls="${pick}"]`);
     if (b) b.click();
-    setTimeout(() => document.getElementById('startBtn')?.click(), 400);
+    setTimeout(() => document.getElementById('startBtn')?.click(), 900);
   };
   startRun();
-  // a real touch: the run is yours
+  // a real touch: the run is yours, at full speed
   const takeOver = () => {
     if (!auto) return;
-    auto = false; JOY.active = false; INPUT.x = INPUT.y = 0; SFX.on = true;
+    auto = false; JOY.active = false; INPUT.x = INPUT.y = 0; SFX.on = true; window.__TIMESCALE = 1;
     document.documentElement.classList.remove('auto');
   };
   addEventListener('pointerdown', (e) => { if (auto && e.isTrusted) takeOver(); }, { capture: true });
@@ -3226,8 +3243,9 @@ boot();
     if (STATE === 'select') { startRun(); return; }
     if (STATE !== 'play') return;
     if (kind) {
+      // linger over the choice, so it can be read
       overlayT += 0.1;
-      if (overlayT < 1.4) return;
+      if (overlayT < 2.6) return;
       overlayT = 0;
       if (kind === 'draft') (o.querySelector('[data-pick]') || document.getElementById('skipBtn'))?.click();
       else if (kind === 'waystone') { const pk = o.querySelector('.choices:not(.done) [data-pick]'); if (pk) pk.click(); else document.getElementById('goBtn')?.click(); }
@@ -3238,34 +3256,37 @@ boot();
     }
     if (G.dead || G.paused) return;
     const p = G.player;
-    // cards: anything with a target and the energy for it
-    for (let i = 0; i < G.hand.length; i++) { const c = CARDS[G.hand[i]]; if (c && G.energy >= c.cost && resolveTarget(c, null)) { playCard(i, null); break; } }
+    // cards: one with a target and the energy for it, at most every 1.2 s
+    if ((cardT -= 0.1) <= 0) for (let i = 0; i < G.hand.length; i++) { const c = CARDS[G.hand[i]]; if (c && G.energy >= c.cost && resolveTarget(c, null)) { playCard(i, null); cardT = 1.2 + Math.random() * 0.8; break; } }
     // where to go: away from a foe that is too close, toward loot and chests, otherwise deeper
     let ix = 0, iy = -1;
-    const foe = near(G.enemies, 110, targetable), loot = near(G.pickups, 160), chest = near(G.props, 300, (q) => (q.kind === 'chest' && !q.opened) || (q.kind === 'waystone' && !q.used));
+    const foe = near(G.enemies, 100, targetable), loot = near(G.pickups, 150), chest = near(G.props, 280, (q) => (q.kind === 'chest' && !q.opened) || (q.kind === 'waystone' && !q.used));
     const go = (t, k = 1) => { const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy) || 1; ix = dx / d * k; iy = dy / d * k; };
     if (foe) { go(foe, -1); ix += side * 0.4; }
     else if (loot) go(loot);
     else if (chest) go(chest);
     else {
-      sideT -= 0.1; if (sideT <= 0) { sideT = 1.5 + Math.random() * 3; side = Math.random() < 0.5 ? -1 : 1; }
+      sideT -= 0.1; if (sideT <= 0) { sideT = 3 + Math.random() * 4; side = Math.random() < 0.5 ? -1 : 1; }
       const centre = (WW * TILE / 2 - p.x) / (WW * TILE / 2);
-      ix = side * 0.35 + centre * 0.6;
+      ix = side * 0.3 + centre * 0.6;
     }
     // not getting deeper for a while: try another way round
-    if (G.maxDepth > lastDepth) { lastDepth = G.maxDepth; stuckT = 0; } else if ((stuckT += 0.1) > 4) { stuckT = 0; side = -side; ix = side; iy = -0.4; }
+    if (G.maxDepth > lastDepth) { lastDepth = G.maxDepth; stuckT = 0; } else if ((stuckT += 0.1) > 5) { stuckT = 0; side = -side; ix = side; iy = -0.4; }
+    // steer smoothly and walk rather than run: no twitching from one tenth of a second to the next
     const l = Math.hypot(ix, iy) || 1;
-    JOY.active = true; INPUT.x = ix / l; INPUT.y = iy / l;
+    ix0 += (ix / l - ix0) * 0.35; iy0 += (iy / l - iy0) * 0.35;
+    const l0 = Math.hypot(ix0, iy0) || 1, pace = foe ? 0.85 : 0.68;
+    JOY.active = true; INPUT.x = ix0 / l0 * pace; INPUT.y = iy0 / l0 * pace;
   }, 100);
-  // dynamic zoom on the delver
+  // a gentle zoom on the delver when it is quiet; never in so far that the cave closes in
   const frame = () => {
     requestAnimationFrame(frame);
     const cv = document.getElementById('game');
     if (!cv || STATE !== 'play' || !G.player) return;
     const p = G.player;
     let crowd = 0; for (const e of G.enemies) if (targetable(e) && Math.hypot(e.x - p.x, e.y - p.y) < 320) crowd += e.elite ? 2 : 1;
-    const want = auto ? 1 + 0.32 * Math.max(0, 1 - crowd / 4) : 1;
-    zoom += (want - zoom) * 0.04;
+    const want = auto ? 1 + 0.1 * Math.max(0, 1 - crowd / 4) : 1;
+    zoom += (want - zoom) * 0.02;
     const sx = (p.x / AP + G.ox) * SCALE, sy = (p.y / AP + G.oy) * SCALE;
     cv.style.transformOrigin = `${sx}px ${sy}px`;
     cv.style.transform = zoom > 1.002 ? `scale(${zoom})` : '';

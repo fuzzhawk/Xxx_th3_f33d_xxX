@@ -1175,6 +1175,7 @@
     let dt = (now - last) / 1000;
     last = now;
     if (dt > 0.25) dt = 0.25;
+    dt *= window.__TIMESCALE || 1;   // a feed card runs the clock a little slow (embed.js)
 
     const ctx = App.ctx;
 

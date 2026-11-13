@@ -936,8 +936,8 @@ window.RENDER = (function () {
   /* ---------------- HUD ----------------
      Authored against this design space and scaled onto the real frame.
      HUD_W/HUD_H are what every coordinate below is in. */
-  const HUD_W = 448, HUD_H = 252;
-  const HUD_S = LV.W / HUD_W;              // 1.25 at 560x315
+  let HUD_W = 448, HUD_H = 252;
+  let HUD_S = LV.W / HUD_W;                // 1.25 at 560x315
   const FONT = 'bold 8px "Courier New", monospace';
 
   /* Round a design-space coordinate so it lands on a whole pixel of the
@@ -950,7 +950,16 @@ window.RENDER = (function () {
      these to step out of its way, so the box and the things dodging it
      cannot drift. */
   const DIALOG_H = 62;
-  const DIALOG_TOP = HUD_H - DIALOG_H - 6;
+  let DIALOG_TOP = HUD_H - DIALOG_H - 6;
+
+  /* The Feed's card (?embed) draws the HUD on its own canvas the shape of the card: a narrower,
+     taller design space, so the corners land in the card's corners instead of being cropped by
+     the camera. layout() switches it; with no arguments it goes back to the frame's own. */
+  function layout(w, h, s) {
+    HUD_W = w || 448; HUD_H = h || 252; HUD_S = s || LV.W / HUD_W;
+    DIALOG_TOP = HUD_H - DIALOG_H - 6;
+  }
+  const portrait = () => HUD_H > HUD_W * 1.05;
 
   function text(ctx, s, x, y, col, align) {
     const px = snap(x), py = snap(y);
@@ -1027,16 +1036,16 @@ window.RENDER = (function () {
 
     /* mission progress: how far along the level, and where the exit is */
     const px = clamp((P.x) / M.L.LW, 0, 1);
-    const bx = HUD_W / 2 - 60;
+    const bx = HUD_W / 2 - 60, ey = portrait() ? 44 : 0;   // in a portrait card: below the corner panels
     ctx.fillStyle = 'rgba(8,10,11,.74)';
-    ctx.fillRect(bx - 4, 4, 128, 14);
-    text(ctx, 'EXTRACTION', HUD_W / 2, 6, '#8d9aa2', 'center');
+    ctx.fillRect(bx - 4, ey + 4, 128, 14);
+    text(ctx, 'EXTRACTION', HUD_W / 2, ey + 6, '#8d9aa2', 'center');
     ctx.fillStyle = 'rgba(40,46,50,.9)';
-    ctx.fillRect(bx, 14, 120, 2);
+    ctx.fillRect(bx, ey + 14, 120, 2);
     ctx.fillStyle = '#4ad07a';
-    ctx.fillRect(bx + 118, 13, 2, 4);
+    ctx.fillRect(bx + 118, ey + 13, 2, 4);
     ctx.fillStyle = acc;
-    ctx.fillRect(bx + Math.round(px * 118), 12, 2, 6);
+    ctx.fillRect(bx + Math.round(px * 118), ey + 12, 2, 6);
 
     /* The objective. Under the extraction bar because that is the bar
        it gates: the pad does not open until this line says it does. */
@@ -1045,7 +1054,7 @@ window.RENDER = (function () {
       if (line) {
         const ready = M.objectiveReady();
         const blink = ready ? (0.65 + 0.35 * Math.sin(time * 5)) : 1;
-        text(ctx, line, HUD_W / 2, 20,
+        text(ctx, line, HUD_W / 2, ey + 20,
              hexA(ready ? '#4ad07a' : '#ffd06b', blink), 'center');
       }
     }
@@ -1054,7 +1063,7 @@ window.RENDER = (function () {
     if (M.campaign) {
       const C = M.campaign;
       const lab = 'SECTOR ' + String(M.sector).padStart(2, '0') + ' / ' + String(C.total).padStart(2, '0');
-      const y2 = (M.objectiveText && M.objectiveText()) ? 27 : 20;
+      const y2 = ey + ((M.objectiveText && M.objectiveText()) ? 27 : 20);
       text(ctx, lab, HUD_W / 2, y2, hexA(acc, 0.85), 'center');
     }
 
@@ -1131,7 +1140,7 @@ window.RENDER = (function () {
 
     /* autopilot badge — steps up out of the way when the mission has
        something to say, since both want the same line */
-    if (M.autopilot && !talking) {
+    if (M.autopilot && !talking && !window.__EMBED) {
       const blink = 0.6 + 0.4 * Math.sin(time * 4);
       const y = (M.bannerT > 0 && M.banner) ? HUD_H - 54 : HUD_H - 42;
       text(ctx, 'AUTOPILOT', HUD_W / 2, y, hexA('#4ad07a', blink), 'center');
@@ -1371,14 +1380,17 @@ window.RENDER = (function () {
     /* The HUD and the run-end overlays are authored in design space and
        scaled onto the frame; everything above this line is authored in
        real play pixels. */
-    ctx.save();
-    ctx.scale(HUD_S, HUD_S);
-    hud(M, ctx, M.time);
-    overlay(M, ctx, M.time);
-    ctx.restore();
+    /* in a feed card the HUD has a canvas of its own, laid out for the card (see layout) */
+    const hc = window.__HUDCTX || ctx;
+    if (hc !== ctx) { hc.setTransform(1, 0, 0, 1, 0, 0); hc.clearRect(0, 0, hc.canvas.width, hc.canvas.height); hc.imageSmoothingEnabled = false; }
+    hc.save();
+    hc.scale(HUD_S, HUD_S);
+    hud(M, hc, M.time);
+    overlay(M, hc, M.time);
+    hc.restore();
   }
 
-  return { frame, entityPass, hud, worldHud, overlay, text, bar, hexA, FONT,
+  return { frame, layout, entityPass, hud, worldHud, overlay, text, bar, hexA, FONT,
            HUD_W, HUD_H, HUD_S,
            drawActor, drawCrawler, drawSlime, drawGib, drawBody, drawVapor,
            drawStasis, drawAllyPip, drawWarden, drawCharge, drawCache, dialogBox };
