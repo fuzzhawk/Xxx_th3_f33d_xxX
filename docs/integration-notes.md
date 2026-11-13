@@ -139,3 +139,28 @@ Running list of wiring the lead must do before the final push.
   - Old roads (a spanning tree of all the ways out) join them, with plank bridges over water and gorges.
   - Tall grass covers about 8% of the land instead of more than half; rubble and mist are also thinner in the other realms.
 - **Upgrade** (`upgrade4`): a v3 world is rebuilt from its own seed. Sown plants and arrived animals move to the nearest good spot to where they were. Seeds, food and the garden's age carry over.
+
+## Calmer embeds, the horror forge, Hell Maze in Quake's colours (2026-11-13)
+- **Vitriol and Cave Crawler cards:**
+  - The camera is pulled out: Vitriol's frame fills most of the card's width; Cave Crawler shows the whole cave.
+  - The clock runs slower in the card (`window.__TIMESCALE`, 0.72–0.74), and the autopilots react later and play steadier.
+  - Vitriol draws its HUD on a canvas the shape of the card (`RENDER.layout`, `window.__HUDCTX`), so every element sits whole in the card.
+- **Horror forge** (`www/js/horror.js`):
+  - Kinds: zombies, demons, imps, wraiths, abominations, hounds and spiders, at any size (`horror(seed, size, { kind, tier })`).
+  - Each monster is built as 3D solids and drawn from 8 angles like Doom's enemies: 5 are painted and 3 mirrored. Pick a view with `viewDir`.
+  - The light, cavity, palette snap and ink outline come from Vitriol's crawlerforge pipeline.
+  - Animations: idle, walk, attack, hurt and dead.
+- **Hell Maze:**
+  - Look and feel: Quake/Heretic moods (`MOODS`), torchlight pools, grime and fog.
+  - Weapons: a rolled arsenal with affixes (`rollArm`).
+  - Destruction: a voxel skin on the walls (`cladWalls`), plus voxel crates that shots chip and blasts crater. Barrels explode, with gibs and burning.
+  - Levels: the grid grows with depth and has more loops. New rooms: galleries (a walkway on three sides and a stair up the fourth; the nav grid's second layer) and broken partition walls (`baffles`).
+  - Checks: every room, walkway and exit was reachable on 12 seeds × 4 depths.
+- **Crypt Hack:**
+  - Every monster comes from the forge, themed by zone (`HORDE`) and seen from 8 angles on the isometric screen (`mobDir`, `mobFrame`).
+  - Bodies stay where they fall.
+  - Views are drawn 2 a frame (`warm`).
+- **Crystal Quest:**
+  - Horror monsters mix in with the cute ones: about 1 in 5 foes in the world and over half in dungeons (`foeArt`). They lunge, flinch and fall in their own poses.
+  - About half the dungeon bosses come from the forge, and so does the villain's Unbound form.
+  - Their elements map to the game's (`HEL`): undead → shadow, fire → fire, poison → beast.

@@ -3,6 +3,7 @@
 // arms shops, multi-phase bosses with telegraphed attacks, and a citadel finale. Self-playing.
 import { Game, W, H, drawFit, ready, roundRect, noiseMap } from './engine.js';
 import { monster, creatureName } from './creature.js';
+import { horror } from '../horror.js';
 import { crystalSheet, Actor, S } from '../crystal/sprites.js';
 
 const T = 20, N = 64, DN = 36;
@@ -34,6 +35,10 @@ const WEAK = { fire: 'ice', water: 'bolt', leaf: 'fire', wind: 'bolt', earth: 'i
 const ECOL = { fire: '#ff7a2a', water: '#5ab8ff', leaf: '#7ad04a', wind: '#c8f0e0', earth: '#c8a060', shadow: '#9a5aff', spirit: '#f0d8ff', beast: '#ff5a5a' };
 const BIG = { fire: 'Inferno', water: 'Tidal Wave', leaf: 'Thorn Storm', wind: 'Cyclone', earth: 'Quake', shadow: 'Umbral Nova', spirit: 'Soul Requiem', beast: 'Rampage' };
 const ZAP = { fire: 'Ember', water: 'Bubble Jet', leaf: 'Spore Cloud', wind: 'Gust', earth: 'Rockfall', shadow: 'Hex', spirit: 'Wail', beast: 'Maul' };
+// horror-forge monsters walk among the cute ones: their elements in this game's terms
+const HEL = { undead: 'shadow', fire: 'fire', poison: 'beast' };
+const HKIND = ['zombie', 'imp', 'wraith', 'hound', 'spider', 'zombie', 'demon', 'abom'];
+const hash = (n) => { n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d); n = Math.imul(n ^ (n >>> 12), 0x297a2d39); return (n ^ (n >>> 15)) >>> 0; };
 const EPI = { fire: 'the Cinder Maw', water: 'the Tide-Drinker', leaf: 'the Thorned Mother', wind: 'the Storm Herald', earth: 'the Stone Warden', shadow: 'the Night Eater', spirit: 'the Hollow Saint', beast: 'the Ravager' };
 // the saga's building blocks
 const THREATS = [
@@ -253,8 +258,10 @@ export class Jrpg extends Game {
   townAt(x, y) { return this.towns.find((t) => t.x === x && t.y === y) || null; }
   bossOf(d) {
     if (!d.bs) {
-      const sp = (this.post.seed || 1) * 131 + d.k * 17 + 999, art = monster(sp, this.skin.hue + 150 + (sp % 5) * 40, 40, Math.min(4, 2 + (d.i >> 1))), el = art.element || 'beast';
-      d.bs = { art, el, name: d.i === 4 ? `${this.story.vname} Unbound` : `${(art.name || creatureName(sp)).split(' ')[0]}, ${EPI[el] || 'the Dread'}` };
+      const sp = (this.post.seed || 1) * 131 + d.k * 17 + 999, dread = d.i !== 4 && hash(sp) % 100 < 45;
+      const art = dread ? horror(sp >>> 0, 48, { kind: ['demon', 'abom', 'spider', 'wraith'][hash(hash(sp) ^ 0x9e3779b9) % 4], tier: Math.min(3, 2 + (d.i >> 1)) }) : monster(sp, this.skin.hue + 150 + (sp % 5) * 40, 40, Math.min(4, 2 + (d.i >> 1)));
+      const el = art.horror ? HEL[art.element] || 'shadow' : art.element || 'beast';
+      d.bs = { art, el, name: d.i === 4 ? `${this.story.vname} Unbound` : art.horror ? `${creatureName(sp).split(' ')[0]} ${art.name.split(' ').pop()}, ${EPI[el] || 'the Dread'}` : `${(art.name || creatureName(sp)).split(' ')[0]}, ${EPI[el] || 'the Dread'}` };
     }
     return d.bs;
   }
@@ -539,10 +546,16 @@ export class Jrpg extends Game {
     // the party lines up facing the monsters (west) and starts at the sight of them
     for (const h of this.party) { h.bo = 0; h.castT = 0; h.pro = h.cover = 0; h.guard = false; if (h.hp > 0 && h.actor.isKO) h.actor.revive(); h.actor.stopCast(); h.actor.face('W'); if (h.hp > 0) h.actor.emote(boss ? 'angry' : 'surprise', 0.9); }
   }
-  foeArt(sp, lv) { return monster(sp, this.skin.hue + 150 + (sp % 5) * 40, 16 + (sp % 3) * 3, Math.min(4, lv >> 2)); }
+  // a cute creature, or (one in five out in the world, more than half underground) something from the horror forge
+  foeArt(sp, lv) {
+    const hv = hash(sp * 7 + 3);
+    if (hv % 100 < (this.dg ? 55 : 20)) return horror(sp >>> 0, 30, { kind: HKIND[(hv >>> 8) % (lv < 5 ? 5 : HKIND.length)], tier: lv < 6 ? 1 : lv < 14 ? 2 : 3 });
+    return monster(sp, this.skin.hue + 150 + (sp % 5) * 40, 16 + (sp % 3) * 3, Math.min(4, lv >> 2));
+  }
   makeFoe(sp, lv) {
     const art = this.foeArt(sp, lv), hp = Math.round((14 + lv * 11) * this.r(0.9, 1.1));
-    return { name: (art.name || creatureName(sp)).split(' ')[0], lv, hp, max: hp, atk: 3.5 + lv * 2, def: 2 + lv * 1.3, mag: 3 + lv * 1.8, spd: 3 + lv * 0.5 + this.r(0, 3), xp: Math.round(6 + lv * 5), gp: Math.round((6 + lv * 4) * this.r(0.8, 1.2)), art, el: art.element || 'beast', dead: 0 };
+    const name = art.horror ? art.name.split(' ').pop() : (art.name || creatureName(sp)).split(' ')[0];
+    return { name, lv, hp, max: hp, atk: 3.5 + lv * 2, def: 2 + lv * 1.3, mag: 3 + lv * 1.8, spd: 3 + lv * 0.5 + this.r(0, 3), xp: Math.round(6 + lv * 5), gp: Math.round((6 + lv * 4) * this.r(0.8, 1.2)), art, el: art.horror ? HEL[art.element] || 'shadow' : art.element || 'beast', dead: 0 };
   }
   makeBoss(d, lv) {
     const bs = this.bossOf(d), fin = d.i === 4, hp = Math.round((14 + lv * 11) * (1.6 + this.party.length * 1.2) * (fin ? 0.75 : 1));
@@ -559,12 +572,12 @@ export class Jrpg extends Game {
   // the villain's second form: a towering spirit
   transform(f) {
     const b = this.bt, st = this.story, v = this.villain(), sp = (this.post.seed || 1) * 977 + this.world * 31 + 4242;
-    const art = monster(sp, this.skin.hue + 270, 44, 4), lv = f.lv + 1, hp = Math.round((14 + lv * 11) * (1.6 + this.party.length * 1.2) * 1.1);
+    const art = horror(sp >>> 0, 64, { kind: ['demon', 'wraith', 'abom'][hash(sp) % 3], tier: 3 }), lv = f.lv + 1, hp = Math.round((14 + lv * 11) * (1.6 + this.party.length * 1.2) * 1.1);
     f.transform = false; f.morph = true;
     this.talk([
       [v, 'Enough! You want to see what the relics have made of me? LOOK!', 'angry'],
-      F(() => { f.morph = false; Object.assign(f, { form: 'beast', art, el: art.element || 'shadow', name: `${st.vname} Unbound`, hp, max: hp, lv, phase: 1, turns: 0, charge: 0, barrier: 0, special: 'summon', dead: 0, mag: f.mag * 1.1, atk: f.atk * 1.1 }); const bs = this.bossOf(this.dg.d); f.hp = f.max = bs.hp2 || (bs.hp2 = this.bossHp(f, 3.5)); b.flash = 1; b.quake = 0.6; b.order = []; b.msg = `${f.name} rises!`; b.wait = 1; this.burst(96, 176, ECOL[f.el] || '#c070ff', 50, 260); this.emoteParty('surprise', 1.2); }),
-      [{ name: `${st.vname} Unbound`, art, el: art.element }, 'NOTHING… ENDS… WITHOUT MY SAY!'],
+      F(() => { f.morph = false; Object.assign(f, { form: 'beast', art, el: HEL[art.element] || 'shadow', name: `${st.vname} Unbound`, hp, max: hp, lv, phase: 1, turns: 0, charge: 0, barrier: 0, special: 'summon', dead: 0, mag: f.mag * 1.1, atk: f.atk * 1.1 }); const bs = this.bossOf(this.dg.d); f.hp = f.max = bs.hp2 || (bs.hp2 = this.bossHp(f, 3.5)); b.flash = 1; b.quake = 0.6; b.order = []; b.msg = `${f.name} rises!`; b.wait = 1; this.burst(96, 176, ECOL[f.el] || '#c070ff', 50, 260); this.emoteParty('surprise', 1.2); }),
+      [{ name: `${st.vname} Unbound`, art, el: HEL[art.element] || 'shadow' }, 'NOTHING… ENDS… WITHOUT MY SAY!'],
       [this.party[0], 'Hold the line, everyone!', 'angry']
     ]);
   }
@@ -1319,7 +1332,11 @@ export class Jrpg extends Game {
       c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x, y + (big ? 62 : sz * 0.42), big ? 50 : sz * 0.32, big ? 9 : sz * 0.08, 0, 0, 7); c.fill();
       if (f.form === 'human') f.actor.draw(c, x + dx, y + 62, 3.2);
       else if (big) drawFit(c, f.art.big, x + dx, y + Math.sin(this.t * 2) * 3, sz, sz);
-      else drawFit(c, f.art.frames[Math.floor(this.t * 2.5 + x) % 2], x + dx, y, sz, sz);
+      else {
+        // the horror forge's monsters lunge, flinch and fall in their own poses
+        const A = f.art, im = !A.horror ? A.frames[Math.floor(this.t * 2.5 + x) % 2] : f.hp <= 0 ? A.dead : b.shake?.u === f ? A.hurt : b.anim?.u === f ? A.view('attack', Math.min(2, Math.floor((0.5 - b.anim.t) / 0.5 * 3)), 2) : A.frames[Math.floor(this.t * 2.5 + x) % 2];
+        drawFit(c, im, x + dx, y + (A.horror && A.floats ? Math.sin(this.t * 2 + x) * 2 : 0), sz, sz);
+      }
       c.globalAlpha = 1;
       if (f.barrier) { c.strokeStyle = `rgba(160,220,255,${0.5 + Math.sin(this.t * 6) * 0.25})`; c.lineWidth = 2; c.beginPath(); for (let k = 0; k <= 6; k++) { const a = k / 6 * Math.PI * 2 + this.t * 0.5; c[k ? 'lineTo' : 'moveTo'](x + Math.cos(a) * 72, y + Math.sin(a) * 72); } c.stroke(); }
       if (f.charge) { c.globalAlpha = 0.6 + Math.sin(this.t * 10) * 0.4; this.text(c, '!!', x, y - 84, 16, '#ffd23a'); c.globalAlpha = 1; }

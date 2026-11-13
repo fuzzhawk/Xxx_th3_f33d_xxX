@@ -2,7 +2,8 @@
 // and caves. Tap a monster to swing at it, hurl fireballs, quaff potions, grab loot in
 // rarity colours and take the stairs ever deeper. Champions and bosses guard the way.
 import { Game, W, H, drawFit, ready, roundRect } from './engine.js';
-import { monster, creatureName, item as itemArt } from './creature.js';
+import { creatureName, item as itemArt } from './creature.js';
+import { horror, viewDir } from '../horror.js';
 import { Actor, dirOf } from '../crystal/sprites.js';
 
 const G = 54, TW = 16, TH = 8, WH = 18, CY = 212, LIGHT = 8, HS = 3.3, COST = 12, PY = 362;
@@ -24,6 +25,16 @@ const UNIQ = { weapon: ['The Gravedigger', 'Kingsbane', 'Widowmaker', 'Bonesaw o
 const CH = [['Bone', 'Gore', 'Rot', 'Blood', 'Grave', 'Gut', 'Skull', 'Ash', 'Bile', 'Maggot', 'Vile', 'Corpse', 'Pox'], ['gnaw', 'maw', 'rend', 'hide', 'tooth', 'fist', 'belly', 'claw', 'spine', 'fang', 'flay', 'drool'], ['the Unclean', 'the Defiler', 'the Hungry', 'the Rotten', 'the Flayer', 'the Cursed', 'the Mad', 'the Vile', 'the Butcher', 'the Wretched', 'the Foul']];
 const CMOD = ['Extra Fast', 'Stone Skin', 'Extra Strong', 'Vampiric'];
 const ZONES = ['Cathedral', 'Catacombs', 'Crypt', 'Ossuary', 'Hell'];
+// who haunts each zone, from the horror forge: [rank and file, brutes, skitterers]
+const HORDE = {
+  Cathedral: [['zombie', 'zombie', 'wraith'], ['abom', 'zombie'], ['imp', 'hound']],
+  Catacombs: [['zombie', 'wraith'], ['abom', 'demon'], ['spider', 'hound']],
+  Crypt: [['wraith', 'zombie'], ['demon', 'abom'], ['spider', 'imp']],
+  Ossuary: [['zombie', 'wraith'], ['abom', 'demon'], ['hound', 'spider']],
+  Hell: [['demon', 'imp', 'zombie'], ['demon', 'abom'], ['imp', 'hound']],
+  Caves: [['zombie', 'spider'], ['abom', 'hound'], ['spider', 'hound']]
+};
+const ANIMS = [['idle', 2], ['walk', 4], ['attack', 3], ['hurt', 1], ['dead', 1]];
 const SOFT = new Set(['cast', 'wave', 'cheer', 'nod', 'shake', 'laugh', 'surprise', 'sad', 'think', 'angry', 'love']);
 
 export class Hack extends Game {
@@ -123,9 +134,15 @@ export class Hack extends Game {
     for (let y = 1; y < G - 1; y++) for (let x = 1; x < G - 1; x++) { const i = y * G + x; if (!m[i] && DIRS.some(([dx, dy]) => m[i + dx + dy * G])) this.edge[i] = 1; }
     this.seen = new Uint8Array(G * G); this.vis = new Uint8Array(G * G); this.lit = new Float32Array(G * G); this.rv = new Float32Array(G * G);
     this.loot = []; this.bolts = []; this.fx = []; this.blood = []; this.mobs = [];
-    const sd = (this.post.seed | 0) + d * 7919;
-    this.kinds = [{ hp: 1, dmg: 1, sp: 1.55, sz: 1 }, { hp: 1.7, dmg: 1.35, sp: 1.1, sz: 1.2 }, { hp: 0.6, dmg: 0.75, sp: 2.2, sz: 0.8 }].map((b, k) => ({ ...b, name: creatureName(sd + k * 131),
-      art: (d + k) % 3 === 0 ? this.skin.creatures[(d * 2 + k) % 6] : monster(sd + k * 131, this.skin.hue + k * 90 + d * 37, 16 + k * 3, Math.min(4, d >> 1), { tex: this.skin.texFor?.(k + d * 3) }) }));
+    const sd = (this.post.seed | 0) + d * 7919, zone = cave ? 'Caves' : ZONES[Math.min(ZONES.length - 1, Math.floor((d - 1) / 3))], tier = d < 3 ? 1 : d < 7 ? 2 : 3;
+    // the horde: horror-forge monsters, seen from eight angles; the views are drawn a few a frame (warm)
+    this.kinds = [{ hp: 1, dmg: 1, sp: 1.55, sz: 1, px: 40 }, { hp: 1.7, dmg: 1.35, sp: 1.1, sz: 1.2, px: 48 }, { hp: 0.6, dmg: 0.75, sp: 2.2, sz: 0.8, px: 36 }].map((b, k) => {
+      const art = horror((sd + k * 131) >>> 0, b.px, { kind: HORDE[zone][k][(d + k) % HORDE[zone][k].length], tier });
+      return { ...b, name: art.name, art };
+    });
+    this.warm = [];
+    for (const K of this.kinds) for (const [a, n] of ANIMS) for (let k = 0; k < n; k++) for (let dir = 0; dir < 8; dir++) this.warm.push([K.art, a, k, dir]);
+    this.corpses = [];
     const far = this.floors.filter((i) => D[i] > 10 && m[i] === 1);
     const nPacks = 8 + Math.min(7, d) + (this.mods.swarm ? 4 : 0);
     for (let p = 0; p < nPacks && far.length; p++) {
@@ -160,7 +177,8 @@ export class Hack extends Game {
     if (rank === 'boss') {
       const s = (this.post.seed | 0) + d * 313;
       mb.name = `${this.pick(['Lord', 'Archbishop', 'Matron', 'King', 'Abbot', 'Warlord', 'Prince'])} ${creatureName(s)}`;
-      mb.art = monster(s, this.skin.hue + 180, 26, 4, { tex: this.skin.texFor?.(d + 17), head: this.skin.slots.enemy[d % Math.max(1, this.skin.slots.enemy.length)] });
+      mb.art = horror(s >>> 0, 64, { kind: ['demon', 'abom', 'spider', 'demon', 'wraith'][(s >> 3) % 5], tier: 3 });
+      for (const [a, n] of ANIMS) for (let k = 0; k < n; k++) for (let dir = 0; dir < 8; dir++) this.warm.push([mb.art, a, k, dir]);
     }
     this.mobs.push(mb);
     return mb;
@@ -242,7 +260,10 @@ export class Hack extends Game {
     const h = this.h, d = this.depth;
     m.dead = true; this.kills++; this.gainXp(m.xp);
     const [sx, sy] = this.P(m.x, m.y); this.burst(sx, sy - 10, '#8a1414', m.rank ? 26 : 10, 120);
+    this.burst(sx, sy - 6, '#3a0606', m.rank ? 18 : 8, 80);
     this.blood.push({ x: m.x, y: m.y, r: m.r * this.r(1.4, 2.4), a: this.r(0, 3) }); if (this.blood.length > 50) this.blood.shift();
+    // the body stays where it fell, seen from the same angle
+    if (m.art?.view) { this.corpses.push({ x: m.x, y: m.y, im: m.art.view('dead', 0, this.mobDir(m)), s: m.r * 108 * this.S * 1.25 }); if (this.corpses.length > 30) this.corpses.shift(); }
     if (m.rank) this.say(`${m.name} slain!`, m.rank === 'boss' ? RAR[3] : RAR[1]);
     const drop = (o) => { let x = m.x + this.r(-0.6, 0.6), y = m.y + this.r(-0.6, 0.6); if (!this.map[this.tileOf({ x, y })]) { x = m.x; y = m.y; } this.loot.push({ x, y, ph: this.r(0, 7), ...o }); };
     const ni = m.rank === 'boss' ? 3 : m.rank ? 2 : this.rng() < 0.13 ? 1 : 0;
@@ -301,6 +322,7 @@ export class Hack extends Game {
   step(dt) {
     const h = this.h, st = this.st, m = this.map;
     this.lvT += dt;
+    for (let k = 0; k < 2 && this.warm?.length; k++) { const [A, a, kk, dir] = this.warm.shift(); A.view(a, kk, dir); }
     const x0 = h.x, y0 = h.y, wasDead = !!h.dead;
     for (const l of this.log) l.t -= dt;
     this.log = this.log.filter((l) => l.t > 0);
@@ -353,9 +375,10 @@ export class Hack extends Game {
       if (!o.aggro) { if (!h.dead && this.vis[this.tileOf(o)] && Math.hypot(o.x - h.x, o.y - h.y) < LIGHT - 1) o.aggro = true; else continue; }
       if (h.dead) continue;
       const dx0 = h.x - o.x, dy0 = h.y - o.y, d = Math.hypot(dx0, dy0);
+      o.mv = 0; o.fa = Math.atan2(dx0 + dy0, dx0 - dy0);   // facing on the screen's ground plane
       if (d <= 0.55 + o.r) {
         if (o.cd <= 0) {
-          o.cd = o.rank === 'boss' ? 1.3 : 1.1; o.atk = 0.25;
+          o.cd = o.rank === 'boss' ? 1.3 : 1.1; o.atk = 0.36;
           const dmg = o.dmg * 50 / (50 + st.ar) * (this.mods.glass ? 2 : 1) * this.r(0.7, 1.2);
           h.hp -= dmg; h.hurt = 0.2; if (h.hp > 0 && this.hero.anim !== 'attack') this.hero.hurt(); this.pop(h.x, h.y, String(Math.max(1, Math.round(dmg))), '#ff5a3a');
           if (o.mod === 'Vampiric') o.hp = Math.min(o.max, o.hp + dmg);
@@ -371,7 +394,7 @@ export class Hack extends Game {
         for (const [dx, dy] of DIRS) { const v = this.dist[ti + dx + dy * G]; if (v >= 0 && v < best && (!(dx && dy) || (m[ti + dx] && m[ti + dy * G]))) { best = v; tx = cx + dx + 0.5; ty = cy + dy + 0.5; } }
       }
       const dx = tx - o.x, dy = ty - o.y, dd = Math.hypot(dx, dy) + 1e-6, s = o.sp * dt;
-      this.slide(o, dx / dd * s, dy / dd * s, o.r * 0.8);
+      this.slide(o, dx / dd * s, dy / dd * s, o.r * 0.8); o.mv = 1; o.fa = Math.atan2(dx + dy, dx - dy);
     }
     // keep them from stacking, and off the hero
     const A = this.mobs.filter((o) => o.aggro);
@@ -503,6 +526,7 @@ export class Hack extends Game {
       for (let k = 0; k < 4; k++) { const [ax, ay] = this.P(sx0 + k * 0.12, sy0 + k * 0.12), s = 1 - k * 0.24; this.poly(c, [ax, ay, ax + TW * s, ay + TH * s, ax, ay + TH * 2 * s, ax - TW * s, ay + TH * s]); c.fillStyle = `rgba(0,0,0,${0.4 + k * 0.18})`; c.fill(); c.strokeStyle = 'rgba(255,230,190,.25)'; c.stroke(); }
     }
     for (const b of this.blood) { const [sx, sy] = this.P(b.x, b.y); c.fillStyle = 'rgba(90,6,6,.55)'; c.beginPath(); c.ellipse(sx, sy, b.r * TW, b.r * TH, 0, 0, 7); c.fill(); }
+    for (const b of this.corpses || []) if (this.seen[this.tileOf(b)]) { const [sx, sy] = this.P(b.x, b.y); drawFit(c, b.im, sx, sy - b.s * 0.44, b.s, b.s); }
     if (this.mark && (this.mark.t -= 1 / 60) > 0) { const [sx, sy] = this.P(this.mark.x, this.mark.y); c.strokeStyle = RAR[2]; c.globalAlpha = this.mark.t * 2; c.beginPath(); c.ellipse(sx, sy, 10, 5, 0, 0, 7); c.stroke(); c.globalAlpha = 1; }
     for (const l of this.loot) if (rv[this.tileOf(l)] > 0.9) this.drawLoot(c, l);
     // walls and creatures, back to front
@@ -584,13 +608,24 @@ export class Hack extends Game {
     c.fillStyle = '#8a6a44'; c.fillRect(x - 2.5 * s, y - 8 * s, 5 * s, 2.5 * s);
     c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(x - 3 * s, y, 1.5 * s, 2.5 * s);
   }
+  // which of the eight views the camera sees: it looks down from the bottom of the screen
+  mobDir(o) { return viewDir(o.fa ?? 0, Math.PI / 2); }
+  mobFrame(o) {
+    const A = o.art;
+    if (!A?.view) return A?.frames?.[Math.floor(o.ph * 4) % 2];
+    const dir = this.mobDir(o);
+    if (o.atk > 0) return A.view('attack', Math.min(2, Math.floor((1 - o.atk / 0.36) * 3)), dir);
+    if (o.flash > 0) return A.view('hurt', 0, dir);
+    if (o.mv) return A.view('walk', Math.floor(o.ph * o.sp * 3.2) % 4, dir);
+    return A.view('idle', Math.floor(o.ph * 2) % 2, dir);
+  }
   drawMob(c, o, hsx) {
-    const [sx, sy] = this.P(o.x, o.y), s = o.r * 108 * this.S, im = o.art?.frames?.[Math.floor(o.ph * 4) % 2];
+    const [sx, sy] = this.P(o.x, o.y), hz = !!o.art?.horror, s = o.r * 108 * this.S * (hz ? 1.25 : 1), im = this.mobFrame(o);
     c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.ellipse(sx, sy, s * 0.4, s * 0.2, 0, 0, 7); c.fill();
     if (o.rank) { c.strokeStyle = o.rank === 'boss' ? '#e0412b' : RAR[1]; c.lineWidth = 1.5; c.globalAlpha = 0.6 + Math.sin(this.t * 6) * 0.3; c.beginPath(); c.ellipse(sx, sy, s * 0.5, s * 0.25, 0, 0, 7); c.stroke(); c.globalAlpha = 1; }
     if (o.flash) c.filter = 'brightness(2.4)';
-    const lunge = o.atk ? 3 : 0, dir = Math.sign(hsx - sx) || 1;
-    if (!drawFit(c, im, sx + lunge * dir, sy - s * 0.42 - Math.abs(Math.sin(o.ph * 8)) * 1.5, s, s, 0, hsx < sx)) { c.fillStyle = this.col(3); c.beginPath(); c.arc(sx, sy - s * 0.4, s * 0.35, 0, 7); c.fill(); }
+    const lunge = o.atk ? 3 : 0, dir = Math.sign(hsx - sx) || 1, bob = hz ? (o.art.floats ? Math.sin(o.ph * 3) * 2 + 3 : 0) : Math.abs(Math.sin(o.ph * 8)) * 1.5;
+    if (!drawFit(c, im, sx + lunge * dir, sy - s * (hz ? 0.44 : 0.42) - bob, s, s, 0, !hz && hsx < sx)) { c.fillStyle = this.col(3); c.beginPath(); c.arc(sx, sy - s * 0.4, s * 0.35, 0, 7); c.fill(); }
     c.filter = 'none';
     if (o.hp < o.max) { c.fillStyle = 'rgba(0,0,0,.6)'; c.fillRect(sx - 10, sy - s - 2, 20, 3); c.fillStyle = '#c01c1c'; c.fillRect(sx - 10, sy - s - 2, 20 * Math.max(0, o.hp / o.max), 3); }
   }
