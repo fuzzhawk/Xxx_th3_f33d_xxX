@@ -1,10 +1,11 @@
-// Hell Maze: a Build-engine-style shooter (think Duke Nukem 3D) drawn with three.js at a low
-// resolution. Levels are polygon sectors with their own floor and ceiling heights: stairs, ramps,
-// sunken pools, stepped daises, slit windows, doors with keys, secret rooms, a bridge over a canal
-// you can walk under, and courtyards under a parallax sky. Monsters come from the creature engine
-// and bleed their own colours; every post rolls its own arsenal of strange weapons.
+// Hell Maze: a Build-engine-style shooter (think Duke Nukem 3D, in Quake's and Heretic's colours)
+// drawn with three.js at a low resolution. Levels are polygon sectors with their own floor and
+// ceiling heights: stairs, ramps, sunken pools, stepped daises, slit windows, doors with keys, secret
+// rooms, a bridge over a canal you can walk under, galleries, arenas and courtyards under a
+// parallax sky, lit by guttering torches. Monsters come from the horror forge, drawn from eight
+// angles like Doom's, and bleed their own colours. Every post rolls its own arsenal.
 import { Game, W, H, ready, rgbOf, imagePixels } from './engine.js';
-import { monster, creatureName } from './creature.js';
+import { horror, viewDir } from '../horror.js';
 import { mulberry32 } from '../util.js';
 
 let T = null, loading = null;
@@ -53,25 +54,71 @@ function rayPoly(P, dx, dy) {
 const rgb01 = (css) => rgbOf(css).map((v) => v / 255);
 const mixc = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 
-// ---------------------------------------------------------------- the strange arsenal
+// ---------------------------------------------------------------- the arsenal
+// Gritty guns (rolled stats, drawn by a modular gun painter) and the old strange ones (their own art).
+// Every post rolls its own: each weapon's numbers move ±18% and it may carry one or two affixes.
+// carve: how much of a voxel wall a hit chews away; splash: blast radius; shot: what it fires.
 const ARMS = {
-  tooth: { label: 'TOOTH', names: ['Tooth Pistol', 'Molar Popper', 'Fang Derringer', 'Nail Spitter'], rate: 0.3, dmg: 13, speed: 30, spread: 0.025, n: 1 },
-  chicken: { label: 'CHICKN', names: ['Rubber Chicken Shotgun', 'Squawk Scattergun', 'Poultry Blunderbuss'], rate: 0.9, dmg: 10, speed: 17, spread: 0.13, n: 6, grav: 7, bounce: 2, ammo: 18, give: 10 },
-  hive: { label: 'HIVE', names: ['Bee-Hive Launcher', 'Apiary Mortar', 'Swarm Bucket'], rate: 1.1, dmg: 12, speed: 12, grav: 9, n: 1, ammo: 5, give: 3 },
-  flail: { label: 'SKULL', names: ['Bouncing Skull Flail', 'Ricochet Cranium', 'Skull on a Chain'], rate: 0.5, dmg: 26, speed: 19, n: 1, bounce: 5 },
-  squid: { label: 'SQUID', names: ['Ink-Squid Cannon', 'Octo-Mortar', 'Cephalopod Cannon'], rate: 0.85, dmg: 22, speed: 15, grav: 3, n: 1, ammo: 8, give: 5 },
-  fork: { label: 'FORK', names: ['Chain-Lightning Tuning Fork', 'Thunder Fork', 'Humming Trident'], rate: 0.5, dmg: 20, n: 1, chain: 4, ammo: 40, give: 25 },
-  marble: { label: 'MARBLE', names: ['Black-Hole Marble', 'Void Marble', 'Event-Horizon Slingshot'], rate: 1.5, dmg: 30, speed: 8, n: 1, ammo: 3, give: 2 },
-  relic: { label: 'RELIC', names: ['Relic Mortar', 'Heirloom Lobber', 'Junk Howitzer'], rate: 0.95, dmg: 45, speed: 14, grav: 8, n: 1, ammo: 8, give: 5 }
+  pistol: { label: 'PISTOL', names: ['Service Pistol', 'Revolver', 'Hand Cannon', 'Rivet Pistol'], rate: 0.32, dmg: 15, speed: 38, spread: 0.02, n: 1, shot: 'bullet', carve: 0.17, gun: true },
+  shotgun: { label: 'SHOTGN', names: ['Double-Barrel', 'Scattergun', 'Boomstick', 'Coach Gun', 'Trench Gun'], rate: 0.9, dmg: 9, speed: 32, spread: 0.12, n: 7, shot: 'pellet', ammo: 24, give: 12, carve: 0.2, gun: true },
+  nailgun: { label: 'NAILS', names: ['Nailgun', 'Rivet Driver', 'Spike Thrower', 'Perforator'], rate: 0.1, dmg: 7, speed: 40, spread: 0.035, n: 1, shot: 'nail', ammo: 120, give: 60, carve: 0.14, gun: true },
+  rocket: { label: 'ROCKET', names: ['Rocket Launcher', 'Bunker Buster', 'Siege Tube'], rate: 1.05, dmg: 70, speed: 16, n: 1, shot: 'rocket', ammo: 10, give: 5, splash: 3.2, carve: 1.5, gun: true },
+  grenade: { label: 'GRENAD', names: ['Grenade Launcher', 'Pipe Lobber', 'Pineapple Mortar'], rate: 0.8, dmg: 60, speed: 13, grav: 9, bounce: 3, fuse: 1.8, n: 1, shot: 'grenade', ammo: 12, give: 6, splash: 3, carve: 1.4, gun: true },
+  plasma: { label: 'PLASMA', names: ['Plasma Rifle', 'Arc Caster', 'Ion Projector'], rate: 0.13, dmg: 12, speed: 28, spread: 0.02, n: 1, shot: 'plasma', ammo: 80, give: 40, carve: 0.3, gun: true },
+  tooth: { label: 'TOOTH', names: ['Tooth Pistol', 'Molar Popper', 'Fang Derringer', 'Nail Spitter'], rate: 0.3, dmg: 13, speed: 30, spread: 0.025, n: 1, shot: 'tooth', carve: 0.15 },
+  chicken: { label: 'CHICKN', names: ['Rubber Chicken Shotgun', 'Squawk Scattergun', 'Poultry Blunderbuss'], rate: 0.9, dmg: 10, speed: 17, spread: 0.13, n: 6, grav: 7, bounce: 2, ammo: 18, give: 10, shot: 'chicken', carve: 0.15 },
+  hive: { label: 'HIVE', names: ['Bee-Hive Launcher', 'Apiary Mortar', 'Swarm Bucket'], rate: 1.1, dmg: 12, speed: 12, grav: 9, n: 1, ammo: 5, give: 3, shot: 'hive', carve: 0.4 },
+  flail: { label: 'SKULL', names: ['Bouncing Skull Flail', 'Ricochet Cranium', 'Skull on a Chain'], rate: 0.5, dmg: 26, speed: 19, n: 1, bounce: 5, shot: 'skull', carve: 0.3 },
+  squid: { label: 'SQUID', names: ['Ink-Squid Cannon', 'Octo-Mortar', 'Cephalopod Cannon'], rate: 0.85, dmg: 22, speed: 15, grav: 3, n: 1, ammo: 8, give: 5, shot: 'squid', carve: 0.6 },
+  fork: { label: 'FORK', names: ['Chain-Lightning Tuning Fork', 'Thunder Fork', 'Humming Trident'], rate: 0.5, dmg: 20, n: 1, chain: 4, ammo: 40, give: 25, shot: 'zap', carve: 0.25 },
+  marble: { label: 'MARBLE', names: ['Black-Hole Marble', 'Void Marble', 'Event-Horizon Slingshot'], rate: 1.5, dmg: 30, speed: 8, n: 1, ammo: 3, give: 2, shot: 'marble', carve: 1.2 },
+  relic: { label: 'RELIC', names: ['Relic Mortar', 'Heirloom Lobber', 'Junk Howitzer'], rate: 0.95, dmg: 45, speed: 14, grav: 8, n: 1, ammo: 8, give: 5, shot: 'relic', splash: 2.6, carve: 1.1 }
 };
-const WEIRD = ['chicken', 'hive', 'flail', 'squid', 'fork', 'marble', 'relic'];
-const ADJ = ['Cursed', 'Velvet', 'Howling', 'Gnostic', 'Feral', 'Holy', 'Salted', 'Lunar', 'Weeping', 'Bent', 'Sacred', 'Junk'];
+const GRIT = ['shotgun', 'nailgun', 'rocket', 'grenade', 'plasma'], WEIRD = ['chicken', 'hive', 'flail', 'squid', 'fork', 'marble', 'relic'];
+const AFFIX = {
+  explosive: { name: 'Explosive', fx: (A) => { A.splash = Math.max(A.splash || 0, 1.5); A.carve = (A.carve || 0.2) + 0.5; A.dmg *= 0.9; } },
+  ricochet: { name: 'Ricocheting', fx: (A) => { A.bounce = (A.bounce || 0) + 2; } },
+  pierce: { name: 'Piercing', fx: (A) => { A.pierce = 2; } },
+  burn: { name: 'Burning', fx: (A) => { A.burn = 3.5; } },
+  split: { name: 'Splintering', fx: (A) => { A.split = 4; } },
+  seek: { name: 'Seeking', fx: (A) => { A.seek = 3.2; } },
+  drill: { name: 'Drilling', fx: (A) => { A.carve = (A.carve || 0.2) * 2.4 + 0.2; A.drill = true; } },
+  twin: { name: 'Twin', fx: (A) => { A.n = (A.n || 1) * 2; A.spread = (A.spread || 0.03) * 1.5 + 0.02; A.dmg *= 0.7; if (A.ammo) { A.ammo = Math.round(A.ammo * 1.5); A.give = Math.round(A.give * 1.5); } } },
+  heavy: { name: 'Heavy', fx: (A) => { A.dmg *= 1.5; A.rate *= 1.35; A.carve = (A.carve || 0.2) * 1.4; } },
+  rapid: { name: 'Rapid', fx: (A) => { A.rate *= 0.62; A.dmg *= 0.8; } },
+  leech: { name: 'Leeching', fx: (A) => { A.leech = 0.15; } }
+};
+const AFFIXES = Object.keys(AFFIX), SUFFIX = ['of the Pit', 'of Saint Gnaw', 'of the Flayed', 'of Ruin', 'of Ash', 'Mk II', 'of the Ossuary', 'of Sorrow', 'of the Abattoir', 'Prototype'];
+const METALS = [['#4a4c52', '#7a7e88', '#26282c'], ['#6a4630', '#9a6a44', '#3a2618'], ['#7a6a3a', '#b8a05a', '#4a3e1e'], ['#3e4a42', '#62746a', '#202a24'], ['#5a3a3a', '#8a5a52', '#2e1c1c'], ['#c8c0ac', '#ece4d0', '#7a7262']];
+const WOODS = ['#5a3820', '#7a4a28', '#3a2a1e', '#6a2a1a'];
+// one weapon, rolled: its numbers jittered, maybe an affix or two, a name to match
+function rollArm(R, k, plain) {
+  const B = ARMS[k], j = (v) => v * (0.82 + R() * 0.36), A = { ...B, k, rate: j(B.rate), dmg: j(B.dmg), speed: B.speed && j(B.speed), affixes: [], metal: METALS[Math.floor(R() * METALS.length)], wood: WOODS[Math.floor(R() * WOODS.length)], hue: Math.floor(R() * 6), seed: Math.floor(R() * 1e6) };
+  if (B.spread) A.spread = j(B.spread);
+  const n = plain ? 0 : R() < 0.55 ? 1 : R() < 0.5 ? 2 : 0;
+  while (A.affixes.length < n) { const a = AFFIXES[Math.floor(R() * AFFIXES.length)]; if (A.affixes.includes(a) || (a === 'twin' && k === 'fork') || (a === 'split' && (k === 'marble' || k === 'fork'))) continue; A.affixes.push(a); AFFIX[a].fx(A); }
+  const nm = B.names[Math.floor(R() * B.names.length)];
+  A.name = [A.affixes.map((a) => AFFIX[a].name).join(' '), nm, R() < 0.3 ? SUFFIX[Math.floor(R() * SUFFIX.length)] : ''].filter(Boolean).join(' ');
+  return A;
+}
+// the garrison, from the horror forge: px is how big its sprites are drawn
 const ROLES = [
-  { role: 'grunt', hp: 45, speed: 3.0, size: 1.75, melee: 12 },
-  { role: 'spitter', hp: 38, speed: 2.2, size: 1.6, ranged: 9 },
-  { role: 'floater', hp: 32, speed: 2.4, size: 1.5, ranged: 8, fly: true },
-  { role: 'imp', hp: 22, speed: 4.3, size: 1.2, melee: 7 },
-  { role: 'brute', hp: 170, speed: 1.7, size: 2.8, ranged: 16, melee: 22, heavy: true }
+  { role: 'grunt', kind: 'zombie', px: 48, hp: 55, speed: 2.5, size: 1.85, melee: 13 },
+  { role: 'spitter', kind: 'imp', px: 40, hp: 38, speed: 2.6, size: 1.5, ranged: 10 },
+  { role: 'floater', kind: 'wraith', px: 44, hp: 34, speed: 2.4, size: 1.75, ranged: 8, fly: true },
+  { role: 'hound', kind: 'hound', px: 40, hp: 28, speed: 4.6, size: 1.45, melee: 8 },
+  { role: 'brute', kind: 'demon', px: 64, hp: 190, speed: 1.7, size: 2.9, ranged: 16, melee: 24, heavy: true },
+  { role: 'crawler', kind: 'spider', px: 48, hp: 46, speed: 3.6, size: 1.6, melee: 11 }
+];
+// gritty palettes in the manner of Quake's browns and Heretic's mossy stone: three walls, the floor,
+// metal, fog, the torches' light, the liquid, and the sky
+const MOODS = [
+  { k: 'umber', wall: [[0.44, 0.33, 0.23], [0.36, 0.3, 0.24], [0.3, 0.27, 0.22]], floor: [0.3, 0.25, 0.19], metal: [0.4, 0.37, 0.31], fog: [0.075, 0.055, 0.04], lamp: [1, 0.6, 0.26], liq: 'lava', sky: ['#1a0e08', '#5a2c14'] },
+  { k: 'slipgate', wall: [[0.3, 0.32, 0.29], [0.37, 0.33, 0.27], [0.25, 0.29, 0.31]], floor: [0.26, 0.27, 0.23], metal: [0.36, 0.4, 0.42], fog: [0.04, 0.05, 0.05], lamp: [0.8, 0.9, 0.62], liq: 'slime', sky: ['#0c1210', '#2a3a30'] },
+  { k: 'heretic', wall: [[0.36, 0.38, 0.31], [0.3, 0.34, 0.27], [0.43, 0.41, 0.34]], floor: [0.28, 0.3, 0.23], metal: [0.4, 0.38, 0.33], fog: [0.035, 0.05, 0.035], lamp: [0.95, 0.78, 0.45], liq: 'water', sky: ['#0c140e', '#34402c'] },
+  { k: 'flesh', wall: [[0.47, 0.2, 0.16], [0.4, 0.28, 0.24], [0.53, 0.46, 0.38]], floor: [0.33, 0.16, 0.13], metal: [0.42, 0.32, 0.28], fog: [0.09, 0.02, 0.02], lamp: [1, 0.42, 0.22], liq: 'blood', sky: ['#1a0406', '#601018'] },
+  { k: 'sulphur', wall: [[0.5, 0.42, 0.24], [0.42, 0.34, 0.2], [0.36, 0.3, 0.22]], floor: [0.38, 0.32, 0.2], metal: [0.44, 0.4, 0.3], fog: [0.09, 0.07, 0.03], lamp: [1, 0.78, 0.32], liq: 'lava', sky: ['#1a1404', '#6a4a10'] },
+  { k: 'crypt', wall: [[0.32, 0.3, 0.34], [0.38, 0.36, 0.38], [0.27, 0.25, 0.3]], floor: [0.24, 0.22, 0.24], metal: [0.36, 0.36, 0.4], fog: [0.04, 0.035, 0.05], lamp: [0.65, 0.7, 1], liq: 'slime', sky: ['#08060c', '#2a2438'] }
 ];
 const KEYS = [['RED', '#ff3b2f'], ['BLUE', '#3b8bff'], ['GOLD', '#ffd23b']];
 
@@ -92,6 +139,38 @@ const ART = {
   health: () => pc(14, 11, (x) => { rect(x, '#e9e4dc', 0, 1, 14, 10); rect(x, '#b9b2a8', 0, 9, 14, 2); rect(x, '#5a5048', 5, 0, 4, 1); rect(x, '#e8241c', 6, 3, 2, 6); rect(x, '#e8241c', 4, 5, 6, 2); }),
   armor: () => pc(12, 14, (x) => { rect(x, '#3b8bff', 1, 0, 10, 9); rect(x, '#3b8bff', 2, 9, 8, 2); rect(x, '#3b8bff', 4, 11, 4, 2); rect(x, '#9cd0ff', 2, 1, 2, 7); rect(x, '#1c4a9a', 8, 1, 2, 9); rect(x, '#ffe27a', 5, 3, 2, 5); }),
   torch: (k) => pc(8, 16, (x) => { rect(x, '#3a2a1a', 3, 9, 2, 7); rect(x, '#ff7a1a', 2, 3 + k, 4, 6 - k); rect(x, '#ffd23b', 3, 5 + k, 2, 4 - k); rect(x, '#fff3c0', 3, 7, 1, 2); rect(x, '#ff4a10', 3 - k, 1 + k * 2, 1, 2); }),
+  bullet: () => pc(3, 8, (x) => { rect(x, '#fff6c0', 1, 0, 1, 8); rect(x, '#ffc040', 0, 2, 3, 4); }),
+  pellet: () => pc(3, 3, (x) => { rect(x, '#ffe0a0', 0, 0, 3, 3); rect(x, '#fff', 1, 1, 1, 1); }),
+  nail: () => pc(10, 3, (x) => { rect(x, '#9aa0a8', 0, 1, 8, 1); rect(x, '#d0d6de', 0, 0, 2, 3); rect(x, '#ffd080', 8, 1, 2, 1); }),
+  rocket: () => pc(14, 7, (x) => { rect(x, '#5a5e56', 2, 2, 9, 3); rect(x, '#8a8e84', 2, 2, 9, 1); rect(x, '#a83020', 11, 2, 2, 3); rect(x, '#3a3c36', 1, 0, 3, 7); rect(x, '#ffd040', 0, 3, 2, 1); }),
+  grenade: () => pc(8, 8, (x) => { x.fillStyle = '#3a4a2a'; x.beginPath(); x.arc(4, 4, 3.6, 0, TAU); x.fill(); rect(x, '#5a6a3a', 2, 2, 2, 2); rect(x, '#8a8a7a', 1, 4, 6, 1); rect(x, '#c83a20', 3, 0, 2, 1); }),
+  plasma: () => pc(10, 10, (x) => { const g = x.createRadialGradient(5, 5, 0, 5, 5, 5); g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, '#9fe8ff'); g.addColorStop(0.7, 'rgba(90,120,255,.8)'); g.addColorStop(1, 'rgba(60,40,200,0)'); x.fillStyle = g; x.fillRect(0, 0, 10, 10); }),
+  // a fireball in five frames: white core, then yellow, orange, red, dark, dithered as it thins
+  boom: (k) => pc(32, 32, (x) => {
+    const im = x.createImageData(32, 32), d = im.data, R = mulberry32(77 + k), lump = Array.from({ length: 7 }, () => [R() * TAU, 0.55 + R() * 0.45]);
+    for (let y = 0; y < 32; y++) for (let xx = 0; xx < 32; xx++) {
+      const dx = (xx - 15.5) / 16, dy = (y - 15.5) / 16, a = Math.atan2(dy, dx), r = Math.hypot(dx, dy);
+      let edge = 0.62 + k * 0.07; for (const [la, ls] of lump) edge += Math.cos(a - la) * 0.05 * ls;
+      const q = r / edge, heat = 1 - q - k * 0.17 + (BAYER[(y & 3) * 4 + (xx & 3)] / 16 - 0.5) * 0.22;
+      if (q > 1 || heat < 0.02 || (k >= 3 && BAYER[(y & 3) * 4 + (xx & 3)] < k * 2.5)) continue;
+      const c = heat > 0.62 ? [255, 250, 220] : heat > 0.42 ? [255, 214, 90] : heat > 0.24 ? [255, 138, 40] : heat > 0.1 ? [196, 56, 20] : [80, 30, 20], i = (y * 32 + xx) * 4;
+      d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+    }
+    x.putImageData(im, 0, 0);
+  }),
+  smoke: () => pc(24, 24, (x) => { const im = x.createImageData(24, 24), d = im.data; for (let y = 0; y < 24; y++) for (let xx = 0; xx < 24; xx++) { const r = Math.hypot(xx - 11.5, y - 11.5) / 12; if (r > 1 || BAYER[(y & 3) * 4 + (xx & 3)] / 16 > 1.15 - r * 1.1) continue; const v = 58 + (1 - r) * 36, i = (y * 24 + xx) * 4; d[i] = v; d[i + 1] = v * 0.92; d[i + 2] = v * 0.86; d[i + 3] = 255; } x.putImageData(im, 0, 0); }),
+  barrel: (hit) => pc(14, 18, (x) => { rect(x, '#5a2a1c', 1, 1, 12, 16); rect(x, hit ? '#ff9a5a' : '#8a3a22', 2, 1, 4, 16); rect(x, '#3a1a10', 10, 1, 3, 16); rect(x, '#2a2420', 0, 0, 14, 2); rect(x, '#2a2420', 0, 8, 14, 2); rect(x, '#2a2420', 0, 16, 14, 2); rect(x, '#e8c020', 4, 11, 6, 3); rect(x, '#161616', 6, 11, 2, 3); }),
+  candles: (k) => pc(12, 14, (x) => { for (const [cx, h] of [[2, 7], [6, 10], [9, 6]]) { rect(x, '#d8ccb0', cx, 14 - h, 2, h); rect(x, '#a89a80', cx + 1, 14 - h, 1, h); rect(x, k ? '#ffd040' : '#ff9a30', cx, 12 - h - (k && cx === 6 ? 1 : 0), 2, 2); rect(x, '#fff6c0', cx, 13 - h, 1, 1); } rect(x, '#6a5a48', 0, 13, 12, 1); }),
+  skulls: () => pc(16, 11, (x) => { for (const [cx, cy] of [[1, 5], [6, 5], [11, 5], [4, 1], [9, 1]]) { rect(x, '#d8ccb0', cx, cy, 4, 4); rect(x, '#efe6d0', cx, cy, 2, 2); rect(x, '#1a1008', cx + 1, cy + 1, 1, 1); rect(x, '#1a1008', cx + 3, cy + 1, 1, 1); rect(x, '#8a7e66', cx + 1, cy + 3, 2, 1); } }),
+  gunicon: (k) => pc(22, 10, (x) => {
+    const m = '#5a5c60', h = '#8a8e96', w = '#6a4228';
+    if (k === 'shotgun') { rect(x, m, 0, 2, 16, 2); rect(x, m, 0, 4, 16, 1); rect(x, w, 12, 3, 10, 4); rect(x, w, 16, 5, 6, 4); }
+    else if (k === 'nailgun') { rect(x, m, 2, 1, 14, 6); rect(x, h, 0, 2, 4, 1); rect(x, h, 0, 4, 4, 1); rect(x, '#3a3c40', 12, 6, 4, 4); }
+    else if (k === 'rocket') { rect(x, '#4e5a44', 0, 1, 20, 5); rect(x, '#7a866a', 0, 1, 20, 1); rect(x, '#2a2e26', 8, 6, 4, 4); rect(x, '#c83a20', 18, 2, 2, 3); }
+    else if (k === 'grenade') { rect(x, m, 4, 1, 10, 7); rect(x, h, 0, 3, 5, 3); rect(x, w, 14, 4, 7, 4); }
+    else if (k === 'plasma') { rect(x, '#4a4e68', 2, 1, 16, 6); rect(x, '#9fe8ff', 4, 3, 10, 2); rect(x, '#2a2c40', 14, 6, 4, 4); }
+    else { rect(x, m, 6, 2, 10, 3); rect(x, '#3a3226', 12, 4, 4, 6); }
+  }),
   exit: () => pc(24, 40, (x) => { for (let k = 0; k < 3; k++) { x.strokeStyle = ['#7affd0', '#ffffff', '#3ad7ff'][k]; x.lineWidth = 2; x.beginPath(); x.ellipse(12, 20, 10 - k * 3, 18 - k * 4, 0, 0, TAU); x.stroke(); } })
 };
 const keyArt = (col) => pc(12, 8, (x) => { rect(x, col, 0, 0, 12, 8); rect(x, '#000', 2, 2, 3, 3); rect(x, 'rgba(255,255,255,.6)', 7, 1, 4, 1); rect(x, 'rgba(0,0,0,.35)', 6, 5, 5, 2); });
@@ -125,12 +204,13 @@ function splatAtlas() {
 // ---------------------------------------------------------------- level generator (pure data)
 // Rooms sit on a coarse grid; each is a polygon (rect, chamfered, octagon, round, cross, L, cave)
 // with flat port edges where corridors join. Corridors are runs of quad sectors: flat, ramps,
-// stairs, doors and slit windows. Holes in a room are pillars or nested sectors (daises, pools,
-// pits, skylights, a canal); slabs are boxes standing in sectors (bridge, railings, steps, doors).
+// stairs, doors and slit windows. Holes in a room are pillars, broken partition walls or nested
+// sectors (daises, pools, pits, skylights, a canal); slabs are boxes standing in sectors (bridge,
+// railings, steps, doors, a gallery's walkway). The grid grows with the level, with more loops.
 const shp = (k, rad, cx, cy) => (k === 'sq' ? ngon(4, rad * 1.25, Math.PI / 4, cx, cy) : k === 'hex' ? ngon(6, rad, 0, cx, cy) : k === 'oct' ? ngon(8, rad, Math.PI / 8, cx, cy) : ngon(12, rad, 0, cx, cy));
 function genLevel(seed, lv) {
   const R = mulberry32(seed), r = (a, b) => a + R() * (b - a), ri = (a, b) => Math.floor(r(a, b + 1)), pick = (a) => a[Math.floor(R() * a.length)];
-  const GX = [3, 4, 4, 5][Math.min(3, lv)], GY = [3, 3, 4, 4][Math.min(3, lv)];
+  const GX = [4, 4, 5, 5][Math.min(3, lv)], GY = [3, 4, 4, 5][Math.min(3, lv)];
   const at = new Map(), K = (i, j) => i + j * 64, rooms = [], links = [], secs = [], slabs = [], doors = [];
   const add = (i, j, par) => { const rm = { i, j, id: rooms.length, cx: (i + 0.5) * CELL, cy: (j + 0.5) * CELL, ports: [], links: [], par, depth: par ? par.depth + 1 : 0 }; rooms.push(rm); at.set(K(i, j), rm); return rm; };
   const link = (a, b, tree) => { const l = { a, b, tree, id: links.length }; links.push(l); a.links.push(l); b.links.push(l); return l; };
@@ -146,7 +226,7 @@ function genLevel(seed, lv) {
   const secret = rooms.find((x) => x.links.length === 1 && x !== start && x !== exit && x !== keyRoom && R() < 0.85) || null;
   for (const a of rooms) for (const [di, dj] of [[1, 0], [0, 1]]) {
     const b = at.get(K(a.i + di, a.j + dj));
-    if (!b || [a, b].some((x) => x === exit || x === secret) || a.links.some((l) => l.a === b || l.b === b) || R() > 0.4) continue;
+    if (!b || [a, b].some((x) => x === exit || x === secret) || a.links.some((l) => l.a === b || l.b === b) || R() > 0.52) continue;
     link(a, b, false).loop = true;
   }
   start.h = 0;
@@ -155,11 +235,13 @@ function genLevel(seed, lv) {
   const hall = hallC.length && R() < 0.9 ? pick(hallC) : null;
   for (const rm of rooms) {
     rm.kind = rm === hall ? 'hall' : rm === exit ? 'shrine' : rm === secret ? 'secret' : R() < 0.24 ? 'yard' : 'room';
-    rm.shape = rm.kind === 'hall' ? 'rect' : rm.kind === 'yard' ? pick(['rect', 'cham', 'round', 'cave']) : rm.kind === 'secret' ? 'oct' : pick(['rect', 'cham', 'oct', 'round', 'cross', 'L', 'cave', 'oct', 'cham']);
+    // a gallery: a tall square room with a walkway round three sides and a stair up the fourth
+    rm.gal = rm.kind === 'room' && R() < 0.26;
+    rm.shape = rm.gal || rm.kind === 'hall' ? 'rect' : rm.kind === 'yard' ? pick(['rect', 'cham', 'round', 'cave']) : rm.kind === 'secret' ? 'oct' : pick(['rect', 'cham', 'oct', 'round', 'cross', 'L', 'cave', 'oct', 'cham']);
     const big = rm.kind === 'hall' || rm.kind === 'yard';
-    rm.R = big ? r(6.6, 7) : rm.kind === 'secret' ? r(3.8, 4.6) : r(5, 6.5);
+    rm.R = big ? r(6.6, 7) : rm.kind === 'secret' ? r(3.8, 4.6) : rm.gal ? r(6, 6.8) : r(5, 6.5);
     const sq = rm.shape === 'rect' || rm.shape === 'cham' || rm.shape === 'L';
-    rm.a = rm.R * (sq && !big ? r(0.82, 1) : 1); rm.b = rm.R * (sq && !big ? r(0.82, 1) : 1);
+    rm.a = rm.R * (sq && !big ? r(rm.gal ? 0.9 : 0.82, 1) : 1); rm.b = rm.R * (sq && !big ? r(rm.gal ? 0.9 : 0.82, 1) : 1);
     rm.t = r(2.8, 3.4); rm.ch = r(0.9, 1.8); rm.qx = pick([-1, 1]); rm.qy = pick([-1, 1]);
     rm.lim = rm.shape === 'cross' ? rm.t - 0.25 : rm.shape === 'L' ? Math.max(3, Math.min(rm.a, rm.b) * 0.5) - 0.3 : 0.55 * Math.min(rm.a, rm.b);
   }
@@ -218,12 +300,16 @@ function genLevel(seed, lv) {
   };
   for (const rm of rooms) {
     const P = roomPoly(rm), rn = rin(P, rm.cx, rm.cy), h = rm.h;
-    const sky = rm.kind === 'yard' || (rm.kind === 'hall' && R() < 0.5), ch = sky ? r(5, 7.5) : rm.kind === 'hall' ? r(6, 7) : rm.kind === 'secret' ? 3 : r(3.2, 5);
+    // the gallery's stair goes up a side with no doorway in it
+    const freeSide = [0, 1, 2, 3].filter((sd) => !rm.ports.some((p) => p.ax === (sd % 2 ? 'y' : 'x') && p.sgn === (sd < 2 ? 1 : -1)));
+    if (rm.gal && !freeSide.length) rm.gal = false;
+    const sky = rm.kind === 'yard' || (rm.kind === 'hall' && R() < 0.5), ch = sky ? r(5, 7.5) : rm.kind === 'hall' ? r(6, 7) : rm.kind === 'secret' ? 3 : rm.gal ? r(5, 5.8) : r(3.2, 5);
     const S = { poly: P, holes: [], f: flat(h), c: flat(h + ch), sky, light: sky ? r(1, 1.15) : rm.kind === 'shrine' ? 0.62 : rm.kind === 'secret' ? 1 : r(0.55, 0.95), room: rm,
       tex: { wall: rm.kind === 'yard' ? 'wall1' : rm.kind === 'secret' ? 'wall2' : pick(['wall0', 'wall0', 'wall1']), floor: rm.kind === 'yard' ? 'rock' : 'floor0', ceil: 'ceil' } };
-    let feat = rm.kind === 'hall' ? 'canal' : rm.kind === 'shrine' ? 'dais' : rm.kind === 'secret' ? 'none' : rm === start ? pick(['none', 'sky']) : rm.kind === 'yard' ? pick(['blocks', 'pool', 'none', 'blocks']) : pick(['pillars', 'pillars', 'dais', 'pool', 'pit', 'sky', 'none', 'columns']);
-    if (!sky && rm.kind === 'room' && R() < 0.35) { const g = r(-0.13, 0.13), ax = R() < 0.5; S.c = { h: h + ch + 0.9, gx: ax ? g : 0, gy: ax ? 0 : g, ox: rm.cx, oy: rm.cy }; }
-    if (rm.kind === 'room' && rm !== start && R() < 0.15) { const g = r(-0.07, 0.07), ax = R() < 0.5; S.f = { h, gx: ax ? g : 0, gy: ax ? 0 : g, ox: rm.cx, oy: rm.cy }; if (feat !== 'pillars') feat = 'none'; }
+    let feat = rm.kind === 'hall' ? 'canal' : rm.kind === 'shrine' ? 'dais' : rm.kind === 'secret' ? 'none' : rm.gal ? pick(['none', 'pool', 'columns', 'pit', 'none']) : rm === start ? pick(['none', 'sky']) : rm.kind === 'yard' ? pick(['blocks', 'pool', 'none', 'blocks', 'baffles']) : pick(['pillars', 'pillars', 'dais', 'pool', 'pit', 'sky', 'none', 'columns', 'baffles', 'baffles']);
+    if (feat === 'baffles' && rn < 4.2) feat = 'pillars';
+    if (!sky && !rm.gal && rm.kind === 'room' && R() < 0.35) { const g = r(-0.13, 0.13), ax = R() < 0.5; S.c = { h: h + ch + 0.9, gx: ax ? g : 0, gy: ax ? 0 : g, ox: rm.cx, oy: rm.cy }; }
+    if (rm.kind === 'room' && !rm.gal && rm !== start && R() < 0.15) { const g = r(-0.07, 0.07), ax = R() < 0.5; S.f = { h, gx: ax ? g : 0, gy: ax ? 0 : g, ox: rm.cx, oy: rm.cy }; if (feat !== 'pillars') feat = 'none'; }
     secs.push(S); rm.S = S; rm.rin = rn; rm.feat = feat;
     const sh = pick(['oct', 'round', 'sq', 'hex']), P2 = (rad) => shp(sh, rad, rm.cx, rm.cy);
     if (feat === 'pillars') { const q = rn * 0.5, pr = clamp(rn * 0.13, 0.4, 0.75); for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) S.holes.push(cw(shp(sh, pr, rm.cx + sx * q, rm.cy + sy * q))); }
@@ -232,6 +318,14 @@ function genLevel(seed, lv) {
     else if (feat === 'pool') { const pool = nest(S, [{ p: P2(rn * 0.5), h: h - 0.35, liq: true, tex: { floor: 'liquid' } }]); if (R() < 0.5) pool.holes.push(cw(P2(0.55))); }
     else if (feat === 'pit') nest(S, [{ p: P2(rn * 0.62), h: h - 0.45, tex: { riser: 'step' } }, { p: P2(rn * 0.42), h: h - 0.9 }, { p: P2(rn * 0.22), h: h - 1.35, liq: true, tex: { floor: 'liquid' } }]);
     else if (feat === 'sky') nest(S, [{ p: P2(rn * 0.45), h, c: flat(cz(S, rm.cx, rm.cy) + 2.5), sky: true, light: S.light + 0.25 }]);
+    else if (feat === 'baffles') {
+      // broken partition walls across the room: always open at one end, so the room stays whole, but no straight line through it
+      const ax = R() < 0.5, n = rn > 5.6 ? 3 : 2, sp = n === 3 ? rn * 0.52 : rn * 0.32, len = rn * 0.45, f0 = R() < 0.5 ? 1 : -1;
+      for (let k = 0; k < n; k++) {
+        const u = n === 3 ? (k - 1) * sp : (k ? sp : -sp), v = f0 * (k % 2 ? 1 : -1) * rn * 0.2, w = 0.6, l = len * r(0.85, 1);
+        S.holes.push(cw(ax ? box(rm.cx + u - w, rm.cy + v - l, rm.cx + u + w, rm.cy + v + l) : box(rm.cx + v - l, rm.cy + u - w, rm.cx + v + l, rm.cy + u + w)));
+      }
+    }
     else if (feat === 'blocks') { const n = ri(2, 3), a0 = r(0, TAU); for (let k = 0; k < n; k++) { const a = a0 + (k * TAU) / n, d = rn * 0.52, s = r(0.8, 1.4); S.holes.push(cw(box(rm.cx + Math.cos(a) * d - s, rm.cy + Math.sin(a) * d - s, rm.cx + Math.cos(a) * d + s, rm.cy + Math.sin(a) * d + s))); } }
     else if (feat === 'canal') {
       // room over room: a sunken canal with steps at one end and a railed bridge across it
@@ -242,6 +336,17 @@ function genLevel(seed, lv) {
       for (const s of [-1, 1]) slabs.push({ poly: q(-w, yb + s * bw - 0.07, w, yb + s * bw + 0.07), b: h - 0.3, t: h + 0.85, tex: 'metal', light: S.light, rail: true });
       for (let k = 1; k <= 5; k++) slabs.push({ poly: q(-w, ext - k * 0.65, w, ext - (k - 1) * 0.65), b: h - D, t: h - (k * D) / 6, tex: 'step', light: S.light * 0.8 });
       rm.bridge = { x: M(0, yb)[0], y: M(0, yb)[1], z: h };
+    }
+    if (rm.gal) {
+      // the walkway over two metres up, round three walls with a rail on its inner edge, and a stair up along the fourth
+      const sd = pick(freeSide), A = sd % 2 ? rm.b : rm.a, B = sd % 2 ? rm.a : rm.b, cx = rm.cx, cy = rm.cy;
+      const M = [(u, v) => [cx + u, cy + v], (u, v) => [cx - v, cy + u], (u, v) => [cx - u, cy - v], (u, v) => [cx + v, cy - u]][sd];
+      const q = (u0, v0, u1, v1) => ccw([M(u0, v0), M(u1, v0), M(u1, v1), M(u0, v1)]), gw = 1.4, zt = h + 2.45, zb = zt - 0.25, lt = S.light;   // headroom under it even from a stair's last step
+      for (const [u0, v0, u1, v1] of [[-A, -B, A, -B + gw], [-A, B - gw, A, B], [-A, -B + gw, -A + gw, B - gw]]) slabs.push({ poly: q(u0, v0, u1, v1), b: zb, t: zt, tex: 'plank', light: lt });
+      for (const [u0, v0, u1, v1] of [[-A + gw, -B + gw - 0.06, A - gw, -B + gw + 0.06], [-A + gw, B - gw - 0.06, A, B - gw + 0.06], [-A + gw - 0.06, -B + gw + 0.06, -A + gw + 0.06, B - gw - 0.06]]) slabs.push({ poly: q(u0, v0, u1, v1), b: zb, t: zt + 0.85, tex: 'metal', light: lt, rail: true });
+      const n = 6, sl = 0.68;
+      for (let k = 1; k <= n; k++) slabs.push({ poly: q(A - gw, -B + gw + (n - k) * sl, A, -B + gw + (n - k + 1) * sl), b: h, t: h + (k * (zt - h)) / n, tex: 'step', light: lt * 0.9 });
+      rm.walk = { z: zt, x: M(-A + gw / 2, 0)[0], y: M(-A + gw / 2, 0)[1] };
     }
     for (const p of rm.ports) p.h = fz(S, ...p.mid);
   }
@@ -288,7 +393,7 @@ function genLevel(seed, lv) {
     const S = rm.S, es = S.edges.filter((e) => !e.o && e.len > 1.4 && S.poly.some((p) => p[0] === e.ax && p[1] === e.ay));
     for (let k = 0; k < (rm.kind === 'shrine' ? 4 : ri(1, 3)) && es.length; k++) {
       const e = es.splice(Math.floor(R() * es.length), 1)[0], x = (e.ax + e.bx) / 2 + e.nx * 0.3, y = (e.ay + e.by) / 2 + e.ny * 0.3;
-      lamps.push({ x, y, z: fz(S, x, y) + Math.min(2.1, cz(S, x, y) - fz(S, x, y) - 0.6), room: rm });
+      lamps.push({ x, y, z: fz(S, x, y) + Math.min(rm.gal ? 3.5 : 2.1, cz(S, x, y) - fz(S, x, y) - 0.6), fz: fz(S, x, y), nx: e.nx, ny: e.ny, room: rm });
     }
   }
   return { secs, slabs, doors, rooms, links, start, exit, keyRoom, secret, lamps, mw: GX * CELL, mh: GY * CELL };
@@ -314,6 +419,13 @@ class World {
       for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], len = Math.hypot(c[0] - a[0], c[1] - a[1]); const e = { ax: a[0], ay: a[1], bx: c[0], by: c[1], len, ux: (c[0] - a[0]) / len, uy: (c[1] - a[1]) / len, nx: (c[1] - a[1]) / len, ny: -(c[0] - a[0]) / len, slab: b }; cells([a, c], (k) => this.wg[k].push(e)); }
     }
     this.buildNav();
+  }
+  // a crate or a barrel set down after the map is built: into the slab and wall grids
+  addSlab(b) {
+    const gw = this.gw, cells = (P, fn) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of P) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } for (let j = Math.max(0, Math.floor(y0 / GS)); j <= Math.min(this.gh - 1, Math.floor(y1 / GS)); j++) for (let i = Math.max(0, Math.floor(x0 / GS)); i <= Math.min(gw - 1, Math.floor(x1 / GS)); i++) fn(j * gw + i); };
+    this.slabs.push(b); cells(b.poly, (c) => this.bg[c].push(b));
+    const P = b.poly;
+    for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length], len = Math.hypot(c[0] - a[0], c[1] - a[1]); const e = { ax: a[0], ay: a[1], bx: c[0], by: c[1], len, ux: (c[0] - a[0]) / len, uy: (c[1] - a[1]) / len, nx: (c[1] - a[1]) / len, ny: -(c[0] - a[0]) / len, slab: b }; cells([a, c], (k) => this.wg[k].push(e)); }
   }
   inSec(s, x, y) { const b = s.bb; return x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3] && inPoly(s.poly, x, y) && !s.holes.some((h) => inPoly(h, x, y)); }
   sAt(x, y, hint) {
@@ -470,6 +582,36 @@ class World {
   }
 }
 
+// ---------------------------------------------------------------- the voxel layer
+// The lower walls of the rooms and halls are clad in a skin of voxels two deep, drawn with the wall's
+// own texture, so a whole wall looks as it did. Shots chew it away: a bullet chips a voxel, a rocket
+// blows a crater. The rough stone behind shows through, the rubble falls and the dust hangs.
+// Crates are whole voxel blocks that come apart; barrels go up.
+const VX = 0.25, VD = 2;
+function cladWalls(wd, R) {
+  const panels = [], cands = [], budget = 34000;
+  let used = 0;
+  for (const s of wd.secs) {
+    if ((!s.room && !s.link) || s.win || s.liq) continue;
+    for (const e of s.edges) {
+      if (e.o || e.len < 1.1) continue;
+      const fa = fz(s, e.ax, e.ay), fb = fz(s, e.bx, e.by), ca = cz(s, e.ax, e.ay), cb = cz(s, e.bx, e.by);
+      if (Math.abs(fa - fb) > 0.02 || Math.abs(ca - cb) > 0.02 || ca - fa < 1.2) continue;
+      cands.push({ s, e, z0: fa, top: Math.min(ca, cb), k: (s.room ? 1 : 0) + R() * 0.6 });
+    }
+  }
+  // the rooms first, then the corridors as far as the budget goes
+  cands.sort((a, b) => b.k - a.k);
+  for (const c of cands) {
+    const cols = Math.max(1, Math.round(c.e.len / VX)), rows = Math.min(12, Math.floor((c.top - c.z0 - 0.02) / VX)), n = cols * rows * VD;
+    if (rows < 3 || used + n > budget) continue;
+    used += n;
+    const P = { e: c.e, s: c.s, cols, rows, z0: c.z0, du: c.e.len / cols, vox: new Uint8Array(n).fill(1), id: panels.length, dirty: true, tex: c.s.tex.wall };
+    c.e.panel = P; panels.push(P);
+  }
+  return panels;
+}
+
 // ---------------------------------------------------------------- the game
 const LIQ = { blood: [0.5, 0.03, 0.05], slime: [0.32, 0.78, 0.14], water: [0.14, 0.34, 0.6], lava: [1, 0.42, 0.08] };
 const NAME_A = ['Gut', 'Ossuary', 'Velvet', 'Molar', 'Weeping', 'Rust', 'Sulphur', 'Moth', 'Gland', 'Saint', 'Ink', 'Marrow', 'Hive', 'Static'];
@@ -479,13 +621,13 @@ export class HellMaze extends Game {
   setup() {
     const s = this.post.seed || 1;
     this.level = 0; this.kills = 0; this.deaths = 0; this.msgs = []; this.ready = false; this.goreMap = new Map();
-    const pool = [...WEIRD];
-    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-    this.arms = ['tooth', ...pool.slice(0, 4)].map((k) => { const A = ARMS[k], nm = A.names[this.ri(0, A.names.length - 1)]; return { ...A, k, name: this.rng() < 0.4 ? `${ADJ[this.ri(0, ADJ.length - 1)]} ${nm}` : nm, hue: this.ri(0, 5) }; });
+    // the arsenal: a sidearm, then four rolled from the gritty guns and the strange ones
+    const sh = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const nWeird = this.rng() < 0.35 ? 2 : 1, pool = [...sh(GRIT).slice(0, 4 - nWeird), ...sh(WEIRD).slice(0, nWeird)];
+    this.arms = [rollArm(this.rng, this.rng() < 0.75 ? 'pistol' : 'tooth', this.rng() < 0.6), ...sh(pool).map((k) => rollArm(this.rng, k))];
     this.relicImg = this.skin.pick('relic', 'item', 'ball');
     this.ammoImg = this.arms.map((a, i) => this.skin.pick(`ammo${i}`, 'item', 'ball'));
-    const C = this.skin.creatures;
-    this.crew = ROLES.map((ro, k) => { const m = C[(k + 1) % C.length]; return { ...ro, m, fly: ro.fly || !!m.floats, name: m.name || creatureName(s + k * 101) }; });
+    this.crew = ROLES.map((ro, k) => { const m = horror((s * 13 + k * 101) >>> 0, ro.px, { kind: ro.kind, tier: 1 }); return { ...ro, m, fly: ro.fly || !!m.floats, name: m.name }; });
     this.knowSecret = this.rng() < 0.6;
     loadThree().then(() => { this.ready = true; }).catch((e) => { this.failed = String(e?.message || e); });
     this.newLevel(true);
@@ -495,16 +637,19 @@ export class HellMaze extends Game {
   newLevel(fresh) {
     const seed = ((this.post.seed || 1) * 7919 + this.level * 104729 + this.deaths * 31) >>> 0, L = genLevel(seed, this.level);
     this.wd = new World(L);
-    const lv = this.level, bg = rgb01(this.pal.bg), tone = (i, t) => mixc(rgb01(this.col(lv + i)), [0.52, 0.5, 0.47], t);
-    const liq = ['blood', 'slime', 'water', 'lava'][((this.post.seed || 1) + lv) % 4];
-    this.mood = { liq, lc: LIQ[liq], wall: [tone(0, 0.5), tone(2, 0.55), tone(4, 0.45)], floor: tone(1, 0.62), fog: mixc(bg, [0.05, 0.03, 0.03], 0.35).map((v) => v * 0.75), key: KEYS[(this.post.seed + lv) % 3], name: `${NAME_A[(seed >>> 4) % NAME_A.length]} ${NAME_B[(seed >>> 9) % NAME_B.length]}` };
+    const lv = this.level, md = MOODS[((this.post.seed || 1) * 7 + lv * 3) % MOODS.length], liq = md.liq;
+    this.mood = { ...md, liq, lc: LIQ[liq], key: KEYS[(this.post.seed + lv) % 3], name: `${NAME_A[(seed >>> 4) % NAME_A.length]} ${NAME_B[(seed >>> 9) % NAME_B.length]}` };
     const st = L.start, p = (this.p ||= {});
     Object.assign(p, { x: st.cx, y: st.cy, z: fz(st.S, st.cx, st.cy), vz: 0, vx: 0, vy: 0, a: this.r(0, TAU), sec: st.S, bob: 0, keys: new Set() });
     p.eye = p.z + EYE;
     if (fresh) { p.hp = this.maxHp(); p.armor = 0; this.owned = [true, false, false, false, false]; this.ammo = this.arms.map((a) => (a.ammo ? 0 : Infinity)); this.weapon = 0; }
-    this.foes = []; this.shots = []; this.items = []; this.deco = []; this.gibs = []; this.gore = []; this.decals = []; this.bolts = []; this.drips = [];
+    this.foes = []; this.shots = []; this.items = []; this.deco = []; this.gibs = []; this.gore = []; this.decals = []; this.bolts = []; this.drips = []; this.booms = []; this.pending = []; this.shake = 0; this.boomFlash = 0;
     this.cool = 0; this.flash = 0; this.recoil = 0; this.hurt = 0; this.dead = 0; this.path = []; this.apT = 0; this.lvT = 0; this.flowT = 0; this.flow = null;
     this.skullOut = null; this.decalDirty = true; this.stuck = { t: 0, x: p.x, y: p.y }; this.ban = new Map(); this.goal = -1; this.secretFound = false;
+    this.vox = { panels: cladWalls(this.wd, mulberry32(seed ^ 0x51ab)), crates: [] };
+    const Wt = this.mood.wall, css = (v, k) => `rgb(${v.map((q) => Math.round(clamp(q * k, 0, 1) * 255)).join(',')})`;
+    // rubble: chips of the walls' own stone (they fly and bounce like gibs and leave dust where they land)
+    this.rubbleG = { blood: mixc(Wt[0], [0.1, 0.09, 0.08], 0.6), glow: null, art: Array.from({ length: 6 }, (_, k) => pc(6, 6, (x) => { const c = Wt[k % 3]; rect(x, css(c, 1.3), 0, 0, 5, 5); rect(x, css(c, 1.7), 0, 0, 3, 2); rect(x, css(c, 0.8), 2, 3, 4, 3); if (k > 2) rect(x, css(c, 1.1), 3, 0, 3, 2); })) };
     this.spawnAll(L);
     if (this.gl) this.dropGpu();
     this.say(`LEVEL ${lv + 1} · ${this.mood.name.toUpperCase()}`, 3.5);
@@ -520,12 +665,12 @@ export class HellMaze extends Game {
     return g;
   }
   boss() {
-    const s = this.post.seed || 1, m = monster((s * 31 + this.level * 977 + 7) >>> 0, this.skin.hue + 160 + this.level * 40, 40, Math.min(3, 2 + (this.level > 1)));
-    return { role: 'boss', hp: 360, speed: 1.9, size: 3.3, ranged: 18, melee: 26, heavy: true, boss: true, fly: !!m.floats, m, name: m.name || creatureName(s + this.level) };
+    const s = this.post.seed || 1, kind = ['abom', 'demon', 'spider', 'demon'][(s + this.level) % 4], m = horror((s * 31 + this.level * 977 + 7) >>> 0, 64, { kind, tier: 3 });
+    return { role: 'boss', hp: 380, speed: kind === 'spider' ? 2.6 : 1.8, size: kind === 'abom' ? 3.6 : 3.4, ranged: 18, melee: 26, heavy: true, boss: true, fly: !!m.floats, m, name: m.name };
   }
   addFoe(ro, x, y, z, mul = 1) {
     const size = ro.size * this.S;
-    const f = { ...ro, x, y, z: z + (ro.fly ? 1.4 : 0), vz: 0, kx: 0, ky: 0, hp: ro.hp * mul, max: ro.hp * mul, size, rad: Math.min(0.65, size * 0.2), ht: size * 0.78, awake: false, cd: this.r(0.5, 2), anim: this.r(0, 3), face: 1, actT: 0, hitT: 0, blind: 0, losT: this.r(0, 0.3), los: false, fireAt: 0, sec: this.wd.sAt(x, y, null), id: (this.fid = (this.fid || 0) + 1), hover: this.r(1.1, 2) };
+    const f = { ...ro, x, y, z: z + (ro.fly ? 1.4 : 0), vz: 0, kx: 0, ky: 0, hp: ro.hp * mul, max: ro.hp * mul, size, rad: Math.min(0.65, size * 0.2), ht: size * 0.78, awake: false, cd: this.r(0.5, 2), anim: this.r(0, 3), face: 1, ang: this.r(0, TAU), actT: 0, hitT: 0, blind: 0, losT: this.r(0, 0.3), los: false, fireAt: 0, sec: this.wd.sAt(x, y, null), id: (this.fid = (this.fid || 0) + 1), hover: this.r(1.1, 2) };
     this.foes.push(f);
     return f;
   }
@@ -533,8 +678,8 @@ export class HellMaze extends Game {
     const wd = this.wd, R = this.rng, pick = (a) => a[Math.floor(R() * a.length)];
     const sd = wd.bfs(wd.nodeAt(this.p.x, this.p.y, this.p.z, 4), false, null, 'spawn').dist;
     const rooms = L.rooms.filter((rm) => rm !== L.start && rm !== L.secret), far = (v) => sd[v] < 0 || sd[v] > 18;
-    const n = Math.round((6 + this.level * 2) * (this.mods.swarm ? 1.7 : 1)), mul = 1 + this.level * 0.15;
-    for (let i = 0; i < n; i++) { const v = wd.randomNode(R, pick(rooms), far); if (v >= 0) this.addFoe(this.crew[i % 7 === 6 ? 4 : this.ri(0, 3)], ...wd.nodeXY(v), mul); }
+    const n = Math.round((3 + L.rooms.length * 0.55 + this.level * 1.5) * (this.mods.swarm ? 1.7 : 1)), mul = 1 + this.level * 0.15;
+    for (let i = 0; i < n; i++) { const v = wd.randomNode(R, pick(rooms), far); if (v >= 0) this.addFoe(this.crew[i % 7 === 6 ? 4 : pick([0, 0, 1, 2, 3, 5, 0, 1])], ...wd.nodeXY(v), mul); }
     const bv = wd.randomNode(R, L.exit); if (bv >= 0) this.addFoe(this.boss(), ...wd.nodeXY(bv), 1 + this.level * 0.25);
     this.total = this.foes.length;
     const item = (kind, v, o) => { if (v < 0) return; const [x, y, z] = wd.nodeXY(v); this.items.push({ kind, x, y, z, bob: this.r(0, 6), sec: wd.sAt(x, y, null), ...o }); };
@@ -542,14 +687,40 @@ export class HellMaze extends Game {
     const unowned = [1, 2, 3, 4].filter((i) => !this.owned[i]), path = rooms.filter((rm) => rm !== L.exit).sort((a, b) => a.depth - b.depth);
     unowned.slice(0, this.level ? 2 : 3).forEach((w, k, all) => item('gun', wd.randomNode(R, path[Math.min(path.length - 1, Math.floor(((k + 0.3) / all.length) * path.length))]), { w }));
     const ammoW = [1, 2, 3, 4].filter((i) => this.arms[i].ammo);
-    for (let i = 0; i < 3; i++) item('health', wd.randomNode(R, pick(rooms)));
-    item('armor', wd.randomNode(R, pick(rooms)));
-    for (let i = 0; i < 6; i++) item('ammo', wd.randomNode(R, pick(rooms)), { w: pick(ammoW) });
+    for (let i = 0; i < 2 + rooms.length / 4; i++) item('health', wd.randomNode(R, pick(rooms)));
+    for (let i = 0; i < 1 + rooms.length / 9; i++) item('armor', wd.randomNode(R, pick(rooms)));
+    for (let i = 0; i < 3 + rooms.length / 2; i++) item('ammo', wd.randomNode(R, pick(rooms)), { w: pick(ammoW) });
     if (L.secret) for (const k of ['armor', 'health', 'ammo', 'ammo']) item(k, wd.randomNode(R, L.secret), { w: pick(ammoW), secret: true });
+    // the furniture of the place: crates, barrels, corpses, candles and skulls
+    this.barrels = [];
+    const taken = [...this.items, ...this.foes].map((o) => [o.x, o.y]), free = (x, y, r) => taken.every(([a, b]) => Math.hypot(a - x, b - y) > r) && Math.hypot(x - this.p.x, y - this.p.y) > 3;
     for (const rm of L.rooms) {
-      const nd = rm.kind === 'yard' ? 4 : rm.kind === 'hall' || (rm.kind === 'room' && R() < 0.4) ? 2 : 0;
-      for (let k = 0; k < nd; k++) { const v = wd.randomNode(R, rm); if (v < 0) continue; const [x, y, z] = wd.nodeXY(v); this.deco.push({ x, y, z, img: this.skin.pick(`deco${(rm.id + k) % 5}`, 'item', 'enemy'), big: this.r(1.2, 2.2), sec: wd.sAt(x, y, null) }); }
+      if (rm === L.start && R() < 0.5) continue;
+      const big = rm.kind === 'yard' || rm.kind === 'hall', nC = big ? 3 : rm.kind === 'room' ? (R() < 0.7 ? 2 : 0) : 0, nB = big ? 2 : rm.kind === 'room' ? (R() < 0.6 ? 1 : 0) : rm.kind === 'shrine' ? 2 : 0;
+      for (let k = 0; k < nC; k++) {
+        const v = wd.randomNode(R, rm); if (v < 0) continue;
+        const [x, y, z] = wd.nodeXY(v), w = R() < 0.3 ? 2 : 1, h = R() < 0.35 ? 2 : 1;
+        if (!free(x, y, 1.6) || wd.near(x, y, z, 1.3)) continue;
+        taken.push([x, y]); this.addCrate(x - w * 0.5, y - 0.5, z, w, h);
+      }
+      for (let k = 0; k < nB; k++) {
+        const v = wd.randomNode(R, rm); if (v < 0) continue;
+        const [x, y, z] = wd.nodeXY(v);
+        if (!free(x, y, 1.3) || wd.near(x, y, z, 0.6)) continue;
+        taken.push([x, y]);
+        const sl = { poly: box(x - 0.3, y - 0.3, x + 0.3, y + 0.3), b: z, t: z + 0.95, tex: 'metal', light: 0.8, barrel: true }, bar = { x, y, z, hp: 16, sl, sec: wd.sAt(x, y, null) };
+        sl.barrel = bar; wd.addSlab(sl); this.barrels.push(bar);
+      }
+      const nd = rm.kind === 'yard' ? 3 : rm.kind === 'hall' || rm.kind === 'shrine' || (rm.kind === 'room' && R() < 0.6) ? 2 : 0;
+      for (let k = 0; k < nd; k++) {
+        const v = wd.randomNode(R, rm); if (v < 0) continue;
+        const [x, y, z] = wd.nodeXY(v), kind = ['corpse', 'corpse', 'candles', 'skulls'][Math.floor(R() * 4)];
+        if (!free(x, y, 0.9)) continue;
+        this.deco.push({ x, y, z, kind, dir: Math.floor(R() * 8), m: this.crew[Math.floor(R() * this.crew.length)].m, ph: R() * 6, sec: wd.sAt(x, y, null) });
+        if (kind === 'corpse') this.pool(x, y, z, this.goreOf(this.crew[0].m), this.r(0.8, 1.5));
+      }
     }
+    if (this.vox.crates.length || this.barrels.length) wd.buildNav();
     this.lamps = L.lamps.map((l) => ({ ...l, sec: wd.sAt(l.x, l.y, null), ph: this.r(0, 6) }));
     const top = L.exit.top || L.exit.S;
     this.exitPos = { x: L.exit.cx, y: L.exit.cy, z: fz(top, L.exit.cx, L.exit.cy), sec: top };
@@ -560,6 +731,7 @@ export class HellMaze extends Game {
   // ------------------------------------------------------------------ simulation
   step(dt) {
     if (!this.wd) return;
+    if (this.pending?.length) { const due = this.pending.filter((q) => q.at <= this.t); if (due.length) { this.pending = this.pending.filter((q) => q.at > this.t); due.forEach((q) => q.fn()); } }
     this.lvT += dt; this.cool -= dt; this.flash -= dt; this.recoil = Math.max(0, this.recoil - dt * 5); this.hurt -= dt;
     for (const m of this.msgs) m.t -= dt;
     this.msgs = this.msgs.filter((m) => m.t > 0);
@@ -612,9 +784,15 @@ export class HellMaze extends Game {
       f.hitT -= dt; f.anim += dt; f.actT -= dt; f.blind -= dt; f.cd -= dt; f.zapT = (f.zapT || 0) - dt;
       const kd = Math.pow(0.03, dt); f.kx *= kd; f.ky *= kd;
       if (f.hp <= 0) {
+        if (f.spurt > this.t && !f.gone && this.rng() < dt * 30) { const g = this.goreOf(f.m); this.spray(f.x, f.y, f.z + 0.25, this.r(-0.3, 0.3), this.r(-0.3, 0.3), g, 2, false); }
         if (!f.fly || f.gone) { const fl = wd.floorAt(f.x, f.y, f.z, f.sec); if (f.z > fl) { f.vz -= 18 * dt; f.z = Math.max(fl, f.z + f.vz * dt); } }
         else { f.fly = false; f.vz = 0; }
         continue;
+      }
+      if (f.burnT > this.t) {
+        // on fire: it burns down, shedding flame
+        f.hp -= dt * 8; if (this.rng() < dt * 26) this.puff(f.x + this.r(-0.3, 0.3), f.y + this.r(-0.3, 0.3), f.z + f.ht * this.r(0.2, 0.9), [1, this.r(0.35, 0.7), 0.15], 2, 1.2, true);
+        if (f.hp <= 0) { this.killFoe(f, 12, 0, 0, 'fire'); continue; }
       }
       const dx = p.x - f.x, dy = p.y - f.y, dist = Math.hypot(dx, dy) || 0.01, ux = dx / dist, uy = dy / dist;
       f.losT -= dt;
@@ -649,6 +827,9 @@ export class HellMaze extends Game {
       f.moving = Math.abs(mx) + Math.abs(my) > 0.1;
       if (f.moving) { const side = -mx * Math.sin(p.a) + my * Math.cos(p.a); if (Math.abs(side) > 0.2) f.face = side > 0 ? 1 : -1; }
       else if (f.los) { const side = -ux * Math.sin(p.a) + uy * Math.cos(p.a); if (Math.abs(side) > 0.3) f.face = side > 0 ? 1 : -1; }
+      // its heading, for which of its eight views to show: it turns toward where it walks, or toward you
+      const want = f.actT > 0 || (!f.moving && f.los) ? Math.atan2(uy, ux) : f.moving ? Math.atan2(my, mx) : f.ang;
+      f.ang += angTo(f.ang, want) * Math.min(1, dt * 7);
       if (vx || vy) { f.x += vx * dt; f.y += vy * dt; wd.collide(f, f.rad, f.fly ? 0.6 : Math.min(f.ht, PH), f.fly ? 0.3 : STEP); f.sec = wd.sAt(f.x, f.y, f.sec); }
       const fl = wd.floorAt(f.x, f.y, f.z, f.sec, f.fly ? 0.3 : STEP);
       if (f.fly) { const cl = wd.ceilAt(f.x, f.y, f.z, f.sec), want = Math.min(fl + f.hover + Math.sin(f.anim * 2) * 0.15, cl - 0.7); f.z += (want - f.z) * Math.min(1, dt * 2.5); }
@@ -690,13 +871,16 @@ export class HellMaze extends Game {
     for (const f of this.foes) if (!f.awake && Math.abs(f.x - p.x) < 9 && Math.abs(f.y - p.y) < 9) f.awake = true;
     const aim = this.autoAim(), ez = p.eye - 0.28, ex = p.x + Math.cos(p.a) * 0.3, ey = p.y + Math.sin(p.a) * 0.3;
     if (A.k === 'fork') return this.zap(A, aim, ex, ey, ez);
-    const kind = { tooth: 'tooth', chicken: 'chicken', hive: 'hive', flail: 'skull', squid: 'squid', marble: 'marble', relic: 'relic' }[A.k];
+    const kind = A.shot;
+    if (kind === 'rocket' || kind === 'grenade') this.shake = Math.max(this.shake || 0, 0.12);
     for (let n = 0; n < A.n; n++) {
       const a = p.a + (aim ? aim.da : 0) + this.r(-1, 1) * (A.spread || 0), sp = A.speed * this.r(0.92, 1.05), d = aim ? aim.d : 8, t = d / sp;
       let vz = aim ? aim.dz / t : 0;
       if (A.grav) vz += 0.5 * A.grav * this.G * t;
       if (kind === 'marble') vz = -1;
-      const b = this.shoot(kind, ex, ey, ez, Math.cos(a) * sp, Math.sin(a) * sp, vz + this.r(-1, 1) * (A.spread || 0) * sp, { mine: true, dmg: A.dmg, grav: kind === 'marble' ? 10 : A.grav || 0, bounce: A.bounce || 0, life: kind === 'skull' ? 3.5 : kind === 'marble' ? 1.3 : 3, r: kind === 'chicken' ? 0.16 : kind === 'tooth' ? 0.08 : 0.18, hits: {} });
+      const life = kind === 'skull' ? 3.5 : kind === 'marble' ? 1.3 : kind === 'grenade' ? A.fuse || 1.8 : kind === 'rocket' ? 4 : 3;
+      const r = { chicken: 0.16, tooth: 0.08, bullet: 0.07, pellet: 0.06, nail: 0.07, rocket: 0.16, grenade: 0.14, plasma: 0.13 }[kind] || 0.18;
+      const b = this.shoot(kind, ex, ey, ez, Math.cos(a) * sp, Math.sin(a) * sp, vz + this.r(-1, 1) * (A.spread || 0) * sp, { mine: true, dmg: A.dmg, grav: kind === 'marble' ? 10 : A.grav || 0, bounce: A.bounce || 0, life, r, hits: {}, A, pierce: A.pierce || 0 });
       if (kind === 'skull') this.skullOut = b;
     }
   }
@@ -726,6 +910,8 @@ export class HellMaze extends Game {
       if (b.k === 'hole') { this.holeStep(b, dt); continue; }
       if (b.life <= 0) { this.expire(b); continue; }
       if (b.k === 'bee') this.beeSteer(b, dt);
+      if (b.k === 'rocket' && (b.trail = (b.trail || 0) - dt) <= 0) { b.trail = 0.035; this.booms.push({ kind: 'smoke', x: b.x - b.vx * 0.02, y: b.y - b.vy * 0.02, z: b.z, vz: 0.4, t: 0, life: 0.7, s: 0.28, id: (this.bid = (this.bid || 0) + 1) }); this.puff(b.x, b.y, b.z, [1, 0.7, 0.3], 1, 1, true); }
+      if (b.A?.seek && b.mine) this.seekSteer(b, dt);
       if (b.k === 'skull' && (b.ret || b.t > 1.4 || b.bounce <= 0)) {
         b.ret = true;
         const dx = p.x - b.x, dy = p.y - b.y, dz = p.eye - 0.3 - b.z, d = Math.hypot(dx, dy, dz);
@@ -743,6 +929,7 @@ export class HellMaze extends Game {
           if (b.k === 'chicken' || b.k === 'skull') { b.bounce--; this.puff(b.x, b.y, b.z, b.k === 'chicken' ? [1, 0.9, 0.4] : [0.95, 0.92, 0.85], 4, 2); }
           continue;
         }
+        if (hit.e.slab?.barrel && b.mine) this.barrelHit(hit.e.slab.barrel, b.dmg);
         this.impact(b, hit.x - b.vx * 0.005, hit.y - b.vy * 0.005, hit.z, hit, null); b.life = 0; continue;
       }
       b.x = nx; b.y = ny; b.z = nz; b.sec = wd.sAt(b.x, b.y, b.sec);
@@ -771,27 +958,68 @@ export class HellMaze extends Game {
   }
   hitFoe(b, f) {
     const k = b.k;
+    // a piercing round goes on through, once per foe
+    if (b.pierce > 0 && b.mine && k !== 'rocket' && k !== 'grenade') { if (b.hits[f.id]) return false; b.hits[f.id] = 1; b.pierce--; this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, k); this.affix(b, b.x, b.y, b.z, null, f); return false; }
     if (k === 'skull') { if ((b.hits[f.id] || 0) > this.t) return false; b.hits[f.id] = this.t + 0.35; this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, k); return false; }
     if (k === 'bee') { if ((b.cdS || 0) > this.t) return false; b.cdS = this.t + 0.5; this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, k); b.vx = -b.vx + this.r(-3, 3); b.vy = -b.vy + this.r(-3, 3); return false; }
     if (k === 'chicken') { this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, k); f.kx += b.vx * 0.25; f.ky += b.vy * 0.25; b.vx *= -0.45; b.vy *= -0.45; b.vz = 3; if (--b.bounce < 0) { b.life = 0; this.puff(b.x, b.y, b.z, [1, 0.92, 0.5], 10, 3); } return true; }
     if (k === 'marble') { this.makeHole(b, b.x, b.y, b.z); return true; }
+    if (k === 'grenade' || k === 'rocket') { this.impact(b, b.x, b.y, b.z, null, f); b.life = 0; return true; }
     this.impact(b, b.x, b.y, b.z, null, f); b.life = 0;
     return true;
   }
   impact(b, x, y, z, hit, f) {
-    const k = b.k;
-    if (k === 'hive') { for (let i = 0; i < 7; i++) this.shoot('bee', x, y, z + 0.2, this.r(-4, 4), this.r(-4, 4), this.r(1, 4), { mine: true, dmg: 6, life: this.r(4.5, 6.5), r: 0.1, sec: b.sec }); this.puff(x, y, z, [0.85, 0.6, 0.2], 14, 3); }
-    else if (k === 'squid') { this.blast(x, y, z, 2.8, b.dmg, 'ink'); this.ink(x, y, z, hit); }
-    else if (k === 'relic') { this.blast(x, y, z, 2.6, b.dmg, 'fire'); this.puff(x, y, z, [1, 0.62, 0.18], 30, 6, true); this.puff(x, y, z, [0.25, 0.22, 0.2], 14, 3); this.decal(x, y, z, hit, [0.05, 0.04, 0.03], 1.4); }
+    const k = b.k, A = b.A;
+    if (k === 'hive') { for (let i = 0; i < 7; i++) this.shoot('bee', x, y, z + 0.2, this.r(-4, 4), this.r(-4, 4), this.r(1, 4), { mine: true, dmg: 6, life: this.r(4.5, 6.5), r: 0.1, sec: b.sec }); this.puff(x, y, z, [0.85, 0.6, 0.2], 14, 3); this.carve(x, y, z, 0.4, hit); }
+    else if (k === 'squid') { this.blast(x, y, z, 2.8, b.dmg, 'ink'); this.ink(x, y, z, hit); this.carve(x, y, z, 0.6, hit); }
+    else if (k === 'relic' || k === 'rocket' || k === 'grenade') this.explode(x, y, z, A?.splash || 2.8, b.dmg, { hit });
     else if (k === 'marble') { this.makeHole(b, x, y, z); return; }
     else {
       if (f) this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, k);
-      this.puff(x, y, z, k === 'spit' ? b.col : k === 'chicken' ? [1, 0.92, 0.5] : [0.95, 0.92, 0.85], 6, 2);
-      if (hit && !f) this.decal(x, y, z, hit, k === 'spit' ? b.col : [0.12, 0.1, 0.09], k === 'spit' ? 0.55 : 0.3);
+      const sparks = k === 'spit' ? b.col : k === 'plasma' ? [0.5, 0.85, 1] : k === 'chicken' ? [1, 0.92, 0.5] : k === 'bullet' || k === 'nail' || k === 'pellet' ? [1, 0.85, 0.5] : [0.95, 0.92, 0.85];
+      this.puff(x, y, z, sparks, k === 'pellet' ? 3 : 6, k === 'plasma' ? 3 : 2, k === 'plasma' || k === 'bullet' || k === 'nail');
+      if (hit && !f) { this.decal(x, y, z, hit, k === 'spit' ? b.col : k === 'plasma' ? [0.08, 0.12, 0.2] : [0.1, 0.08, 0.07], k === 'spit' ? 0.55 : 0.3); if (b.mine || k === 'spit') this.carve(x, y, z, A?.carve || 0.15, hit); }
     }
+    this.affix(b, x, y, z, hit, f);
+  }
+  // what a weapon's affixes add to a hit
+  affix(b, x, y, z, hit, f) {
+    const A = b.A;
+    if (!A || !b.mine) return;
+    if (A.splash && !['rocket', 'grenade', 'relic'].includes(b.k)) this.explode(x, y, z, A.splash, b.dmg * 0.6, { small: true, hit });
+    if (A.split && !b.frag) {
+      const back = Math.atan2(-b.vy, -b.vx);
+      for (let q = 0; q < A.split; q++) { const a = back + this.r(-1.1, 1.1); this.shoot('pellet', x + Math.cos(back) * 0.12, y + Math.sin(back) * 0.12, z, Math.cos(a) * 18, Math.sin(a) * 18, this.r(-3, 3), { mine: true, dmg: b.dmg * 0.4, r: 0.05, life: 0.6, frag: true, hits: {} }); }
+    }
+    if (A.burn && f && f.hp > 0) f.burnT = this.t + A.burn;
+    if (A.leech && f) this.p.hp = Math.min(this.maxHp(), this.p.hp + b.dmg * A.leech);
+  }
+  // an explosion: the blast, corpses coming apart, the walls chewed, fire, smoke, sparks, a flash, a scorch
+  explode(x, y, z, rad, dmg, o = {}) {
+    this.blast(x, y, z, rad, dmg, 'fire');
+    for (const f of this.foes) if (f.hp <= 0 && !f.gone && Math.hypot(f.x - x, f.y - y) < rad * 0.8) this.gib(f, f.x - x, f.y - y);
+    this.carve(x, y, z, rad * (o.small ? 0.38 : 0.5), o.hit, true);
+    this.barrelsNear(x, y, z, rad);
+    const n = o.small ? 3 : 6, R = (a, b2) => this.r(a, b2), id = () => (this.bid = (this.bid || 0) + 1);
+    for (let k = 0; k < n; k++) this.booms.push({ kind: 'fire', x: x + R(-0.5, 0.5) * rad * 0.35, y: y + R(-0.5, 0.5) * rad * 0.35, z: z + R(-0.1, 0.5), t: -k * 0.035, life: R(0.36, 0.56), s: rad * (o.small ? 0.55 : 0.8) * R(0.6, 1.1), id: id() });
+    for (let k = 0; k < n + 2; k++) this.booms.push({ kind: 'smoke', x: x + R(-0.5, 0.5) * rad * 0.4, y: y + R(-0.5, 0.5) * rad * 0.4, z: z + R(0, 0.4), vz: R(0.5, 1.3), t: -0.12 - k * 0.05, life: R(1.4, 2.6), s: rad * R(0.35, 0.6), id: id() });
+    if (this.booms.length > 90) this.booms.splice(0, this.booms.length - 90);
+    this.puff(x, y, z, [1, 0.72, 0.32], o.small ? 16 : 40, o.small ? 5 : 8, true);
+    this.puff(x, y, z, [0.22, 0.18, 0.16], o.small ? 6 : 16, 3);
+    this.decal(x, y, z, o.hit || null, [0.05, 0.04, 0.03], rad * (o.small ? 0.4 : 0.6));
+    const d = Math.hypot(this.p.x - x, this.p.y - y);
+    this.shake = Math.max(this.shake || 0, clamp((o.small ? 0.28 : 0.7) * (1 - d / 16), 0, 0.7));
+    this.boomFlash = Math.max(this.boomFlash || 0, clamp(1 - d / 13, 0, 1) * (o.small ? 0.22 : 0.5));
+  }
+  seekSteer(b, dt) {
+    if (!b.tg || b.tg.hp <= 0 || (b.reT = (b.reT || 0) - dt) <= 0) { b.reT = 0.25; b.tg = null; let bd = 14; for (const f of this.foes) if (f.hp > 0) { const d = Math.hypot(f.x - b.x, f.y - b.y); if (d < bd) { bd = d; b.tg = f; } } }
+    const f = b.tg;
+    if (!f) return;
+    const sp = Math.hypot(b.vx, b.vy, b.vz) || 1, tx = f.x - b.x, ty = f.y - b.y, tz = f.z + f.ht * 0.55 - b.z, l = Math.hypot(tx, ty, tz) || 1, k = Math.min(1, dt * b.A.seek);
+    b.vx += ((tx / l) * sp - b.vx) * k; b.vy += ((ty / l) * sp - b.vy) * k; b.vz += ((tz / l) * sp - b.vz) * k;
   }
   expire(b) {
-    if (b.k === 'hive' || b.k === 'squid' || b.k === 'relic') this.impact(b, b.x, b.y, b.z, null, null);
+    if (b.k === 'hive' || b.k === 'squid' || b.k === 'relic' || b.k === 'rocket' || b.k === 'grenade') this.impact(b, b.x, b.y, b.z, null, null);
     else if (b.k === 'marble') { this.makeHole(b, b.x, b.y, b.z); b.life = 3.2; }
     else if (b.k === 'skull') this.skullOut = null;
   }
@@ -847,16 +1075,90 @@ export class HellMaze extends Game {
   }
   killFoe(f, dmg, ux, uy, kind) {
     this.kills++; this.score += Math.round(f.max) + (f.boss ? 500 : 0);
-    const g = this.goreOf(f.m), gib = !f.boss && (dmg > f.max * 0.55 || kind === 'relic' || kind === 'hole' || kind === 'ink' || this.rng() < 0.3);
-    this.spray(f.x, f.y, f.z + f.ht * 0.5, ux, uy, g, gib ? 70 : 34, true);
-    const n = gib ? this.ri(9, 14) : this.ri(2, 4);
-    for (let i = 0; i < n; i++) this.gibs.push({ x: f.x, y: f.y, z: f.z + f.ht * this.r(0.3, 0.8), vx: ux * 2.5 + this.r(-3.5, 3.5), vy: uy * 2.5 + this.r(-3.5, 3.5), vz: this.r(2, 7.5), k: this.ri(0, 5), g, life: 25, sec: f.sec, spin: this.r(-12, 12), s: this.r(0.28, 0.45) * (f.heavy ? 1.4 : 1) });
-    if (this.gibs.length > 60) this.gibs.splice(0, this.gibs.length - 60);
-    this.pool(f.x, f.y, f.z, g, (gib ? 1.9 : 1.3) * (f.heavy ? 1.4 : 1));
-    for (let k = 0; k < (gib ? 4 : 2); k++) { const a = this.r(0, TAU); this.wallSplat(f.x, f.y, f.z + f.ht * this.r(0.2, 0.9), Math.cos(a), Math.sin(a), g, this.r(0.6, 1.2), 3.5); }
-    f.gone = gib; f.dieT = this.t;
-    if (f.boss) this.say(`${f.name.toUpperCase()} IS DEAD`, 3);
+    const g = this.goreOf(f.m), gib = !f.boss && (dmg > f.max * 0.45 || ['relic', 'hole', 'ink'].includes(kind) || this.rng() < 0.35);
+    f.dieT = this.t;
+    if (gib) { this.gib(f, ux, uy); return; }
+    // it drops, bleeding: a spray, a few pieces, a spreading pool, and it keeps pumping for a moment
+    this.spray(f.x, f.y, f.z + f.ht * 0.5, ux, uy, g, 48, true);
+    for (let i = 0, n = this.ri(3, 5); i < n; i++) this.gibs.push({ x: f.x, y: f.y, z: f.z + f.ht * this.r(0.3, 0.8), vx: ux * 2.5 + this.r(-3, 3), vy: uy * 2.5 + this.r(-3, 3), vz: this.r(2, 6.5), k: this.ri(0, 5), g, life: 25, sec: f.sec, spin: this.r(-12, 12), s: this.r(0.26, 0.42) * (f.heavy ? 1.4 : 1) });
+    this.pool(f.x, f.y, f.z, g, 1.6 * (f.heavy ? 1.4 : 1));
+    for (let k = 0; k < 3; k++) { const a = this.r(0, TAU); this.wallSplat(f.x, f.y, f.z + f.ht * this.r(0.2, 0.9), Math.cos(a), Math.sin(a), g, this.r(0.6, 1.2), 3.5); }
+    f.spurt = this.t + 1.8;
+    if (f.boss) { this.say(`${f.name.toUpperCase()} IS DEAD`, 3); this.explode(f.x, f.y, f.z + f.ht * 0.4, 3.4, 0, {}); for (let k = 0; k < 3; k++) this.later(0.25 + k * 0.3, () => { this.explode(f.x + this.r(-1, 1), f.y + this.r(-1, 1), f.z + f.ht * this.r(0.2, 0.8), 2, 0, { small: true }); this.spray(f.x, f.y, f.z + f.ht * 0.6, 0, 0, g, 40, true); }); }
   }
+  // blown apart: a burst of red, many pieces flung wide, a great pool, splashes on every wall near
+  gib(f, ux, uy) {
+    const g = this.goreOf(f.m), l = Math.hypot(ux, uy) || 1;
+    ux /= l; uy /= l;
+    this.spray(f.x, f.y, f.z + f.ht * 0.5, ux, uy, g, 90, true);
+    this.puff(f.x, f.y, f.z + f.ht * 0.5, g.blood, 26, 3);
+    for (let i = 0, n = Math.round(this.ri(14, 22) * (f.heavy ? 1.4 : 1)); i < n; i++) this.gibs.push({ x: f.x, y: f.y, z: f.z + f.ht * this.r(0.2, 0.9), vx: ux * 3 + this.r(-4.5, 4.5), vy: uy * 3 + this.r(-4.5, 4.5), vz: this.r(2.5, 9.5), k: this.ri(0, 5), g, life: 28, sec: f.sec, spin: this.r(-14, 14), s: this.r(0.26, 0.5) * (f.heavy ? 1.5 : 1) });
+    if (this.gibs.length > 110) this.gibs.splice(0, this.gibs.length - 110);
+    this.pool(f.x, f.y, f.z, g, 2.3 * (f.heavy ? 1.5 : 1));
+    for (let k = 0; k < 7; k++) { const a = this.r(0, TAU); this.wallSplat(f.x, f.y, f.z + f.ht * this.r(0.1, 1), Math.cos(a), Math.sin(a), g, this.r(0.7, 1.5), 4); }
+    f.gone = true;
+  }
+  later(s, fn) { (this.pending ||= []).push({ at: this.t + s, fn }); }
+  // a crate (or a stack, or a pair): a voxel block with a slab to bump into
+  addCrate(x0, y0, z0, w, h) {
+    const n = Math.round(1 / VX), C = { x0, y0, z0, nx: n * w, ny: n, nz: n * h, dirty: true, id: this.vox.crates.length };
+    C.vox = new Uint8Array(C.nx * C.ny * C.nz).fill(1); C.left = C.vox.length;
+    C.sl = { poly: box(x0, y0, x0 + w, y0 + 1), b: z0, t: z0 + h, tex: 'plank', light: 0.8, crate: C };
+    this.wd.addSlab(C.sl); this.vox.crates.push(C);
+  }
+  // chew the voxels near a point: a shot takes the face it hits, a blast a ball of them
+  carve(x, y, z, rad, hit, boom) {
+    if (!this.vox) return;
+    const rub = [];
+    for (const P of this.vox.panels) {
+      const e = P.e, rx = x - e.ax, ry = y - e.ay, u = rx * e.ux + ry * e.uy, wn = rx * e.nx + ry * e.ny;
+      if (u < -rad || u > e.len + rad || wn > rad + 0.08 || wn < -VD * VX - rad || z < P.z0 - rad || z > P.z0 + P.rows * VX + rad) continue;
+      const c0 = Math.max(0, Math.floor((u - rad) / P.du)), c1 = Math.min(P.cols - 1, Math.floor((u + rad) / P.du)), r0 = Math.max(0, Math.floor((z - P.z0 - rad) / VX)), r1 = Math.min(P.rows - 1, Math.floor((z - P.z0 + rad) / VX));
+      let hitAny = false;
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+        const dd = Math.hypot((c + 0.5) * P.du - u, P.z0 + (r + 0.5) * VX - z);
+        if (dd > rad + VX * 0.45) continue;
+        for (let d = 0; d < VD; d++) {
+          const i = (d * P.rows + r) * P.cols + c;
+          if (!P.vox[i]) continue;
+          if (boom && Math.hypot(dd, -(d + 0.5) * VX - wn) > rad * (0.8 + this.rng() * 0.35)) break;
+          P.vox[i] = 0; hitAny = true;
+          if (rub.length < 14) rub.push([e.ax + e.ux * (c + 0.5) * P.du + e.nx * 0.15, e.ay + e.uy * (c + 0.5) * P.du + e.ny * 0.15, P.z0 + (r + 0.5) * VX, e.nx, e.ny]);
+          if (!boom) break;
+        }
+      }
+      if (hitAny) P.dirty = true;
+    }
+    for (const C of this.vox.crates) {
+      if (C.gone || x < C.x0 - rad - 0.2 || x > C.x0 + C.nx * VX + rad + 0.2 || y < C.y0 - rad - 0.2 || y > C.y0 + C.ny * VX + rad + 0.2 || z < C.z0 - rad || z > C.z0 + C.nz * VX + rad) continue;
+      const rr = boom ? rad : rad + VX * 0.7;
+      for (let k = 0; k < C.nz; k++) for (let j = 0; j < C.ny; j++) for (let i = 0; i < C.nx; i++) {
+        const q = (k * C.ny + j) * C.nx + i;
+        if (!C.vox[q]) continue;
+        const vx = C.x0 + (i + 0.5) * VX, vy = C.y0 + (j + 0.5) * VX, vz = C.z0 + (k + 0.5) * VX;
+        if (Math.hypot(vx - x, vy - y, vz - z) > rr * (boom ? 0.8 + this.rng() * 0.35 : 1)) continue;
+        C.vox[q] = 0; C.left--; C.dirty = true;
+        if (rub.length < 16) rub.push([vx, vy, vz, vx - x, vy - y, true]);
+      }
+      // too little left to stand: it collapses into planks and splinters
+      if (C.left < C.vox.length * 0.35) { C.gone = true; C.sl.t = C.sl.b = -99; for (let q = 0; q < 6; q++) rub.push([C.x0 + this.r(0, C.nx * VX), C.y0 + this.r(0, C.ny * VX), C.z0 + this.r(0, C.nz * VX), this.r(-1, 1), this.r(-1, 1), true]); }
+    }
+    // the rubble flies, the dust hangs
+    for (const [rx, ry, rz, ux, uy, wood] of rub) {
+      this.gibs.push({ x: rx, y: ry, z: rz, vx: ux * this.r(1, 3.5) + this.r(-1.2, 1.2), vy: uy * this.r(1, 3.5) + this.r(-1.2, 1.2), vz: this.r(0.5, boom ? 5 : 2.5), k: this.ri(0, 5), g: wood ? this.splinterG() : this.rubbleG, life: 14, sec: this.wd.sAt(rx, ry, null), spin: this.r(-10, 10), s: this.r(0.12, 0.22) });
+      if (this.rng() < 0.5) this.puff(rx, ry, rz, mixc(this.rubbleG.blood, [0.5, 0.48, 0.45], 0.4), 3, 1.2);
+    }
+    if (this.gibs.length > 140) this.gibs.splice(0, this.gibs.length - 140);
+    if (rub.length) { const before = this.decals.length; this.decals = this.decals.filter((d) => !d.wall || Math.hypot(d.x - x, d.y - y, d.z - z) > rad + 0.15); if (this.decals.length !== before) this.decalDirty = true; }
+  }
+  splinterG() { return (this.splG ||= { blood: [0.16, 0.1, 0.06], glow: null, art: Array.from({ length: 6 }, (_, k) => pc(7, 4, (x) => { rect(x, k % 2 ? '#7a5228' : '#5a3a1c', 0, 1, 6 - (k % 3), 2); rect(x, '#a8743c', 0, 1, 3, 1); })) }); }
+  // a barrel is hit: it goes up a moment later, and takes its neighbours with it
+  barrelHit(bar, dmg) {
+    if (bar.gone || (bar.hp -= dmg) > 0) { if (!bar.gone) bar.hitT = this.t; return; }
+    bar.gone = true;
+    this.later(0.12 + this.rng() * 0.12, () => { bar.sl.t = bar.sl.b = -99; this.explode(bar.x, bar.y, bar.z + 0.5, 3.2, 75, {}); this.score += 15; });
+  }
+  barrelsNear(x, y, z, rad) { for (const bar of this.barrels || []) if (!bar.gone && Math.hypot(bar.x - x, bar.y - y) < rad * 0.9 && Math.abs(bar.z - z) < rad) this.barrelHit(bar, 99); }
   bloodCol(g) { return g.party ? [this.rng(), this.rng(), this.rng()] : g.glow && this.rng() < 0.45 ? g.glow : mixc(g.blood, [0, 0, 0], this.rng() * 0.35); }
   spray(x, y, z, ux, uy, g, n, wide) {
     const fl = this.wd.floorAt(x, y, z, this.wd.sAt(x, y, null));
@@ -864,7 +1166,7 @@ export class HellMaze extends Game {
       const sp = this.r(1, 5.5), w = wide ? 3 : 1.6;
       this.gore.push({ x, y, z, vx: ux * sp + this.r(-w, w), vy: uy * sp + this.r(-w, w), vz: this.r(0, 4.5), c: this.bloodCol(g), glow: !!g.glow && this.rng() < 0.5, life: this.r(0.8, 2.2), fl, g });
     }
-    if (this.gore.length > 480) this.gore.splice(0, this.gore.length - 480);
+    if (this.gore.length > 720) this.gore.splice(0, this.gore.length - 720);
   }
   puff(x, y, z, c, n, sp, glow) { for (let i = 0; i < n; i++) this.gore.push({ x, y, z, vx: this.r(-sp, sp), vy: this.r(-sp, sp), vz: this.r(-sp * 0.3, sp), c, glow: !!glow, life: this.r(0.3, 0.8), fl: z - 3, air: true }); }
   wallSplat(x, y, z, ux, uy, g, s, range = 3) {
@@ -875,12 +1177,12 @@ export class HellMaze extends Game {
     let nx = 0, ny = 0;
     if (hit) { nx = hit.e.nx; ny = hit.e.ny; const vx = x - (hit.e.ax + hit.e.bx) / 2, vy = y - (hit.e.ay + hit.e.by) / 2; if (hit.e.slab ? vx * nx + vy * ny < 0 : false) { nx = -nx; ny = -ny; } }
     this.decals.push({ x, y, z: hit ? z : this.wd.floorAt(x, y, z + 0.3, this.wd.sAt(x, y, null)) + 0.02, nx, ny, wall: !!hit, s, c, k: this.ri(0, 3), rot: this.r(0, TAU), glow });
-    if (this.decals.length > 150) this.decals.shift();
+    if (this.decals.length > 240) this.decals.shift();
     this.decalDirty = true;
   }
   pool(x, y, z, g, s) {
     const d = { x, y, z: this.wd.floorAt(x, y, z + 0.3, this.wd.sAt(x, y, null)) + 0.015, nx: 0, ny: 0, wall: false, s: 0.2, to: s, c: mixc(g.blood, [0, 0, 0], 0.25), k: this.ri(0, 3), rot: this.r(0, TAU), glow: !!g.glow };
-    this.decals.push(d); if (this.decals.length > 150) this.decals.shift(); this.decalDirty = true;
+    this.decals.push(d); if (this.decals.length > 240) this.decals.shift(); this.decalDirty = true;
   }
   hitPlayer(d) {
     if (this.dead > 0) return;
@@ -906,7 +1208,7 @@ export class HellMaze extends Game {
     let best = 0, bs = -1;
     this.arms.forEach((A, i) => {
       if (!this.canUse(i)) return;
-      const big = f?.heavy || f?.boss, s = { tooth: 1, chicken: d < 5 ? 6 : 1.5, hive: d > 3 ? 4 + (big ? 2 : 0) : 0.5, flail: d < 11 ? 4.5 : 1, squid: d > 2.5 && d < 11 ? 4 : 1, fork: d < 15 ? 5 : 1, marble: d > 5 && big ? 7 : d > 5 ? 2.5 : 0, relic: d > 3.5 ? 5 + (big ? 1 : 0) : 0.3 }[A.k] + ((i * 7 + this.level * 3) % 5) * 0.2;
+      const big = f?.heavy || f?.boss, s = { pistol: 1.2, shotgun: d < 6 ? 6.5 : 1.3, nailgun: d < 14 ? 4 : 1.5, rocket: d > 4 ? 5.5 + (big ? 2 : 0) : 0.2, grenade: d > 3 && d < 11 ? 4.6 + (big ? 1 : 0) : 0.3, plasma: d < 14 ? 4.8 : 1.6, tooth: 1, chicken: d < 5 ? 6 : 1.5, hive: d > 3 ? 4 + (big ? 2 : 0) : 0.5, flail: d < 11 ? 4.5 : 1, squid: d > 2.5 && d < 11 ? 4 : 1, fork: d < 15 ? 5 : 1, marble: d > 5 && big ? 7 : d > 5 ? 2.5 : 0, relic: d > 3.5 ? 5 + (big ? 1 : 0) : 0.3 }[A.k] + ((i * 7 + this.level * 3) % 5) * 0.2;
       if (s > bs) { bs = s; best = i; }
     });
     return best;
@@ -1014,10 +1316,13 @@ export class HellMaze extends Game {
       const seed = (kind.length * 131 + lv * 17 + tint[0] * 999) | 0, hsh = (a, b) => ((((a * 73856093) ^ (b * 19349663) ^ seed) >>> 0) % 997) / 997;
       const paint = () => {
         const px = photoPx(photo), x = cv.getContext('2d'), im = x.createImageData(64, 64), d = im.data, pat = PAT[kind];
+        const streaks = kind !== 'liquid' && kind !== 'ceil';
         for (let y = 0; y < 64; y++) for (let xx = 0; xx < 64; xx++) {
           const i = (y * 64 + xx) * 4, L = px ? (px[i] * 0.3 + px[i + 1] * 0.55 + px[i + 2] * 0.15) / 255 : 0.42 + hsh(xx >> 2, y >> 2) * 0.22;
-          const v = (0.52 + 0.55 * L) * pat(xx, y, hsh), b = (BAYER[(y & 3) * 4 + (xx & 3)] / 16 - 0.5) * 0.09;
-          for (let c = 0; c < 3; c++) d[i + c] = clamp(Math.round((tint[c] * v * 1.45 + b) * 7) / 7, 0, 1) * 255;
+          // grime: big blotches, fine grit, and dark streaks run down from the joints (rust, soot, old blood)
+          const blot = 0.8 + 0.3 * hsh(xx >> 4, y >> 4) * (0.6 + 0.4 * hsh((xx + 7) >> 3, (y + 3) >> 3)), run = streaks && hsh(xx >> 1, 33) > 0.84 && y > hsh(xx >> 1, 34) * 40 ? 0.74 : 1;
+          const v = (0.5 + 0.55 * L) * pat(xx, y, hsh) * blot * run, b = (BAYER[(y & 3) * 4 + (xx & 3)] / 16 - 0.5) * 0.1;
+          for (let c = 0; c < 3; c++) d[i + c] = clamp(Math.round((tint[c] * v * 1.45 + b) * 6) / 6, 0, 1) * 255;
           d[i + 3] = 255;
         }
         x.putImageData(im, 0, 0); over?.(x); t.needsUpdate = true;
@@ -1026,7 +1331,7 @@ export class HellMaze extends Game {
       if (photo && !ready(photo)) photo.addEventListener?.('load', paint, { once: true });
       return t;
     };
-    const Wt = M.wall, F = M.floor, grey = [0.56, 0.57, 0.6];
+    const Wt = M.wall, F = M.floor, grey = M.metal || [0.42, 0.4, 0.38];
     gl.kit = {
       wall0: mk('brick', Wt[0], ph(1)), wall1: mk('stone', Wt[1], ph(2)), wall2: mk('panel', Wt[2], tiles[lv % tiles.length]), metal: mk('panel', mixc(grey, Wt[2], 0.3), ph(3)),
       floor0: mk('tile', F, ph(4)), tile: mk('tile', mixc(F, [0.95, 0.82, 0.6], 0.45), ph(4)), rock: mk('rock', mixc(F, [0.42, 0.46, 0.3], 0.5), ph(5)), grate: mk('grate', mixc(grey, F, 0.35), ph(6)),
@@ -1040,17 +1345,17 @@ export class HellMaze extends Game {
     if (!live.includes(this)) live.push(this);
     const sc = new T.Scene(), fog = this.rgbC(this.mood.fog);
     const gl = (this.gl = { scene: sc, textures: [], tex: new Map(), spr: new Map(), frame: 0 });
-    sc.fog = new T.Fog(fog, 3, 34); sc.background = fog;
+    sc.fog = new T.Fog(fog, 2, 27); sc.background = fog;
     gl.cam = new T.PerspectiveCamera(72, RW / RH, 0.05, 200);
     this.paintKit(gl); this.buildWorld(gl); this.buildSky(gl);
     const pts = (add) => {
-      const N = 640, g = new T.BufferGeometry(), pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+      const N = 900, g = new T.BufferGeometry(), pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
       g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3)); g.setDrawRange(0, 0);
       const m = new T.Points(g, new T.PointsMaterial({ size: add ? 0.1 : 0.08, vertexColors: true, sizeAttenuation: true, transparent: add, blending: add ? T.AdditiveBlending : T.NormalBlending, depthWrite: !add }));
       m.frustumCulled = false; sc.add(m); return { g, pos, col, N };
     };
     gl.gore = pts(false); gl.glow = pts(true);
-    const D = 150, dg = new T.BufferGeometry(), idx = new Uint16Array(D * 6);
+    const D = 240, dg = new T.BufferGeometry(), idx = new Uint16Array(D * 6);
     for (let i = 0; i < D; i++) idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6);
     gl.dec = { g: dg, pos: new Float32Array(D * 12), uv: new Float32Array(D * 8), col: new Float32Array(D * 12), D };
     dg.setAttribute('position', new T.BufferAttribute(gl.dec.pos, 3)); dg.setAttribute('uv', new T.BufferAttribute(gl.dec.uv, 2)); dg.setAttribute('color', new T.BufferAttribute(gl.dec.col, 3)); dg.setIndex(new T.BufferAttribute(idx, 1)); dg.setDrawRange(0, 0);
@@ -1074,7 +1379,7 @@ export class HellMaze extends Game {
     };
     const V2 = (P) => P.map(([x, y]) => new T.Vector2(x, y)), glowLiq = M.liq === 'lava' || M.liq === 'slime';
     for (const s of wd.secs) {
-      const L = s.light, all = [...s.poly, ...s.holes.flat()], fb = bk(s.liq ? 'liquid' : s.tex.floor), cb = bk(s.tex.ceil), lf = s.liq && glowLiq ? 1.2 : L, ts = s.liq ? 3 : TS;
+      const L = s.light * 0.8, all = [...s.poly, ...s.holes.flat()], fb = bk(s.liq ? 'liquid' : s.tex.floor), cb = bk(s.tex.ceil), lf = s.liq && glowLiq ? 1.2 : L, ts = s.liq ? 3 : TS;
       for (const [i, j, k] of T.ShapeUtils.triangulateShape(V2(s.poly), s.holes.map(V2))) {
         const Fv = (q) => { const [x, y] = all[q]; return [x, fz(s, x, y), y, x / ts, y / ts, lf]; }, Cv = (q) => { const [x, y] = all[q]; return [x, cz(s, x, y), y, x / TS, y / TS, L * 0.8]; };
         tri(fb, Fv(i), Fv(j), Fv(k), [0, 1, 0]);
@@ -1082,6 +1387,11 @@ export class HellMaze extends Game {
       }
       for (const e of s.edges) {
         const fa = fz(s, e.ax, e.ay), fb2 = fz(s, e.bx, e.by), ca = cz(s, e.ax, e.ay), cb2 = cz(s, e.bx, e.by), o = e.o;
+        if (!o && e.panel) {
+          const P = e.panel, zt = P.z0 + P.rows * VX, back = VD * VX, e2 = { ...e, ax: e.ax - e.nx * back, ay: e.ay - e.ny * back, bx: e.bx - e.nx * back, by: e.by - e.ny * back };
+          wall(bk(s.tex.wall), e, zt, zt, ca, cb2, L); wall(bk('rock'), e2, fa, fb2, zt, zt, L * 0.55);
+          continue;
+        }
         if (!o) { wall(bk(s.tex.wall), e, fa, fb2, ca, cb2, L); continue; }
         const ofa = fz(o, e.ax, e.ay), ofb = fz(o, e.bx, e.by), oca = cz(o, e.ax, e.ay), ocb = cz(o, e.bx, e.by);
         if (ofa > fa + 0.001 || ofb > fb2 + 0.001) wall(bk(o.tex.riser || s.tex.wall), e, fa, fb2, Math.min(ofa, ca), Math.min(ofb, cb2), L, !!o.tex.riser);
@@ -1089,7 +1399,7 @@ export class HellMaze extends Game {
       }
     }
     for (const sl of wd.slabs) {
-      const b = sl.door ? (sl.geo = { p: [], u: [], c: [] }) : bk(sl.tex), L = sl.light, P = sl.poly, b0 = sl.b0 ?? sl.b, t0 = sl.t0 ?? sl.t;
+      const b = sl.door ? (sl.geo = { p: [], u: [], c: [] }) : bk(sl.tex), L = sl.light * 0.8, P = sl.poly, b0 = sl.b0 ?? sl.b, t0 = sl.t0 ?? sl.t;
       for (const [i, j, k] of T.ShapeUtils.triangulateShape(V2(P), [])) {
         const Q = (q, z, l) => [P[q][0], z, P[q][1], P[q][0] / TS, P[q][1] / TS, l];
         tri(b, Q(i, t0, L), Q(j, t0, L), Q(k, t0, L), [0, 1, 0]); tri(b, Q(i, b0, L * 0.6), Q(j, b0, L * 0.6), Q(k, b0, L * 0.6), [0, -1, 0]);
@@ -1106,6 +1416,85 @@ export class HellMaze extends Game {
     };
     for (const [k, b] of B) mesh(b, gl.kit[k] || gl.kit.wall0);
     gl.doors = wd.doors.map((sl) => ({ sl, m: mesh(sl.geo, gl.kit[sl.tex] || gl.kit.door) }));
+    this.buildPools(gl);
+    this.buildVox(gl);
+  }
+  // the voxel skin and the crates as meshes of their exposed faces, rebuilt when they are chewed
+  buildVox(gl) {
+    gl.vox = new Map(); gl.voxMat = new Map();
+    for (const P of this.vox?.panels || []) { P.dirty = true; this.voxMesh(gl, P); }
+    for (const C of this.vox?.crates || []) { C.dirty = true; this.voxMesh(gl, C); }
+  }
+  voxMesh(gl, O) {
+    O.dirty = false;
+    const crate = !!O.nx, tex = crate ? 'plank' : O.tex, geo = crate ? this.crateGeo(O) : this.panelGeo(O);
+    let mt = gl.voxMat.get(tex);
+    if (!mt) { mt = new T.MeshBasicMaterial({ map: gl.kit[tex] || gl.kit.wall0, vertexColors: true, side: T.DoubleSide }); gl.voxMat.set(tex, mt); }
+    let m = gl.vox.get(O);
+    if (!geo) { if (m) { gl.scene.remove(m); m.geometry.dispose(); gl.vox.delete(O); } return; }
+    if (!m) { m = new T.Mesh(geo, mt); gl.scene.add(m); gl.vox.set(O, m); } else { m.geometry.dispose(); m.geometry = geo; }
+  }
+  geoOf(pos, uv, col) {
+    if (!pos.length) return null;
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new T.Float32BufferAttribute(col, 3));
+    return g;
+  }
+  panelGeo(P) {
+    const e = P.e, L = P.s.light * 0.8, pos = [], uv = [], col = [], Rr = P.rows, Cc = P.cols, u0 = (e.ax * e.ux + e.ay * e.uy) / TS;
+    const has = (c, r, d) => c >= 0 && c < Cc && r >= 0 && r < Rr && d >= 0 && d < VD && P.vox[(d * Rr + r) * Cc + c];
+    const at = (u, z, w) => [e.ax + e.ux * u - e.nx * w, P.z0 + z, e.ay + e.uy * u - e.ny * w], tu = (q) => u0 + q / TS, tv = (q) => (P.z0 + q) / TS;
+    const quad = (A, B, C2, D, ta, tb, tc, td, k) => { for (const [q, t2] of [[A, ta], [B, tb], [C2, tc], [A, ta], [C2, tc], [D, td]]) { pos.push(q[0], q[1], q[2]); uv.push(t2[0], t2[1]); col.push(k, k * 0.95, k * 0.88); } };
+    for (let d = 0; d < VD; d++) for (let r = 0; r < Rr; r++) for (let c = 0; c < Cc; c++) {
+      if (!P.vox[(d * Rr + r) * Cc + c]) continue;
+      const u = c * P.du, U = u + P.du, z = r * VX, Z = z + VX, w = d * VX, Wd = w + VX, j = (0.95 + 0.07 * (((c * 7 + r * 13 + d * 5) % 7) / 7)) * L * (d ? 0.7 : 1);
+      if (!has(c, r, d - 1)) quad(at(u, z, w), at(U, z, w), at(U, Z, w), at(u, Z, w), [tu(u), tv(z)], [tu(U), tv(z)], [tu(U), tv(Z)], [tu(u), tv(Z)], j);
+      if (r < Rr - 1 && !has(c, r + 1, d)) quad(at(u, Z, w), at(U, Z, w), at(U, Z, Wd), at(u, Z, Wd), [tu(u), tv(Z)], [tu(U), tv(Z)], [tu(U), tv(Z + VX)], [tu(u), tv(Z + VX)], j * 0.86);
+      if (r > 0 && !has(c, r - 1, d)) quad(at(u, z, w), at(U, z, w), at(U, z, Wd), at(u, z, Wd), [tu(u), tv(z)], [tu(U), tv(z)], [tu(U), tv(z - VX)], [tu(u), tv(z - VX)], j * 0.48);
+      if (c > 0 && !has(c - 1, r, d)) quad(at(u, z, w), at(u, z, Wd), at(u, Z, Wd), at(u, Z, w), [tu(u), tv(z)], [tu(u + VX), tv(z)], [tu(u + VX), tv(Z)], [tu(u), tv(Z)], j * 0.66);
+      if (c < Cc - 1 && !has(c + 1, r, d)) quad(at(U, z, w), at(U, z, Wd), at(U, Z, Wd), at(U, Z, w), [tu(U), tv(z)], [tu(U + VX), tv(z)], [tu(U + VX), tv(Z)], [tu(U), tv(Z)], j * 0.66);
+    }
+    return this.geoOf(pos, uv, col);
+  }
+  crateGeo(C) {
+    if (C.gone) return null;
+    const L = (this.wd.sAt(C.x0 + 0.5, C.y0 + 0.5, null)?.light ?? 0.8) * 0.85, pos = [], uv = [], col = [], n = Math.round(1 / VX);
+    const has = (i, j, k) => i >= 0 && i < C.nx && j >= 0 && j < C.ny && k >= 0 && k < C.nz && C.vox[(k * C.ny + j) * C.nx + i];
+    const at = (i, j, k) => [C.x0 + i * VX, C.z0 + k * VX, C.y0 + j * VX];
+    const quad = (A, B, C2, D, k) => { const t2 = [[0, 0], [0.125, 0], [0.125, 0.125], [0, 0.125]].map(([a, b]) => [a + A[0] * 0.5, b + A[1] * 0.5 + A[2] * 0.5]); for (const [q, t] of [[A, t2[0]], [B, t2[1]], [C2, t2[2]], [A, t2[0]], [C2, t2[2]], [D, t2[3]]]) { pos.push(q[0], q[1], q[2]); uv.push(t[0], t[1]); col.push(k, k * 0.92, k * 0.82); } };
+    for (let k = 0; k < C.nz; k++) for (let j = 0; j < C.ny; j++) for (let i = 0; i < C.nx; i++) {
+      if (!has(i, j, k)) continue;
+      // the frame of each crate is darker than its boards
+      const frame = (i % n === 0 || i % n === n - 1 ? 1 : 0) + (k % n === 0 || k % n === n - 1 ? 1 : 0) + (j === 0 || j === C.ny - 1 ? 1 : 0) >= 2, b = L * (frame ? 0.62 : 1);
+      if (!has(i, j, k + 1)) quad(at(i, j, k + 1), at(i + 1, j, k + 1), at(i + 1, j + 1, k + 1), at(i, j + 1, k + 1), b);
+      if (!has(i, j, k - 1)) quad(at(i, j, k), at(i + 1, j, k), at(i + 1, j + 1, k), at(i, j + 1, k), b * 0.4);
+      if (!has(i - 1, j, k)) quad(at(i, j, k), at(i, j + 1, k), at(i, j + 1, k + 1), at(i, j, k + 1), b * 0.72);
+      if (!has(i + 1, j, k)) quad(at(i + 1, j, k), at(i + 1, j + 1, k), at(i + 1, j + 1, k + 1), at(i + 1, j, k + 1), b * 0.8);
+      if (!has(i, j - 1, k)) quad(at(i, j, k), at(i + 1, j, k), at(i + 1, j, k + 1), at(i, j, k + 1), b * 0.9);
+      if (!has(i, j + 1, k)) quad(at(i, j + 1, k), at(i + 1, j + 1, k), at(i + 1, j + 1, k + 1), at(i, j + 1, k + 1), b * 0.66);
+    }
+    return this.geoOf(pos, uv, col);
+  }
+  // torchlight: a warm pool on the floor under each torch and a glow on the wall it hangs on, added
+  // over the scene (they gutter: see sync)
+  buildPools(gl) {
+    const rad = pc(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,.42)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); });
+    const rt = new T.CanvasTexture(rad); gl.textures.push(rt);
+    const lamps = this.lamps || [], Q = lamps.length * 2, pos = new Float32Array(Q * 12), uv = new Float32Array(Q * 8), col = new Float32Array(Q * 12), idx = new Uint16Array(Q * 6);
+    lamps.forEach((l, k) => {
+      const fr = 3.6, wr = 1.7, z = (l.fz ?? l.z - 1.6) + 0.03, nx = l.nx || 0, ny = l.ny || 0, wx = l.x - nx * 0.27, wy = l.y - ny * 0.27, ax = -ny, ay = nx;
+      [[[l.x - fr, z, l.y - fr], [l.x + fr, z, l.y - fr], [l.x + fr, z, l.y + fr], [l.x - fr, z, l.y + fr]],
+        [[wx - ax * wr, l.z - wr, wy - ay * wr], [wx + ax * wr, l.z - wr, wy + ay * wr], [wx + ax * wr, l.z + wr, wy + ay * wr], [wx - ax * wr, l.z + wr, wy - ay * wr]]].forEach((q, j) => {
+        const b = k * 2 + j;
+        q.forEach((v, n) => pos.set(v, (b * 4 + n) * 3));
+        uv.set([0, 0, 1, 0, 1, 1, 0, 1], b * 8); idx.set([b * 4, b * 4 + 1, b * 4 + 2, b * 4, b * 4 + 2, b * 4 + 3], b * 6);
+      });
+    });
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('uv', new T.BufferAttribute(uv, 2)); g.setAttribute('color', new T.BufferAttribute(col, 3)); g.setIndex(new T.BufferAttribute(idx, 1));
+    const m = new T.Mesh(g, new T.MeshBasicMaterial({ map: rt, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
+    m.frustumCulled = false; m.renderOrder = 2; gl.scene.add(m);
+    gl.pools = { g, col, lamps };
   }
   buildSky(gl) {
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
@@ -1113,9 +1502,9 @@ export class HellMaze extends Game {
     const img = this.skin.bgSet?.[this.level % (this.skin.bgSet.length || 1)] || this.skin.bg, fog = this.mood.fog, ph = [this.r(0, 6), this.r(0, 6), this.r(0, 6)];
     const css = (v, k = 1) => `rgb(${v.map((q) => Math.round(clamp(q * k, 0, 1) * 255)).join(',')})`;
     const paint = () => {
-      const x = cv.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 72);
-      g.addColorStop(0, this.pal.bg2); g.addColorStop(1, this.col(this.level + 3)); x.fillStyle = g; x.fillRect(0, 0, 256, 128);
-      if (ready(img)) { x.globalAlpha = 0.85; x.drawImage(img, 0, 0, 128, 72); x.save(); x.translate(256, 0); x.scale(-1, 1); x.drawImage(img, 0, 0, 128, 72); x.restore(); x.globalAlpha = 1; }
+      const x = cv.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 72), sky = this.mood.sky || [this.pal.bg2, this.col(this.level + 3)];
+      g.addColorStop(0, sky[0]); g.addColorStop(1, sky[1]); x.fillStyle = g; x.fillRect(0, 0, 256, 128);
+      if (ready(img)) { x.globalAlpha = 0.35; x.drawImage(img, 0, 0, 128, 72); x.save(); x.translate(256, 0); x.scale(-1, 1); x.drawImage(img, 0, 0, 128, 72); x.restore(); x.globalAlpha = 1; }
       for (let layer = 0; layer < 2; layer++) {
         x.fillStyle = css(mixc(fog, rgb01(this.col(this.level + 2)), 0.3), layer ? 0.55 : 0.9);
         x.beginPath(); x.moveTo(0, 128);
@@ -1172,12 +1561,24 @@ export class HellMaze extends Game {
       else if (this.rng() < 0.4) this.gore.push({ x: g.x, y: g.y, z: g.z, vx: 0, vy: 0, vz: 0, c: this.bloodCol(g.g), glow: !!g.g.glow, life: 1, fl, g: g.g });
     }
     this.gibs = this.gibs.filter((g) => g.life > 0);
+    for (const b of this.booms) { b.t += dt; if (b.kind === 'smoke' && b.t > 0) { b.z += b.vz * dt; b.vz *= 1 - dt * 0.6; } }
+    this.booms = this.booms.filter((b) => b.t < b.life);
+    this.shake = Math.max(0, (this.shake || 0) - dt * 1.6); this.boomFlash = Math.max(0, (this.boomFlash || 0) - dt * 2.2);
     for (const d of this.drips) { d.y += d.v * dt; d.life -= dt; }
     this.drips = this.drips.filter((d) => d.life > 0);
     for (const d of this.decals) if (d.to && d.s < d.to) { d.s = Math.min(d.to, d.s + dt * 0.45); this.decalDirty = true; }
   }
   frameOf(f) {
     const m = f.m;
+    if (m.view) {
+      // the view of it from where you stand (Doom's eight rotations)
+      const d = viewDir(f.ang, Math.atan2(this.p.y - f.y, this.p.x - f.x));
+      if (f.hp <= 0) return m.view('dead', 0, d);
+      if (f.actT > 0) return m.view('attack', clamp(Math.floor((1 - f.actT / (f.act === 'bite' ? 0.5 : 0.65)) * 3), 0, 2), d);
+      if (f.hitT > 0) return m.view('hurt', 0, d);
+      if (f.moving) return m.view('walk', Math.floor(f.anim * (f.speed > 3.5 ? 9 : 6)) % 4, d);
+      return m.view('idle', Math.floor(f.anim * 2.4) % 2, d);
+    }
     if (f.hp <= 0) return m.dead || m.hurt || m.frames[0];
     if (f.actT > 0 && m.attack) return m.attack[clamp(Math.floor((1 - f.actT / (f.act === 'bite' ? 0.5 : 0.65)) * 3), 0, 2)];
     if (f.hitT > 0 && m.hurt) return m.hurt;
@@ -1188,20 +1589,34 @@ export class HellMaze extends Game {
     gl.frame++;
     const p = this.p, t = this.t, light = (s) => (s ? s.light : 0.8);
     // creature sheets are built lazily: touch one cycle per frame so the first fight does not hitch
-    if (!this.warm) { this.warm = true; this.warmList = [...this.crew.map((c) => c.m), ...this.foes.filter((f) => f.boss).map((f) => f.m)]; }
-    const wm = this.warmList.shift(); if (wm) { void wm.walk; void wm.attack; void wm.hurt; void wm.dead; void wm.anatomy; }
+    if (!this.warm) {
+      this.warm = true;
+      const ms = [...this.crew.map((c) => c.m), ...this.foes.filter((f) => f.boss).map((f) => f.m)];
+      this.warmList = ms.flatMap((m) => [() => m.anatomy, ...[0, 1, 2, 3, 4].flatMap((d) => [['idle', 0], ['idle', 1], ['walk', 0], ['walk', 1], ['walk', 2], ['walk', 3], ['attack', 0], ['attack', 1], ['attack', 2], ['hurt', 0], ['dead', 0]].map(([a, k]) => () => m.view(a, k, d)))]);
+    }
+    for (let k = 0; k < 2 && this.warmList.length; k++) this.warmList.shift()();
     if (t > 1 && !gl.refreshed && t < 8 && Math.floor(t) % 2 === 0) { for (const [cv, tx] of gl.tex) if (cv instanceof HTMLCanvasElement) tx.needsUpdate = true; gl.refreshed = Math.floor(t) >= 6; }
     for (const { sl, m } of gl.doors) m.position.y = sl.b - sl.b0;
+    if (this.vox) { let n = 4; for (const O of [...this.vox.panels, ...this.vox.crates]) if (O.dirty && n-- > 0) this.voxMesh(gl, O); }
+    if (gl.pools?.lamps.length) {
+      const L = this.mood.lamp || [1, 0.7, 0.4], c = gl.pools.col;
+      gl.pools.lamps.forEach((l, k) => {
+        const ph = this.lamps[k]?.ph || 0, f = 0.78 + 0.14 * Math.sin(t * 11 + ph) + 0.08 * Math.sin(t * 23.7 + ph * 2);
+        for (let j = 0; j < 2; j++) { const a = f * (j ? 0.5 : 0.34); for (let n = 0; n < 4; n++) c.set([L[0] * a, L[1] * a, L[2] * a], ((k * 2 + j) * 4 + n) * 3); }
+      });
+      gl.pools.g.attributes.color.needsUpdate = true;
+    }
     gl.kit.liquid.offset.set(t * 0.04, Math.sin(t * 0.7) * 0.06);
     this.pitch = (this.pitch || 0) + ((this.pitchT || 0) - (this.pitch || 0)) * Math.min(1, dt * 4);
     const sp = Math.min(1, Math.hypot(p.vx, p.vy) / 3), bob = Math.sin(p.bob * 2) * 0.035 * sp, eye = p.eye + bob, cam = gl.cam;
-    cam.position.set(p.x, eye, p.y); cam.lookAt(p.x + Math.cos(p.a), eye + this.pitch, p.y + Math.sin(p.a));
+    const sk = this.shake || 0, jx = (Math.random() - 0.5) * sk * 0.22, jy = (Math.random() - 0.5) * sk * 0.18;
+    cam.position.set(p.x + jx, eye + jy, p.y + jx * 0.5); cam.lookAt(p.x + Math.cos(p.a) + jx, eye + this.pitch + jy * 1.6, p.y + Math.sin(p.a));
     gl.sky.position.set(p.x, eye, p.y);
     for (const f of this.foes) {
       if (f.gone) continue;
       const im = this.frameOf(f), L = light(f.sec), dead = f.hp <= 0;
-      const col = f.hitT > 0 && !dead ? [1.6, 0.45, 0.4] : f.zapT > 0 ? [0.8, 1.1, 1.8] : f.blind > 0 ? [L * 0.5, L * 0.5, L * 0.75] : L * (f.boss ? 1.1 : 1);
-      this.put(gl, f, im, f.x, f.y, f.z - (dead ? 0.05 : 0) - f.size * 0.04, f.size, f.size, col, { flip: f.face < 0 });
+      const col = f.hitT > 0 && !dead ? [1.6, 0.45, 0.4] : f.zapT > 0 ? [0.8, 1.1, 1.8] : f.burnT > this.t && !dead ? [1.5, 0.75, 0.4] : f.blind > 0 ? [L * 0.5, L * 0.5, L * 0.75] : L * (f.boss ? 1.1 : 1);
+      this.put(gl, f, im, f.x, f.y, f.z - (dead ? 0.05 : 0) - f.size * 0.04, f.size, f.size, col, { flip: !f.m.view && f.face < 0 });
     }
     for (const it of this.items) {
       if (it.got) continue;
@@ -1209,12 +1624,17 @@ export class HellMaze extends Game {
       if (k === 'health' || k === 'armor') this.put(gl, it, this.art(k), it.x, it.y, it.z + bob, 0.55, k === 'armor' ? 0.64 : 0.43, L);
       else if (k === 'key') this.put(gl, it, this.art('key', this.mood.key[1]), it.x, it.y, it.z + bob + 0.2, 0.5, 0.33, 1.2);
       else {
-        const pi = { tooth: 'tooth', chicken: 'chicken', hive: 'hive', flail: 'skull', squid: 'squid', fork: 'fork', marble: 'marble', relic: 'relic' }[this.arms[it.w].k];
-        const png = k === 'ammo' ? this.ammoImg[it.w] : null, im = png && ready(png) ? png : this.art(pi), iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, h = k === 'gun' ? 0.75 : 0.5;
+        const Aw = this.arms[it.w], pi = Aw.gun ? null : { tooth: 'tooth', chicken: 'chicken', hive: 'hive', flail: 'skull', squid: 'squid', fork: 'fork', marble: 'marble', relic: 'relic' }[Aw.k];
+        const png = k === 'ammo' ? this.ammoImg[it.w] : null, im = png && ready(png) ? png : pi ? this.art(pi) : this.art('gunicon', Aw.k), iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, h = k === 'gun' ? (Aw.gun ? 0.4 : 0.75) : 0.5;
         this.put(gl, it, im, it.x, it.y, it.z + bob, (h * iw) / ih, h, k === 'gun' ? [L * 1.2, L * 1.1, L * 0.8] : L);
       }
     }
-    for (const d of this.deco) { if (!ready(d.img)) continue; const iw = d.img.naturalWidth || d.img.width, ih = d.img.naturalHeight || d.img.height; this.put(gl, d, d.img, d.x, d.y, d.z, (d.big * iw) / ih, d.big, light(d.sec)); }
+    for (const d of this.deco) {
+      if (d.kind === 'corpse') this.put(gl, d, d.m.view('dead', 0, d.dir), d.x, d.y, d.z - 0.06, 1.8, 1.8, light(d.sec) * 0.85);
+      else if (d.kind === 'candles') this.put(gl, d, this.art('candles', Math.floor(t * 6 + d.ph) % 2), d.x, d.y, d.z, 0.5, 0.58, 1.3);
+      else if (d.kind === 'skulls') this.put(gl, d, this.art('skulls'), d.x, d.y, d.z, 0.72, 0.5, light(d.sec));
+    }
+    for (const bar of this.barrels || []) if (!bar.gone) this.put(gl, bar, this.art('barrel', t - (bar.hitT ?? -9) < 0.12 ? 1 : 0), bar.x, bar.y, bar.z, 0.74, 0.95, light(bar.sec) * 1.05);
     for (const l of this.lamps) this.put(gl, l, this.art('torch', Math.floor(t * 8 + l.ph) % 2), l.x, l.y, l.z, 0.35, 0.7, 1.35);
     const E = this.exitPos;
     if (E) this.put(gl, E, this.art('exit'), E.x, E.y, E.z + 0.05, 1.3 + Math.sin(t * 4) * 0.08, 2.2, this.exitOK() ? [0.5, 1.4, 1] : [1.4, 0.35, 0.3], { add: true });
@@ -1223,7 +1643,18 @@ export class HellMaze extends Game {
       if (k === 'hole') this.put(gl, b, this.art('hole'), b.x, b.y, b.z, 1.7 + Math.sin(t * 9) * 0.15, 1.7, 1, { add: true, mid: true, rot: t * 6 });
       else if (k === 'spit') this.put(gl, b, this.art('ball', `rgb(${b.col.map((v) => Math.round(v * 255)).join(',')})`), b.x, b.y, b.z, b.r * 2.4, b.r * 2.4, 1.3, { mid: true });
       else if (k === 'relic') this.put(gl, b, ready(this.relicImg) ? this.relicImg : this.art('relic'), b.x, b.y, b.z, 0.45, 0.45, 1, { mid: true, rot: spin });
+      else if (k === 'plasma') this.put(gl, b, this.art('plasma'), b.x, b.y, b.z, 0.42, 0.42, 1, { add: true, mid: true });
+      else if (k === 'bullet' || k === 'pellet' || k === 'nail' || k === 'rocket' || k === 'grenade') {
+        const s = { bullet: [0.08, 0.2], pellet: [0.07, 0.07], nail: [0.3, 0.09], rocket: [0.5, 0.25], grenade: [0.26, 0.26] }[k], side = b.vx * -Math.sin(p.a) + b.vy * Math.cos(p.a);
+        this.put(gl, b, this.art(k), b.x, b.y, b.z, s[0], s[1], k === 'rocket' || k === 'grenade' ? light(b.sec) + 0.3 : 1.4, { mid: true, flip: side < 0, rot: k === 'grenade' ? spin : 0 });
+      }
       else { const s = { tooth: 0.16, chicken: 0.42, hive: 0.42, bee: 0.17, skull: 0.42, squid: 0.42, marble: 0.26 }[k] || 0.3; this.put(gl, b, this.art(k), b.x, b.y, b.z, s * (k === 'chicken' ? 1.3 : 1), s, 1, { mid: true, rot: k === 'bee' ? 0 : spin, flip: k === 'bee' && b.vx * -Math.sin(p.a) + b.vy * Math.cos(p.a) < 0 }); }
+    }
+    for (const b of this.booms) {
+      if (b.t < 0) continue;
+      const u = b.t / b.life;
+      if (b.kind === 'fire') this.put(gl, b, this.art('boom', Math.min(4, Math.floor(u * 5))), b.x, b.y, b.z, b.s * (0.7 + u * 0.7), b.s * (0.7 + u * 0.7), 1, { add: true, mid: true, rot: b.id });
+      else { const L = light(this.wd.sAt(b.x, b.y, null)) * 0.7 * (1 - u * 0.6); this.put(gl, b, this.art('smoke'), b.x, b.y, b.z, b.s * (0.8 + u * 1.4), b.s * (0.8 + u * 1.4), [L, L * 0.95, L * 0.9], { mid: true, rot: b.id * 0.7 + u }); }
     }
     for (const g of this.gibs) { const im = g.g.art[g.k]; this.put(gl, g, im, g.x, g.y, g.z, (g.s * im.width) / 8, (g.s * im.height) / 8, light(g.sec), { rot: g.rot }); }
     for (const [k, s] of gl.spr) if (s.f !== gl.frame) { gl.scene.remove(s); s.material.dispose(); gl.spr.delete(k); }
@@ -1289,7 +1720,8 @@ export class HellMaze extends Game {
     const mv = Math.min(1, Math.hypot(p.vx, p.vy) / 3), bx = Math.sin(p.bob) * 4 * mv, by = Math.abs(Math.cos(p.bob)) * 3 * mv + this.recoil * 8 + (this.dead > 0 ? 70 : 0);
     const R = (col, a, b, w, h) => { x.fillStyle = col; x.fillRect(Math.round(a + bx), Math.round(b + by), w, h); }, dark = '#1d1814', body = this.col(A.hue);
     let mz = [90, 40];
-    switch (A.k) {
+    if (A.gun) mz = this.gritGun(R, A, t);
+    else switch (A.k) {
       case 'tooth':
         R(dark, 80, 92, 20, 28); R('#e9dfc8', 82, 90, 16, 30); R('#d8ccb0', 76, 62, 28, 32); R(body, 76, 80, 28, 4); R('#b03a3a', 76, 62, 28, 4);
         for (let k = 0; k < 5; k++) R('#fbf6ea', 77 + k * 5, 55, 4, 8);
@@ -1336,12 +1768,36 @@ export class HellMaze extends Game {
         R('#7a5a20', 66, 44, 48, 76); R('#b8893a', 70, 48, 40, 72); R('#d8a95a', 74, 48, 6, 72); R('#7a5a20', 66, 70, 48, 5); R(body, 66, 96, 48, 5); R('#2a1e10', 72, 40, 36, 8);
         if (this.cool < 0.3 && ready(this.relicImg)) { const im = this.relicImg, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, s = 28 / Math.max(iw, ih); x.drawImage(im, 90 + bx - (iw * s) / 2, 40 + by - ih * s, iw * s, ih * s); }
     }
-    if (this.flash > 0 && A.k !== 'flail') { x.fillStyle = A.k === 'fork' ? '#9fd8ff' : '#ffe8a0'; x.beginPath(); x.arc(mz[0] + bx, mz[1] + by, 9 + Math.random() * 4, 0, TAU); x.fill(); x.fillStyle = '#fff'; x.beginPath(); x.arc(mz[0] + bx, mz[1] + by, 4, 0, TAU); x.fill(); }
+    if (this.flash > 0 && A.k !== 'flail') { x.fillStyle = A.k === 'fork' || A.k === 'plasma' ? '#9fd8ff' : '#ffe8a0'; x.beginPath(); x.arc(mz[0] + bx, mz[1] + by, 9 + Math.random() * 4, 0, TAU); x.fill(); x.fillStyle = '#fff'; x.beginPath(); x.arc(mz[0] + bx, mz[1] + by, 4, 0, TAU); x.fill(); }
     c.imageSmoothingEnabled = false; c.drawImage(vm, 0, VH - 240, 360, 240); c.imageSmoothingEnabled = true;
     c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(W / 2 - 6, VH / 2); c.lineTo(W / 2 + 6, VH / 2); c.moveTo(W / 2, VH / 2 - 6); c.lineTo(W / 2, VH / 2 + 6); c.stroke();
   }
+  // the gritty guns, built from parts in the weapon's own metal and wood, with what its affixes add
+  gritGun(R, A, t) {
+    const [m, hi, lo] = A.metal, wd = A.wood, firing = this.cool > A.rate * 0.6, k = A.k, af = A.affixes || [];
+    let mz = [90, 40];
+    if (k === 'pistol') { R(lo, 82, 92, 16, 28); R(wd, 84, 94, 12, 26); R(m, 78, 60, 24, 34); R(hi, 80, 60, 5, 34); R(lo, 98, 60, 4, 34); R(m, 82, 50, 16, 12); R(lo, 86, 46, 8, 6); R('#111', 88, 46, 4, 3); mz = [90, 46]; }
+    else if (k === 'shotgun') { for (const ox of [70, 92]) { R(lo, ox, 26, 18, 76); R(m, ox + 2, 26, 14, 76); R(hi, ox + 3, 26, 4, 76); R('#0c0a08', ox + 4, 22, 10, 6); } R(wd, 66, 70, 48, 18); R('#2a1a10', 66, 84, 48, 4); R(wd, 72, 98, 36, 22); mz = [90, 26]; }
+    else if (k === 'nailgun') { const sp = firing ? Math.floor(t * 40) % 4 : 0; R(lo, 64, 64, 52, 56); R(m, 66, 64, 48, 56); R(hi, 68, 66, 6, 52); for (let q = 0; q < 4; q++) { const ox = 70 + ((q + sp) % 4) * 10; R(lo, ox, 24, 8, 42); R(q % 2 ? m : hi, ox + 1, 24, 5, 42); R('#0c0a08', ox + 2, 22, 4, 4); } R(lo, 66, 60, 48, 6); mz = [90, 26]; }
+    else if (k === 'rocket') { R(lo, 62, 28, 56, 92); R(m, 64, 28, 52, 92); R(hi, 68, 28, 8, 92); R('#0a0808', 70, 26, 40, 10); R('#c83a20', 64, 70, 52, 5); R(lo, 112, 50, 10, 14); R(hi, 114, 52, 4, 4); mz = [90, 30]; }
+    else if (k === 'grenade') { R(lo, 64, 62, 52, 44); R(m, 66, 62, 48, 44); for (let q = 0; q < 3; q++) R('#14110e', 72 + q * 14, 72, 8, 8); R(hi, 68, 64, 4, 40); R(lo, 76, 34, 28, 30); R(m, 78, 34, 24, 30); R('#0c0a08', 80, 30, 20, 6); R(wd, 72, 104, 36, 16); mz = [90, 32]; }
+    else {
+      const g = 0.6 + 0.4 * Math.sin(t * 9);
+      R(lo, 66, 56, 48, 64); R(m, 68, 56, 44, 64); R(hi, 70, 58, 5, 60);
+      for (let q = 0; q < 3; q++) R(`rgba(120,220,255,${(0.5 + g * 0.4).toFixed(2)})`, 70, 66 + q * 14, 40, 4);
+      R(lo, 78, 32, 24, 26); R('#9fe8ff', 82, 30, 16, 6); R('#ffffff', 86, 31, 8, 3); mz = [90, 32];
+    }
+    // affixes on the metal: a hazard band, a glow along it, a spinning bit at the muzzle, a seeker's lamp
+    if (af.includes('explosive')) for (let q = 0; q < 5; q++) R(q % 2 ? '#e8c020' : '#161616', 70 + q * 8, 96, 8, 4);
+    if (af.includes('burn')) R(`rgba(255,${110 + Math.round(Math.sin(t * 13) * 40)},40,.85)`, 72, 100, 36, 3);
+    if (af.includes('drill')) { const s2 = Math.floor(t * 30) % 2; for (let q = 0; q < 4; q++) R('#c8ccd0', mz[0] - 4 + ((q + s2) % 2) * 4, mz[1] - 6 - q * 3, 4, 3); }
+    if (af.includes('seek')) R(Math.floor(t * 4) % 2 ? '#7aff5a' : '#2a6a20', 108, 62, 4, 4);
+    if (af.includes('leech')) R('#8a1020', 74, 92, 32, 3);
+    return mz;
+  }
   drawOverlay(c) {
     if (this.hurt > 0) { c.fillStyle = `rgba(190,10,10,${Math.min(0.4, this.hurt * 1.4)})`; c.fillRect(0, 0, W, VH); }
+    if (this.boomFlash > 0) { c.fillStyle = `rgba(255,150,60,${Math.min(0.35, this.boomFlash * 0.6)})`; c.fillRect(0, 0, W, VH); }
     for (const d of this.drips) { c.globalAlpha = Math.min(1, d.life) * 0.8; c.fillStyle = '#7a0608'; c.fillRect(d.x, d.y - d.l, d.w, d.l); c.beginPath(); c.arc(d.x + d.w / 2, d.y, d.w * 0.7, 0, TAU); c.fill(); }
     c.globalAlpha = 1;
     if (this.dead > 0) { c.fillStyle = `rgba(120,0,0,${clamp(0.75 - this.dead * 0.3, 0, 0.75)})`; c.fillRect(0, 0, W, VH); }
