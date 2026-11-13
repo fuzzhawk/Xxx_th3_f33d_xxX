@@ -46,7 +46,7 @@ const handleFor = (post, ctx) => {
     case 'news': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'news', `${ctx.topics?.news?.[post.sub] || 'News'}${post.date ? ` · ${post.date}` : ''}`];
     case 'oracle': return ['the.oracle', post.sub === 'sigil' ? 'Sigil maker · chaos magic' : post.sub === 'paradigm' ? 'Paradigm shift · chaos magic' : post.sub === 'ritual' ? 'Random ritual · chaos magic' : `${oracleLabel(post.sub)} · ask, then cast`];
     case 'studio': return ['the.studio', post.sub === 'creator' ? 'Character creator · you star in the games' : post.sub === 'blank' ? 'A blank page · tap ✈ to download' : post.sub === 'rhyme' ? 'Rhyming dictionary · tap ✈ to download' : 'Writing prompt · tap ✈ to download'];
-    case 'read': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'longread', `${post.kind === 'poem' ? 'Poem' : post.kind === 'novel' ? 'From a novel' : 'Long read'}${post.author ? ` · ${post.author}` : ''}`];
+    case 'read': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'longread', `${post.contemporary ? 'Contemporary erotica' : post.erotica ? 'Erotica' : post.kind === 'poem' ? 'Poem' : post.kind === 'novel' ? 'From a novel' : 'Long read'}${post.author ? ` · ${post.author}` : ''}`];
     case 'power': return ['power.scale', post.sub === 'tier' ? 'Tier list · binding in no jurisdiction' : 'Who would win?'];
     case 'mind': return MIND_HANDLE[post.sub] || ['good.morning', ''];
     case 'quote': return [post.mode === 'evening' ? 'night.thoughts' : 'morning.pages', `${post.author} · Wikiquote`];

@@ -3,7 +3,7 @@
 // Also the quote card for the package's morning and night quotes.
 import { el, mulberry32 } from './util.js';
 import { cellView } from './cells.js';
-import { dreamscape } from './dreamscape.js';
+import { dreamscape, WORLD_KEYS } from './dreamscape.js';
 
 const pick = (R, a) => a[Math.floor(R() * a.length)];
 export const MORNING_KINDS = { body: 2.2, affirm: 1.8, cells: 1.4 };
@@ -252,15 +252,17 @@ function paintWorld(cv, R, land) {
   if (land === 'sea') { c.fillStyle = 'rgba(255,255,255,.25)'; for (let y = h * 0.8; y < h; y += 5) c.fillRect(px - pr * 0.6 + Math.sin(y) * 6, y, pr * 1.2, 1); }
 }
 function worldView(p) {
-  const R = mulberry32(p.seed), name = worldName(R), [land, landText] = pick(R, LAND);
+  // the same draws, in the same order, as the words always used; the 3D world is built from them
+  const R = mulberry32(p.seed), name = worldName(R), ix = (a) => Math.floor(R() * a.length);
+  const li = ix(LAND), [land, landText] = LAND[li], si = ix(STAR), ki = ix(SKY), pi = ix(PEOPLE), ci = ix(CUSTOM);
   const cv = el('canvas.mind-canvas.world-canvas');
   const box = el('div.mind.world', el('div.media-in', cv), el('div.mind-text', el('div.kicker', 'Other worlds'), el('h3', name),
-    el('p', `A world around ${pick(R, STAR)}. The sky is ${pick(R, SKY)}, over ${landText}.`),
-    el('p', `It is home to ${pick(R, PEOPLE)}. Here ${pick(R, CUSTOM)}.`),
+    el('p', `A world around ${STAR[si]}. The sky is ${SKY[ki]}, over ${landText}.`),
+    el('p', `It is home to ${PEOPLE[pi]}. Here ${CUSTOM[ci]}.`),
     el('p.then', `Tonight, imagine arriving on ${name} as you fall asleep.`)));
-  // a dreamscape flown through in 3D; if WebGL is not there, the painted world as before
+  // the world itself in 3D, flown through; if WebGL is not there, the painted world as before
   let painted = false;
-  const scape = dreamscape(cv, p.seed >>> 0);
+  const K = WORLD_KEYS, scape = dreamscape(cv, p.seed >>> 0, { star: K.star[si], sky: K.sky[ki], land: K.land[li], people: K.people[pi], custom: K.custom[ci] });
   return { body: box, label: name,
     activate: () => { scape.start().then((ok) => { if (!ok && !painted) { painted = true; paintWorld(cv, mulberry32(p.seed ^ 0x9e3779b9), land); } }); },
     deactivate: () => scape.stop() };

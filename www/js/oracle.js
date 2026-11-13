@@ -1,11 +1,10 @@
-// Oracle posts: dice, I Ching (three-coin method), augury with sacred chickens,
-// haruspicy on a sheep's liver, tarot with scans of old decks from Wikimedia
+// Oracle posts: dice, I Ching (three-coin method), haruspicy on a sheep's liver, tarot with scans of old decks from Wikimedia
 // Commons, and chaos magic (chaos.js). Each cast is random; the canvas animates it and the
 // reading appears below: what fell, how it bears on the question, and something to do.
 import { el, toast } from './util.js';
 import { img, ready, getTextures } from './games/assets.js';
 import { themePalette } from './games/creature.js';
-import { HEX, TRI, hexNumber, DECK, SUITS, AUGURY, DICE3, QUESTIONS, VERDICT, ADVICE, LENS, DIE_ROLE, qKind, verdictOf, cardTone, hexTone } from './oracle-data.js';
+import { HEX, TRI, hexNumber, DECK, SUITS, DICE3, QUESTIONS, VERDICT, ADVICE, LENS, DIE_ROLE, qKind, verdictOf, cardTone, hexTone } from './oracle-data.js';
 import { CHAOS, CTA, castChaos, drawChaos, chaosUI } from './chaos.js';
 import { Haruspex } from './haruspex.js';
 import { rollCharacter, sheet, sheetText, drawCharacter, saveAsHero } from './dnd.js';
@@ -16,7 +15,7 @@ export function setOracle(data) { tarotImgs = data?.tarot || {}; }
 const W = 360, H = 300;
 const rnd = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
 const pick = (a) => a[Math.floor(rnd() * a.length)];
-const LABEL = { dice: 'Dice', die: 'One die', iching: 'I Ching', augury: 'Augury', haruspicy: 'Haruspicy', tarot: 'Tarot', dnd: 'Character', sigil: 'Sigil', paradigm: 'Paradigm shift', ritual: 'Random ritual' };
+const LABEL = { dice: 'Dice', die: 'One die', iching: 'I Ching', haruspicy: 'Haruspicy', tarot: 'Tarot', dnd: 'Character', sigil: 'Sigil', paradigm: 'Paradigm shift', ritual: 'Random ritual' };
 const D20 = ['A natural 1. Stay in bed; the universe has your number.', 'Something will break. Let it be something cheap.', 'A detour, then a worse detour.', 'Ask for help before you need it.', 'Proceed with snacks and caution.', 'Middling luck. Bring a towel.', 'An old friend, or an old debt, comes calling.', 'Fine, if you keep it small.', 'The answer is in your pocket.', 'A coin flip in a trench coat.', 'Slightly in your favour.', 'Someone is rooting for you quietly.', 'Unlucky number, lucky result.', 'Yes, but read the small print.', 'The door is unlocked. Push.', 'Momentum is on your side.', 'Go now, before you think about it.', 'Strong yes. Dress for it.', 'Nearly perfect. Take it.', 'A natural 20. Whatever it is: do it, and narrate it out loud.'];
 const dieLine = (n, v) => (n === 20 ? D20[v - 1] : v === 1 ? 'The lowest face. Retreat and regroup.' : v === n ? 'The highest face. Fortune is loud today.' : v / n < 0.34 ? 'Low. Keep expectations modest.' : v / n < 0.67 ? 'Middling. It depends on you, annoyingly.' : 'High. The odds lean your way.');
 function download(name, text) { const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: name }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
@@ -28,6 +27,8 @@ function wrap(src, q, score, facts) {
 export const oracleLabel = (sub) => LABEL[sub] || 'Oracle';
 
 export function oracleMedia(p) {
+  // the chicken augury is gone: an old package's augury post is read as dice
+  if (p.sub === 'augury') p = { ...p, sub: 'dice' };
   const canvas = el('canvas.oracle-cv');
   const reading = el('div.oracle-reading');
   let question = p.question || pick(QUESTIONS);
@@ -108,13 +109,6 @@ class Oracle {
         facts.push(`${LENS[qKind(q)]}, the hexagram’s advice is its first sentence: ${gloss.split('. ')[0].replace(/\.$/, '')}.`);
         this.say(`${n}. ${en} · ${py}`, wrap('the hexagram', q, score, facts));
       });
-    } else if (s === 'augury') {
-      const r = rnd(), o = AUGURY[r < 0.18 ? 0 : r < 0.5 ? 1 : r < 0.75 ? 2 : r < 0.92 ? 3 : 4];
-      const hens = Array.from({ length: 3 + Math.floor(rnd() * 3) }, (_, i) => ({ x: 70 + i * 55 + rnd() * 20, y: 200 + rnd() * 50, dir: rnd() < 0.5 ? -1 : 1, hue: [30, 15, 45, 0, 350][i % 5], ph: rnd() * 7 }));
-      const grain = Array.from({ length: 70 }, () => ({ x: 60 + rnd() * 240, y: 190 + rnd() * 70, gone: false }));
-      this.anim = { t: 0, o, hens, grain };
-      const q = this.question, tone = { solistimum: 2, eat: 1, peck: -0.5, refuse: -1.2, flee: -2 }[o.key], hungry = hens.length;
-      this.after(4, () => this.say(o.title, wrap('the sacred chickens', q, tone, [o.text, `${hungry} hens were let out of the coop to the grain; ${o.eat > 0.6 ? 'most of them fell on it' : o.eat > 0 ? 'only a few showed interest' : 'none of them wanted it'}. The Romans took this as a plain yes or no for the day, and never argued with the chickens.`])));
     } else if (CHAOS.includes(s)) {
       const r = castChaos(s, this); this.anim = r.anim;
       this.after(r.delay, () => this.say(r.title, r.lines));
@@ -149,14 +143,13 @@ class Oracle {
     else if (s === 'dnd') drawCharacter(c, a.ch, a.t, this.pal, W, H);
     else if (s === 'dice') this.drawDice(c, a);
     else if (s === 'iching') this.drawIChing(c, a);
-    else if (s === 'augury') this.drawAugury(c, a);
     else if (CHAOS.includes(s)) drawChaos(c, a, this);
     else this.drawTarot(c, a);
   }
   idle(c) {
     c.fillStyle = this.pal.ink; c.globalAlpha = 0.6 + Math.sin(this.t * 2) * 0.2;
     c.font = '600 46px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillText({ die: '⚅', dnd: '⚔', dice: '⚄', iching: '☯', augury: '𓅬', haruspicy: '⛤', tarot: '🂠', paradigm: '☉', ritual: '⛧' }[this.p.sub] || '✶', W / 2, H / 2 - 10);
+    c.fillText({ die: '⚅', dnd: '⚔', dice: '⚄', iching: '☯', haruspicy: '⛤', tarot: '🂠', paradigm: '☉', ritual: '⛧' }[this.p.sub] || '✶', W / 2, H / 2 - 10);
     c.font = '600 13px ui-monospace, monospace'; c.fillText(this.p.sub === 'sigil' ? 'state an intent, then draw' : 'tap Cast', W / 2, H / 2 + 40); c.globalAlpha = 1;
   }
   // ---- dice
@@ -219,43 +212,6 @@ class Oracle {
       });
     }
     if (done >= 6) { c.fillStyle = this.pal.ink; c.font = '700 22px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(`${a.n}${a.m ? `  →  ${a.m}` : ''}`, W / 2, 34); }
-  }
-  // ---- augury
-  drawAugury(c, a) {
-    const o = a.o, t = a.t;
-    c.fillStyle = this.pal.c[4]; c.globalAlpha = 0.35; c.fillRect(0, 180, W, H - 180); c.globalAlpha = 1;
-    // coop
-    c.fillStyle = this.pal.c[5]; c.fillRect(20, 120, 70, 70); c.fillStyle = this.pal.bg; c.fillRect(32, 140, 46, 50);
-    c.strokeStyle = this.pal.ink; c.globalAlpha = 0.5; for (let i = 0; i < 5; i++) { c.beginPath(); c.moveTo(34 + i * 10, 140); c.lineTo(34 + i * 10, 190); c.stroke(); } c.globalAlpha = 1;
-    // grain
-    c.fillStyle = this.pal.c[1];
-    for (const g of a.grain) if (!g.gone) c.fillRect(g.x, g.y, 2.5, 2);
-    for (const [i, h] of a.hens.entries()) {
-      const start = 0.3 + i * 0.25;
-      let x = h.x, y = h.y, peck = 0;
-      if (t < start) { x = 55; y = 175; }
-      else if (o.flee) { const k = t - start; x = 55 + k * 120 * (i % 2 ? 1 : 0.7); y = 175 - k * 70 + Math.sin(k * 20) * 6; }
-      else {
-        const k = Math.min(1, (t - start) / 0.8); x = 55 + (h.x - 55) * k; y = 175 + (h.y - 175) * k;
-        if (k >= 1 && o.eat > 0) { peck = Math.max(0, Math.sin((t + h.ph) * (6 + o.eat * 10))); if (peck > 0.95 && rnd() < o.eat * 0.5) { const g = a.grain.find((g) => !g.gone && Math.abs(g.x - x) < 30 && Math.abs(g.y - y) < 20); if (g) { g.gone = true; if (o.drop && rnd() < 0.6) a.grain.push({ x: x + h.dir * 14 + rnd() * 6, y: y + 6, gone: false }); } } }
-        if (k >= 1 && o.eat === 0) h.dir = Math.sin(t * 2 + i) > 0 ? 1 : -1;
-      }
-      this.hen(c, x, y, h.dir, h.hue, peck, o.flee && t > start);
-    }
-  }
-  hen(c, x, y, dir, hue, peck, flap) {
-    c.save(); c.translate(x, y); c.scale(dir, 1);
-    c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(0, 14, 14, 4, 0, 0, 7); c.fill();
-    c.strokeStyle = '#d9a23a'; c.lineWidth = 2; c.beginPath(); c.moveTo(-3, 6); c.lineTo(-4, 14); c.moveTo(3, 6); c.lineTo(4, 14); c.stroke();
-    c.fillStyle = `hsl(${hue},45%,${hue === 0 ? 92 : 55}%)`; c.beginPath(); c.ellipse(0, 0, 15, 10, -0.2, 0, 7); c.fill();
-    c.beginPath(); c.moveTo(-12, -3); c.lineTo(-22, -12); c.lineTo(-14, 2); c.fill(); // tail
-    if (flap) { c.beginPath(); c.moveTo(-2, -4); c.lineTo(-10, -20 + Math.sin(this.t * 30) * 8); c.lineTo(6, -4); c.fill(); }
-    const hy = -8 + peck * 14, hx = 12 + peck * 3;
-    c.beginPath(); c.arc(hx, hy, 6, 0, 7); c.fill();
-    c.fillStyle = '#c0392b'; c.beginPath(); c.arc(hx, hy - 6, 3, 0, 7); c.fill(); c.beginPath(); c.arc(hx + 2, hy + 6, 2, 0, 7); c.fill();
-    c.fillStyle = '#e8b04a'; c.beginPath(); c.moveTo(hx + 5, hy - 1); c.lineTo(hx + 11, hy + 1); c.lineTo(hx + 5, hy + 3); c.fill();
-    c.fillStyle = '#111'; c.fillRect(hx + 1, hy - 2, 2, 2);
-    c.restore();
   }
   // ---- tarot
   drawTarot(c, a) {

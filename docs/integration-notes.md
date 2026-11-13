@@ -164,3 +164,33 @@ Running list of wiring the lead must do before the final push.
   - Horror monsters mix in with the cute ones: about 1 in 5 foes in the world and over half in dungeons (`foeArt`). They lunge, flinch and fall in their own poses.
   - About half the dungeon bosses come from the forge, and so does the villain's Unbound form.
   - Their elements map to the game's (`HEL`): undead → shadow, fire → fire, poison → beast.
+
+## Living cells, worlds built from their words, more erotica, no chickens (2026-11-13, later)
+- **cell.life** (`www/js/cells.js`): each card is one of five tissues, with a real capillary bed. An arteriole branches into single-file capillaries, with cross-links between them, and they join a venule. Red cells darken as they unload oxygen; in the lung they brighten.
+  - **muscle:** a motor nerve fires; a calcium wave sweeps the fibre and the striations bunch as it contracts; ATP sparks.
+  - **brain:** spikes leap node to node along myelinated axons to synapses that release transmitter; astrocytes carry glucose from their endfeet; microglia probe with fine arms.
+  - **wound:** bacteria swim and divide; neutrophils squeeze out through the venule wall to hunt them; platelets and fibrin plug a leak; a macrophage clears debris; fibroblasts lay collagen.
+  - **lung:** alveoli fill the gaps between capillaries and swell with each breath; O₂ crosses in and CO₂ crosses out; type II cells release surfactant; a macrophage cleans up dust.
+  - **gut:** a villus with a brush border; sugars and amino acids go to the capillaries and fats to the lacteal; goblet cells release mucus; the lining migrates up and sheds at the tip.
+  - A live caption names each process and the microscope drifts over to look.
+  - `p.tissue` forces a tissue; `www/_cells.html` (gitignored) shows all five.
+- **other.worlds** (`www/js/dreamscape.js`): the 3D world is built from the card's own words (`WORLD_KEYS`; mindful.js draws them in the same order as before).
+  - **star:** red dwarf, twin suns, white dwarf, orange sun, pulsar with sweeping beams, or a blue star in dust.
+  - **sky:** violet, a green aurora, the ring of a broken moon, drifting islands, a sun on the horizon, or three moons.
+  - **land** (a terrain heightfield): mushroom spires, a crystal canyon that the camera flies down, a waving shallow sea with sun glitter, terraced mesas with long shadows, coral cities with lit windows, or glass dunes.
+  - **people:** colour-speech rings, sky whales singing, light waves through moss, breathing sleeper pods, book towers with books circling, robots in gardens, a lantern caravan with tents, or glowing children on the peaks.
+  - **custom:** groves, dream bubbles, rising lanterns, song ribbons, a timed eclipse, gates to fly through, or silence.
+  - The camera swoops, banks and turns to look at points of interest.
+  - `www/_worlds.html` (gitignored) previews it.
+- **Erotica** (`tools/data/erotica.mjs`, `buildErotica`/`eroTales`/`buildContemporary` in the builder):
+  - More public-domain works, now including:
+    - Recently public-domain modern novels: *Lady Chatterley's Lover* and *Women in Love*.
+    - *Teleny*, Louÿs' *Aphrodite*, *Lysistrata*, *Venus and Adonis*, Donne, Baudelaire and Rochester.
+    - Whole bawdy tales from the Decameron, the Heptameron, Balzac's *Droll Stories* and La Fontaine.
+  - Auto excerpts keep the most sensual candidates. Works marked `light` use a ban that still excludes youth, family, captivity, violence and animals but allows feelings.
+  - Tales must pass the hard ban plus a tale ban (no girls, maids, virgins, lads or daughters anywhere in the tale).
+  - The hard ban now also covers animals.
+  - **Contemporary:** explicit, complete, English Original Work stories on Archive of Our Own marked "No Archive Warnings Apply" and clear of `ao3Ban` (minors, school and college, family, force and coercion, animals).
+    - Only AO3's own listing is used (title, author, the author's summary, tags, length and kudos), with a link to read the story there. The repo is public, so modern copyrighted stories are never copied into packages.
+  - Shares: `reads.erotica` 44 and `reads.contemporary` 16.
+- **Oracle:** the chicken augury is removed (builder subs, client, data). Old packages' augury posts render as dice.

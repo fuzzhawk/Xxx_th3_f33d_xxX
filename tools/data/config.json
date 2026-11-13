@@ -913,7 +913,8 @@
     "poems": 70,
     "poemMaxLines": 70,
     "articles": 30,
-    "erotica": 20,
+    "erotica": 44,
+    "contemporary": 16,
     "knownBooks": {
       "occult": [
         [

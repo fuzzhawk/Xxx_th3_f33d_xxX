@@ -32,5 +32,5 @@ function versus(p) {
 
 function tier(p) {
   const rows = p.ents.map((e, i) => el('div.pw-tr', el(`span.pw-t.t${i}`, p.tiers[i]), face(e, '.sm'), el('div.pw-tn', wikiLink(e), el('small', `${KIND[e.k] || e.k} · ${fmt(e.pw)} ${p.unit}${e.f ? ` · ${e.f}` : ''}`))));
-  return el('div.pw.pw-tierlist', el('h3', p.title), ...rows, el('small.pw-foot', 'Rankings final. Complaints to the sacred chickens.'));
+  return el('div.pw.pw-tierlist', el('h3', p.title), ...rows, el('small.pw-foot', 'Rankings final. Complaints to the oracle.'));
 }

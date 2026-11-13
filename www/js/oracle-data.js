@@ -188,15 +188,6 @@ export const EXTA = {
     { k: 'none', w: 10, s: 'absent — just empty space', r: 'No gut, no instinct. Do not trust your hunches today.' }] }
 };
 
-// ---------------------------------------------------------------- augury with the sacred chickens
-export const AUGURY = [
-  { key: 'solistimum', eat: 1, drop: true, title: 'Tripudium solistimum', text: 'The chickens fall on the grain so greedily that it tumbles from their beaks. The best omen there is. Begin the battle, send the email.' },
-  { key: 'eat', eat: 0.7, title: 'They eat', text: 'The chickens eat steadily. A favourable sign; the gods are neither thrilled nor bored.' },
-  { key: 'peck', eat: 0.3, title: 'Hesitant pecking', text: 'The chickens peck, look around, peck again. Uncertain. Ask again tomorrow, with better grain.' },
-  { key: 'refuse', eat: 0, title: 'They refuse to eat', text: 'The chickens will not eat. Unfavourable. (In 249 BC the consul Claudius Pulcher threw them overboard — “let them drink, then” — and lost his fleet.)' },
-  { key: 'flee', eat: 0, flee: true, title: 'They flee the coop', text: 'The chickens flap out of the coop and away. The worst sign. Whatever it is, not today.' }
-];
-
 // ---------------------------------------------------------------- dice
 export const DICE3 = {
   3: 'Snake eyes and then some. Lie down and wait for the weather to change.', 4: 'Low ebb. Do the smallest version of the task.', 5: 'A detour is the road this time.', 6: 'Quiet luck. Don’t announce it.',

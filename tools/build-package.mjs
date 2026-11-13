@@ -25,7 +25,7 @@ import { modesBuilder } from './modes.mjs';
 import { imagesBuilder } from './images.mjs';
 import { DECK, QUESTIONS } from '../www/js/oracle-data.js';
 import { selfCare, selfCareFlavors, fallbackQuotes, videoAvoid, videoAvoidTitle } from './data/content.mjs';
-import { eroticaWorks, eroticaHardBan, eroticaSoftBan, eroticaSensual } from './data/erotica.mjs';
+import { eroticaWorks, eroticaHardBan, eroticaSoftBan, eroticaLightBan, eroticaTaleBan, eroticaSensual } from './data/erotica.mjs';
 import { productClassics, productParts } from './data/products-data.mjs';
 import { memeText, memeWeights, memeImageCount } from './data/memes-data.mjs';
 
@@ -895,7 +895,7 @@ async function buildTarot() {
 }
 function buildOracle() {
   // sigil, paradigm and ritual are the chaos-magic oracles
-  const subs = ['tarot', 'iching', 'sigil', 'augury', 'dnd', 'paradigm', 'tarot', 'haruspicy', 'ritual', 'dice', 'die'];
+  const subs = ['tarot', 'iching', 'sigil', 'dnd', 'paradigm', 'tarot', 'haruspicy', 'ritual', 'dice', 'die'];
   return shuffle(Array.from({ length: want.oracle || 0 }, (_, i) => {
     const seed = Math.floor(rand() * 2 ** 31), sub = subs[i % subs.length];
     return { id: `o${seed.toString(36)}`, cat: 'oracle', sub, seed, question: pick(QUESTIONS), spread: sub === 'tarot' && rand() < 0.5 ? 3 : 1 };
@@ -969,7 +969,7 @@ function gutBody(t) {
 // ---- classic erotica (tools/data/erotica.mjs)
 const eroNorm = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const eroHas = (s, phrase) => ` ${eroNorm(s)} `.includes(` ${eroNorm(phrase)} `);
-const eroOk = (text, pk = {}, soft = false) => { const s = pk.allow ? text.replace(new RegExp(pk.allow.source, 'gi'), ' ') : text; return !eroticaHardBan.test(s) && !(soft && eroticaSoftBan.test(s)); };
+const eroOk = (text, pk = {}, soft = false, light = false) => { const s = pk.allow ? text.replace(new RegExp(pk.allow.source, 'gi'), ' ') : text; return !eroticaHardBan.test(s) && !(soft && (light ? eroticaLightBan : eroticaSoftBan).test(s)); };
 const eroSensual = (text) => new Set((text.match(eroticaSensual) || []).map((w) => w.toLowerCase().slice(0, 5))).size;
 const isNote = (p) => /^\[?(?:footnote|fn#|illustration|note:|transcriber)/i.test(p);
 // prose: from the paragraph holding `at`, `n` paragraphs (or through the one holding `to`)
@@ -1036,7 +1036,9 @@ function eroVerses(text, w, pk) {
 }
 // random excerpts inside `span`: verse runs of 8–28 lines, or 2–5 paragraphs of prose
 function eroAuto(body, w, a) {
-  const out = [], [f0, f1] = a.span || [0, 1], tries = 300;
+  const out = [], [f0, f1] = a.span || [0, 1], tries = 500, min = a.min || 4, cands = [];
+  // of the candidates that pass, keep the most sensual (a few of the best, in a random order)
+  const best = (key) => { cands.sort((x, y) => y.score - x.score); for (const c of shuffle(cands.slice(0, Math.max(a.count, Math.ceil(a.count * 1.6))))) if (out.length < a.count && !out.some((o) => o[key][0] === c.x[key][0])) out.push(c.x); return out; };
   if (a.prose || w.kind === 'novel') {
     const paras = body.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').trim()).filter((p) => p && !isNote(p));
     const i0 = Math.floor(paras.length * f0), i1 = Math.floor(paras.length * f1);
@@ -1045,7 +1047,7 @@ function eroAuto(body, w, a) {
     const secs = [];
     for (let i = i0; i < i1; i++) if (isHead(paras[i])) { const txt = []; for (let j = i + 1; j < i1 && !isHead(paras[j]); j++) txt.push(paras[j]); if (txt.length) secs.push({ title: paras[i], paras: txt.slice(0, 6), i }); }
     const pieces = secs.length >= 8 ? secs : null;
-    for (let t = 0; t < tries && out.length < a.count; t++) {
+    for (let t = 0; t < tries && cands.length < a.count * 5; t++) {
       let run, title, i, k;
       if (pieces) ({ paras: run, title, i } = pieces[Math.floor(rand() * pieces.length)]), (k = run.length + 1);
       else {
@@ -1055,16 +1057,17 @@ function eroAuto(body, w, a) {
       }
       const txt = run.join(' ');
       if (txt.length < (pieces ? 250 : 500) || txt.length > 3600) continue;
-      if (!eroOk(`${title || ''} ${txt}`, a, true) || !eroOk(`${paras[i - 1] || ''} ${paras[i + k] || ''}`) || eroSensual(txt) < (pieces ? 3 : 4)) continue;
+      const score = eroSensual(txt);
+      if (!eroOk(`${title || ''} ${txt}`, a, true, w.light) || !eroOk(`${paras[i - 1] || ''} ${paras[i + k] || ''}`) || score < (pieces ? Math.min(3, min) : min)) continue;
       const nice = title && title.toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, p, c) => p + c.toUpperCase()).replace(/(?!^)\b(Of|The|And|To|In|On|A|An|At|For|By|With)\b/g, (x) => x.toLowerCase());
-      if (!out.some((o) => o.paras[0] === run[0])) out.push({ paras: run, title: nice || undefined });
+      if (!cands.some((o) => o.x.paras[0] === run[0])) cands.push({ score, x: { paras: run, title: nice || undefined } });
     }
-    return out;
+    return best('paras');
   }
   // verse: blocks of short, capitalised lines between headings
   const L = body.split('\n'), i0 = Math.floor(L.length * f0), i1 = Math.floor(L.length * f1);
   const verse = (l) => { const t = l.trim(); return t.length > 0 && t.length <= 72 && /^["“‘'(]?[A-Z]/.test(t) && !/^[^a-z]+$/.test(t); };
-  for (let t = 0; t < tries && out.length < a.count; t++) {
+  for (let t = 0; t < tries && cands.length < a.count * 5; t++) {
     let i = i0 + Math.floor(rand() * Math.max(1, i1 - i0 - 30));
     while (i < i1 && !(verse(L[i]) && (!L[i - 1]?.trim() || /[.!?;:]\s*$/.test(L[i - 1])))) i++;
     const run = [];
@@ -1076,10 +1079,31 @@ function eroAuto(body, w, a) {
     }
     while (run.length && (!run[run.length - 1] || (run.filter(Boolean).length > 8 && !/[.!?;]\s*$/.test(run[run.length - 1])))) run.pop();
     const txt = run.join(' ');
-    if (run.filter(Boolean).length < 8 || !eroOk(txt, a, true) || !eroOk(L.slice(Math.max(0, i - 6), i).join(' ')) || eroSensual(txt) < 4) continue;
-    if (!out.some((o) => o.lines[0] === run[0])) out.push({ lines: run });
+    const score = eroSensual(txt);
+    if (run.filter(Boolean).length < 8 || !eroOk(txt, a, true, w.light) || !eroOk(L.slice(Math.max(0, i - 6), i).join(' ')) || score < min) continue;
+    if (!cands.some((o) => o.x.lines[0] === run[0])) cands.push({ score, x: { lines: run } });
   }
-  return out;
+  return best('lines');
+}
+// whole tales from a collection: the sections between its headings, the most sensual first. Every word
+// of a tale must pass the hard ban and the tale ban (no girls, maids, virgins, lads, children in it).
+function eroTales(body, w, o) {
+  const paras = body.split(/\n\s*\n/).map((p) => (o.verse ? p.trim() : p.replace(/\s*\n\s*/g, ' ').trim())).filter((p) => p && !isNote(p));
+  const isHead = (p) => p.length <= 90 && !p.includes('\n') && !/[,;:]["”’)]*$/.test(p) && /^[^a-z]*[A-Z]/.test(p) && (p === p.toUpperCase() || /^(?:novel|tale|story|nouvelle|the \w+ (?:tale|story))\b/i.test(p));
+  const heads = []; paras.forEach((p, i) => { if (isHead(p)) heads.push(i); });
+  const tales = [];
+  for (let h = 0; h < heads.length; h++) {
+    const i = heads[h], j = heads[h + 1] ?? paras.length, run = paras.slice(i + 1, j);
+    if (!run.length) continue;
+    const txt = run.join(' '), score = eroSensual(txt);
+    if (txt.length < 1500 || txt.length > 16000 || !eroOk(`${paras[i]} ${txt}`) || eroticaTaleBan.test(txt) || eroticaTaleBan.test(paras[i]) || score < (o.min || 6)) continue;
+    // a tale's own title, or (for "NOVEL III." and the like) the opening of its rubric
+    const plain = /^(?:novel|tale|story|nouvelle|chapter)?\s*[ivxlc\d]+\.?$/i.test(paras[i].trim());
+    const title = plain ? clip(run[0].replace(/^[-–—\s]+/, '').split(/(?<=[.;])\s/)[0], 90) : paras[i].toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, p, c) => p + c.toUpperCase());
+    tales.push({ score: score / Math.sqrt(txt.length / 1000), x: o.verse ? { lines: run.join('\n\n').split('\n').map((l) => l.trim()), title } : { paras: run, title } });
+  }
+  tales.sort((a, b) => b.score - a.score);
+  return shuffle(tales.slice(0, Math.ceil(o.count * 1.5))).slice(0, o.count).map((t) => t.x);
 }
 async function buildErotica() {
   const posts = [], per = {}, books = {};
@@ -1102,6 +1126,11 @@ async function buildErotica() {
         if (!res) { miss.push(`"${pk.title}" not found in #${c.id}`); continue; }
         if (!eroOk(res.join(' '), pk)) { miss.push(`"${pk.title}" failed the content check`); continue; }
         out.push({ kind, title: pk.title, ...base, [kind === 'poem' ? 'lines' : 'paras']: res });
+      }
+      if (w.tales) {
+        const tl = eroTales(body, w, w.tales);
+        if (!tl.length) miss.push(`no whole tale in #${c.id} passed the content filters`);
+        for (const x of tl) out.push({ kind: x.lines ? 'poem' : 'novel', ...base, ...x, tale: true });
       }
       if (w.auto) {
         const auto = eroAuto(body, w, w.auto);
@@ -1132,6 +1161,46 @@ async function buildErotica() {
   report.sources.erotica = per;
   report.sources.eroticaBooks = books;
   return posts;
+}
+
+// ---- contemporary erotica: explicit original fiction from Archive of Our Own. The stories are their
+// authors' and stay on AO3: a post carries only what AO3's own listings show (title, author, the
+// author's summary, tags, length), with a link to read the story there. Only works rated Explicit,
+// marked "No Archive Warnings Apply", and clear of anything about minors, family, force or animals.
+const AO3 = 'https://archiveofourown.org';
+const ao3Ban = /\b(?:underage|under-age|teen\w*|high ?school|school\w*|student\w*|college|campus|age ?play|age ?gap|ageplay|incest\w*|step-?\w+|non-?con\w*|dub-?con\w*|dubious|consent issues|rape\w*|forced|coerc\w*|minor\w*|daddy|mommy|lolita|loli|shota|barely legal|virgin\w*|bestial\w*|zoophil\w*|tentacle\w*|monster\w*|blackmail\w*|drugged|sleep sex|somnophil\w*|noncon\w*|abuse\w*|kidnap\w*|slave\w*)\b/i;
+async function buildContemporary() {
+  const R = config.reads || {}, n = QUICK ? 4 : R.contemporary ?? 16;
+  if (!n) return [];
+  const found = [], ids = new Set();
+  for (const sort of ['kudos_count', 'revised_at', 'hits']) for (const page of [1, 2]) {
+    if (found.length >= n * 3) break;
+    const url = `${AO3}/tags/${encodeURIComponent('Original Work')}/works?${new URLSearchParams({ 'work_search[sort_column]': sort, 'work_search[language_id]': 'en', 'work_search[rating_ids]': '13', 'work_search[complete]': 'T', page: String(page) })}`;
+    let html;
+    try { html = await fetchText(url, { timeout: 30000, retries: 1, ua: BROWSER_UA }); } catch (e) { warn(`ao3 ${sort} p${page}: ${e.message}`); continue; }
+    for (const chunk of html.split(/<li id="work_/).slice(1)) {
+      const id = (chunk.match(/^(\d+)/) || [])[1], title = stripTags((chunk.match(/<h4 class="heading">\s*<a href="\/works\/\d+">([\s\S]*?)<\/a>/) || [])[1] || '');
+      if (!id || !title || ids.has(id)) continue;
+      const by = [...chunk.matchAll(/<a rel="author" href="[^"]*">([^<]+)<\/a>/g)].map((m) => decodeEntities(m[1])).join(', ') || 'Anonymous';
+      const rating = (chunk.match(/<span class="rating-[^"]*"[^>]*title="([^"]+)"/) || [])[1], warns = (chunk.match(/<span class="warning-[^"]*"[^>]*title="([^"]+)"/) || [])[1];
+      const tags = [...chunk.matchAll(/<a class="tag" href="[^"]*">([^<]+)<\/a>/g)].map((m) => decodeEntities(m[1])).filter((t) => !/^(?:Original Work|No Archive Warnings Apply|Creator Chose Not To Use Archive Warnings)$/.test(t));
+      const sum = (chunk.match(/<blockquote class="userstuff summary">([\s\S]*?)<\/blockquote>/) || [])[1] || '';
+      const paras = sum.split(/<\/p>|<br\s*\/?>/i).map(stripTags).filter((x) => x.length > 2).slice(0, 4).map((x) => clip(x, 520));
+      const num = (re) => +((chunk.match(re) || [])[1] || '0').replace(/,/g, '');
+      const words = num(/<dd class="words">([\d,]+)<\/dd>/), kudos = num(/<dd class="kudos">\s*<a[^>]*>([\d,]+)<\/a>/), chapters = stripTags((chunk.match(/<dd class="chapters">([\s\S]*?)<\/dd>/) || [])[1] || '');
+      const all = `${title} ${paras.join(' ')} ${tags.join(' ')}`;
+      if (rating !== 'Explicit' || warns !== 'No Archive Warnings Apply' || !paras.join('').length || paras.join(' ').length < 60) continue;
+      if (words < 800 || words > 80000 || ao3Ban.test(all) || eroticaHardBan.test(all)) continue;
+      ids.add(id);
+      found.push({ kind: 'story', title, author: by, paras, tags: tags.slice(0, 8), words, kudos, chapters, url: `${AO3}/works/${id}?view_adult=true`, source: 'Archive of Our Own', topic: 'erotica', erotica: true, contemporary: true });
+    }
+    await sleep(2000);
+  }
+  report.sources.contemporary = found.length;
+  log(`contemporary erotica: ${found.length} works from AO3`);
+  // the best loved, and a few new ones
+  found.sort((a, b) => b.kudos - a.kudos);
+  return shuffle(found.slice(0, Math.ceil(n * 1.8))).slice(0, n);
 }
 
 // Novels, poems and erotica don't depend on the week's Wikipedia picks, and Gutendex is slow, so
@@ -1181,8 +1250,8 @@ async function readsPrefetch() {
     const j = await fetchJSON(`https://poetrydb.org/random/${QUICK ? 20 : R.poemsFetch || 120}`, { timeout: 30000 });
     for (const p of shuffle(j || []).filter((p) => +p.linecount >= 8 && +p.linecount <= (R.poemMaxLines || 70)).slice(0, R.poems || 60)) out.push({ kind: 'poem', title: p.title, author: p.author, lines: p.lines, url: `https://www.google.com/search?q=${encodeURIComponent(`${p.title} ${p.author}`)}`, source: 'PoetryDB' });
   } catch (e) { warn(`poetrydb: ${e.message}`); }
-  const ero = await buildErotica();
-  return { out, ero, books: books.length };
+  const [ero, modern] = await Promise.all([buildErotica(), buildContemporary().catch((e) => { warn(`ao3: ${e.message}`); return []; })]);
+  return { out, ero, modern, books: books.length };
 }
 async function buildReads(wiki, early) {
   const R = config.reads || {}, n = want.read || 0;
@@ -1192,11 +1261,12 @@ async function buildReads(wiki, early) {
     for (let i = 0; i < n; i++) out.push(i % 3 === 1 ? { kind: 'poem', title: `Offline poem ${i}`, author: 'Anonymous', lines: Array.from({ length: 14 }, (_, k) => `Placeholder line ${k + 1} of a poem for layout testing`) } : { kind: i % 3 ? 'article' : 'novel', title: `Offline long read ${i}`, book: 'A Test Book', author: 'A. Writer', paras: Array.from({ length: 5 }, (_, k) => `Paragraph ${k + 1}. This is placeholder text for the long reads layout, written so the card has something to fold and unfold. It is never committed.`) });
     // classic erotica fixtures: always shown (no adult flag), flagged erotica
     const ero = { book: 'A Classic of Love', author: 'An Old Poet', year: 1866, source: 'Project Gutenberg', topic: 'erotica', erotica: true, url: 'https://www.gutenberg.org/' };
-    out.splice(0, 2, { kind: 'novel', title: 'Offline erotica excerpt', ...ero, paras: Array.from({ length: 4 }, (_, k) => `Paragraph ${k + 1} of a classic erotica excerpt. Placeholder text for the long reads layout; the real package takes a vetted passage from Project Gutenberg.`) },
-      { kind: 'poem', title: 'Offline erotic poem', ...ero, lines: Array.from({ length: 12 }, (_, k) => (k % 5 === 4 ? '' : `Placeholder line ${k + 1} of a love poem`)) });
+    out.splice(0, 3, { kind: 'novel', title: 'Offline erotica excerpt', ...ero, paras: Array.from({ length: 4 }, (_, k) => `Paragraph ${k + 1} of a classic erotica excerpt. Placeholder text for the long reads layout; the real package takes a vetted passage from Project Gutenberg.`) },
+      { kind: 'poem', title: 'Offline erotic poem', ...ero, lines: Array.from({ length: 12 }, (_, k) => (k % 5 === 4 ? '' : `Placeholder line ${k + 1} of a love poem`)) },
+      { kind: 'story', title: 'Offline contemporary story', author: 'A. Writer', paras: ['The author’s own summary of a story on Archive of Our Own: a placeholder for the layout.'], tags: ['Romance', 'Explicit Sexual Content'], words: 5400, kudos: 210, chapters: '1/1', url: 'https://archiveofourown.org/', source: 'Archive of Our Own', topic: 'erotica', erotica: true, contemporary: true });
     return out.map((x, i) => ({ id: `rd-off-${i}`, cat: 'read', sub: x.kind, ...x }));
   }
-  const { out, ero, books } = await (early || readsPrefetch());
+  const { out, ero, modern = [], books } = await (early || readsPrefetch());
   // long articles: the first five paragraphs of this week's longest Wikipedia picks
   const long = [...wiki].sort((a, b) => (b.summary?.length || 0) - (a.summary?.length || 0)).slice(0, QUICK ? 3 : R.articles || 30);
   await pool(long, 3, async (w) => {
@@ -1208,9 +1278,9 @@ async function buildReads(wiki, early) {
     } catch (e) { warn(`long article ${w.title}: ${e.message}`); }
   });
   // classic erotica: a reserved share, mixed in with the rest (all of it in quick builds, to check every pick)
-  const eroN = QUICK ? ero.length : Math.min(ero.length, R.erotica ?? 20);
-  report.sources.reads = { novels: out.filter((x) => x.kind === 'novel').length, poems: out.filter((x) => x.kind === 'poem').length, articles: out.filter((x) => x.kind === 'article').length, books, erotica: ero.length };
-  const mix = [...shuffle(ero).slice(0, eroN), ...shuffle(out).slice(0, Math.max(0, n - eroN))];
+  const eroN = QUICK ? ero.length : Math.min(ero.length, R.erotica ?? 20), modN = modern.length;
+  report.sources.reads = { novels: out.filter((x) => x.kind === 'novel').length, poems: out.filter((x) => x.kind === 'poem').length, articles: out.filter((x) => x.kind === 'article').length, books, erotica: ero.length, tales: ero.filter((x) => x.tale).length, contemporary: modN };
+  const mix = [...shuffle(ero).slice(0, eroN), ...modern, ...shuffle(out).slice(0, Math.max(0, n - eroN - modN))];
   return shuffle(mix).map((x) => ({ id: `rd${hashStr(`${x.title}${x.paras?.[0] || x.lines?.[0] || ''}`).toString(36)}`, cat: 'read', sub: x.kind, ...x }));
 }
 
@@ -1435,7 +1505,7 @@ async function main() {
       quote: { uplift: 'Morning quotes', introspect: 'Night thoughts' },
       game: Object.fromEntries(config.gameTypes.map((t) => [t, GAME_NAMES[t] || t])),
       web: { hn: 'Hacker News', site: 'Sites', comic: 'Comics', reddit: 'Reddit' },
-      oracle: { tarot: 'Tarot', iching: 'I Ching', augury: 'Augury', dnd: 'Adventurer', haruspicy: 'Haruspicy', dice: 'Dice', die: 'One die', sigil: 'Sigil', paradigm: 'Paradigm shift', ritual: 'Random ritual' },
+      oracle: { tarot: 'Tarot', iching: 'I Ching', dnd: 'Adventurer', haruspicy: 'Haruspicy', dice: 'Dice', die: 'One die', sigil: 'Sigil', paradigm: 'Paradigm shift', ritual: 'Random ritual' },
       studio: { prompt: 'Writing prompt', blank: 'Blank page', rhyme: 'Rhyming dictionary', creator: 'Character creator' },
       read: { novel: 'Novels', poem: 'Poems', article: 'Articles' },
       news: Object.fromEntries(Object.entries(config.news.groups).map(([k, g]) => [k, g.label]))

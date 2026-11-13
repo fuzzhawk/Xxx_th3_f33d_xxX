@@ -393,6 +393,9 @@ details.subw[open] summary::after { transform: rotate(90deg); }
 .textpost.read .kicker { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--ochre); }
 .textpost.read h3 { font-family: var(--serif); font-size: 22px; line-height: 1.2; font-weight: 600; margin: 6px 0 2px; }
 .read-by { font-size: 13px; color: var(--muted); font-style: italic; margin-bottom: 8px; }
+.textpost.read .read-tags { margin-top: 12px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.textpost.read .read-meta { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.textpost.read .read-out { display: inline-block; margin-top: 14px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--ochre); font-size: 13.5px; font-weight: 600; text-decoration: none; }
 .textpost.read p { font-family: var(--serif); font-size: 16px; line-height: 1.6; color: #e6d9c8; margin: 10px 0 0; }
 .read-poem { font-family: var(--serif); font-size: 16px; line-height: 1.6; color: #e6d9c8; white-space: pre-wrap; margin-top: 8px; }
 .textpost.read .rest { overflow: hidden; max-height: 0; transition: max-height .5s ease; }
