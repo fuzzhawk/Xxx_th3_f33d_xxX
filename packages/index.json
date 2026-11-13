@@ -45,7 +45,31 @@
         "evening": 381
       },
       "estHours": 38.1
+    },
+    {
+      "id": "2026-W46",
+      "title": "The Feed · 2026-W46",
+      "created": "2026-11-13T20:17:20.255Z",
+      "total": 5697,
+      "counts": {
+        "game": 1040,
+        "wiki": 933,
+        "video": 937,
+        "meme": 520,
+        "product": 208,
+        "psych": 208,
+        "selfcare": 260,
+        "web": 260,
+        "news": 154,
+        "oracle": 156,
+        "power": 104,
+        "studio": 104,
+        "read": 158,
+        "morning": 396,
+        "evening": 259
+      },
+      "estHours": 37.2
     }
   ],
-  "latest": "2026-W45"
+  "latest": "2026-W46"
 }
