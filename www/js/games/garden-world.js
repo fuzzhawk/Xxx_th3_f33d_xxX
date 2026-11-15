@@ -1667,21 +1667,61 @@ export function invalidate(Rm, x0, y0, x1, y1) {
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) miniPaint(Rm, x, y);
 }
 
-// ------------------------------------------------ minimap (explored tiles only)
-export function minimap(Rm) {
-  if (Rm.mini) return Rm.mini;
-  const [cv, c] = mk(Rm.w, Rm.h);
-  Rm.mini = { cv, c };
-  c.fillStyle = Rm.name === 'cave' ? '#100c14' : Rm.name === 'sky' ? '#9cc8ec' : '#2a3a2c';
-  c.fillRect(0, 0, Rm.w, Rm.h);
-  for (let y = 0; y < Rm.h; y++) for (let x = 0; x < Rm.w; x++) if (Rm.seen[ix(Rm, x, y)]) miniPaint(Rm, x, y);
-  return Rm.mini;
+// ------------------------------------------------ the map (shown by garden-map.js)
+// One pixel per tile in the realm's own colours: explored ground clear, the rest under drifting
+// cloud with the land showing faintly through. Built the first time the map is looked at, then
+// kept up to date a tile at a time as you explore (miniPaint, from markSeen and invalidate).
+const MIST = { surface: [226, 222, 240, 0.8], cave: [14, 11, 20, 0.88], sky: [236, 240, 252, 0.8] }, MIST_DUSK = { surface: [54, 50, 92, 0.8], sky: [30, 28, 64, 0.8] };
+const pack = (r, g, b) => (255 << 24 | b << 16 | g << 8 | r) >>> 0;
+const mixP = (v, r, g, b, k) => pack(Math.round((v & 255) * (1 - k) + r * k), Math.round(((v >> 8) & 255) * (1 - k) + g * k), Math.round(((v >> 16) & 255) * (1 - k) + b * k));
+// packed colour of each kind of ground, for one palette
+function mapTable(Rm, P) {
+  const t = new Uint32Array(16), h = (c, d = '#888888') => { const [r, g, b] = rgbOf(c || d); return pack(r, g, b); };
+  for (let g = 0; g < 16; g++) {
+    if (Rm.kind === 'cave') t[g] = g === ROCK ? h(P.wall) : g === WATER ? h(Rm.name === 'abyss' ? '#ff6a2a' : P.water) : g === PORTAL ? pack(255, 232, 168) : g === BRIDGE ? h(P.plank, '#8a6a48') : h(P.floor?.[1]);
+    else if (Rm.kind === 'sky') t[g] = g === VOID ? (P.night ? pack(14, 16, 44) : P.roofs ? pack(20, 18, 36) : h(P.bg?.[1], '#9cc8ec')) : g === BRIDGE ? (P.roofs ? pack(90, 90, 130) : pack(236, 240, 250)) : g === PORTAL ? pack(255, 255, 255) : h(P.grass?.[1]);
+    else t[g] = g === WATER ? h(P.water) : g === SAND ? h(P.sand) : g === PATH ? h(P.path) : g === STONE ? h(P.stone) : g === BRIDGE ? h(P.plank, '#b88a5a') : g === ROCK ? h(P.rock2, '#7f7a72')
+      : g === CHASM ? pack(44, 20, 24) : g === ICE ? h(P.ice, '#b8dcf0') : g === STREET ? pack(52, 52, 86) : g === PORTAL ? pack(24, 18, 22) : g === FOREST ? h(P.forest?.[1]) : g === FLOWERS ? mixP(h(P.grass?.[1]), ...rgbOf(P.dot?.[0] || '#ffffff'), 0.3) : h(P.grass?.[1]);
+  }
+  return t;
 }
-const MINI = { [GRASS]: '#8fcf7a', [WATER]: '#5aa8e0', [PATH]: '#d8c098', [SAND]: '#e8d6a6', [STONE]: '#c8c0b8', [BRIDGE]: '#c09060', [ROCK]: '#8a8690', [PORTAL]: '#20181c', [FOREST]: '#5a9a58', [FLOWERS]: '#c8d890', [VOID]: '#b8d8f4', [CHASM]: '#3a1e1a', [ICE]: '#c8e6f4', [STREET]: '#2a2a44' };
+// a tile's colour on the map: its ground, darker in tall grass, forest dappled, cliff tops lit
+function mapCol(Rm, M, i) {
+  const g = Rm.ground[i], N = Rm.w;
+  let v = (M.bio ? M.tabs[M.bio[i]] : M.tabs[0])[g];
+  if (Rm.wild[i]) v = mixP(v, 20, 40, 20, Math.min(0.3, 0.12 + Rm.wild[i] * 0.04));
+  if (Rm.kind === 'surface') {
+    if (g === FOREST && ((i % N) + ((i / N) | 0)) % 3 === 0) v = mixP(v, 0, 0, 0, 0.12);
+    else if (g === ROCK && i >= N && Rm.ground[i - N] !== ROCK) v = mixP(v, 255, 255, 255, 0.2);
+  }
+  return v;
+}
+export function minimap(Rm, mode = 'day') {
+  if (Rm.mini?.mode === mode && Rm.mini.px) return Rm.mini;
+  const N = Rm.w, Hh = Rm.h, [cv, c] = mk(N, Hh), im = c.createImageData(N, Hh), pxl = new Uint32Array(im.data.buffer);
+  const bio = Rm.name === 'surface' ? biomeMap(Rm) : null;
+  const M = Rm.mini = { cv, c, im, px: pxl, mode, bio, dirty: true, tabs: bio ? BIOMES.map((_, b) => mapTable(Rm, biomePal(b, mode))) : [mapTable(Rm, palFor(Rm.name, mode))] };
+  // unexplored: soft cloud with the land faint beneath. The cloud (two octaves of noise, so it
+  // billows) is worked out per 4×4 tiles in 16 strengths, and each ground's clouded colour is
+  // looked up, so the whole meadows take a few milliseconds
+  const [mr, mg, mb, k0] = (mode === 'evening' || NIGHT[Rm.name]) && MIST_DUSK[Rm.kind] ? MIST_DUSK[Rm.kind] : MIST[Rm.kind] || MIST.surface, s = (Rm.seed & 0xffff) ^ 0x3a7, L = 16, lo = 0.5, hi = 0.97;
+  const veil = M.tabs.map((t) => { const o = new Uint32Array(16 * L); for (let g = 0; g < 16; g++) for (let l = 0; l < L; l++) o[g * L + l] = mixP(t[g], mr, mg, mb, lo + ((hi - lo) * l) / (L - 1)); return o; });
+  const CW = (N + 3) >> 2, lev = new Uint8Array(CW * ((Hh + 3) >> 2));
+  for (let i = 0; i < lev.length; i++) {
+    const x = (i % CW) * 4 + 2, y = ((i / CW) | 0) * 4 + 2, k = k0 + (vnoise(x * 0.045, y * 0.045, s) - 0.5) * 0.26 + (vnoise(x * 0.16, y * 0.16, s + 9) - 0.5) * 0.1;
+    lev[i] = Math.round(((Math.max(lo, Math.min(hi, k)) - lo) / (hi - lo)) * (L - 1));
+  }
+  const seen = Rm.seen, ground = Rm.ground;
+  for (let y = 0, i = 0; y < Hh; y++) {
+    const row = (y >> 2) * CW;
+    for (let x = 0; x < N; x++, i++) pxl[i] = seen[i] ? mapCol(Rm, M, i) : veil[bio ? bio[i] : 0][ground[i] * L + lev[row + (x >> 2)]];
+  }
+  return M;
+}
 export function miniPaint(Rm, x, y) {
-  if (!Rm.mini || !inside(Rm, x, y)) return;
-  const i = ix(Rm, x, y), g = Rm.ground[i], c = Rm.mini.c;
+  const M = Rm.mini;
+  if (!M?.px || !inside(Rm, x, y)) return;
+  const i = ix(Rm, x, y);
   if (!Rm.seen[i]) return;
-  c.fillStyle = Rm.name === 'cave' ? (g === ROCK ? '#3a3044' : g === WATER ? '#2d5680' : g === PORTAL ? '#ffe8a8' : Rm.wild[i] ? '#7a6e80' : '#a898b0') : g === PORTAL ? (Rm.name === 'sky' ? '#ffffff' : '#20181c') : Rm.wild[i] ? (Rm.name === 'sky' ? '#f4f8ff' : '#4f8a4c') : Rm.name === 'sky' && g === GRASS ? '#a8e090' : MINI[g] || '#888';
-  c.fillRect(x, y, 1, 1);
+  M.px[i] = mapCol(Rm, M, i); M.dirty = true;
 }

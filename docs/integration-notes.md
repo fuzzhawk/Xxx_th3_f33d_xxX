@@ -218,3 +218,22 @@ The garden is rebuilt as a wordless dream to walk through. Same world sizes; old
 - **Interactions (walking and tapping only):** houses, lamps, wells, stalls, windmills, gates, signs, towers, crystals, chests, glints, fairy rings, ruins, creatures, whales, giants; a tap on water skips a stone. People answer with pictogram bubbles (`iconSprite`). There is no text anywhere: `say()` is a no-op and the philosophers' quotes are gone.
 - **Performance** (headless, CPU throttled 4×): about 50–58 fps in every realm; the dream layer costs under 1 ms a frame; a chunk repaint with edges is a few ms once a realm's maps exist.
 - **Tested:** fresh world (2.4 s to ready), v4 save upgraded with its own plants and seeds kept, all 13 realms entered, taps on chest, house, lamp and giant, giants sowing while walking. Preview pages (gitignored): `www/_gart.html`.
+
+## Garden: menu button and map (2026-11-15)
+- **Menu button** (`garden-map.js`, installed onto `Garden`): a small round button in the card's top-right corner. It shows only while you are in control and standing still, and fades the moment you walk. It opens a menu; entries live in `MENU` (only "Map" for now). Adding one is a row there plus a case in `menuDo`.
+- **Map:** fills the card and shows the realm you are in at one pixel per tile.
+  - Explored ground is drawn in the realm's own palette for the current mode. Unexplored ground lies under soft cloud with the land faint beneath it.
+  - Names:
+    - Countries on the meadows are always shown; they are named per patch, for example "Whispering Woods", with "Home Meadow" at the start, and are faint where you haven't been.
+    - Villages (generated names), Neon City, the ways up and down (coloured by where they lead, labelled with the destination), found ruins and the places at the ends of forest paths are named once you have come near them.
+    - Labels never overlap and stay inside the card.
+  - **You:** a pulsing marker pointing the way you face; when you are off the card, an arrow at its edge.
+  - **Controls:**
+    - Pinch to zoom; drag to pan.
+    - Double-tap zooms in there; at full zoom it goes back to the whole realm.
+    - ‹ › walk through the realms you have visited, each centred on where you last stood.
+    - The target button comes back to you; × closes.
+  - **The image** is `Wd.minimap(Rm, mode)` in `garden-world.js`, replacing the old unused explored-only minimap. It is built once per realm (meadows: 17 ms, 67 ms at 4× CPU throttle) and kept current a tile at a time by `miniPaint` from `markSeen` and `invalidate`. It is never saved.
+  - While the map covers the card, only the map is drawn (under 3 ms a frame throttled).
+- **Card:** while the menu or map is open, the 25-second idle timer in `cards.js` doesn't hand the card back to autopilot (`g.holdPlay()`). Going back to autopilot or scrolling the card away closes them.
+- **Tested** (Playwright, touch events): button fades in when still and out while walking. Menu opens, and a tap outside closes it without planting. Map: pinch in and out, drag, double-tap, recentre, cycling realms, close. Evening palettes and the night realms render. No errors.

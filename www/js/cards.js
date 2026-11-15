@@ -316,7 +316,7 @@ function game(p, ctx) {
     if (on && !g.running) g.start();
     bump();
   };
-  const bump = () => { clearTimeout(idle); idle = setTimeout(() => { if (!g?.auto) setPlaying(false); }, 25000); };
+  const bump = () => { clearTimeout(idle); idle = setTimeout(() => { if (g?.holdPlay?.()) bump(); else if (!g?.auto) setPlaying(false); }, 25000); };
   stage.addEventListener('click', (e) => {
     if (g?.auto && g.autoTap) { const q = g.local(e); if (g.autoTap(q.x, q.y)) return; }
     if (!g || g.auto) { setPlaying(true); const q = g.local(e); g.tap(q.x, q.y); }

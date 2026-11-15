@@ -12,6 +12,7 @@ import { getMode } from '../modes.js';
 import { settings } from '../state.js';
 import * as Wd from './garden-world.js';
 import { install } from './garden-live.js';
+import { install as installMap } from './garden-map.js';
 import { shadowSprite } from './garden-art.js';
 import { glowSprite } from './garden-kit.js';
 // a soft-edged disc, cached by radius: cut out of the caves' darkness wherever there is a light
@@ -171,7 +172,7 @@ export class Garden extends Game {
     }
     Garden.active = this;
   }
-  stop() { const live = this.live; super.stop(); if (this.ready && live) { this.Rm.hero = { x: this.hero.x, y: this.hero.y }; Wd.saveGarden(); } }
+  stop() { const live = this.live; this.closeUI(); super.stop(); if (this.ready && live) { this.Rm.hero = { x: this.hero.x, y: this.hero.y }; Wd.saveGarden(); } }
   get live() { return this.ready && Garden.active === this; }
   hud() { return ''; }   // nothing to read: the garden speaks in pictures
 
@@ -232,15 +233,18 @@ export class Garden extends Game {
   // Movement is Seed & Sage's: drag anywhere and a floating stick appears where you pressed; how far
   // you pull sets the pace, and pulling past its rim drags the stick along behind your finger. A
   // short press is a tap, which only reaches things within arm's length.
-  down(x, y) { this.press = { x, y, t: performance.now(), moved: 0, lx: x, ly: y }; }
-  move(x, y) {
+  // (the menu button, its menu and the map, garden-map.js, take their touches first)
+  down(x, y, id) { if (this.uiDown(x, y, id)) return; this.press = { x, y, t: performance.now(), moved: 0, lx: x, ly: y }; }
+  move(x, y, id) {
+    if (this.uiMove(x, y, id)) return;
     const p = this.press;
     if (!p || !this.ready || this.fade) return;
     p.moved += Math.abs(x - p.lx) + Math.abs(y - p.ly); p.lx = x; p.ly = y;
     if (!this.stick && p.moved > 8) { this.stick = { ox: p.x, oy: p.y, x, y }; const h = this.hero; h.path = []; h.task = null; h.actor.cancel(); h.busy = 0; }
     if (this.stick) { this.stick.x = x; this.stick.y = y; }
   }
-  up(x, y) {
+  up(x, y, id) {
+    if (this.uiUp(x, y, id)) return;
     const p = this.press; this.press = null;
     if (this.stick) { this.stick = null; return; }
     if (p && p.moved < 10 && performance.now() - p.t < 450) this.tap(x, y);
@@ -261,7 +265,7 @@ export class Garden extends Game {
     for (let k = 0; k < n; k++) { if (sx && this.standable(h.x + sx, h.y)) h.x += sx; if (sy && this.standable(h.x, h.y + sy)) h.y += sy; }
   }
   tap(x, y) {
-    if (!this.ready || this.fade) return;
+    if (!this.ready || this.fade || this.uiTap(x, y)) return;
     const Rm = this.Rm, wx = x / Z + this.cam.x - VW / 2, wy = y / Z + this.cam.y - VH / 2, tx = Math.floor(wx / T), ty = Math.floor(wy / T);
     if (!inside(Rm, tx, ty)) return;
     this.fx.push({ kind: 'ring', x: wx, y: wy, t: 0, life: 0.5 });
@@ -740,6 +744,7 @@ export class Garden extends Game {
     this.underfoot(h, dt, vx || vy);
     this.portalUnderfoot();
     h.vx = vx; h.vy = vy;
+    this.stepUI(dt);
     // Cave Crawler's way: the animator gets the velocity you are asking for, so stride and facing
     // follow the stick at once (frames advance by distance, so the feet keep time with the ground);
     // the facing is eased a touch so it does not flicker between two of the eight directions
@@ -935,6 +940,8 @@ export class Garden extends Game {
       c.save(); c.translate(W / 2, H / 2 + 14); c.scale(k, k); c.drawImage(sp.cv, -sp.w / 2, -sp.h); c.restore();
       return;
     }
+    // the map, once it covers the card, is all that is drawn
+    if (this.ui?.map && this.ui.map.a >= 1 && !this.ui.map.closing) { this.drawMap(c); return; }
     // a phone that cannot keep up gets a lighter picture: the bloom goes first, then the colour drain
     const nowT = performance.now();
     if (this.lastDraw) {
@@ -1292,7 +1299,8 @@ export class Garden extends Game {
     b.globalCompositeOperation = 'source-over';
     this.dreamLights(b, cx, cy);
   }
-  // no buttons, maps or words on the card: only, on a first visit, two soft ripples where to tap
+  // on the card itself: the stick while you drag, on a first visit two soft ripples where to tap,
+  // and the menu button (with its menu and the map, garden-map.js)
   drawUI(c) {
     if (this.stick) {
       const st = this.stick, dx = st.x - st.ox, dy = st.y - st.oy, d = Math.hypot(dx, dy), k = Math.min(d, STICK_R) / (d || 1);
@@ -1308,6 +1316,7 @@ export class Garden extends Game {
       for (const [wx, wy] of spots) for (let i = 0; i < 2; i++) { const ph = ((this.t * 0.7 + i * 0.5) % 1), x = (wx - cx0) * Z0, y = (wy - cy0) * Z0; c.globalAlpha = a * (1 - ph) * 0.9; c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.beginPath(); c.ellipse(x, y, 6 + ph * 20, 3 + ph * 10, 0, 0, 7); c.stroke(); }
       c.globalAlpha = 1;
     }
+    this.drawMenuUI(c);
   }
   // the nearest tall grass to the hero (world pixels), for the first-visit ripple
   frontierNear() {
@@ -1318,3 +1327,4 @@ export class Garden extends Game {
 }
 
 install(Garden, { VW, VH, Z, GAIT, HERO_SPEED });
+installMap(Garden);
