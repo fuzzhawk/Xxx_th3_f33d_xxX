@@ -5,13 +5,20 @@
 import { W, H, noiseMap } from './engine.js';
 import { mulberry32 } from '../util.js';
 import { idbGet, idbSet } from '../store.js';
+import { mk, ell, px, rgbOf, hexOf, tone, mixHex, crisp, hash2, vnoise, vivid } from './garden-kit.js';
+import { treeSprite, creatureSprite, STRANGE } from './garden-art.js';
+import { dreamify, populateDream } from './garden-dream.js';
+export { tone };
 
 export const T = 16, CH = 16, HR = 3600e3, KEY = 'garden-v2', OLD = 'garden-v1';
-export const GRASS = 0, WATER = 2, PATH = 3, SAND = 4, STONE = 5, BRIDGE = 6, ROCK = 7, PORTAL = 8, FOREST = 9, FLOWERS = 10, VOID = 11, CHASM = 12, ICE = 13;
+export const GRASS = 0, WATER = 2, PATH = 3, SAND = 4, STONE = 5, BRIDGE = 6, ROCK = 7, PORTAL = 8, FOREST = 9, FLOWERS = 10, VOID = 11, CHASM = 12, ICE = 13, STREET = 14;
 // realm sizes in tiles (a world about fifty times the first garden's area) and what each realm is
 // like underfoot: meadow-like ground, cave dark, or islands in open air
-export const SIZE = { surface: 900, canyon: 384, mountain: 384, cave: 192, deep: 256, sky: 192, canopy: 192 };
-export const KIND = { surface: 'surface', canyon: 'surface', mountain: 'surface', cave: 'cave', deep: 'cave', sky: 'sky', canopy: 'sky' };
+export const SIZE = { surface: 900, canyon: 384, mountain: 384, cave: 192, deep: 256, sky: 192, canopy: 192, gorge: 256, abyss: 192, high: 192, stars: 192, under: 160, roofs: 160 };
+export const KIND = { surface: 'surface', canyon: 'surface', mountain: 'surface', cave: 'cave', deep: 'cave', sky: 'sky', canopy: 'sky', gorge: 'surface', abyss: 'cave', high: 'sky', stars: 'sky', under: 'cave', roofs: 'sky' };
+// how high each realm sits (which way a lift goes), and the realms where it is always night
+export const ALT = { abyss: -3, deep: -2, gorge: -2, cave: -1, canyon: -1, under: -1, surface: 0, canopy: 1, mountain: 1, roofs: 1, sky: 2, high: 3, stars: 4 };
+export const NIGHT = { stars: 1, roofs: 1 };
 export const REALM_NAME = { surface: 'The meadows', cave: 'The caverns', sky: 'The sky islands' };
 export const now = () => Date.now();
 
@@ -48,8 +55,20 @@ export const PLANTS = {
   snowpine: { type: 'tree', hours: 32, name: 'Snow pine', leaf: '#3f6f5e', pine: true, snow: true },
   bigshroom: { type: 'tree', hours: 20, name: 'Giant mushroom', leaf: '#8a6ad0', cap: '#8a6ad0', glow: '#c8a8ff', shroomTree: true },
   cactus: { type: 'shrub', hours: 12, name: 'Cactus', leaf: '#5f9a5a', bloom: '#ff7aa8', cactus: true },
-  heather: { type: 'shrub', hours: 8, name: 'Heather', leaf: '#6a7a5a', bloom: '#c07ad8' }
+  heather: { type: 'shrub', hours: 8, name: 'Heather', leaf: '#6a7a5a', bloom: '#c07ad8' },
+  // the dream's trees: each kind of country has its own shapes
+  cypress: { type: 'tree', hours: 30, name: 'Cypress', leaf: '#3a6a4a', shape: 'cypress' },
+  redwood: { type: 'tree', hours: 48, name: 'Redwood', leaf: '#2f6a48', shape: 'redwood' },
+  palm: { type: 'tree', hours: 26, name: 'Palm', leaf: '#5aa85a', shape: 'palm', fruit: '#c8843a', food: true },
+  ginkgo: { type: 'tree', hours: 30, name: 'Ginkgo', leaf: '#e8c040', shape: 'ginkgo' },
+  wisteria: { type: 'tree', hours: 28, name: 'Wisteria', leaf: '#7aa870', shape: 'wisteria', bloom: '#b08af0' },
+  jacaranda: { type: 'tree', hours: 28, name: 'Jacaranda', leaf: '#a078e0', shape: 'blossom', bloom: '#c8a8ff' },
+  acacia: { type: 'tree', hours: 30, name: 'Acacia', leaf: '#8aa850', shape: 'umbrella' },
+  baobab: { type: 'tree', hours: 50, name: 'Baobab', leaf: '#7aa860', shape: 'baobab' },
+  mangrove: { type: 'tree', hours: 26, name: 'Mangrove', leaf: '#5a9a6a', shape: 'mangrove' },
+  crystaltree: { type: 'tree', hours: 36, name: 'Crystal tree', leaf: '#9ff0f0', shape: 'crystal', bark: 'crystal', glow: '#9ff0f0' }
 };
+PLANTS.bigshroom.shape = 'shroom';
 export const COMMON = ['daisy', 'tulip', 'poppy', 'lavender', 'bluebell', 'cosmos', 'sunflower', 'berrybush', 'rosebush', 'hydrangea', 'apple', 'cherry', 'willow', 'birch', 'oak'];
 export const stageOf = (p) => (p.g < 0.12 ? 0 : p.g < 0.4 ? 1 : p.g < 0.8 ? 2 : 3);
 export const FRUIT_CAP = { tree: 4, shrub: 5 };
@@ -73,7 +92,18 @@ export const ANIMALS = {
   cavefish: { realm: 'cave', speed: 14, cap: 6, why: 'the still pools', need: (s) => s.water >= 6, water: true },
   swallow: { realm: 'sky', fly: true, speed: 40, cap: 8, why: 'the open sky', need: (s) => s.seen >= 120 },
   cloudsheep: { realm: 'sky', speed: 10, cap: 6, why: 'the soft grass', need: (s) => s.plants >= 3, eats: true },
-  dragonfly: { realm: 'sky', fly: true, speed: 30, cap: 6, why: 'the sky orchids', need: (s) => s.bloom >= 2 }
+  dragonfly: { realm: 'sky', fly: true, speed: 30, cap: 6, why: 'the sky orchids', need: (s) => s.bloom >= 2 },
+  // strange and mythical: they are found, never drawn by planting (glow: a light they carry)
+  kirin: { strange: 1, speed: 26, cap: 0, glow: '#c8a8ff', icon: 'star' }, spiritfox: { strange: 1, speed: 34, cap: 0, glow: '#9fd8ff', icon: 'moon' },
+  mothdeer: { strange: 1, speed: 20, cap: 0, glow: '#c8a8ff', icon: 'spiral' }, mossling: { strange: 1, speed: 12, cap: 0, hop: true, icon: 'leaf', eats: true },
+  jelly: { strange: 1, fly: true, speed: 7, cap: 0, glow: '#bfe6ff', icon: 'drop' }, snail: { strange: 1, speed: 3, cap: 0, icon: 'flower', eats: true },
+  tortoise: { strange: 1, speed: 4, cap: 0, icon: 'flower', eats: true, big: 1 }, stag: { strange: 1, speed: 24, cap: 0, glow: '#bfe6ff', icon: 'star', big: 1 },
+  moonhare: { strange: 1, speed: 34, cap: 0, hop: true, glow: '#fff6c8', icon: 'moon' }, axolotl: { strange: 1, speed: 12, cap: 0, water: true, icon: 'heart' },
+  crab: { strange: 1, speed: 10, cap: 0, icon: 'gem' }, kodama: { strange: 1, speed: 8, cap: 0, glow: '#e8fff8', icon: 'note' },
+  emberbird: { strange: 1, fly: true, speed: 36, cap: 0, glow: '#ffb23a', icon: 'sun' }, angler: { strange: 1, fly: true, speed: 9, cap: 0, glow: '#d8ffa0', icon: 'fish' },
+  manta: { strange: 1, fly: true, speed: 22, cap: 0, icon: 'drop', big: 1 }, koi: { strange: 1, fly: true, speed: 18, cap: 0, glow: '#ffb08a', icon: 'fish' },
+  phoenix: { strange: 1, fly: true, speed: 40, cap: 0, glow: '#ffb23a', icon: 'sun', big: 1 }, drone: { strange: 1, fly: true, speed: 30, cap: 0, glow: '#5af0ff', icon: 'note' },
+  cat: { strange: 1, speed: 28, cap: 0, icon: 'heart', eats: true }, gecko: { strange: 1, speed: 26, cap: 0, icon: 'sun' }
 };
 
 // ruins: [type, name, lore, rare seed, w, h, solid]
@@ -128,14 +158,26 @@ const DERIVE = {
   canyon: (m) => shiftPal(PAL.surface[m] || PAL.surface.day, '#c2703f', 0.34, { rock: '#a8573a', rock2: '#7e3d28', rock3: '#c9805a', water: '#4f8fb0', water2: '#8cc0d8' }),
   mountain: (m) => shiftPal(PAL.surface[m] || PAL.surface.day, '#a9bccb', 0.24, { sand: '#eef2f6', path: '#d8d2c8', stone: '#cfd4da' }),
   deep: () => shiftPal(PAL.cave, '#3b2a66', 0.28, { water: '#14504f', water2: '#2a8a86', dot: ['#9ff0f0', '#e0a8ff'] }),
+  gorge: (m) => shiftPal(PAL.surface[m] || PAL.surface.day, '#5a2a8a', 0.4, { rock: '#5a3a72', rock2: '#3a2450', rock3: '#8a5aa8', water: '#22c8b8', water2: '#8af8e8', sand: '#806090', path: '#9070a0', plank: '#6a4a70' }),
+  abyss: () => shiftPal(PAL.cave, '#4a0a1a', 0.36, { water: '#ff6a2a', water2: '#ffc04a', wall: '#160a10', wall2: '#3a1a22', wall3: '#7a2a2a', dot: ['#ff8a3a', '#ffd24a'], lava: 1 }),
+  under: () => shiftPal(PAL.cave, '#10283a', 0.42, { water: '#12c8c0', water2: '#8afff0', wall: '#0c0e1a', wall2: '#1e2238', wall3: '#3a4a76', dot: ['#5af0ff', '#ff5ad8'], neon: 1 }),
+  high: (m) => shiftPal(PAL.sky[m] || PAL.sky.day, '#ffc8f0', 0.26, { bg: m === 'evening' ? ['#2e2270', '#f08ab0'] : m === 'morning' ? ['#ffd8c8', '#c8e8ff'] : ['#4a7af0', '#f0d8ff'], cloud: m === 'evening' ? '#ffd0e8' : '#ffffff' }),
+  stars: () => ({ grass: ['#8a9ad8', '#7e8ecc', '#98a8e4'], dot: ['#fff6c8', '#9fd8ff', '#ffffff', '#e0a8ff'], under: '#4a4a8a', under2: '#2e2e5e', mist: '#c8d0ff', cloud: '#b8c0f8', bg: ['#060820', '#2a1a5a'], night: 1 }),
+  roofs: () => ({ grass: ['#4a5068', '#444a60', '#525872'], dot: ['#5af0ff', '#ff5ad8', '#ffd24a'], under: '#1c1a2e', under2: '#14121f', mist: '#a8b0d0', cloud: '#6a70a0', bg: ['#0a0818', '#2a1438'], night: 1, roofs: 1 }),
   canopy: (m) => shiftPal(PAL.sky[m] || PAL.sky.day, '#3f7a3a', 0.45, { under: '#5a4030', under2: '#3d2b20', mist: '#cfe8c0', cloud: '#7fb86a', bg: m === 'evening' ? ['#1f1a24', '#0c0a0e'] : ['#24321f', '#0f160d'], planks: true })
 };
+// the dream's colour: every palette is pushed toward richer colour (the living things most, stone
+// and sand a little), so the world reads as vivid and not washed out
+const SOFT = new Set(['stone', 'stone2', 'rock', 'rock2', 'rock3', 'path', 'sand', 'plank', 'wall', 'wall2', 'wall3', 'under', 'under2', 'floor', 'rubble', 'bg']);
+function vibrant(P, k = 0.3) {
+  const mv = (v, q) => (typeof v === 'string' && v[0] === '#' ? vivid(v, q) : Array.isArray(v) ? v.map((x) => mv(x, q)) : v);
+  return Object.fromEntries(Object.entries(P).map(([key, v]) => [key, mv(v, SOFT.has(key) ? k * 0.35 : k)]));
+}
 export const palFor = (realm, mode) => {
-  if (realm === 'cave') return PAL.cave;
-  if (PAL[realm]) return PAL[realm][mode] || PAL[realm].day;
   const key = `${realm}|${mode}`;
-  if (!derived.has(key) && DERIVE[realm]) derived.set(key, DERIVE[realm](mode));
-  return derived.get(key) || PAL.surface.day;
+  let P = derived.get(key);
+  if (!P) { P = vibrant(realm === 'cave' ? PAL.cave : PAL[realm] ? PAL[realm][mode] || PAL[realm].day : DERIVE[realm] ? DERIVE[realm](mode) : PAL.surface.day); derived.set(key, P); }
+  return P;
 };
 // ------------------------------------------------ the ten kinds of country
 // Each has its own colours (given for the day; morning and evening are worked out from them), its
@@ -167,7 +209,7 @@ export const BIOMES = [
 ];
 export const B_MEADOW = 0, B_WOODS = 1, B_DOWNS = 2, B_MARSH = 3, B_HEATH = 4, B_AUTUMN = 5, B_DUNES = 6, B_ANCIENT = 7, B_FROST = 8, B_FUNGAL = 9;
 // morning is paler and cooler, evening dusky; the light grade (garden.js) does the rest
-const MODE_MIX = { morning: ['#f0f8ff', 0.37], day: null, evening: ['#6e6e82', 0.35] };
+const MODE_MIX = { morning: ['#ffeaf0', 0.27], day: null, evening: ['#5c58a8', 0.3] };
 const biomePals = new Map();
 export function biomePal(b, mode) {
   const key = `${b}|${mode}`;
@@ -175,16 +217,9 @@ export function biomePal(b, mode) {
   if (P) return P;
   const B = BIOMES[b] || BIOMES[0], m = MODE_MIX[mode];
   const mv = (v, k) => (typeof v === 'string' && v[0] === '#' ? mixHex(v, m[0], k) : Array.isArray(v) ? v.map((x) => mv(x, k)) : v);
-  P = m ? Object.fromEntries(Object.entries(B.pal).map(([k, v]) => [k, mv(v, k === 'dot' ? m[1] * 0.4 : m[1])])) : { ...B.pal };
+  P = vibrant(m ? Object.fromEntries(Object.entries(B.pal).map(([k, v]) => [k, mv(v, k === 'dot' ? m[1] * 0.4 : m[1])])) : { ...B.pal });
   biomePals.set(key, P);
   return P;
-}
-// smooth value noise from a hash (no tables): for wiggling the borders between kinds of country
-function hash2(x, y, s) { let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
-function vnoise(x, y, s) {
-  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
-  const a = hash2(x0, y0, s), b = hash2(x0 + 1, y0, s), c = hash2(x0, y0 + 1, s), d = hash2(x0 + 1, y0 + 1, s);
-  return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
 }
 // which kind of country each tile is: broad regions from heat, damp and strangeness (8-tile cells,
 // ranked so every kind gets its share), their borders warped and dithered so they meet organically.
@@ -212,54 +247,16 @@ export function biomeAt(Rm, x, y) {
   return biomeMap(Rm)[y * Rm.w + x];
 }
 
-// ------------------------------------------------ tiny pixel sprite helpers
-function mk(w, h) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return [cv, cv.getContext('2d')]; }
-function ell(c, cx, cy, rx, ry, col) {
-  c.fillStyle = col;
-  for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
-    const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
-    if (dx * dx + dy * dy <= 1) c.fillRect(x, y, 1, 1);
-  }
-}
-const px = (c, x, y, col, w = 1, h = 1) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
-// colours as #rrggbb in and out (rgb(...) is read too), so tints can be chained
-const rgbOf = (c) => (c[0] === '#' ? (() => { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; })() : c.match(/\d+/g).slice(0, 3).map(Number));
-const hexOf = (r, g, b) => `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
-export function tone(c, f) {
-  const m = (v) => Math.max(0, Math.min(255, Math.round(f > 0 ? v + (255 - v) * f : v * (1 + f))));
-  return hexOf(...rgbOf(c).map(m));
-}
-function mixHex(a, b, t) {
-  const A = rgbOf(a), B = rgbOf(b);
-  return hexOf(...A.map((v, k) => Math.round(v * (1 - t) + B[k] * t)));
-}
-
-// retro finish for a sprite: hard pixel edges (no soft alpha) and a dark one-pixel outline
-function crisp(cv, outline = 'rgba(38,28,44,.92)') {
-  const c = cv.getContext('2d'), w = cv.width, h = cv.height, src = c.getImageData(0, 0, w, h), d = src.data;
-  const big = mk(w + 2, h + 2), out = big[1].createImageData(w + 2, h + 2), o = out.data;
-  const solid = (x, y) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] >= 110;
-  const [or, og, ob, oa] = outline.match(/[\d.]+/g).map(Number);
-  for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++) {
-    const j = ((y + 1) * (w + 2) + (x + 1)) * 4;
-    if (solid(x, y)) { const i = (y * w + x) * 4; o[j] = d[i]; o[j + 1] = d[i + 1]; o[j + 2] = d[i + 2]; o[j + 3] = 255; }
-    else {
-      // selective outline: a deep shade of whatever it borders, pulled toward the ink colour, so thin stems stay green
-      let n = 0, r = 0, g = 0, bl = 0;
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) if (solid(x + dx, y + dy)) { const i = ((y + dy) * w + x + dx) * 4; r += d[i]; g += d[i + 1]; bl += d[i + 2]; n++; }
-      if (!n) continue;
-      o[j] = Math.round(r / n * 0.3 + or * 0.45); o[j + 1] = Math.round(g / n * 0.3 + og * 0.45); o[j + 2] = Math.round(bl / n * 0.3 + ob * 0.45); o[j + 3] = Math.round((oa ?? 1) * 255);
-    }
-  }
-  big[1].putImageData(out, 0, 0);
-  return big[0];
-}
+// ------------------------------------------------ sprites (the pixel helpers live in garden-kit.js)
 const spriteCache = new Map();
-export function plantSprite(k, st, fruit) {
+export function plantSprite(k, st, fruit, v = 0) {
+  const P = PLANTS[k];
+  // trees (young and grown) are drawn by the dream's art, in one of four variants
+  if (P.type === 'tree' && st >= 2) return treeSprite(k, P, st, fruit, v & 3);
   const key = `${k}|${st}|${fruit ? 1 : 0}`;
   let s = spriteCache.get(key);
   if (s) return s;
-  const P = PLANTS[k], stem = '#5f9a4e', leaf = '#76b35f';
+  const stem = '#5f9a4e', leaf = '#76b35f';
   let cv, c;
   if (st === 0) { [cv, c] = mk(8, 5); ell(c, 4, 3.5, 3.5, 1.6, P.cave ? '#5a4a52' : '#9b7653'); px(c, 3, 2, '#b8936b', 2); px(c, 4, 1, P.cave ? P.petal : '#7fbf68'); }
   else if (P.shroom) {
@@ -361,6 +358,7 @@ export function plantSprite(k, st, fruit) {
 
 // animals: two frames each, drawn facing right
 export function animalSprite(k, f) {
+  if (STRANGE.includes(k)) return creatureSprite(k, f);
   const key = `a|${k}|${f}`;
   let s = spriteCache.get(key);
   if (s) return s;
@@ -474,6 +472,26 @@ export function liftSprite(style) {
     c.fillStyle = '#e8fbff'; c.beginPath(); c.moveTo(20, 30); c.lineTo(25, 40); c.lineTo(20, 50); c.lineTo(15, 40); c.closePath(); c.fill();
     c.fillStyle = '#7fd8f8'; c.beginPath(); c.moveTo(20, 30); c.lineTo(25, 40); c.lineTo(20, 50); c.closePath(); c.fill();
     c.fillStyle = '#ffffff'; c.fillRect(18, 35, 2, 3);
+  } else if (style === 'tube') {
+    // the city's way up: a glass tube ringed with neon over a lit pad
+    [cv, c] = mk(40, 92);
+    c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(20, 86, 17, 5, 0, 0, 7); c.fill();
+    c.fillStyle = '#2a2838'; c.beginPath(); c.ellipse(20, 85, 15, 5, 0, 0, 7); c.fill();
+    c.fillStyle = '#5af0ff'; c.beginPath(); c.ellipse(20, 85, 9, 3, 0, 0, 7); c.fill();
+    c.fillStyle = 'rgba(150,230,255,.22)'; c.fillRect(12, 6, 16, 79); c.fillStyle = 'rgba(220,250,255,.5)'; c.fillRect(13, 6, 2, 79);
+    c.fillStyle = '#3a3850'; c.fillRect(11, 6, 1, 79); c.fillRect(28, 6, 1, 79); c.fillRect(10, 2, 20, 5);
+    for (let y = 14; y < 84; y += 12) { c.fillStyle = (y / 12) % 2 < 1 ? '#ff5ad8' : '#5af0ff'; c.fillRect(10, y, 20, 2); }
+    c.fillStyle = '#ffd24a'; c.fillRect(18, 0, 4, 3);
+  } else if (style === 'hatch') {
+    // the way down: a round hatch standing open, a ladder into the light below
+    [cv, c] = mk(40, 46);
+    c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(20, 40, 17, 5, 0, 0, 7); c.fill();
+    c.fillStyle = '#2a2838'; c.beginPath(); c.ellipse(20, 38, 15, 6, 0, 0, 7); c.fill();
+    c.fillStyle = '#ff5ad8'; c.beginPath(); c.ellipse(20, 37, 12, 4.4, 0, 0, 7); c.fill();
+    c.fillStyle = '#12c8c0'; c.beginPath(); c.ellipse(20, 37, 9, 3, 0, 0, 7); c.fill();
+    c.fillStyle = '#0c0e1a'; c.beginPath(); c.ellipse(20, 37.5, 6, 2, 0, 0, 7); c.fill();
+    c.fillStyle = '#3a3850'; c.beginPath(); c.ellipse(20, 18, 13, 9, 0, 0, 7); c.fill(); c.fillStyle = '#565470'; c.beginPath(); c.ellipse(19, 17, 11, 7, 0, 0, 7); c.fill();
+    c.fillStyle = '#5af0ff'; c.fillRect(13, 16, 12, 1); c.fillStyle = '#2a2838'; c.fillRect(7, 20, 2, 18); c.fillRect(31, 20, 2, 18);
   } else if (style === 'vine') {
     [cv, c] = mk(28, 70);
     c.strokeStyle = '#7a6a48'; c.lineWidth = 1;
@@ -508,6 +526,17 @@ export function plantIndex(Rm) {
 export function plantsIn(Rm, x0, y0, x1, y1) {
   const m = plantIndex(Rm), out = [];
   for (let cy = Math.max(0, y0 >> 4); cy <= y1 >> 4; cy++) for (let cx = Math.max(0, x0 >> 4); cx <= x1 >> 4; cx++) { const l = m.get((cy << 12) | cx); if (l) for (const p of l) if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1) out.push(p); }
+  return out;
+}
+// decor (houses, lamps, chests, towers…) by 16-tile cells, like the plants
+export function decorIn(Rm, x0, y0, x1, y1) {
+  if (!Rm.dIdx || Rm.dIdxN !== Rm.decor.length || Rm.dIdxA !== Rm.decor) {
+    const m = new Map();
+    for (const d of Rm.decor) { const k = ((d.y >> 4) << 12) | (d.x >> 4); let l = m.get(k); if (!l) m.set(k, (l = [])); l.push(d); }
+    Rm.dIdx = m; Rm.dIdxN = Rm.decor.length; Rm.dIdxA = Rm.decor;
+  }
+  const out = [];
+  for (let cy = Math.max(0, y0 >> 4); cy <= y1 >> 4; cy++) for (let cx = Math.max(0, x0 >> 4); cx <= x1 >> 4; cx++) { const l = Rm.dIdx.get((cy << 12) | cx); if (l) for (const d of l) if (d.x >= x0 && d.x <= x1 && d.y >= y0 && d.y <= y1) out.push(d); }
   return out;
 }
 export function crystalSprite(col) {
@@ -584,8 +613,8 @@ function natural(Rm, k, x, y, extra = {}) { Rm.plants.push({ k, x, y, g: 1, w: 0
 function critter(G, Rm, k, x, y) { Rm.animals.push({ id: G.nextId++, k, x: x * T + 8, y: y * T + 8, b: now() - 48 * HR, f: 0, baby: 0, n: 1 }); }
 
 // the caverns: three layers of the cave automaton, pools, glowshrooms and crystals
-function genCave(G, R, mouths, name = 'cave', upTo = 'surface') {
-  const Rm = mkRealm(name, G.seed ^ (name === 'cave' ? 0x5bd1 : 0x4e77)), N = Rm.w;
+function genCave(G, R, mouths, name = 'cave', upTo = 'surface', salt = null) {
+  const Rm = mkRealm(name, G.seed ^ (salt ?? (name === 'cave' ? 0x5bd1 : 0x4e77))), N = Rm.w;
   // three layers of the cave automaton blended: great halls (coarse), side chambers (middling) and
   // ragged edges and pillars (fine); the deepest 46% becomes floor
   const f1 = caField(R, N, N, 6, 0.5, 5), f2 = caField(R, N, N, 2.5, 0.5, 4), f3 = caField(R, N, N, 1, 0.45, 2), f = new Float32Array(N * N);
@@ -660,8 +689,8 @@ function genCave(G, R, mouths, name = 'cave', upTo = 'surface') {
 }
 
 // the sky: islands over a sea of cloud, joined by cloud paths; mist to clear
-function genSky(G, R, name = 'sky') {
-  const Rm = mkRealm(name, G.seed ^ (name === 'sky' ? 0x2c9f : 0x7c1d)), N = Rm.w, nN = noiseMap(R, N, 3, Math.max(5, N / 13 | 0)), many = Math.round(8 * (N / 64) ** 1.6);
+function genSky(G, R, name = 'sky', salt = null) {
+  const Rm = mkRealm(name, G.seed ^ (salt ?? (name === 'sky' ? 0x2c9f : 0x7c1d))), N = Rm.w, nN = noiseMap(R, N, 3, Math.max(5, N / 13 | 0)), many = Math.round(8 * (N / 64) ** 1.6);
   Rm.ground.fill(VOID);
   const isl = [];
   for (let t = 0; t < 400 * many / 8 && isl.length < many; t++) {
@@ -692,9 +721,9 @@ function genSky(G, R, name = 'sky') {
   for (let yy = hy - 2; yy <= hy + 2; yy++) for (let xx = hx - 2; xx <= hx + 2; xx++) Rm.wild[ix(Rm, xx, yy)] = 0;
   Rm.portals.push({ x: hx, y: hy, to: 'surface', tx: 0, ty: 0, kind: 'down' });
   const ok = (x, y) => inside(Rm, x, y) && Rm.ground[ix(Rm, x, y)] === GRASS && Math.hypot(x - hx, y - hy) > 5;
-  if (name === 'sky') placeRuins(Rm, R, RUINS.sky, ok, 8, 40, hx, hy);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (Rm.ground[ix(Rm, x, y)] === GRASS && R() < 0.05 && Math.hypot(x - hx, y - hy) > 2 && !Rm.ruins.some((u) => x >= u.x - 1 && x <= u.x + u.w && y >= u.y - 1 && y <= u.y + u.h)) natural(Rm, name === 'sky' ? (R() < 0.6 ? 'skyorchid' : 'daisy') : (R() < 0.5 ? 'fern' : R() < 0.5 ? 'cosmos' : 'bluebell'), x, y);
-  for (const [k, n] of name === 'sky' ? [['cloudsheep', 4], ['swallow', 4], ['dragonfly', 3]] : [['squirrel', 6], ['songbird', 6], ['butterfly', 5]]) for (let i = 0; i < n; i++) { const o = isl[1 + Math.floor(R() * (isl.length - 1))] || home; critter(G, Rm, k, Math.round(o.x), Math.round(o.y)); }
+  if (name === 'sky' || name === 'high') placeRuins(Rm, R, RUINS.sky, ok, 8, 40, hx, hy);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (Rm.ground[ix(Rm, x, y)] === GRASS && R() < 0.05 && Math.hypot(x - hx, y - hy) > 2 && !Rm.ruins.some((u) => x >= u.x - 1 && x <= u.x + u.w && y >= u.y - 1 && y <= u.y + u.h)) natural(Rm, name === 'stars' ? (R() < 0.5 ? 'moonflower' : R() < 0.6 ? 'crystallily' : 'crystaltree') : name !== 'canopy' ? (R() < 0.6 ? 'skyorchid' : 'daisy') : (R() < 0.5 ? 'fern' : R() < 0.5 ? 'cosmos' : 'bluebell'), x, y);
+  for (const [k, n] of name === 'stars' ? [['moonhare', 8], ['stag', 2], ['jelly', 6]] : name === 'high' ? [['cloudsheep', 4], ['manta', 4], ['phoenix', 2], ['swallow', 4]] : name === 'sky' ? [['cloudsheep', 4], ['swallow', 4], ['dragonfly', 3]] : [['squirrel', 6], ['songbird', 6], ['butterfly', 5]]) for (let i = 0; i < n; i++) { const o = isl[1 + Math.floor(R() * (isl.length - 1))] || home; critter(G, Rm, k, Math.round(o.x), Math.round(o.y)); }
   Rm.hero = { x: hx * T + 8, y: (hy + 1) * T + 12 };
   return Rm;
 }
@@ -736,7 +765,6 @@ function spotIn(Rm, R, ok, others = [], sep = 10, tries = 4000) {
 }
 const openGround = (Rm) => (x, y) => inside(Rm, x, y) && [GRASS, SAND, FLOWERS, FOREST, PATH].includes(Rm.ground[ix(Rm, x, y)]) && !Rm.ruins.some((u) => x >= u.x - 2 && x <= u.x + u.w + 1 && y >= u.y - 2 && y <= u.y + u.h + 1);
 // how high each realm sits, for which way a lift goes
-const ALT = { deep: -2, cave: -1, canyon: -1, surface: 0, canopy: 1, mountain: 1, sky: 2 };
 function clearAt(Rm, x, y) {
   for (let yy = y - 1; yy <= y + 2; yy++) for (let xx = x - 1; xx <= x + 1; xx++) {
     if (!inside(Rm, xx, yy)) continue;
@@ -973,13 +1001,14 @@ function genMountain(G, R) {
 
 // what grows wild in a chunk and who lives there: worked out the first time you come near, so the
 // world only remembers the parts you have seen
-export function populate(G, Rm, cx, cy) {
+export function populate(G, Rm, cx, cy) { const a = populateBase(G, Rm, cx, cy), b = populateDream(G, Rm, cx, cy, API); return a || b; }
+function populateBase(G, Rm, cx, cy) {
   const C = Math.ceil(Rm.w / CH);
   if (!Rm.pop || Rm.pop.length !== C * C) Rm.pop = new Uint8Array(C * C);
   const ci = cy * C + cx;
   if (cx < 0 || cy < 0 || cx >= C || cy >= C || Rm.pop[ci]) return false;
   Rm.pop[ci] = 1;
-  if (Rm.kind !== 'surface') return true;
+  if (Rm.kind !== 'surface' || Rm.name === 'gorge') return true;
   const R = mulberry32((Rm.seed * 31 + ci * 7919) | 0), x0 = cx * CH, y0 = cy * CH, x1 = Math.min(Rm.w - 3, x0 + CH), y1 = Math.min(Rm.h - 3, y0 + CH);
   const taken = new Set(Rm.plants.filter((p) => p.x >= x0 - 1 && p.x <= x1 && p.y >= y0 - 1 && p.y <= y1).map((p) => p.y * Rm.w + p.x));
   const busy = (x, y) => Rm.ruins.some((u) => x >= u.x - 1 && x <= u.x + u.w && y >= u.y - 1 && y <= u.y + u.h) || Rm.portals.some((p) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 2) || Rm.decor.some((o) => o.t === 'lift' && Math.abs(o.x - x) <= 1 && Math.abs(o.y - y) <= 2);
@@ -996,16 +1025,16 @@ export function populate(G, Rm, cx, cy) {
     else if (Rm.name === 'canyon') k = (g === SAND || g === GRASS) && wet(x, y) ? (r < 0.3 ? 'reed' : null) : g === GRASS ? (r < 0.018 ? pick(['poppy', 'sunflower', 'lavender']) : r < 0.024 ? 'berrybush' : r < 0.032 ? 'cactus' : null) : null;
     else if ((g === SAND || g === GRASS) && wet(x, y) && bi !== B_FROST) k = r < (bi === B_MARSH ? 0.35 : bi === B_DUNES ? 0.12 : 0.2) ? 'reed' : null;
     else switch (bi) {
-      case B_WOODS: k = F ? tr(0.22, ['pine', 'oak', 'birch', 'pine']) || (r < 0.36 ? 'fern' : null) : GR ? (r < 0.03 ? 'fern' : tr(0.036, ['birch', 'oak'])) : null; break;
-      case B_DOWNS: k = g === FLOWERS ? (r < 0.12 ? pick(FL) : null) : g === GRASS ? (r < 0.045 ? pick([...FL, 'sunflower']) : tr(0.05, ['cherry'])) : F ? tr(0.15, ['cherry', 'apple', 'birch']) || (r < 0.22 ? 'rosebush' : null) : null; break;
-      case B_MARSH: k = GR ? (r < 0.015 ? 'bluebell' : tr(0.022, ['willow'])) : F ? tr(0.16, ['willow', 'birch']) || (r < 0.26 ? 'fern' : null) : null; break;
-      case B_HEATH: k = GR ? (r < 0.07 ? 'heather' : r < 0.085 ? 'lavender' : r < 0.092 ? 'berrybush' : null) : F ? tr(0.12, ['pine']) || (r < 0.2 ? 'heather' : null) : null; break;
-      case B_AUTUMN: k = F ? tr(0.22, ['maple', 'maple', 'oak', 'apple']) || (r < 0.3 ? 'berrybush' : null) : GR ? tr(0.012, ['maple']) || (r < 0.02 ? 'berrybush' : null) : null; break;
-      case B_DUNES: k = g === SAND || GR ? (r < 0.02 ? 'cactus' : null) : F ? (r < 0.08 ? 'cactus' : null) : null; break;
-      case B_ANCIENT: k = F ? tr(0.2, ['pine', 'oak', 'willow']) || (r < 0.32 ? 'fern' : r < 0.36 ? 'hydrangea' : null) : GR ? (r < 0.03 ? 'fern' : null) : null; break;
+      case B_WOODS: k = F ? tr(0.22, ['pine', 'oak', 'birch', 'pine', 'ginkgo', 'redwood']) || (r < 0.36 ? 'fern' : null) : GR ? (r < 0.03 ? 'fern' : tr(0.036, ['birch', 'oak'])) : null; break;
+      case B_DOWNS: k = g === FLOWERS ? (r < 0.12 ? pick(FL) : null) : g === GRASS ? (r < 0.045 ? pick([...FL, 'sunflower']) : tr(0.05, ['cherry', 'jacaranda'])) : F ? tr(0.15, ['cherry', 'apple', 'birch', 'wisteria', 'jacaranda']) || (r < 0.22 ? 'rosebush' : null) : null; break;
+      case B_MARSH: k = GR ? (r < 0.015 ? 'bluebell' : tr(0.022, ['willow', 'mangrove'])) : F ? tr(0.16, ['willow', 'birch', 'mangrove', 'mangrove']) || (r < 0.26 ? 'fern' : null) : null; break;
+      case B_HEATH: k = GR ? (r < 0.07 ? 'heather' : r < 0.085 ? 'lavender' : r < 0.092 ? 'berrybush' : null) : F ? tr(0.12, ['pine', 'cypress']) || (r < 0.2 ? 'heather' : null) : null; break;
+      case B_AUTUMN: k = F ? tr(0.22, ['maple', 'maple', 'oak', 'apple', 'ginkgo']) || (r < 0.3 ? 'berrybush' : null) : GR ? tr(0.012, ['maple']) || (r < 0.02 ? 'berrybush' : null) : null; break;
+      case B_DUNES: k = g === SAND || GR ? (r < 0.02 ? 'cactus' : tr(0.028, ['palm', 'acacia', 'baobab'])) : F ? (r < 0.08 ? 'cactus' : tr(0.16, ['acacia', 'palm', 'baobab'])) : null; break;
+      case B_ANCIENT: k = F ? tr(0.2, ['pine', 'oak', 'willow', 'redwood', 'redwood']) || (r < 0.32 ? 'fern' : r < 0.36 ? 'hydrangea' : null) : GR ? (r < 0.03 ? 'fern' : null) : null; break;
       case B_FROST: k = F ? tr(0.24, ['snowpine']) : GR ? tr(0.008, ['snowpine']) || (r < 0.012 ? 'moonflower' : null) : null; break;
-      case B_FUNGAL: k = F ? tr(0.12, ['bigshroom']) || (r < 0.2 ? 'glowshroom' : tr(0.21, ['spirittree'])) : GR ? (r < 0.035 ? 'glowshroom' : r < 0.045 ? 'moonflower' : tr(0.05, ['bigshroom'])) : null; break;
-      default: k = F ? tr(0.2, ['pine', 'oak', 'birch']) || (r < 0.32 ? 'fern' : null) : g === GRASS ? tr(0.005, ['apple', 'cherry']) : g === FLOWERS ? (r < 0.06 ? pick(FL) : null) : null;
+      case B_FUNGAL: k = F ? tr(0.12, ['bigshroom']) || (r < 0.2 ? 'glowshroom' : tr(0.21, ['spirittree', 'crystaltree'])) : GR ? (r < 0.035 ? 'glowshroom' : r < 0.045 ? 'moonflower' : tr(0.05, ['bigshroom'])) : null; break;
+      default: k = F ? tr(0.2, ['pine', 'oak', 'birch', 'cypress']) || (r < 0.32 ? 'fern' : null) : g === GRASS ? tr(0.005, ['apple', 'cherry']) : g === FLOWERS ? (r < 0.06 ? pick(FL) : null) : null;
     }
     if (k) { natural(Rm, k, x, y); taken.add(i); }
   }
@@ -1065,6 +1094,7 @@ function newGarden(avoid, keep = {}) {
   giants.slice(0, 4).forEach((g, n) => link(S, { x: g.x, y: g.y + 2 }, Cp, n ? spotIn(Cp, R, (x, y) => Cp.ground[ix(Cp, x, y)] === GRASS && !Cp.wild[ix(Cp, x, y)], [], 12) : home, 'vine'));
   for (const Rm of [S, Mt, Cn]) for (const k of ['mouths', 'giants', 'liftUps', 'liftDowns', 'skyUps']) delete Rm[k];
   G.R = { surface: S, cave: C, sky: K, canyon: Cn, mountain: Mt, deep: D.Rm, canopy: Cp };
+  try { dreamify(G, API); } catch (e) { console.error('garden dream', e); }
   // the start and its neighbours are grown at once
   const M = (S.w >> 1) / CH | 0;
   for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) populate(G, S, M + x, M + y);
@@ -1132,6 +1162,10 @@ function upgrade4(old) {
   return G;
 }
 
+// what the dream module (garden-dream.js) builds with
+const API = { get PLANTS() { return PLANTS; }, T, CH, HR, SIZE, KIND, GRASS, WATER, PATH, SAND, STONE, BRIDGE, ROCK, PORTAL, FOREST, FLOWERS, VOID, CHASM, ICE, STREET, B: { B_MEADOW, B_WOODS, B_DOWNS, B_MARSH, B_HEATH, B_AUTUMN, B_DUNES, B_ANCIENT, B_FROST, B_FUNGAL },
+  ix, inside, now, mkRealm, caField, quantS, joinRegions, spotIn, openGround, clearAt, link, natural, critter, genCave, genSky, biomeMap, biomeAt, hash2, vnoise };
+
 // ------------------------------------------------ saving
 // maps are saved run-length encoded ([count, value] byte pairs): a 900² meadow is mostly long runs
 function rle(a) {
@@ -1140,7 +1174,7 @@ function rle(a) {
   return Uint8Array.from(out);
 }
 function unrle(b, n) { const out = new Uint8Array(n); let j = 0; for (let i = 0; i < b.length; i += 2) { out.fill(b[i + 1], j, j + b[i]); j += b[i]; } return out; }
-const packR = (Rm) => ({ ...Rm, tone: undefined, soil: undefined, wear: undefined, biome: undefined, bio: undefined, pIdx: undefined, pIdxA: undefined, cv: undefined, mini: undefined, enc: 'rle', wild: rle(Rm.wild), ground: rle(Rm.ground), seen: rle(Rm.seen) });
+const packR = (Rm) => ({ ...Rm, tone: undefined, soil: undefined, wear: undefined, biome: undefined, bio: undefined, pIdx: undefined, pIdxA: undefined, dIdx: undefined, dIdxA: undefined, cv: undefined, mini: undefined, enc: 'rle', wild: rle(Rm.wild), ground: rle(Rm.ground), seen: rle(Rm.seen) });
 const unpackR = (o) => {
   const n = o.w * o.h, kind = KIND[o.name] || o.name;
   if (o.enc === 'rle') return { ...o, kind, wild: unrle(o.wild, n), ground: unrle(o.ground, n), seen: unrle(o.seen, n), pop: o.pop ? Uint8Array.from(o.pop) : undefined };
@@ -1153,11 +1187,13 @@ export async function loadGarden() {
   if (G) return G;
   loading ||= (async () => {
     let g = null;
-    try { const o = await idbGet('kv', KEY); if (o?.v >= 2 && o?.v <= 4) g = { ...o, R: Object.fromEntries(Object.entries(o.R).map(([k, v]) => [k, unpackR(v)])) }; } catch { /* a fresh one */ }
+    try { const o = await idbGet('kv', KEY); if (o?.v >= 2 && o?.v <= 5) g = { ...o, R: Object.fromEntries(Object.entries(o.R).map(([k, v]) => [k, unpackR(v)])) }; } catch { /* a fresh one */ }
     if (!g) { try { const o = await idbGet('kv', OLD); if (o?.v === 1) g = fromV1(o); } catch { /* a fresh one */ } }
     // older gardens move into the newest world (v1/v2: as they were, into its middle; v3: rebuilt)
     if (g && g.v < 3) { try { g = upgrade3(g); } catch (e) { console.error('garden upgrade', e); } }
     else if (g && g.v === 3) { try { g = upgrade4(g); } catch (e) { console.error('garden upgrade', e); } }
+    // a v4 world keeps everything it has and gains the dream on top: villages, the city, deeper and higher realms
+    if (g && g.v === 4) { try { dreamify(g, API); } catch (e) { console.error('garden dream', e); } }
     G = g || newGarden();
     G.away = catchUp(G);
     saveGarden(true);
@@ -1303,6 +1339,20 @@ function texture(c, key, X, Y, x, y, so = 0, k = 1) {
 function paintGround(c, Rm, P, x, y, X, Y, mode) {
   const i = ix(Rm, x, y), R = tileRand(x, y), g = Rm.ground[i], realm = Rm.kind, at = (dx, dy) => (inside(Rm, x + dx, y + dy) ? Rm.ground[ix(Rm, x + dx, y + dy)] : realm === 'sky' ? VOID : ROCK);
   if (realm === 'sky') {
+    if (g === VOID && P.roofs) {
+      // below a roof's edge: the building's face, its windows lit here and there, fading into the dark
+      for (let d = 1; d <= 4; d++) {
+        if (at(0, -d) === VOID) continue;
+        if (at(0, -d) !== GRASS) break;
+        c.fillStyle = d === 1 ? '#1e1c32' : d === 2 ? '#181628' : '#12101e'; c.fillRect(X, Y, T, T);
+        c.fillStyle = '#0c0a16'; c.fillRect(X + T - 1, Y, 1, T);
+        for (let wy = 2; wy < 14; wy += 6) for (let wx = 2; wx < 14; wx += 5) { const hsh = hash2(x * 3 + wx, y * 3 + wy, 91); c.fillStyle = hsh < 0.16 ? '#5af0ff' : hsh < 0.3 ? '#ff5ad8' : hsh < 0.5 ? '#ffe9a8' : '#2a2c48'; c.globalAlpha = d === 1 ? 1 : d === 2 ? 0.7 : 0.4; c.fillRect(X + wx, Y + wy, 3, 3); }
+        c.globalAlpha = 1;
+        if (d === 1) { c.fillStyle = '#3a3c5a'; c.fillRect(X, Y, T, 2); }
+        break;
+      }
+      return;
+    }
     if (g === VOID) {
       // the earthy underside of an island hangs below its edge
       if (at(0, -1) !== VOID && at(0, -1) !== BRIDGE) { c.fillStyle = P.under; c.fillRect(X, Y, T, 7 + (R() * 5 | 0)); c.fillStyle = P.under2; c.fillRect(X + 2, Y + 8, T - 4, 4 + (R() * 6 | 0)); c.fillRect(X + 6, Y + 12, 4, 3 + (R() * 3 | 0)); }
@@ -1406,6 +1456,15 @@ function paintGround(c, Rm, P, x, y, X, Y, mode) {
     }
     return;
   }
+  if (g === STREET) {
+    // the city's wet paving: dark slabs with a seam, neon caught in the puddles, a drain here and there
+    const h1 = hash2(x, y, 61);
+    c.fillStyle = h1 < 0.5 ? '#3a3a58' : '#404264'; c.fillRect(X, Y, T, T);
+    c.fillStyle = '#2c2c46'; c.fillRect(X, Y + T - 1, T, 1); c.fillRect(X + T - 1, Y, 1, T); c.fillStyle = '#4a4c72'; c.fillRect(X, Y, T - 1, 1);
+    if (h1 > 0.62) { c.fillStyle = ['rgba(90,240,255,.5)', 'rgba(255,90,216,.46)', 'rgba(255,210,74,.4)'][(x * 3 + y) % 3]; c.fillRect(X + 2 + (R() * 8 | 0), Y + 3 + (R() * 9 | 0), 5, 1); c.fillRect(X + 3 + (R() * 8 | 0), Y + 6 + (R() * 7 | 0), 3, 1); }
+    if (h1 < 0.07) { c.fillStyle = '#3a3c5a'; c.fillRect(X + 5, Y + 5, 6, 6); c.fillStyle = '#12121c'; c.fillRect(X + 6, Y + 6, 4, 1); c.fillRect(X + 6, Y + 8, 4, 1); }
+    return;
+  }
   // soil from the three automaton layers: dry drifts, mossy hollows, small clumps of clover or pebbles
   const n = toneOf(Rm, i), base = g === FOREST ? P.forest : P.grass, so = soilOf(Rm)[i], dry = so & 1, mossy = so & 2, clump = so & 4, green = g === GRASS || g === FOREST || g === FLOWERS;
   let gc = g === SAND ? P.sand : g === PATH ? P.path : g === STONE ? P.stone : mixHex(base[1], base[n > 0.5 ? 2 : 0], Math.abs(n - 0.5) * 1.6);
@@ -1439,7 +1498,65 @@ function paintGround(c, Rm, P, x, y, X, Y, mode) {
     for (let k = 0; k < 5; k++) { c.fillStyle = 'rgba(0,0,0,.06)'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 2, 1); }
     // dunes: wind ripples across the sand
     if (g === SAND && B.dry) for (let k = 0; k < 3; k++) { const yy = Y + 3 + k * 5 + (R() * 2 | 0); c.fillStyle = tone(P.sand, -0.1); c.fillRect(X, yy, 6 + (R() * 6 | 0), 1); c.fillStyle = tone(P.sand, 0.12); c.fillRect(X + 4 + (R() * 6 | 0), yy - 1, 6, 1); }
+    // a path through the woods: flat stepping stones, moss at the rims, fallen petals
+    if (g === PATH && (at(1, 0) === FOREST || at(-1, 0) === FOREST || at(0, 1) === FOREST || at(0, -1) === FOREST)) {
+      for (let k = 0; k < 2; k++) { const sx = X + 2 + (R() * 9 | 0), sy = Y + 2 + k * 7 + (R() * 3 | 0); c.fillStyle = tone(P.stone2, -0.1); c.fillRect(sx, sy + 1, 5, 3); c.fillStyle = P.stone; c.fillRect(sx, sy, 5, 3); c.fillStyle = tone(P.stone, 0.25); c.fillRect(sx, sy, 3, 1); }
+      for (let k = 0; k < 3; k++) { c.fillStyle = P.dot[(R() * P.dot.length) | 0]; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 1, 1); }
+      c.fillStyle = P.moss; c.fillRect(X + (R() * 12 | 0), Y + (R() * 13 | 0), 3, 1);
+    }
     if (clump && (g === PATH || g === SAND)) for (let k = 0; k < 3; k++) { c.fillStyle = R() < 0.5 ? P.stone2 : P.stone; c.fillRect(X + 1 + (R() * 13 | 0), Y + 1 + (R() * 13 | 0), 2, 1); }
+  }
+}
+// Soft edges. Where two kinds of ground meet, the one that lies over the other (rock over forest over
+// grass over path over sand over water; cave wall over floor; island over air) spills a ragged
+// fringe a few pixels into its neighbour, with a darker rim where it meets water, and its outer
+// corners are rounded off; where two countries' grass meets, each scatters a little into the other.
+const RANK = { [WATER]: 0, [ICE]: 0, [SAND]: 1, [PATH]: 2, [GRASS]: 3, [FLOWERS]: 3, [FOREST]: 4, [ROCK]: 5, [STREET]: -1, [VOID]: -2 };
+function edgeCol(Rm, P, x, y, mode) {
+  const i = ix(Rm, x, y), g = Rm.ground[i];
+  if (Rm.kind === 'cave') return g === ROCK ? P.wall : P.floor[1];
+  if (Rm.kind === 'sky') return P.grass[1];
+  if (Rm.name === 'surface') P = biomePal(biomeMap(Rm)[i], mode);
+  if (g === ROCK) return P.rock;
+  if (g === SAND) return P.sand;
+  if (g === PATH) return P.path;
+  const base = g === FOREST ? P.forest : P.grass, n = toneOf(Rm, i);
+  return mixHex(base[1], base[n > 0.5 ? 2 : 0], Math.abs(n - 0.5) * 1.6);
+}
+function paintEdges(c, Rm, P, x, y, X, Y, mode) {
+  if (!inside(Rm, x, y)) return;
+  const g = Rm.ground[ix(Rm, x, y)], kind = Rm.kind, ra = kind === 'cave' ? (g === ROCK ? 5 : -9) : kind === 'sky' ? (g === GRASS || g === PORTAL ? 3 : -9) : RANK[g] ?? -9;
+  if (ra < 1) return;
+  const at = (dx, dy) => (inside(Rm, x + dx, y + dy) ? Rm.ground[ix(Rm, x + dx, y + dy)] : g), rk = (q) => (kind === 'cave' ? (q === ROCK ? 5 : q === WATER ? 0 : 2) : kind === 'sky' ? (q === VOID ? -2 : 3) : RANK[q] ?? 9);
+  const col = edgeCol(Rm, P, x, y, mode), rim = tone(col, -0.22), bio = Rm.name === 'surface' ? biomeMap(Rm) : null, bi = bio ? bio[ix(Rm, x, y)] : 0;
+  const lower = [0, 0, 0, 0];
+  near4.forEach(([dx, dy], q) => {
+    const nb = at(dx, dy), rb = rk(nb);
+    if (rb >= ra) {
+      // the same ground in another country's colours: scatter a little of ours into theirs
+      if (bio && rb === ra && ra === 3 && inside(Rm, x + dx, y + dy) && bio[ix(Rm, x + dx, y + dy)] !== bi) { c.fillStyle = col; for (let k = 0; k < 7; k++) { const u = (hash2(x * 5 + k, y * 7 + q, 23) * 16) | 0, d = (hash2(x * 3 + k, y * 11 + q, 29) * 5) | 0; c.fillRect(dx ? (dx > 0 ? X + T + d : X - 1 - d) : X + u, dy ? (dy > 0 ? Y + T + d : Y - 1 - d) : Y + u, 1 + (k & 1), 1); } }
+      return;
+    }
+    // the cliff face of a rock (or a cave wall) is on its south side: no fringe there
+    if (g === ROCK && dy === 1) return;
+    lower[q] = 1;
+    const wet = nb === WATER || nb === ICE, deep = ra === 5 ? 2 : 4;
+    for (let sgm = 0; sgm < 8; sgm++) {
+      const u = sgm * 2, w = dy ? x * T + u : y * T + u, d = 1 + Math.floor(vnoise(w * 0.21, (dy ? y : x) * 7.7 + q * 3.1, 17) * deep + hash2(w, q, 5) * 0.9);
+      c.fillStyle = col;
+      if (dy) c.fillRect(X + u, dy > 0 ? Y + T : Y - d, 2, d); else c.fillRect(dx > 0 ? X + T : X - d, Y + u, d, 2);
+      if (wet || sgm % 2) { c.fillStyle = wet ? 'rgba(20,40,70,.28)' : rim; if (dy) c.fillRect(X + u, dy > 0 ? Y + T + d : Y - d - 1, 2, 1); else c.fillRect(dx > 0 ? X + T + d : X - d - 1, Y + u, 1, 2); }
+    }
+  });
+  // outer corners rounded off: the lower ground's colour comes round them
+  for (const [qx, qy, cxp, cyp] of [[0, 2, 1, 1], [1, 2, -1, 1], [0, 3, 1, -1], [1, 3, -1, -1]]) {
+    if (!lower[qx] || !lower[qy] || !inside(Rm, x + cxp, y)) continue;
+    const nb = at(cxp, 0);
+    if (kind === 'surface' && (nb === WATER || nb === STREET || nb === ICE)) continue;
+    c.fillStyle = kind === 'sky' ? 'rgba(0,0,0,0)' : edgeCol(Rm, P, x + cxp, y, mode);
+    const ex = cxp > 0 ? X + T : X, ey = cyp > 0 ? Y + T : Y;
+    if (kind === 'sky') { c.clearRect(ex - (cxp > 0 ? 2 : 0), ey - (cyp > 0 ? 1 : 0), 2, 1); c.clearRect(ex - (cxp > 0 ? 1 : 0), ey - (cyp > 0 ? 2 : 0), 1, 2); }
+    else { c.fillRect(ex - (cxp > 0 ? 3 : 0), ey - (cyp > 0 ? 1 : 0), 3, 1); c.fillRect(ex - (cxp > 0 ? 1 : 0), ey - (cyp > 0 ? 3 : 0), 1, 3); c.fillRect(ex - (cxp > 0 ? 2 : 0), ey - (cyp > 0 ? 2 : 0), 2, 2); }
   }
 }
 function paintWild(c, Rm, P, x, y, X, Y, mode) {
@@ -1526,6 +1643,8 @@ export function chunk(Rm, mode, cx, cy) {
   const P = palFor(Rm.name, mode), X0 = cx * CH, Y0 = cy * CH;
   k.g.clearRect(0, 0, CH * T, CH * T); k.w.clearRect(0, 0, CH * T, CH * T);
   for (let y = Y0; y < Y0 + CH; y++) for (let x = X0; x < X0 + CH; x++) if (inside(Rm, x, y)) paintGround(k.g, Rm, P, x, y, (x - X0) * T, (y - Y0) * T, mode);
+  // the soft edges, from a ring of neighbours too (their fringes reach into this chunk)
+  for (let y = Y0 - 1; y <= Y0 + CH; y++) for (let x = X0 - 1; x <= X0 + CH; x++) paintEdges(k.g, Rm, P, x, y, (x - X0) * T, (y - Y0) * T, mode);
   // tall grass leans into the row above and over its sides, so paint a ring of neighbours too
   for (let y = Y0; y <= Y0 + CH; y++) for (let x = X0 - 1; x <= X0 + CH; x++) paintWild(k.w, Rm, P, x, y, (x - X0) * T, (y - Y0) * T, mode);
   k.ver = ver;
@@ -1550,7 +1669,7 @@ export function minimap(Rm) {
   for (let y = 0; y < Rm.h; y++) for (let x = 0; x < Rm.w; x++) if (Rm.seen[ix(Rm, x, y)]) miniPaint(Rm, x, y);
   return Rm.mini;
 }
-const MINI = { [GRASS]: '#8fcf7a', [WATER]: '#5aa8e0', [PATH]: '#d8c098', [SAND]: '#e8d6a6', [STONE]: '#c8c0b8', [BRIDGE]: '#c09060', [ROCK]: '#8a8690', [PORTAL]: '#20181c', [FOREST]: '#5a9a58', [FLOWERS]: '#c8d890', [VOID]: '#b8d8f4', [CHASM]: '#3a1e1a', [ICE]: '#c8e6f4' };
+const MINI = { [GRASS]: '#8fcf7a', [WATER]: '#5aa8e0', [PATH]: '#d8c098', [SAND]: '#e8d6a6', [STONE]: '#c8c0b8', [BRIDGE]: '#c09060', [ROCK]: '#8a8690', [PORTAL]: '#20181c', [FOREST]: '#5a9a58', [FLOWERS]: '#c8d890', [VOID]: '#b8d8f4', [CHASM]: '#3a1e1a', [ICE]: '#c8e6f4', [STREET]: '#2a2a44' };
 export function miniPaint(Rm, x, y) {
   if (!Rm.mini || !inside(Rm, x, y)) return;
   const i = ix(Rm, x, y), g = Rm.ground[i], c = Rm.mini.c;
