@@ -2,6 +2,9 @@
 // rivers, lakes and islands, rocky hills, gorges and old roads), the caverns and the deep below them,
 // the canyons down the gorges, the mountains and the sky islands above, and the treetops of the
 // ancient trees. Also the sprites, the generators, saving, real-time catch-up and the painted chunks.
+// The dream (garden-dream.js) is laid over it: villages, the neon city with its undercity and
+// rooftops, forest paths, treasure, the gorge and the abyss below the canyons, the high sky and the
+// star sea above the islands. Art for it is in garden-art.js; shared pixel helpers in garden-kit.js.
 import { W, H, noiseMap } from './engine.js';
 import { mulberry32 } from '../util.js';
 import { idbGet, idbSet } from '../store.js';
@@ -209,7 +212,7 @@ export const BIOMES = [
 ];
 export const B_MEADOW = 0, B_WOODS = 1, B_DOWNS = 2, B_MARSH = 3, B_HEATH = 4, B_AUTUMN = 5, B_DUNES = 6, B_ANCIENT = 7, B_FROST = 8, B_FUNGAL = 9;
 // morning is paler and cooler, evening dusky; the light grade (garden.js) does the rest
-const MODE_MIX = { morning: ['#ffeaf0', 0.27], day: null, evening: ['#5c58a8', 0.3] };
+const MODE_MIX = { morning: ['#ffeaf0', 0.27], day: null, evening: ['#3e3a96', 0.2] };
 const biomePals = new Map();
 export function biomePal(b, mode) {
   const key = `${b}|${mode}`;
@@ -1528,7 +1531,12 @@ function paintEdges(c, Rm, P, x, y, X, Y, mode) {
   const g = Rm.ground[ix(Rm, x, y)], kind = Rm.kind, ra = kind === 'cave' ? (g === ROCK ? 5 : -9) : kind === 'sky' ? (g === GRASS || g === PORTAL ? 3 : -9) : RANK[g] ?? -9;
   if (ra < 1) return;
   const at = (dx, dy) => (inside(Rm, x + dx, y + dy) ? Rm.ground[ix(Rm, x + dx, y + dy)] : g), rk = (q) => (kind === 'cave' ? (q === ROCK ? 5 : q === WATER ? 0 : 2) : kind === 'sky' ? (q === VOID ? -2 : 3) : RANK[q] ?? 9);
-  const col = edgeCol(Rm, P, x, y, mode), rim = tone(col, -0.22), bio = Rm.name === 'surface' ? biomeMap(Rm) : null, bi = bio ? bio[ix(Rm, x, y)] : 0;
+  const bio = Rm.name === 'surface' ? biomeMap(Rm) : null, bi = bio ? bio[ix(Rm, x, y)] : 0;
+  // most tiles lie among their own kind: nothing to do, and no colour to work out
+  let any = false;
+  for (const [dx, dy] of near4) { const rb = rk(at(dx, dy)); if (rb < ra || (bio && rb === ra && ra === 3 && inside(Rm, x + dx, y + dy) && bio[ix(Rm, x + dx, y + dy)] !== bi)) { any = true; break; } }
+  if (!any) return;
+  const col = edgeCol(Rm, P, x, y, mode), rim = tone(col, -0.22);
   const lower = [0, 0, 0, 0];
   near4.forEach(([dx, dy], q) => {
     const nb = at(dx, dy), rb = rk(nb);

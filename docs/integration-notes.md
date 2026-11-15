@@ -194,3 +194,27 @@ Running list of wiring the lead must do before the final push.
     - Only AO3's own listing is used (title, author, the author's summary, tags, length and kudos), with a link to read the story there. The repo is public, so modern copyrighted stories are never copied into packages.
   - Shares: `reads.erotica` 44 and `reads.contemporary` 16.
 - **Oracle:** the chicken augury is removed (builder subs, client, data). Old packages' augury posts render as dice.
+
+## Garden: the dream world (2026-11-15)
+The garden is rebuilt as a wordless dream to walk through. Same world sizes; old gardens are upgraded in place (v4 → v5, `dreamify`) and keep everything sown, found and carried.
+- **Modules:** `garden-kit.js` (pixel helpers, `glowSprite`, `vivid`), `garden-art.js` (all new sprites), `garden-dream.js` (world additions, `populateDream`), `garden-live.js` (interactions, whales, giants, motes, lights; installed onto `Garden`). `garden-world.js` and `garden.js` call into them.
+- **Look:**
+  - Palettes are pushed toward richer colour (`vibrant`); the full-screen saturation pass is gone (it was the slowest thing in the frame).
+  - Tile edges are soft: higher ground spills a ragged fringe into lower, with rounded corners and a dithered blend between countries (`paintEdges`, skipped for interior tiles).
+  - Trees are drawn by `treeSprite`: leaf-puff crowns, tapered trunks, four variants each, a shadow under each. New kinds: cypress, redwood, palm, ginkgo, wisteria, jacaranda, acacia, baobab, mangrove, crystal tree. Some standing trees are re-speciesed so old woods vary too.
+  - Lights are cached glow sprites (lamps, windows, neon, treasure, glowing plants and creatures, wisps); caves cut their darkness with cached discs. Forest light shafts, water glints and an aurora (frost dusk, mountains, high sky, star sea) are world-anchored.
+  - Motes blow through each country: petals, leaves, dust, spores, embers, stardust (`MOTES`, `REALM_MOTES`). Chimneys smoke.
+- **World additions:**
+  - **Villages:** 12 on the surface (one within about 60 tiles of the start), two each in the mountains and canyons, cloud houses in the sky and high sky. Houses in the country's style (cottage, timber, stone, igloo, adobe, mushroom, stilt, treehouse, cloud) round a well, with lamps, flower beds, fruit trees, sometimes a windmill, stall or field; joined to the old roads. Villagers live in the houses and go indoors at dusk.
+  - **Neon city** (`S.city`, ground `STREET`): about 150 towers on a street grid with a canal, a holo-plaza, signs and lamps. It has its own dusk and drizzle. Lifts: three hatches down to the undercity (`under`, a neon night market), three tubes up to the rooftops (`roofs`, gardens and skywalks over the lights).
+  - **Depths:** canyon → `gorge` (violet, glowing river, crystal flora) → `abyss` (lakes of fire that cannot be crossed, embers).
+  - **Heights:** sky → `high` → `stars` (always night).
+  - **Forest paths:** 46 winding trails with lanterns, a gate where they leave a road, plank bridges, and a place at the end: chest, fairy ring, spirit pond, ribbon tree, lantern shrine or crystal garden.
+  - **Treasure:** chests, urns, geodes, capsules and star chests in every realm, glints in the grass. Each chest gives rare seeds, food and a wisp that follows you (up to 12).
+- **Living things:**
+  - 20 strange creatures by country and realm (kirin, spirit fox, moth deer, mossling, jellies, garden snail, island tortoise, white stag, moon hare, axolotl, crystal crab, kodama, ember bird, angler, manta, flying koi, phoenix, drone, city cat, gecko).
+  - **Sky whales** in the sky, high sky and star sea, on rounds set by the clock, some below the islands; tap one and it sings, the others answer, and it comes over.
+  - **Giant gardeners** (five, saved in `G.giants`): each footfall sows flowers, shrubs and quick-growing saplings and turns the ground to forest. Tap one and it follows you for a while. What they grow is capped.
+- **Interactions (walking and tapping only):** houses, lamps, wells, stalls, windmills, gates, signs, towers, crystals, chests, glints, fairy rings, ruins, creatures, whales, giants; a tap on water skips a stone. People answer with pictogram bubbles (`iconSprite`). There is no text anywhere: `say()` is a no-op and the philosophers' quotes are gone.
+- **Performance** (headless, CPU throttled 4×): about 50–58 fps in every realm; the dream layer costs under 1 ms a frame; a chunk repaint with edges is a few ms once a realm's maps exist.
+- **Tested:** fresh world (2.4 s to ready), v4 save upgraded with its own plants and seeds kept, all 13 realms entered, taps on chest, house, lamp and giant, giants sowing while walking. Preview pages (gitignored): `www/_gart.html`.

@@ -40,6 +40,14 @@ export function install(Garden, K) {
       for (let k = 0; k < nW; k++) { const h = (q) => hash2(k * 7 + q, Rm.seed & 1023, 3); this.whales.push({ cx: W0 * (0.25 + h(1) * 0.5), cy: W0 * (0.25 + h(2) * 0.5), A: W0 * (0.14 + h(3) * 0.2), B: W0 * (0.1 + h(4) * 0.18), w: (0.012 + h(5) * 0.012) * (h(6) < 0.5 ? 1 : -1), ph: h(7) * 6.283, v: Rm.name === 'stars' ? 3 : k % 3, layer: k % 3 === 1 ? 0 : 1, calf: k === nW - 1 && nW > 3, x: 0, y: 0, dir: 1, sang: -99, ox: 0, oy: 0 }); }
       for (const g of (Rm.name === 'surface' && Wd.G.giants) || []) { g.f ||= 0; g.ft = 0; g.wait = R() * 2; g.tx = undefined; g.follow = 0; }
     },
+    unstick() {
+      const h = this.hero, Rm = this.Rm, tx = Math.floor(h.x / T), ty = Math.floor((h.y - 2) / T);
+      if (this.walkable(tx, ty)) return;
+      for (let r = 1; r < 40; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !this.walkable(tx + dx, ty + dy) || Rm.ground[ix(Rm, tx + dx, ty + dy)] === WATER) continue;
+        h.x = (tx + dx) * T + 8; h.y = (ty + dy) * T + 12; this.cam.x = h.x; this.cam.y = h.y - 16; return;
+      }
+    },
     lightMode() { return this.night || this.Rm.name === 'gorge' ? 'evening' : this.mode; },
     icon(x, y, k, delay = 0) { this.icons.push({ x, y, k, t: -delay, life: 2.4 }); if (this.icons.length > 14) this.icons.shift(); },
     // what stands in the way: houses, towers, wells and stalls, lamps, chests
@@ -49,7 +57,6 @@ export function install(Garden, K) {
         if (d.t === 'house') { for (let y = d.y - 1; y <= d.y; y++) for (let x = d.x - 1; x <= d.x + 1; x++) set(x, y); occ.add(ix(Rm, d.x, d.y + 1)); }
         else if (d.t === 'tower') { for (let y = d.y - d.d + 1; y <= d.y; y++) for (let x = d.x; x < d.x + d.w; x++) set(x, y); }
         else if (d.t === 'prop' || d.t === 'chest' || d.t === 'lamp' || d.t === 'neon') set(d.x, d.y);
-        else if (d.t === 'gate') { set(d.x - 1, d.y); set(d.x + 1, d.y); }
       }
     },
     // the sprite a piece of decor is drawn with, and where its foot stands (world pixels)
@@ -358,8 +365,8 @@ export function install(Garden, K) {
       b.globalCompositeOperation = 'lighter';
       for (const d of Wd.decorIn(Rm, x0, y0, x1, y1 + 4)) {
         const x = d.x * T + 8, y = (d.y + 1) * T, fl = 0.85 + Math.sin(t * 5 + d.x * 3 + d.y) * 0.1;
-        if (d.t === 'lamp') { if (this.isLit(d)) L(x, y - (d.k === 'neonlamp' ? 28 : d.k === 'lamp' ? 15 : 9), d.k === 'neonlamp' ? 34 : 28, d.k === 'neonlamp' ? Art.NEON[(d.v || 0) % 3] : d.k === 'shroomlamp' ? '#8ff0d8' : '#ffd98a', 0.62 * fl); }
-        else if (d.t === 'house') { if (this.isLit(d)) L(x, y - 12, 30, '#ffd98a', 0.5 * fl); }
+        if (d.t === 'lamp') { if (this.isLit(d)) { const col = d.k === 'neonlamp' ? Art.NEON[(d.v || 0) % 3] : d.k === 'shroomlamp' ? '#8ff0d8' : '#ffd98a', ly = y - (d.k === 'neonlamp' ? 28 : d.k === 'lamp' ? 15 : 9); L(x, ly, 44, col, 0.55 * fl); L(x, ly, 16, col, 0.9 * fl); L(x, y - 2, 28, col, 0.35); } }
+        else if (d.t === 'house') { if (this.isLit(d)) { L(x, y - 12, 44, '#ffc070', 0.5 * fl); L(x, y + 4, 28, '#ffd98a', 0.4); } }
         else if (d.t === 'tower') { if (dark) L((d.x + d.w / 2) * T, y - 4, 32, Art.NEON[d.v % 6], 0.3); }
         else if (d.t === 'neon') L(x, y - 20, 22, Art.NEON[d.v % 6], dark ? 0.6 : 0.25);
         else if (d.t === 'chest') { if (!d.o) L(x, y - 6, 12, d.k === 'capsule' ? '#ff5ad8' : '#ffe9a8', 0.3 + Math.sin(t * 3 + d.x) * 0.2); }

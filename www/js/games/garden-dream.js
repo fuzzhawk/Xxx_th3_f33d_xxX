@@ -26,6 +26,7 @@ export function dreamify(G, W) {
   const av = (D.av = new Uint8Array(N * N)), mark = (x0, y0, x1, y1) => { for (let y = Math.max(0, y0); y <= Math.min(N - 1, y1); y++) av.fill(1, y * N + Math.max(0, x0), y * N + Math.min(N - 1, x1) + 1); };
   D.mark = mark;
   mark(M - 30, M - 30, M + 30, M + 30);
+  if (S.hero) mark(Math.floor(S.hero.x / 16) - 14, Math.floor(S.hero.y / 16) - 14, Math.floor(S.hero.x / 16) + 14, Math.floor(S.hero.y / 16) + 14);
   for (const p of S.plants) if (!p.n) mark(p.x - 4, p.y - 4, p.x + 4, p.y + 4); else if (p.k === 'giant') mark(p.x - 4, p.y - 5, p.x + 4, p.y + 4);
   for (const r of S.ruins) mark(r.x - 4, r.y - 4, r.x + r.w + 3, r.y + r.h + 3);
   for (const p of S.portals) mark(p.x - 4, p.y - 4, p.x + 4, p.y + 5);
@@ -49,6 +50,7 @@ function findSite(D, Rm, w, h, d0, d1, maxBad, tries = 5000) {
   for (let t = 0; t < tries; t++) {
     const a = R() * 6.283, d = d0 + R() * (d1 - d0), x = Math.round(cx + Math.cos(a) * d), y = Math.round(cy + Math.sin(a) * d), x0 = x - (w >> 1), y0 = y - (h >> 1);
     if (x0 < 8 || y0 < 8 || x0 + w > Rm.w - 8 || y0 + h > Rm.h - 8) continue;
+    if (Rm !== D.S && Rm.hero && Math.hypot(Rm.hero.x / 16 - x, Rm.hero.y / 16 - y) < 18) continue;
     let nb = 0, no = false;
     for (let yy = y0; yy < y0 + h && !no; yy++) for (let xx = x0; xx < x0 + w; xx++) {
       const i = yy * Rm.w + xx, g = Rm.ground[i];
@@ -150,7 +152,7 @@ function skyVillage(D, Rm) {
 // ------------------------------------------------ the neon city
 function city(D) {
   const { S, W, R, rr, ri, G } = D, CW = 62, CD = 52;
-  const site = findSite(D, S, CW + 8, CD + 8, 120, 260, 0.2, 8000) || findSite(D, S, CW + 8, CD + 8, 100, S.w * 0.46, 0.4, 20000);
+  const site = findSite(D, S, CW + 8, CD + 8, 105, 170, 0.22, 6000) || findSite(D, S, CW + 8, CD + 8, 105, 260, 0.25, 8000) || findSite(D, S, CW + 8, CD + 8, 100, S.w * 0.46, 0.4, 20000);
   if (!site) return;
   const cx = site.x, cy = site.y, x0 = cx - (CW >> 1), y0 = cy - (CD >> 1), x1 = x0 + CW - 1, y1 = y0 + CD - 1, ix = (x, y) => W.ix(S, x, y);
   const inC = (x, y) => { const dx = (x - cx) / (CW / 2), dy = (y - cy) / (CD / 2); return dx ** 4 + dy ** 4 + (W.hash2(x >> 1, y >> 1, 41) - 0.5) * 0.16 < 1; };

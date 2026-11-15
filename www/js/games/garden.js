@@ -44,8 +44,8 @@ const N8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]
 const ATMOS = {
   morning: { dim: '#c6d0da', dimA: 0.62, sat: 0.14, mistCol: [255, 226, 234], cloudCol: [255, 244, 248], fog: 9, fogA: 0.56, bloom: 0.4 },
   day: { dim: '#dce2d6', dimA: 0.42, sat: 0.16, mistCol: [236, 246, 240], cloudCol: [250, 252, 255], fog: 5, fogA: 0.46, bloom: 0.44 },
-  evening: { dim: '#6e68b0', dimA: 0.64, sat: 0.2, mistCol: [176, 156, 236], cloudCol: [244, 206, 236], fog: 9, fogA: 0.6, bloom: 0.64 },
-  night: { dim: '#5c5cae', dimA: 0.5, sat: 0.2, mistCol: [150, 150, 230], cloudCol: [190, 196, 250], fog: 6, fogA: 0.5, bloom: 0.7 },
+  evening: { dim: '#6660b8', dimA: 0.6, sat: 0.2, mistCol: [140, 120, 214], cloudCol: [244, 206, 236], fog: 7, fogA: 0.36, bloom: 0.62 },
+  night: { dim: '#5c5cae', dimA: 0.5, sat: 0.2, mistCol: [130, 130, 220], cloudCol: [190, 196, 250], fog: 5, fogA: 0.34, bloom: 0.7 },
   cave: { dim: '#a09cb0', dimA: 0.4, sat: 0.14, mistCol: [120, 132, 166], fog: 5, fogA: 0.45, bloom: 0.55 }
 };
 // one soft puff of fog: an ellipse whose density falls off toward the edge, posterised into four
@@ -154,6 +154,7 @@ export class Garden extends Game {
     this.npcs = null;   // spawned once the map is ready (below)
     this.dreamInit();
     this.computeBlock();
+    this.unstick();
     this.markSeen();
     this.spawnNPCs();
     this.ready = true;
@@ -1098,9 +1099,10 @@ export class Garden extends Game {
     b.globalAlpha = 1;
   }
   // The light's colour over everything, cheaply: one cached multiply layer (the time of day's grade,
-  // the evening's sunset wash, a rainy dimness and the vignette together), the colour drained a
-  // little, one cached screen layer (a morning blush, the low sun) and a soft bloom so the lights
-  // smear as in a half-remembered place. Slow phones drop the bloom, then the drain (this.q).
+  // the evening's sunset wash, a rainy dimness and the vignette together), one cached screen layer
+  // (a morning blush, the low sun) and a soft bloom so the lights smear as in a half-remembered
+  // place. The colour itself is in the palettes (no full-screen saturation pass: it was the slowest
+  // thing in the frame). Slow phones drop the bloom, then the shafts, glints and half the motes (this.q).
   drawGrade(b) {
     const realm = this.Rm.kind, mode = this.night ? 'night' : this.lightMode(), w = this.weather, A = ATMOS[realm === 'cave' ? 'cave' : mode] || ATMOS.day;
     const rain = w.kind === 'rain' && mode === 'day' && realm === 'surface', sun = w.kind === 'sun' && mode === 'day' && realm !== 'cave';
@@ -1142,10 +1144,10 @@ export class Garden extends Game {
     if (mode === 'morning' && realm !== 'cave') { scr = cv(); const q = scr.getContext('2d'), g = q.createLinearGradient(0, 0, VW, VH); g.addColorStop(0, 'rgba(255,200,220,.18)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(190,220,255,.14)'); q.fillStyle = g; q.fillRect(0, 0, VW, VH); }
     if (mode === 'evening' && realm !== 'cave') {
       scr = cv(); const q = scr.getContext('2d'), g = q.createLinearGradient(0, 0, 0, VH);
-      g.addColorStop(0, 'rgba(255,130,170,.16)'); g.addColorStop(1, 'rgba(80,70,220,.14)'); q.fillStyle = g; q.fillRect(0, 0, VW, VH);
-      glow(VW * 0.8, -14, 200, 'rgba(255,150,120,.32)');
+      g.addColorStop(0, 'rgba(255,130,170,.06)'); g.addColorStop(1, 'rgba(80,70,220,.04)'); q.fillStyle = g; q.fillRect(0, 0, VW, VH);
+      glow(VW * 0.8, -14, 200, 'rgba(255,150,120,.2)');
     }
-    if (mode === 'night') { scr = cv(); const q = scr.getContext('2d'), g = q.createLinearGradient(0, 0, VW, VH); g.addColorStop(0, 'rgba(120,90,255,.14)'); g.addColorStop(1, 'rgba(60,200,255,.08)'); q.fillStyle = g; q.fillRect(0, 0, VW, VH); }
+    if (mode === 'night') { scr = cv(); const q = scr.getContext('2d'), g = q.createLinearGradient(0, 0, VW, VH); g.addColorStop(0, 'rgba(120,90,255,.06)'); g.addColorStop(1, 'rgba(60,200,255,.04)'); q.fillStyle = g; q.fillRect(0, 0, VW, VH); }
     if (sun) glow(VW * 0.85, 0, 210, 'rgba(255,240,180,.28)');
     return { mul, scr };
   }

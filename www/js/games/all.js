@@ -53,7 +53,7 @@ export function upgradeGamePost(p) {
   return p;
 }
 export const GAME_HINT = {
-  garden: 'tap the ground to walk and plant · tap tall grass to clear it · tap animals to feed them · the seed button picks what you plant',
+  garden: 'drag to walk · tap what you find: houses, lamps, chests, creatures, whales, giants · tap open ground to plant',
   plinko: 'tap to drop a ball', breakout: 'drag to move the paddle', merge: 'drag to aim, release to drop · two alike merge (on the planet, aim around the core)', dash: 'tap to jump (twice to double-jump)',
   flappy: 'tap to flap', tetris: 'tap beside the piece to move, tap the piece to turn, drag to slide, swipe down to drop, swipe up to hold · every full line is lifted out as a saying', pong: 'drag to move your paddle', peggle: 'aim, release to shoot', juggle: 'tap the balls to keep them up',
   platformer: 'tap to jump, twice to double-jump · ladders, pads and springs work by themselves · grab power-ups', racer: 'hold left or right to steer, tap to change lane · pass the gates for extra time', raycast: 'drag sideways to turn, up/down to walk · tap to fire, hold to keep firing · tap the weapon bar to switch · find the key, reach the glowing exit',
