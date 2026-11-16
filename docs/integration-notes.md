@@ -237,3 +237,42 @@ The garden is rebuilt as a wordless dream to walk through. Same world sizes; old
   - While the map covers the card, only the map is drawn (under 3 ms a frame throttled).
 - **Card:** while the menu or map is open, the 25-second idle timer in `cards.js` doesn't hand the card back to autopilot (`g.holdPlay()`). Going back to autopilot or scrolling the card away closes them.
 - **Tested** (Playwright, touch events): button fades in when still and out while walking. Menu opens, and a tap outside closes it without planting. Map: pinch in and out, drag, double-tap, recentre, cycling realms, close. Evening palettes and the night realms render. No errors.
+
+## Hell Maze: grime, sky, horror, a surviving autopilot (2026-11-16)
+- **Autopilot:**
+  - **Stuck at spawn (about 9% of levels):** a gallery start room could get a central column, pool island or pit, and the player spawned inside it.
+    - The start room now never gets a centre feature.
+    - The spawn moves to the nearest open floor if the centre is ever blocked.
+  - **Sealed rooms (about 9% of levels):** crates and barrels could land in a doorway and wall off the rest of the level.
+    - They now keep 3 m (crates) or 2.2 m (barrels) from every doorway.
+    - After furnishing, if any room became unreachable, furniture is removed, nearest a doorway first, until it isn't.
+    - Measured over 160 levels: 0 bad starts, 0 unreachable exits, 0 cut-off rooms.
+  - **Combat:**
+    - Movement is now independent of aim (`go()` turns a world direction into forward and strafe input).
+    - It steps out of the line of incoming spit (`dodgeDir`).
+    - It keeps biters at 4–5 m and spitters at middle range.
+    - Below 40% health it backs toward the nearest health (`planHeal`) while still shooting.
+    - It never backs into a wall or off a ledge (`canGo`) and flips its strafe when blocked.
+  - **Simulated, headless:**
+    - Before: 4 deaths in 40 minutes, two seeds frozen at spawn.
+    - After: 1 death in 100 minutes across 20 seeds (levels 1, 5 and 7), never stuck, about 5 levels per 10 minutes from level 1.
+- **Weapons:**
+  - Drawn part by part in a 180×120 buffer: shaded cylinders with a specular line, bevelled boxes, worn wood grain, rivets, bores, gloved hands (and a left hand on the fore-end of long guns). The metals and woods are darker.
+  - Then `grimeGun`: a per-weapon field of grit, rust, scratches and old-blood spatter, soot round the silhouette, a dark outline, colours dulled and dithered to 16 steps.
+  - Rebuilt only when the weapon's look changes (the strange ones at 12 fps).
+  - On the card it takes the light of the sector you stand in, flickers, warms near a torch, and is lit by its own muzzle flash (a ragged pixel star).
+- **Monsters:** `grimeSprite` grits every sheet frame once (grit, filth, dried blood thicker toward the feet, duller colours, dither); eyes and glowing parts stay lit. Pre-warmed one frame per display frame.
+- **Sky:** three layers over open yards and halls, living between about 25° and 60° (yards are walled about 6 m up).
+  - **Far:** gradient, stars, and a moon, blood moon or black sun.
+  - **Clouds:** lit from below, drifting.
+  - **Near:** giant spires and a hooded colossus with lit windows and red eyes. It is centred 0.82 × your position, so it shifts as you walk.
+  - **Lightning:** every 7–19 s a bolt, the sky flaring, and a white flash when you are under the open sky.
+  - Hidden when no open sector is within 22 m.
+- **Atmosphere:**
+  - Darker rooms (sector light × 0.72) and closer fog (1.5–22).
+  - Stronger torch pools; about 28% of torches are dying and gutter.
+  - Grain and vignette baked into four small frames (one plain draw a frame).
+  - A heartbeat pulse under 35% health.
+  - Carcasses on hooks dripping into pools, old blood smeared on walls and dragged across floors, and pairs of eyes in dark corners that blink and vanish when you come within 6.5 m.
+  - Ash and embers under the sky, dust indoors.
+- **Performance:** swiftshader, view frozen: 41–43 fps with everything on (overlays now cost about 1 fps, the gun about 5). Warm-up is the slow part: reading back each new sheet frame costs about 4 ms, so it is spread one frame at a time.
