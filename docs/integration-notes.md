@@ -325,3 +325,57 @@ The garden is rebuilt as a wordless dream to walk through. Same world sizes; old
   - **Autopilot (headless):** from level 1, 1 death in 24 min and about 5.4 levels per 10 min; from level 4 with the new cast, 2 deaths in 24 min. Never stuck.
   - **Frame rate** (swiftshader, view frozen): 49–55 fps with everything on.
   - Crypt Hack, Crystal Quest and Hell Maze run without errors.
+
+## Hell Maze: frame rate with monsters, and a standalone page (2026-11-16, later)
+
+- **Frame drops with monsters on screen.** The cause was the sprite pipeline, not the AI. Each monster's look (8 views × poses) was drawn, grimed and melted on the main thread the first time it was seen, and each grimed sprite was read back with `getImageData`.
+  - Measured with 14 awake monsters at 4× CPU throttle: 31 fps before, with drawing sprites costing 12.9 ms a frame and the monster AI 2.6 ms.
+  - **Fixes:**
+    - **Grime in the bake:** the grime pass (`grime.js`, `grimePixels`) now runs on the raw pixels inside the bake, so there is no second readback. `registerPost('hm', grimePixels)` names it, so the bake can run anywhere.
+    - **Worker drawing:** a module worker (`horror-worker.js`) draws frames off the main thread. It rebuilds the genome from the seed and posts the pixels back as a transferable. In `horror.js`:
+      - `bakePixels` and `canvasOf` split the bake.
+      - `framePixels` gives a frame's pixels by seed.
+      - `prefetch(anim, k, dir, urgent)` queues a frame; `has(...)` asks whether it is ready.
+      - Without a worker, everything falls back to drawing in place, as before.
+    - **Half the views:** views 5–7 are mirrors of 3–1, flipped at draw time (`flipV`).
+    - **Warm-up per level:** each level warms its whole cast in the background. Up to 2 frames a frame are drawn in place when a needed view has not arrived yet.
+    - **Monster AI at 60 Hz:** it now steps at about 60 Hz (`foeAcc`) instead of every 120 Hz physics step.
+    - **Texture refresh:** the 3D textures behind sprites refresh once a second instead of every frame.
+  - **After:** 42 fps (52 with no monsters). Sprite drawing is down to 0.2 ms a frame, the monster AI to 1.5 ms, and a cold start costs 7 ms a frame instead of 33.
+- **Any width:** Hell Maze no longer assumes a 360-wide screen.
+  - **Render width:** the 3D picture is ⅔ of the logical width (`RW`).
+  - **Centring:** the weapon, its flash and the status bar are centred (`GXO`). The tap-to-switch weapon zones follow the bar.
+  - **Film:** the grain and vignette film is half the logical width.
+  - **Field of view:** a screen wider than it is tall uses a 64° vertical field of view (about 96° across) instead of 72°.
+  - **In the app nothing changes:** at 360×420, `GXO` is 0, `RW` is 240 and the field of view is 72°.
+- **Jumping and mouse aim (used by the standalone):**
+  - `movePlayer` no longer snaps a rising player back to the floor (only the player's own jump rises), and the head stops at the ceiling.
+  - With nothing to lock on to, shots follow the view's pitch.
+  - `aimCone` narrows the sideways lock-on.
+- **Standalone page:** `node tools/build-hellmaze.mjs` writes `standalone/hellmaze/index.html`, one self-contained file of about 1.4 MB. Netlify's drop deploy takes the `standalone/hellmaze` folder as it is.
+  - **Build:** it needs esbuild (`npm i --no-save esbuild@0.24.2`), which the app does not.
+  - **Inlined:**
+    - The game and three.js, as one module.
+    - The monster worker, as a blob (`HORROR_WORKER_URL`).
+    - The W46 wall photos, as data URIs.
+  - **Screen:** the engine's 360×420 is swapped for a screen 400 high and 480–720 wide, fitted to the window when the page opens (`HM_W`, `HM_H`).
+  - **Controls** (`tools/hellmaze/main.js`):
+
+    | Input | Action |
+    |---|---|
+    | WASD or arrows | move |
+    | Mouse (pointer lock) | look; sensitivity and invert Y are saved |
+    | Left button | fire; hold for automatic weapons |
+    | 1–5, wheel, E, `[`, `]` | weapons |
+    | Q | last weapon |
+    | Shift | sprint |
+    | Space | jump |
+    | P | autopilot |
+    | F | fullscreen |
+    | Esc | pause |
+    | New maze | a new seed; `?seed=N` replays one |
+
+  - **Attract mode:** the autopilot plays behind the title card.
+  - **Tested (headless):**
+    - Pointer lock, walking, strafing, jumping, firing, weapon keys and wheel, the autopilot toggle, pause and resume, a level change, and no errors.
+    - Headless Chromium's pointer-locked mouse moves cancel out, so mouse look was checked with real `movementX` events.

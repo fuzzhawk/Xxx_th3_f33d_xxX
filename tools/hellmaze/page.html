@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hell Maze</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230c0a09'/%3E%3Cpath d='M3 13V4l2 3 3-4 3 4 2-3v9z' fill='%23b8401a'/%3E%3Crect x='6' y='9' width='1.5' height='1.5' fill='%23ffd27a'/%3E%3Crect x='8.5' y='9' width='1.5' height='1.5' fill='%23ffd27a'/%3E%3C/svg%3E">
+<style>
+  :root { --bg: #070605; --ink: #e9dcc6; --dim: #9a8a74; --blood: #b8401a; --gold: #ffd27a; --panel: rgba(14, 10, 8, 0.86); --line: #3a2f27; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  #shell { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  #game { display: block; width: 100%; height: 100%; image-rendering: pixelated; cursor: crosshair; background: #0c0a09; }
+  #status { position: absolute; left: 8px; top: 6px; color: rgba(255, 226, 168, 0.75); font-size: 12px; text-shadow: 0 1px 0 #000; pointer-events: none; }
+  #autotag { position: absolute; right: 8px; bottom: 44px; color: var(--gold); font-size: 11px; letter-spacing: 0.08em; background: rgba(0, 0, 0, 0.55); padding: 3px 7px; border: 1px solid var(--line); pointer-events: none; }
+  #veil { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(10, 4, 2, 0.35), rgba(5, 2, 1, 0.82)); padding: 16px; }
+  #veil[hidden], #autotag[hidden] { display: none; }
+  .card { width: min(460px, 100%); max-height: 100%; overflow: auto; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 0 0 1px #000, 0 18px 60px rgba(0, 0, 0, 0.7); padding: 18px 20px 14px; }
+  h1 { margin: 0 0 2px; font-size: 30px; letter-spacing: 0.12em; color: var(--blood); text-shadow: 0 2px 0 #000, 0 0 18px rgba(184, 64, 26, 0.35); }
+  #title { margin: 0 0 12px; color: var(--dim); font-weight: 400; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0 0 14px; }
+  .keys b { color: var(--gold); font-weight: 600; white-space: nowrap; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+  button { font: inherit; color: var(--ink); background: #241a14; border: 1px solid #5a4030; padding: 7px 14px; cursor: pointer; }
+  button:hover { background: #33241a; }
+  #go { background: var(--blood); border-color: #e0703a; color: #fff; font-weight: 700; letter-spacing: 0.08em; padding: 9px 22px; }
+  #go:hover { background: #d04e22; }
+  label { display: inline-flex; gap: 6px; align-items: center; color: var(--dim); cursor: pointer; }
+  input[type=range] { width: 130px; accent-color: var(--blood); }
+  input[type=checkbox] { accent-color: var(--blood); }
+  .meta { color: #6e604e; font-size: 11px; display: flex; gap: 12px; flex-wrap: wrap; }
+  #mods { color: var(--gold); }
+  details { margin-top: 8px; color: #6e604e; font-size: 11px; }
+  summary { cursor: pointer; }
+</style>
+<script>
+  // the game's logical screen follows the window's shape when the page opens (16:10 to about 16:9)
+  (function () { var a = innerWidth / Math.max(1, innerHeight); globalThis.HM_H = 400; globalThis.HM_W = Math.max(480, Math.min(720, Math.round((400 * a) / 2) * 2)); })();
+</script>
+<script id="hm-worker" type="text/plain">/*HM_WORKER*/</script>
+<script>
+  try { globalThis.HORROR_WORKER_URL = URL.createObjectURL(new Blob([document.getElementById('hm-worker').textContent], { type: 'text/javascript' })); } catch (e) { /* the monsters are then drawn on the main thread */ }
+</script>
+</head>
+<body>
+<div id="shell">
+  <canvas id="game"></canvas>
+  <div id="status"></div>
+  <div id="autotag" hidden>AUTOPILOT · P or any key to take over</div>
+  <div id="veil">
+    <div class="card">
+      <h1>HELL MAZE</h1>
+      <p id="title">A maze of rooms, yards and stairs. Find the exit.</p>
+      <div class="keys">
+        <b>W A S D</b><span>move (arrow keys too)</span>
+        <b>Mouse</b><span>look</span>
+        <b>Left button</b><span>fire (hold for automatic weapons)</span>
+        <b>1–5 · wheel · E · Q</b><span>weapons (Q: the last one)</span>
+        <b>Shift</b><span>sprint</span>
+        <b>Space</b><span>jump</span>
+        <b>P</b><span>autopilot on or off</span>
+        <b>F · Esc</b><span>fullscreen · pause</span>
+      </div>
+      <div class="row"><button id="go">Play</button><button id="again">New maze</button><button id="full">Fullscreen</button></div>
+      <div class="row">
+        <label>Mouse <input id="sens" type="range" min="0.6" max="8" step="0.1"> <span id="sensv"></span></label>
+        <label><input id="invert" type="checkbox"> Invert Y</label>
+        <label><input id="watch" type="checkbox"> Watch the autopilot</label>
+      </div>
+      <div class="meta"><span id="seed"></span><span id="mods"></span></div>
+      <details><summary>Credits</summary><p>Wall and floor photos: Wikimedia Commons contributors (CC BY-SA). Three.js (MIT).</p></details>
+    </div>
+  </div>
+</div>
+<script type="module">/*HM_MAIN*/</script>
+</body>
+</html>

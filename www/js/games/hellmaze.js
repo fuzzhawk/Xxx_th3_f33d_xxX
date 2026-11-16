@@ -5,13 +5,15 @@
 // parallax sky, lit by guttering torches. Monsters come from the horror forge, drawn from eight
 // angles like Doom's, and bleed their own colours. Every post rolls its own arsenal.
 import { Game, W, H, ready, rgbOf, imagePixels } from './engine.js';
-import { horror, viewDir } from '../horror.js';
+import { horror, viewDir, registerPost } from '../horror.js';
+import { grimePixels } from '../grime.js';
+registerPost('hm', grimePixels);
 import { mulberry32 } from '../util.js';
 
 let T = null, loading = null;
 const loadThree = () => (loading ||= import('../vendor/three.module.min.js').then((m) => { T = m; return m; }));
 // one renderer for every Hell Maze card; scenes are built per game and dropped when old
-const VH = H - 34, RW = 240, RH = Math.round((RW * VH) / W);
+const VH = H - 34, RW = Math.round((W * 2) / 3), RH = Math.round((RW * VH) / W), GXO = Math.round((W - 360) / 2);
 let RR = null;
 const live = [];
 function renderer() {
@@ -365,81 +367,18 @@ function grimeGun(src, seed, out) {
   return out;
 }
 
-// the creatures made dirtier: grit in every pixel, blotches of filth and dried blood (thicker low
-// down, where it splashes), colours dulled and dithered to the levels' palette, darker toward the
-// feet. Eyes and anything glowing keep their light. Done once per frame of each sheet, kept.
+// canvases (props, carcasses) grimed the same way as the monsters (theirs is done as they are drawn)
 const grimed = new WeakMap();
-// the noise is worked out once (128×128, more than any sheet's frame) and only looked up after
-let GRIT_F = null;
-function gritField() {
-  if (GRIT_F) return GRIT_F;
-  const N = 128, hs = (x, y, k) => { let q = (x * 374761393 + y * 668265263 + k * 1442695041) | 0; q = Math.imul(q ^ (q >>> 13), 1274126177); return ((q ^ (q >>> 16)) >>> 0) / 4294967296; };
-  const blot = (x, y, sz, k) => { const fx = x / sz, fy = y / sz, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0, a = hs(x0, y0, k), b = hs(x0 + 1, y0, k), c = hs(x0, y0 + 1, k), e = hs(x0 + 1, y0 + 1, k); return a + (b - a) * tx + (c - a) * ty + (a - b - c + e) * tx * ty; };
-  const tex = new Float32Array(N * N), dirt = new Float32Array(N * N), gore = new Float32Array(N * N);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = y * N + x; tex[i] = 0.78 + 0.2 * hs(x, y, 7) + 0.22 * blot(x, y, 3, 11); dirt[i] = clamp((blot(x, y, 5, 23) - 0.6) * 2.6, 0, 0.55); gore[i] = blot(x, y, 4, 37); }
-  return (GRIT_F = { N, tex, dirt, gore });
-}
 function grimeSprite(cv) {
-  if (!cv?.getContext) return cv;
+  if (!cv?.getContext || cv.post) return cv;
   let out = grimed.get(cv);
   if (out) return out;
-  const w = cv.width, h = cv.height, sd = cv.getContext('2d').getImageData(0, 0, w, h), d = sd.data, F = gritField(), N = F.N;
-  for (let y = 0; y < h; y++) {
-    const v = y / h, shade = 1.06 - 0.32 * v, gv = v * 0.18 - 0.7, row = (y % N) * N;
-    for (let x = 0; x < w; x++) {
-      const j = (y * w + x) * 4;
-      if (d[j + 3] < 8) continue;
-      let r = d[j], g = d[j + 1], b = d[j + 2];
-      const mx = r > g ? (r > b ? r : b) : g > b ? g : b, mn = r < g ? (r < b ? r : b) : g < b ? g : b;
-      if (mx > 215 && mx - mn > 90) continue;   // a glowing eye or ember: leave it lit
-      const i = row + (x % N), lu = r * 0.3 + g * 0.59 + b * 0.11, k = F.tex[i] * shade;
-      r = (lu + (r - lu) * 0.62) * k; g = (lu + (g - lu) * 0.62) * k; b = (lu + (b - lu) * 0.62) * k;
-      const dt2 = F.dirt[i];
-      if (dt2 > 0) { r += (30 - r) * dt2; g += (24 - g) * dt2; b += (18 - b) * dt2; }
-      const gr = (F.gore[i] + gv) * 3;
-      if (gr > 0) { const q = gr > 0.7 ? 0.7 : gr; r += (74 - r) * q; g += (8 - g) * q; b += (10 - b) * q; }
-      const bq = (BAYER[(y & 3) * 4 + (x & 3)] / 16 - 0.5) * 14;
-      d[j] = clamp(Math.round((r + bq) / 14) * 14, 0, 255); d[j + 1] = clamp(Math.round((g + bq) / 14) * 14, 0, 255); d[j + 2] = clamp(Math.round((b + bq) / 14) * 14, 0, 255);
-    }
-  }
-  melt(d, w, h);
+  const w = cv.width, h = cv.height, sd = cv.getContext('2d').getImageData(0, 0, w, h);
+  grimePixels(sd.data, w, h);
   out = pc(w, h, () => {});
   out.getContext('2d').putImageData(sd, 0, 0);
   grimed.set(cv, out);
   return out;
-}
-// The meltdown: in about a third of the columns the lower part of each run of body slumps, its pixels
-// sorted by brightness so the light sinks to the bottom (pixel sorting, run downward), and now and
-// then it runs on past the body as a drip a few pixels long. Glowing pixels (eyes) are left where they are.
-function melt(d, w, h) {
-  const hs = (a, b) => { let q = (a * 374761393 + b * 668265263 + 0x51ed) | 0; q = Math.imul(q ^ (q >>> 13), 1274126177); return ((q ^ (q >>> 16)) >>> 0) / 4294967296; };
-  const lum = (j) => d[j] * 0.3 + d[j + 1] * 0.59 + d[j + 2] * 0.11, hot = (j) => { const mx = Math.max(d[j], d[j + 1], d[j + 2]), mn = Math.min(d[j], d[j + 1], d[j + 2]); return mx > 215 && mx - mn > 90; };
-  const seg = [];
-  for (let x = 0; x < w; x++) {
-    if (hs(x, w) > 0.34) continue;
-    let y = 0, run = 0;
-    while (y < h) {
-      while (y < h && d[(y * w + x) * 4 + 3] < 8) y++;
-      const y0 = y;
-      while (y < h && d[(y * w + x) * 4 + 3] >= 8) y++;
-      const y1 = y, len = y1 - y0;
-      run++;
-      if (len < 5) continue;
-      const s0 = y0 + Math.floor(len * (0.3 + 0.45 * hs(x, run * 7 + y0))), s1 = y1 - 1;   // the last pixel is the outline: it stays at the edge
-      if (s1 - s0 < 3) continue;
-      seg.length = 0;
-      let skip = false;
-      for (let q = s0; q < s1; q++) { const j = (q * w + x) * 4; if (hot(j)) { skip = true; break; } seg.push([lum(j), d[j], d[j + 1], d[j + 2]]); }
-      if (skip) continue;
-      seg.sort((a, b) => a[0] - b[0]);
-      for (let q = s0; q < s1; q++) { const j = (q * w + x) * 4, c = seg[q - s0]; d[j] = c[1]; d[j + 1] = c[2]; d[j + 2] = c[3]; }
-      // a drip off the bottom of it, darker as it goes, ending in ink
-      if (y1 < h * 0.86 && hs(x, y1 * 3 + run) < 0.45) {
-        const n = 1 + Math.floor(hs(x + 11, y1) * 4), c = seg[seg.length - 1];
-        for (let k = 0; k < n && y1 + k < h; k++) { const j = ((y1 + k) * w + x) * 4; if (d[j + 3] >= 8) break; const f = k === n - 1 ? 0.18 : 0.75 - k * 0.12; d[j] = c[1] * f; d[j + 1] = c[2] * f; d[j + 2] = c[3] * f; d[j + 3] = 255; }
-      }
-    }
-  }
 }
 
 // ---------------------------------------------------------------- level generator (pure data)
@@ -910,7 +849,7 @@ export class HellMaze extends Game {
     this.arms = [rollArm(this.rng, this.rng() < 0.75 ? 'pistol' : 'tooth', this.rng() < 0.6), ...sh(pool).map((k) => rollArm(this.rng, k))];
     this.relicImg = this.skin.pick('relic', 'item', 'ball');
     this.ammoImg = this.arms.map((a, i) => this.skin.pick(`ammo${i}`, 'item', 'ball'));
-    this.crew = ROLES.map((ro, k) => { let m = null; const c = { ...ro, fly: !!ro.fly }; Object.defineProperty(c, 'm', { get: () => (m ||= horror((s * 13 + k * 101) >>> 0, ro.px, { kind: ro.kind, tier: 1 })), enumerable: true }); Object.defineProperty(c, 'name', { get: () => c.m.name, enumerable: true }); return c; });
+    this.crew = ROLES.map((ro, k) => { let m = null; const c = { ...ro, fly: !!ro.fly }; Object.defineProperty(c, 'm', { get: () => (m ||= horror((s * 13 + k * 101) >>> 0, ro.px, { kind: ro.kind, tier: 1, postId: 'hm' })), enumerable: true }); Object.defineProperty(c, 'name', { get: () => c.m.name, enumerable: true }); return c; });
     this.knowSecret = this.rng() < 0.6;
     loadThree().then(() => { this.ready = true; }).catch((e) => { this.failed = String(e?.message || e); });
     this.newLevel(true);
@@ -950,7 +889,7 @@ export class HellMaze extends Game {
     return g;
   }
   boss() {
-    const s = this.post.seed || 1, kind = ['abom', 'demon', 'spider', 'demon'][(s + this.level) % 4], m = horror((s * 31 + this.level * 977 + 7) >>> 0, 64, { kind, tier: 3 });
+    const s = this.post.seed || 1, kind = ['abom', 'demon', 'spider', 'demon'][(s + this.level) % 4], m = horror((s * 31 + this.level * 977 + 7) >>> 0, 64, { kind, tier: 3, postId: 'hm' });
     return { role: 'boss', hp: 380, speed: kind === 'spider' ? 2.6 : 1.8, size: kind === 'abom' ? 3.6 : 3.4, ranged: 18, melee: 26, heavy: true, boss: true, fly: !!m.floats, m, name: m.name };
   }
   addFoe(ro, x, y, z, mul = 1) {
@@ -1070,7 +1009,8 @@ export class HellMaze extends Game {
     if (!this.auto && this.drag) { const dy = (this.drag.cy ?? this.drag.sy) - this.drag.sy; if (Math.abs(dy) > 12) this.inF = clamp(-dy / 14, -4.5, 4.5); else if (this.t - this.drag.t > 0.35 && !this.drag.moved) this.fire(); }
     this.movePlayer(dt);
     this.doDoors(dt);
-    this.stepFoes(dt);
+    this.foeAcc = (this.foeAcc || 0) + dt;
+    if (this.foeAcc >= 1 / 61) { this.stepFoes(this.foeAcc); this.foeAcc = 0; }
     this.stepShots(dt);
     const p = this.p;
     for (const it of this.items) if (!it.got && Math.abs(it.x - p.x) < 0.8 && Math.abs(it.y - p.y) < 0.8 && Math.abs(it.z - p.z) < 1.2) this.pickup(it);
@@ -1084,8 +1024,8 @@ export class HellMaze extends Game {
     wd.collide(p, PR, PH, STEP);
     p.sec = wd.sAt(p.x, p.y, p.sec);
     const fl = wd.floorAt(p.x, p.y, p.z, p.sec);
-    if (p.z <= fl + 0.001 || (p.z - fl < 0.45 && p.vz > -0.5)) { p.z = fl; p.vz = 0; }
-    else { p.vz -= 20 * this.G * dt; p.z = Math.max(fl, p.z + p.vz * dt); }
+    if (p.vz <= 0.5 && (p.z <= fl + 0.001 || (p.z - fl < 0.45 && p.vz > -0.5))) { p.z = fl; p.vz = 0; }
+    else { p.vz -= 20 * this.G * dt; p.z = Math.max(fl, p.z + p.vz * dt); const cl = wd.ceilAt(p.x, p.y, p.z, p.sec); if (p.z + PH > cl) { p.z = Math.max(fl, cl - PH); p.vz = Math.min(0, p.vz); } }
     p.bob += Math.hypot(p.vx, p.vy) * dt * 2.2;
     p.eye += (p.z + EYE - p.eye) * Math.min(1, dt * 14);
     if (p.sec && !p.sec.seen) { p.sec.seen = true; for (const e of p.sec.edges) if (e.o) e.o.seen = true; }
@@ -1299,7 +1239,7 @@ export class HellMaze extends Game {
 
   // ------------------------------------------------------------------ weapons and projectiles
   shoot(k, x, y, z, vx, vy, vz, o) { const b = { k, x, y, z, vx, vy, vz, life: 3, r: 0.12, grav: 0, bounce: 0, t: 0, spin: this.r(-9, 9), sec: this.wd.sAt(x, y, this.p.sec), ...o }; this.shots.push(b); return b; }
-  autoAim(cone = 0.13) {
+  autoAim(cone = this.aimCone ?? 0.13) {
     const p = this.p, ez = p.eye - 0.28;
     let best = null, bs = 1e9;
     for (const f of this.foes) {
@@ -1326,7 +1266,7 @@ export class HellMaze extends Game {
     if (kind === 'rocket' || kind === 'grenade') this.shake = Math.max(this.shake || 0, 0.12);
     for (let n = 0; n < A.n; n++) {
       const a = p.a + (aim ? aim.da : 0) + this.r(-1, 1) * (A.spread || 0), sp = A.speed * this.r(0.92, 1.05), d = aim ? aim.d : 8, t = d / sp;
-      let vz = aim ? aim.dz / t : 0;
+      let vz = aim ? aim.dz / t : (this.pitch || 0) * sp;
       if (A.grav) vz += 0.5 * A.grav * this.G * t;
       if (kind === 'marble') vz = -1;
       const life = kind === 'skull' ? 3.5 : kind === 'marble' ? 1.3 : kind === 'grenade' ? A.fuse || 1.8 : kind === 'rocket' ? 4 : kind === 'flame' ? this.r(0.45, 0.6) : kind === 'soul' ? 5 : kind === 'mine' ? 4 : 3;
@@ -1891,7 +1831,7 @@ export class HellMaze extends Game {
 
   // ------------------------------------------------------------------ touch: drag sideways to turn, up/down to walk, tap to fire, tap the HUD to switch weapons
   down(x, y) {
-    if (y > H - 34) { const i = Math.floor((x - 150) / 42); if (i >= 0 && i < 5 && this.owned[i]) this.weapon = i; this.drag = null; return; }
+    if (y > H - 34) { const i = Math.floor((x - GXO - 150) / 42); if (i >= 0 && i < 5 && this.owned[i]) this.weapon = i; this.drag = null; return; }
     this.drag = { x, y, sx: x, sy: y, t: this.t, moved: false };
   }
   move(x, y) { if (!this.drag) return; const dx = x - this.drag.x; if (Math.abs(x - this.drag.sx) + Math.abs(y - this.drag.sy) > 8) this.drag.moved = true; this.p.a += dx * 0.012; this.drag.x = x; this.drag.cy = y; }
@@ -1953,7 +1893,7 @@ export class HellMaze extends Game {
     const sc = new T.Scene(), fog = this.rgbC(this.mood.fog);
     const gl = (this.gl = { scene: sc, textures: [], tex: new Map(), spr: new Map(), frame: 0 });
     sc.fog = new T.Fog(fog, 1.5, 22); sc.background = fog;
-    gl.cam = new T.PerspectiveCamera(72, RW / RH, 0.05, 200);
+    gl.cam = new T.PerspectiveCamera(W > H ? 64 : 72, RW / RH, 0.05, 200);
     this.paintKit(gl); this.buildWorld(gl); this.buildSky(gl);
     const pts = (add) => {
       const N = 900, g = new T.BufferGeometry(), pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
@@ -2258,11 +2198,25 @@ export class HellMaze extends Game {
     for (const d of this.decals) if (d.to && d.s < d.to) { d.s = Math.min(d.to, d.s + dt * 0.45); this.decalDirty = true; }
   }
   frameOf(f) { return grimeSprite(this.rawFrame(f)); }
+  // a view of a monster; one that has not been drawn yet is drawn only if this frame's budget allows,
+  // otherwise the nearest frame already drawn stands in for a moment (no stalls when a crowd turns up)
+  viewOf(m, anim, k, d) {
+    if (!m.has || m.has(anim, k, d)) return m.view(anim, k, d);
+    // drawn in the background if this device can: ask for it first in the queue, show the nearest drawn frame meanwhile
+    const bg = m.prefetch?.(anim, k, d, true);
+    if (!bg && this.bakeBudget > 0) { this.bakeBudget--; return m.view(anim, k, d); }
+    for (const [a2, k2, d2] of [[anim, 0, d], ['idle', 0, d], ['idle', 1, d], [anim, k, 2], ['idle', 0, 2], ['idle', 0, 0]]) if (m.has(a2, k2, d2)) return m.view(a2, k2, d2);
+    return m.view(anim, k, d);
+  }
   rawFrame(f) {
-    const m = f.m;
-    if (m.view) {
-      // the view of it from where you stand (Doom's eight rotations)
-      const d = viewDir(f.ang, Math.atan2(this.p.y - f.y, this.p.x - f.x));
+    const m0 = f.m;
+    f.flipV = false;
+    if (m0.view) {
+      // the view of it from where you stand (Doom's eight rotations); the three left-facing ones are the
+      // right-facing frames drawn flipped (no extra pictures, no extra textures)
+      let d = viewDir(f.ang, Math.atan2(this.p.y - f.y, this.p.x - f.x));
+      if (d > 4) { d = 8 - d; f.flipV = true; }
+      const m = { view: (an, k, dd) => this.viewOf(m0, an, k, dd) };
       if (f.hp <= 0) return m.view('dead', 0, d);
       if (f.cst === 'run') return m.view('walk', Math.floor(f.anim * 12) % 4, d);
       if (f.cst === 'wind' || f.cst === 'crouch' || f.cst === 'aim' || f.cst === 'chant') return m.view('attack', f.cst === 'aim' && f.cT < 0.3 ? 2 : 1, d);
@@ -2273,6 +2227,7 @@ export class HellMaze extends Game {
       if (f.moving) return m.view('walk', Math.floor(f.anim * (f.speed > 3.5 ? 9 : 6)) % 4, d);
       return m.view('idle', Math.floor(f.anim * 2.4) % 2, d);
     }
+    const m = m0;
     if (f.hp <= 0) return m.dead || m.hurt || m.frames[0];
     if (f.actT > 0 && m.attack) return m.attack[clamp(Math.floor((1 - f.actT / (f.act === 'bite' ? 0.5 : 0.65)) * 3), 0, 2)];
     if (f.hitT > 0 && m.hurt) return m.hurt;
@@ -2283,13 +2238,19 @@ export class HellMaze extends Game {
     gl.frame++;
     const p = this.p, t = this.t, light = (s) => (s ? s.light * (s.sky ? 0.95 : 0.86) : 0.72);
     // creature sheets are built lazily: touch one cycle per frame so the first fight does not hitch
-    if (!this.warm) {
-      this.warm = true;
+    this.bakeBudget = 2;   // at most two monster frames drawn a display frame: one kept for whatever turns up on screen
+    if (this.warm !== this.foes) {
+      this.warm = this.foes;
       const ms = [...new Set(this.foes.map((f) => f.m))];
-      this.warmList = ms.flatMap((m) => [() => m.anatomy, ...[0, 1, 2, 3, 4].flatMap((d) => [['idle', 0], ['idle', 1], ['walk', 0], ['walk', 1], ['walk', 2], ['walk', 3], ['attack', 0], ['attack', 1], ['attack', 2], ['hurt', 0], ['dead', 0]].map(([a, k]) => () => grimeSprite(m.view(a, k, d))))]);
+      const poses = [['idle', 0], ['walk', 0], ['walk', 1], ['walk', 2], ['walk', 3], ['idle', 1], ['attack', 0], ['attack', 1], ['attack', 2], ['hurt', 0], ['dead', 0]];
+      ms.forEach((m) => m.anatomy);
+      // everything this level's monsters will need, the most-seen first: drawn by the worker where there is one,
+      // otherwise a frame or two each display frame
+      this.warmList = [];
+      for (const d of [2, 0, 1, 3, 4]) for (const [a, k] of poses) for (const m of ms) if (!m.has?.(a, k, d) && !m.prefetch?.(a, k, d)) this.warmList.push(() => { if (!m.has?.(a, k, d)) { this.bakeBudget--; m.view(a, k, d); } });
     }
-    if (this.warmList.length) this.warmList.shift()();   // one a frame: each is a sheet frame drawn, read back and grimed
-    if (t > 1 && !gl.refreshed && t < 8 && Math.floor(t) % 2 === 0) { for (const [cv, tx] of gl.tex) if (cv instanceof HTMLCanvasElement) tx.needsUpdate = true; gl.refreshed = Math.floor(t) >= 6; }
+    while (this.warmList.length && this.bakeBudget > 1) this.warmList.shift()();   // a frame drawn each display frame, the most-seen first
+    if (t > 1 && !gl.refreshed && t < 8 && Math.floor(t) % 2 === 0 && gl.refSec !== Math.floor(t)) { gl.refSec = Math.floor(t); for (const [cv, tx] of gl.tex) if (cv instanceof HTMLCanvasElement && !cv.post) tx.needsUpdate = true; gl.refreshed = Math.floor(t) >= 6; }
     for (const { sl, m } of gl.doors) m.position.y = sl.b - sl.b0;
     if (this.vox) { let n = 4; for (const O of [...this.vox.panels, ...this.vox.crates]) if (O.dirty && n-- > 0) this.voxMesh(gl, O); }
     if (gl.pools?.lamps.length) {
@@ -2329,7 +2290,7 @@ export class HellMaze extends Game {
       const near = Math.hypot(f.x - p.x, f.y - p.y), op = f.ghost && !dead ? (near < 4 || f.hitT > 0 || f.actT > 0 ? 1 : clamp(0.08 + (Math.random() < 0.06 ? 0.3 : 0) + Math.max(0, 1 - (near - 4) / 3) * 0.6, 0.06, 0.9)) : null;
       // a worm comes up out of the floor (the floor hides what is still below it)
       const sink = f.burrow ? (1 - f.rise) * f.size * 0.95 : 0;
-      this.put(gl, f, im, f.x, f.y, f.z - (dead ? 0.05 : 0) - f.size * 0.04 - sink, f.size, f.size, col, { flip: !f.m.view && f.face < 0, op });
+      this.put(gl, f, im, f.x, f.y, f.z - (dead ? 0.05 : 0) - f.size * 0.04 - sink, f.size, f.size, col, { flip: f.m.view ? f.flipV : f.face < 0, op });
     }
     for (const it of this.items) {
       if (it.got) continue;
@@ -2343,7 +2304,7 @@ export class HellMaze extends Game {
       }
     }
     for (const d of this.deco) {
-      if (d.kind === 'corpse') this.put(gl, d, grimeSprite(d.m.view('dead', 0, d.dir)), d.x, d.y, d.z - 0.06, 1.8, 1.8, light(d.sec) * 0.85);
+      if (d.kind === 'corpse') this.put(gl, d, grimeSprite(d.m.view('dead', 0, d.dir > 4 ? 8 - d.dir : d.dir)), d.x, d.y, d.z - 0.06, 1.8, 1.8, light(d.sec) * 0.85, { flip: d.dir > 4 });
       else if (d.kind === 'candles') this.put(gl, d, this.art('candles', Math.floor(t * 6 + d.ph) % 2), d.x, d.y, d.z, 0.5, 0.58, 1.3);
       else if (d.kind === 'skulls') this.put(gl, d, this.art('skulls'), d.x, d.y, d.z, 0.72, 0.5, light(d.sec));
       else if (d.kind === 'deadtree' && !d.gone) this.put(gl, d, grimeSprite(this.art('deadtree', d.v)), d.x, d.y, d.z - 0.05, 2.6, 4.4, light(d.sec) * 0.9);
@@ -2482,10 +2443,10 @@ export class HellMaze extends Game {
     if (A.k === 'soul') { const gl2 = 0.5 + 0.5 * Math.sin(t * 5); G(`rgba(150,255,200,${(0.35 + gl2 * 0.4).toFixed(2)})`, 80, 44, 20, 26); G('rgba(10,30,20,.9)', 83, 50, 4, 5); G('rgba(10,30,20,.9)', 93, 50, 4, 5); G('rgba(10,30,20,.9)', 86, 58 + Math.round(gl2 * 2), 8, 6); }
     if (A.k === 'mines' && Math.floor(t * 3) % 2) G('#ff3020', 89, 42, 3, 2);
     if (A.affixes?.includes('burn')) G(`rgba(255,${110 + Math.round(Math.sin(t * 13) * 40)},40,.8)`, 72, 100, 36, 2);
-    c.imageSmoothingEnabled = false; c.drawImage(vl, Math.round(bx) * 2, VH - GUN_H * 2 + Math.round(by) * 2, 360, GUN_H * 2);
+    c.imageSmoothingEnabled = false; c.drawImage(vl, GXO + Math.round(bx) * 2, VH - GUN_H * 2 + Math.round(by) * 2, 360, GUN_H * 2);
     // the muzzle flash: a ragged pixel star, white-hot in the middle, as far off as the muzzle is
     if (this.flash > 0 && A.k !== 'flail') {
-      const fx = (fw[0] + Math.round(bx)) * 2, fy = VH - GUN_H * 2 + (fw[1] + Math.round(by)) * 2, cool = A.k === 'fork' || A.k === 'plasma' || A.k === 'railgun', R2 = this.rng, fk = 0.55 + fw[2] * 0.6;
+      const fx = GXO + (fw[0] + Math.round(bx)) * 2, fy = VH - GUN_H * 2 + (fw[1] + Math.round(by)) * 2, cool = A.k === 'fork' || A.k === 'plasma' || A.k === 'railgun', R2 = this.rng, fk = 0.55 + fw[2] * 0.6;
       for (const [r0, col] of [[22, cool ? '#3a8cff' : '#c8401a'], [15, cool ? '#9fd8ff' : '#ffa030'], [8, cool ? '#e8f8ff' : '#ffe8a0'], [3, '#ffffff']]) {
         const r = r0 * fk;
         c.fillStyle = col;
@@ -2666,7 +2627,7 @@ export class HellMaze extends Game {
   drawOverlay(c) {
     // the picture's grain and a heavy vignette, baked together into four small frames made once and
     // cycled (one plain draw a frame: cheap even where the canvas is drawn in software)
-    const film = (this.filmCv ||= Array.from({ length: 4 }, (_, k) => pc(180, Math.ceil(VH / 2), (x, w, h) => {
+    const film = (this.filmCv ||= Array.from({ length: 4 }, (_, k) => pc(Math.round(W / 2), Math.ceil(VH / 2), (x, w, h) => {
       const im = x.createImageData(w, h), d = im.data, R = mulberry32(k * 977 + 3);
       for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) {
         const i = (y * w + xx) * 4, dx = (xx - w / 2) / (w / 2), dy = (y - h * 0.46) / (h * 0.6), r = Math.hypot(dx * 0.92, dy), v = clamp((r - 0.42) / 0.75, 0, 1), va = v * v * 0.82 + (BAYER[(y & 3) * 4 + (xx & 3)] / 16 - 0.5) * 0.04, g = R();
@@ -2708,6 +2669,7 @@ export class HellMaze extends Game {
   drawHud(c) {
     const p = this.p, vh = VH;
     c.fillStyle = '#1b1612'; c.fillRect(0, vh, W, H - vh); c.fillStyle = '#3a2f27'; c.fillRect(0, vh, W, 2);
+    c.save(); c.translate(GXO, 0);
     this.text(c, `${Math.max(0, Math.ceil(p.hp))}%`, 24, vh + 18, 14, p.hp < 30 ? '#ff5a3a' : '#ffd27a');
     this.text(c, `${Math.ceil(p.armor)}`, 62, vh + 18, 12, '#7ad7ff');
     const am = this.ammo[this.weapon];
@@ -2718,7 +2680,8 @@ export class HellMaze extends Game {
       this.text(c, A.label, 169.5 + i * 42, vh + 14, 7, this.owned[i] ? '#fff' : '#665');
       if (this.owned[i]) this.text(c, A.ammo ? String(this.ammo[i]) : '∞', 169.5 + i * 42, vh + 24, 7, '#ffd27a');
     });
-    this.text(c, this.arms[this.weapon].name, W / 2, vh - 10, 9, 'rgba(255,255,255,.7)');
+    this.text(c, this.arms[this.weapon].name, 180, vh - 10, 9, 'rgba(255,255,255,.7)');
+    c.restore();
   }
 }
 

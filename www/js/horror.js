@@ -25,7 +25,8 @@
 // view() takes dir 0–7 round the monster: 0 front, 1 front three-quarter facing right, 2 side facing
 // right, 3 back three-quarter, 4 back, 5–7 the same mirrored. Canvases are size×size with .pixel set,
 // built on first use and kept.
-// opts: { kind: one of KINDS, tier: 0–4, glow: GLOWS key }
+// opts: { kind: one of KINDS, tier: 0–4, glow: GLOWS key, post: (rgba, w, h) => void — a pass over each
+//   frame's pixels before they become a canvas (a game's own grime), postId: names it in the memo }
 import { mulberry32 } from './util.js';
 
 export const KINDS = ['zombie', 'demon', 'imp', 'wraith', 'abom', 'hound', 'spider', 'butcher', 'stalker', 'bloater', 'skitter', 'eye', 'priest', 'charger', 'leaper', 'worm', 'gunner'];
@@ -612,10 +613,9 @@ function snap(pal, r, g, b) {
   }
   return ci;
 }
-function bake(g, p, size, smooth = false) {
-  const n = p.n, ss = n / size, L = light(p), cv = document.createElement('canvas');
-  cv.width = cv.height = size; cv.pixel = !smooth;
-  const ctx = cv.getContext('2d'), img = ctx.createImageData(size, size), d = img.data, idx = new Int16Array(size * size).fill(-1), pal = (g.pal ||= paletteOf(g));
+// the finished pixels of a frame (no canvas: a worker can do this)
+function bakePixels(g, p, size, smooth = false, post = null) {
+  const n = p.n, ss = n / size, L = light(p), d = new Uint8ClampedArray(size * size * 4), idx = new Int16Array(size * size).fill(-1), pal = (g.pal ||= paletteOf(g));
   // crush: average each block of supersamples; keep it if enough of the block is covered
   const cols = new Float32Array(size * size * 3), glow = new Uint8Array(size * size);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
@@ -646,10 +646,47 @@ function bake(g, p, size, smooth = false) {
       if ((x > 0 && solid[o - 1]) || (x < size - 1 && solid[o + 1]) || (y > 0 && solid[o - size]) || (y < size - 1 && solid[o + size])) { d[o * 4] = pal.ink[0]; d[o * 4 + 1] = pal.ink[1]; d[o * 4 + 2] = pal.ink[2]; d[o * 4 + 3] = smooth ? 200 : 255; }
     }
   }
-  ctx.putImageData(img, 0, 0);
+  // a game's own pass over the finished pixels (done here, before they are a canvas, so nothing has to be read back)
+  if (post) post(d, size, size);
+  return d;
+}
+function canvasOf(d, size, smooth, post) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size; cv.pixel = !smooth; if (post) cv.post = true;
+  const ctx = cv.getContext('2d'), img = ctx.createImageData(size, size);
+  img.data.set(d); ctx.putImageData(img, 0, 0);
   return cv;
 }
-const mirror = (cv) => { const o = document.createElement('canvas'); o.width = cv.width; o.height = cv.height; o.pixel = cv.pixel; const c = o.getContext('2d'); c.translate(cv.width, 0); c.scale(-1, 1); c.drawImage(cv, 0, 0); return o; };
+const bake = (g, p, size, smooth = false, post = null) => canvasOf(bakePixels(g, p, size, smooth, post), size, smooth, post);
+
+// ---------------------------------------------------------------- drawing frames off the main thread
+// A game can name a pass over finished pixels (registerPost) and ask for frames ahead of time
+// (monster.prefetch): a worker builds the same genome from the seed, draws the frame, runs the pass
+// and sends the pixels back; the main thread only makes the canvas. Frames wanted on screen jump the
+// queue. Where workers are not available prefetch says so and the game draws as before.
+const POSTS = new Map();
+export const registerPost = (name, fn) => POSTS.set(name, fn);
+export function framePixels(seed, size, opts, anim, k, dir) {
+  const S = Math.max(12, Math.round(size)), gk = `${seed}|${opts.kind || ''}|${opts.tier ?? ''}|${opts.glow || ''}`;
+  let g = GEN.get(gk);
+  if (!g) { g = genome(seed, opts); GEN.set(gk, g); if (GEN.size > 200) GEN.delete(GEN.keys().next().value); }
+  const fr = ANIM[anim] || ANIM.idle, kk = clamp(k | 0, 0, fr.length - 1);
+  g.R = mulberry32((seed * 31 + 5) >>> 0);
+  return bakePixels(g, paintFrame(g, S * (S >= 40 ? 3 : 4), anim, fr[kk], PHI[dir]), S, false, POSTS.get(opts.postId) || null);
+}
+let WK = null, wkDead = typeof Worker === 'undefined', busy = null, jid = 0;
+const jobs = [];
+function worker() {
+  if (WK || wkDead) return WK;
+  try {
+    WK = globalThis.HORROR_WORKER_URL ? new Worker(globalThis.HORROR_WORKER_URL) : new Worker(new URL('./horror-worker.js', import.meta.url), { type: 'module' });
+    WK.onmessage = (e) => { const j = busy; busy = null; if (j && e.data.id === j.id) j.done(e.data.d || null); pump(); };
+    WK.onerror = (e) => { e.preventDefault?.(); wkDead = true; WK?.terminate(); WK = null; const all = busy ? [busy, ...jobs] : [...jobs]; busy = null; jobs.length = 0; all.forEach((j) => j.done(null)); };
+  } catch { wkDead = true; WK = null; }
+  return WK;
+}
+function pump() { if (busy || !jobs.length || !WK) return; busy = jobs.shift(); WK.postMessage({ id: busy.id, ...busy.msg }); }
+const mirror = (cv) => { const o = document.createElement('canvas'); o.width = cv.width; o.height = cv.height; o.pixel = cv.pixel; o.post = cv.post; const c = o.getContext('2d'); c.translate(cv.width, 0); c.scale(-1, 1); c.drawImage(cv, 0, 0); return o; };
 
 // ---------------------------------------------------------------- the monster
 const GEN = new Map(), MEMO = new Map();
@@ -657,7 +694,7 @@ const ANIM = { idle: [0, 1], walk: [0, 0.25, 0.5, 0.75], attack: [1, 2, 3], hurt
 // the camera angle for each of the five drawn views (dir 0 front … 4 back)
 const PHI = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2];
 export function horror(seed, size = 32, opts = {}) {
-  const S = Math.max(12, Math.round(size)), key = `${seed}|${S}|${opts.kind || ''}|${opts.tier ?? ''}|${opts.glow || ''}`;
+  const S = Math.max(12, Math.round(size)), key = `${seed}|${S}|${opts.kind || ''}|${opts.tier ?? ''}|${opts.glow || ''}|${opts.post || opts.postId ? opts.postId || 'post' : ''}`;
   if (MEMO.has(key)) return MEMO.get(key);
   const gk = `${seed}|${opts.kind || ''}|${opts.tier ?? ''}|${opts.glow || ''}`;
   let g = GEN.get(gk);
@@ -665,15 +702,33 @@ export function horror(seed, size = 32, opts = {}) {
   // supersample: 4× for small sprites, 3× for big ones (the grit comes out of the crush either way).
   // Details (wounds, drips, pustules) come from one stream, the same for every frame, so they stay put.
   const ss = S >= 40 ? 3 : 4, cache = new Map();
-  const draw = (type, t, dir) => { g.R = mulberry32((seed * 31 + 5) >>> 0); return bake(g, paintFrame(g, S * ss, type, t, PHI[dir]), S); };
+  const postFn = opts.post || (opts.postId && POSTS.get(opts.postId)) || null;
+  const draw = (type, t, dir) => { g.R = mulberry32((seed * 31 + 5) >>> 0); return bake(g, paintFrame(g, S * ss, type, t, PHI[dir]), S, false, postFn); };
   const view = (anim, k = 0, dir = 2) => {
     const fr = ANIM[anim] || ANIM.idle, kk = clamp(k | 0, 0, fr.length - 1), d = ((dir | 0) % 8 + 8) % 8, ck = `${anim}|${kk}|${d}`;
     let cv = cache.get(ck);
     if (!cv) { cv = d > 4 ? mirror(view(anim, kk, 8 - d)) : draw(anim, fr[kk], d); cache.set(ck, cv); }
     return cv;
   };
+  // whether a frame has been drawn yet (so a game can spread the drawing out instead of stalling on it)
+  const has = (anim, k = 0, dir = 2) => { const fr = ANIM[anim] || ANIM.idle, kk = clamp(k | 0, 0, fr.length - 1), d = ((dir | 0) % 8 + 8) % 8; return cache.has(`${anim}|${kk}|${d}`); };
+  // ask for a frame to be drawn in the background (false: no worker here, draw it yourself)
+  const pend = new Map();
+  const prefetch = (anim, k = 0, dir = 2, urgent = false) => {
+    const fr = ANIM[anim] || ANIM.idle, kk = clamp(k | 0, 0, fr.length - 1), d = ((dir | 0) % 8 + 8) % 8, ck = `${anim}|${kk}|${d}`;
+    if (cache.has(ck)) return true;
+    if (d > 4 || !worker()) return false;
+    const old = pend.get(ck);
+    if (old) { if (urgent && jobs.includes(old)) { jobs.splice(jobs.indexOf(old), 1); jobs.unshift(old); } return true; }
+    const job = { id: ++jid, msg: { seed, size: S, opts: { kind: opts.kind, tier: opts.tier, glow: opts.glow, postId: opts.postId }, anim, k: kk, dir: d },
+      done: (px) => { pend.delete(ck); if (px && !cache.has(ck)) cache.set(ck, canvasOf(px, S, false, !!postFn)); } };
+    pend.set(ck, job);
+    if (urgent) jobs.unshift(job); else jobs.push(job);
+    pump();
+    return true;
+  };
   const hide = toHex(g.skin[0]);
-  const out = { view, dirs: 8, frames: [view('idle', 0), view('idle', 1)], name: g.name, species: g.species, element: ELEMENT[g.kind], kind: g.kind, floats: !!g.float && g.kind !== 'priest', tier: g.tier, size: S, horror: true, hue: 0, genome: g,
+  const out = { view, has, prefetch, dirs: 8, frames: [view('idle', 0), view('idle', 1)], name: g.name, species: g.species, element: ELEMENT[g.kind], kind: g.kind, floats: !!g.float && g.kind !== 'priest', tier: g.tier, size: S, horror: true, hue: 0, genome: g,
     palette: { body: hide, shade: toHex(g.skin[2]), dark: toHex(shadeC(g.skin[2], -0.3)), light: toHex(g.skin[1]), belly: toHex(g.skin[1]), accent: toHex(g.horn[1]), glow: toHex(g.glow), glowDeep: toHex(shadeC(g.glow, -0.4)), eye: toHex(g.glow), outline: '#0b0809', colors: [g.skin[0], g.skin[1], g.cloth[0], g.bone[0], g.blood[1]].map(toHex) } };
   const lazy = (k, fn) => { let v; Object.defineProperty(out, k, { get: () => v || (v = fn()), enumerable: true }); };
   lazy('walk', () => ANIM.walk.map((_, k) => view('walk', k)));
