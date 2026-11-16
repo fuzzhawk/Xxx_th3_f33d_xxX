@@ -1,6 +1,9 @@
 // Horror Forge: gritty monsters for the dark games, built in the round and drawn from eight angles
 // like Doom's sprites. It makes shambling zombies, horned demon brutes, spiny imps, hooded wraiths,
-// abominations of meat and metal, flayed hellhounds and spider horrors.
+// abominations of meat and metal, flayed hellhounds and spider horrors; and (Hell Maze's second
+// wave) sack-hooded butchers, faceless stalkers, bloaters swollen with bile, skitters (a flayed head
+// on finger legs), floating watcher eyes, robed priests with skull staves, horned chargers, crouching
+// leapers, burrowing worms with a ring of teeth, and gunners of flesh and iron with a cannon arm.
 //
 // Each monster is a set of solids in body space: x forward, y down, z to its right. A frame is drawn
 // from one of eight camera angles round it. Front, three-quarter, side, back three-quarter and back
@@ -25,7 +28,7 @@
 // opts: { kind: one of KINDS, tier: 0–4, glow: GLOWS key }
 import { mulberry32 } from './util.js';
 
-export const KINDS = ['zombie', 'demon', 'imp', 'wraith', 'abom', 'hound', 'spider'];
+export const KINDS = ['zombie', 'demon', 'imp', 'wraith', 'abom', 'hound', 'spider', 'butcher', 'stalker', 'bloater', 'skitter', 'eye', 'priest', 'charger', 'leaper', 'worm', 'gunner'];
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v), lerp = (a, b, t) => a + (b - a) * t;
 const hx = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
@@ -60,19 +63,32 @@ const NAMES = {
   wraith: [['Hollow', 'Grave', 'Mourning', 'Pale', 'Shrouded'], ['Wraith', 'Shade', 'Revenant', 'Banshee', 'Spectre']],
   abom: [['Writhing', 'Stitched', 'Bolted', 'Festering', 'Many-eyed'], ['Abomination', 'Flesh Weaver', 'Meat Golem', 'Maw', 'Amalgam', 'Gorger']],
   hound: [['Rabid', 'Skinless', 'Burning', 'Gaunt'], ['Hellhound', 'Gorehound', 'Ravager', 'Cur']],
-  spider: [['Bloated', 'Eyeless', 'Venom', 'Ossuary', 'Weeping'], ['Broodmother', 'Crawler', 'Webspinner', 'Skitterer']]
+  spider: [['Bloated', 'Eyeless', 'Venom', 'Ossuary', 'Weeping'], ['Broodmother', 'Crawler', 'Webspinner', 'Skitterer']],
+  butcher: [['Sack-headed', 'Grinning', 'Aproned', 'Hacking', 'Swollen'], ['Butcher', 'Slaughterman', 'Cleaver', 'Carver', 'Renderer']],
+  stalker: [['Faceless', 'Long', 'Thin', 'Quiet', 'Pale'], ['Stalker', 'Watcher-in-walls', 'Longarm', 'Nobody', 'Hollowman']],
+  bloater: [['Swollen', 'Weeping', 'Bilious', 'Ripe', 'Gassy'], ['Bloater', 'Boil', 'Sack', 'Burster', 'Pustule']],
+  skitter: [['Flayed', 'Chattering', 'Little', 'Fingered', 'Grinning'], ['Skitter', 'Headcrawler', 'Facecrab', 'Nibbler']],
+  eye: [['Unblinking', 'Weeping', 'Bloodshot', 'Hanging', 'Lidless'], ['Watcher', 'Eye', 'Gazer', 'Witness', 'Oculus']],
+  priest: [['Hollow', 'Bone', 'Ashen', 'Chanting', 'Faithless'], ['Priest', 'Deacon', 'Abbot', 'Summoner', 'Mourner']],
+  charger: [['Iron-horned', 'Gored', 'Thundering', 'Tusked', 'Scarred'], ['Charger', 'Ramhound', 'Goremaul', 'Bullock', 'Battering Beast']],
+  leaper: [['Crouching', 'Wide-mouthed', 'Leaping', 'Gangling', 'Slick'], ['Leaper', 'Pouncer', 'Hopper', 'Springer']],
+  worm: [['Burrowing', 'Blind', 'Ringmouthed', 'Pale', 'Gnawing'], ['Worm', 'Lamprey', 'Borer', 'Earth-maw', 'Grublord']],
+  gunner: [['Bolted', 'Iron', 'Smoking', 'Plated', 'Rivet-skinned'], ['Gunner', 'Mortarman', 'Siege-flesh', 'Cannoneer']]
 };
-const ELEMENT = { zombie: 'undead', demon: 'fire', imp: 'fire', wraith: 'undead', abom: 'poison', hound: 'fire', spider: 'poison' };
+const ELEMENT = { zombie: 'undead', demon: 'fire', imp: 'fire', wraith: 'undead', abom: 'poison', hound: 'fire', spider: 'poison', butcher: 'undead', stalker: 'undead', bloater: 'poison', skitter: 'undead', eye: 'poison', priest: 'undead', charger: 'fire', leaper: 'poison', worm: 'poison', gunner: 'fire' };
 function genome(seed, opts) {
   const R = mulberry32((seed * 2654435761) >>> 0), r = (a, b) => a + R() * (b - a), pick = (a) => a[Math.floor(R() * a.length) % a.length];
   const kind = KINDS.includes(opts.kind) ? opts.kind : pick(['zombie', 'zombie', 'demon', 'imp', 'wraith', 'abom', 'hound', 'spider']);
   const tier = clamp(opts.tier ?? 0, 0, 4);
   const g = { seed, kind, tier, R, ns: (seed * 7919) & 0xffff };
-  g.skin = C(kind === 'zombie' ? SKIN[pick(['rot', 'rot', 'bruise', 'pallid', 'drowned'])] : kind === 'demon' ? SKIN[pick(['hellhide', 'hellhide', 'char', 'umber'])] : kind === 'imp' ? SKIN[pick(['umber', 'char', 'hellhide', 'ash'])]
-    : kind === 'wraith' ? SKIN[pick(['pallid', 'ash', 'drowned'])] : kind === 'abom' ? MEAT[pick(['raw', 'raw', 'bile', 'necrotic', 'toxic', 'rust'])] : kind === 'hound' ? MEAT[pick(['raw', 'ember', 'rust'])] : SKIN[pick(['char', 'umber', 'bruise', 'ash'])]);
+  const SK = { zombie: () => SKIN[pick(['rot', 'rot', 'bruise', 'pallid', 'drowned'])], demon: () => SKIN[pick(['hellhide', 'hellhide', 'char', 'umber'])], imp: () => SKIN[pick(['umber', 'char', 'hellhide', 'ash'])],
+    wraith: () => SKIN[pick(['pallid', 'ash', 'drowned'])], abom: () => MEAT[pick(['raw', 'raw', 'bile', 'necrotic', 'toxic', 'rust'])], hound: () => MEAT[pick(['raw', 'ember', 'rust'])], spider: () => SKIN[pick(['char', 'umber', 'bruise', 'ash'])],
+    butcher: () => SKIN[pick(['pallid', 'pallid', 'bruise'])], stalker: () => SKIN[pick(['pallid', 'ash', 'ash', 'drowned'])], bloater: () => MEAT[pick(['bile', 'toxic', 'necrotic'])], skitter: () => MEAT[pick(['raw', 'raw', 'necrotic'])],
+    eye: () => MEAT[pick(['raw', 'necrotic', 'rust'])], priest: () => SKIN[pick(['ash', 'pallid', 'char'])], charger: () => SKIN[pick(['hellhide', 'char', 'umber'])], leaper: () => SKIN[pick(['rot', 'drowned', 'bruise'])], worm: () => MEAT[pick(['raw', 'necrotic', 'bile'])], gunner: () => SKIN[pick(['hellhide', 'umber', 'hellhide'])] };
+  g.skin = C(SK[kind]());
   g.cloth = C(pick(CLOTH)); g.metal = C(pick(METAL)); g.bone = C(BONE); g.blood = C(BLOOD); g.horn = C(HORN);
-  g.glow = hx(GLOWS[opts.glow] || GLOWS[kind === 'zombie' ? pick(['blood', 'toxic', 'cold']) : kind === 'wraith' ? pick(['cold', 'void', 'toxic']) : kind === 'abom' ? pick(['toxic', 'gold', 'blood']) : kind === 'spider' ? pick(['blood', 'toxic', 'void']) : pick(['fire', 'hell', 'gold'])]);
-  g.eyesGlow = kind !== 'zombie' || R() < 0.45;
+  g.glow = hx(GLOWS[opts.glow] || GLOWS[kind === 'zombie' || kind === 'butcher' ? pick(['blood', 'toxic', 'cold']) : kind === 'wraith' || kind === 'priest' ? pick(['cold', 'void', 'toxic']) : kind === 'abom' || kind === 'bloater' ? pick(['toxic', 'gold', 'blood']) : kind === 'spider' || kind === 'skitter' || kind === 'eye' ? pick(['blood', 'toxic', 'void']) : kind === 'worm' || kind === 'leaper' ? pick(['toxic', 'blood']) : pick(['fire', 'hell', 'gold'])]);
+  g.eyesGlow = !['zombie', 'butcher', 'bloater'].includes(kind) || R() < 0.45;
   // the body plan, in sprite units (0..1 across; feet on the line y = .955)
   const big = 1 + tier * 0.04;
   if (kind === 'zombie') Object.assign(g, { H: r(0.8, 0.88), leg: 0.47, torso: r(0.3, 0.34), headR: r(0.064, 0.074), lean: r(0.22, 0.5), tilt: r(0.1, 0.45), bulk: r(0.95, 1.25) * (R() < 0.2 ? 1.3 : 1), reach: r(1.05, 1.45), stride: 0.3, drag: r(0.3, 0.6), jaw: r(0.1, 0.6), wounds: 2 + Math.floor(R() * 4), shirt: R() < 0.85, tears: r(0.3, 0.55), hair: R() < 0.6, ribs: R() < 0.6 });
@@ -81,9 +97,23 @@ function genome(seed, opts) {
   else if (kind === 'wraith') Object.assign(g, { H: r(0.84, 0.92), leg: 0, torso: 0.36, headR: r(0.06, 0.07), lean: r(0.12, 0.3), tilt: 0.2, bulk: r(0.85, 1), reach: r(0.9, 1.3), jaw: r(0.3, 0.7), hood: R() < 0.7, float: true });
   else if (kind === 'abom') Object.assign(g, { lobes: Array.from({ length: 5 + Math.floor(R() * 4) }, () => ({ a: r(0, TAU), b: r(-0.9, 0.9), d: r(0.05, 0.15), rx: r(0.11, 0.19), ry: r(0.1, 0.16), rz: r(0.11, 0.18) })), eyes: 3 + Math.floor(R() * 5), plates: R() < 0.75, rebar: Math.floor(r(0, 4)), tents: 4 + Math.floor(R() * 4), pust: R() < 0.7, maw: R() < 0.85 });
   else if (kind === 'hound') Object.assign(g, { len: r(0.42, 0.5), bodyY: r(0.56, 0.62), headR: r(0.06, 0.075), spikes: R() < 0.7, ribs: R() < 0.8, tail: R() < 0.9, jaw: r(0.3, 0.6), stride: 0.45 });
-  else Object.assign(g, { abd: r(0.17, 0.22), legR: r(0.012, 0.018), eyes: 4 + Math.floor(R() * 5), marks: R() < 0.7, fangs: true });
+  else if (kind === 'spider') Object.assign(g, { abd: r(0.17, 0.22), legR: r(0.012, 0.018), eyes: 4 + Math.floor(R() * 5), marks: R() < 0.7, fangs: true });
+  // the second wave
+  else if (kind === 'butcher') Object.assign(g, { H: r(0.9, 0.95), leg: 0.4, torso: 0.36, headR: r(0.066, 0.074), lean: r(0.06, 0.16), tilt: 0.12, bulk: r(1.9, 2.3), reach: 0.5, stride: 0.26, drag: 0.9, jaw: 0.15, belly: r(0.15, 0.19), apron: true, sack: true, cleaver: true, hook: R() < 0.8, wide: true, wounds: 2, stitches: true, head: 'sack', cloth: C(['#6e5c40', '#8e7a56', '#3a2e20']) });
+  else if (kind === 'stalker') Object.assign(g, { H: r(0.94, 1), leg: 0.52, torso: 0.33, headR: r(0.05, 0.058), lean: r(0.45, 0.62), tilt: r(0.3, 0.5), bulk: r(0.5, 0.62), reach: r(1.2, 1.5), stride: 0.46, drag: 1, jaw: 0.8, armK: 1.55, clawK: 2.3, ribs: true, spine: true, head: 'faceless' });
+  else if (kind === 'bloater') Object.assign(g, { H: r(0.76, 0.82), leg: 0.34, torso: 0.33, headR: r(0.056, 0.064), lean: r(-0.12, -0.02), tilt: 0.3, bulk: r(1.2, 1.4), reach: r(0.45, 0.7), stride: 0.2, drag: 0.6, jaw: r(0.4, 0.7), belly: r(0.2, 0.24), pust: true, wounds: 3, head: 'skull' });
+  else if (kind === 'skitter') Object.assign(g, { headR: r(0.12, 0.14), jaw: r(0.4, 0.7), legs: 6, tail: true });
+  else if (kind === 'eye') Object.assign(g, { eyeR: r(0.17, 0.2), tents: 5 + Math.floor(R() * 4), iris: pick([[150, 120, 40], [90, 30, 30], [60, 90, 70], [200, 190, 160]]), float: true });
+  else if (kind === 'priest') Object.assign(g, { H: r(0.88, 0.94), leg: 0.44, torso: 0.34, headR: r(0.058, 0.066), lean: r(0.1, 0.22), tilt: 0.25, bulk: r(0.8, 0.95), reach: 0.9, stride: 0.22, drag: 1, jaw: 0.5, robe: true, hood: true, staff: true, head: 'skull' });
+  else if (kind === 'charger') Object.assign(g, { len: r(0.5, 0.56), bodyY: r(0.5, 0.55), headR: r(0.07, 0.085), spikes: true, ribs: false, tail: R() < 0.6, jaw: r(0.2, 0.4), stride: 0.4, bulk: r(1.35, 1.55), horns: true, tusks: true, plates: true });
+  else if (kind === 'leaper') Object.assign(g, { H: r(0.8, 0.86), leg: 0.5, torso: 0.3, headR: r(0.07, 0.08), lean: r(0.65, 0.8), tilt: -0.25, bulk: r(0.78, 0.9), reach: r(0.8, 1.1), stride: 0.42, drag: 1, jaw: r(0.6, 0.9), digi: true, spikes: true, armK: 1.3, clawK: 1.6, head: 'frog', spine: true });
+  else if (kind === 'worm') Object.assign(g, { thick: r(0.085, 0.1), segs: 9 });
+  else Object.assign(g, { H: r(0.9, 0.96), leg: 0.43, torso: 0.34, headR: r(0.052, 0.06), lean: r(0.06, 0.18), tilt: 0.05, bulk: r(1.5, 1.8), reach: 0.4, stride: 0.3, drag: 1, jaw: 0.25, digi: false, wide: true, cannon: true, tank: true, plates: true, head: 'visor', metalSkin: true });
   const nm = NAMES[kind];
   g.name = `${pick(nm[0])} ${pick(nm[1])}`;
+  // the finer detail is rolled after the name, so the older kinds keep the names they always had
+  if (['zombie', 'demon', 'imp'].includes(kind)) { g.spine = R() < 0.7; g.veins = R() < 0.8; g.shackles = kind === 'zombie' && R() < 0.4; g.stitches = kind === 'zombie' && R() < 0.5; }
+  if (['butcher', 'stalker', 'bloater', 'leaper', 'gunner', 'priest'].includes(kind)) g.veins = R() < 0.85;
   g.species = nm[1][0];
   return g;
 }
@@ -189,12 +219,12 @@ function biped(g, P) {
   };
   const lN = leg(P.thN + (g.digi ? 0.35 : 0), P.knN + (g.digi ? 0.9 : 0)), lF = leg(P.thF + (g.digi ? 0.35 : 0), P.knF + (g.digi ? 0.9 : 0));
   const low = Math.max(lN[2][1], lF[2][1], lN[1][1], lF[1][1]), hx0 = 0.5 - Math.sin(P.lean) * g.torso * H * 0.25;
-  const hip = [hx0, (g.float ? yg - H * 0.42 : yg - low) - P.bob, 0], hw = 0.06 * H * Math.sqrt(bk), sw = (g.kind === 'demon' ? 0.13 : 0.1) * H * Math.sqrt(bk);
+  const hip = [hx0, (g.float ? yg - H * 0.42 : yg - low) - P.bob, 0], hw = 0.06 * H * Math.sqrt(bk), sw = (g.kind === 'demon' || g.wide ? 0.13 : 0.1) * H * Math.sqrt(bk);
   const at = (o, z) => [hip[0] + o[0], hip[1] + o[1], z];
   const T = g.torso * H, top = [hip[0] + Math.sin(P.lean) * T, hip[1] - Math.cos(P.lean) * T, 0];
   const sh = [lerp(hip[0], top[0], 0.86), lerp(hip[1], top[1], 0.86), 0], hd = g.headR + 0.03 * H, ht = P.lean + P.tilt;
   const head = [top[0] + Math.sin(ht) * hd, top[1] - Math.cos(ht) * hd, 0];
-  const lk = g.kind === 'imp' || g.kind === 'wraith' ? 1.15 : 1, A1 = H * 0.2 * lk, A2 = H * 0.19 * lk;
+  const lk = g.armK || (g.kind === 'imp' || g.kind === 'wraith' ? 1.15 : 1), A1 = H * 0.2 * lk, A2 = H * 0.19 * lk;
   const arm = (s, e, z) => { const o = [sh[0], sh[1], z], el = [o[0] + Math.sin(s) * A1, o[1] + Math.cos(s) * A1, z * 1.1], c = s + e; return [o, el, [el[0] + Math.sin(c) * A2, el[1] + Math.cos(c) * A2, z * 1.05]]; };
   const aN = arm(P.shN, P.elN, sw), aF = arm(P.shF, P.elF, -sw);
   return { hip, top, sh, head, ht, hw, sw, hipN: [hip[0], hip[1], hw], hipF: [hip[0], hip[1], -hw], kN: at(lN[0], hw), fN: at(lN[1], hw), tN: at(lN[2], hw), kF: at(lF[0], -hw), fF: at(lF[1], -hw), tF: at(lF[2], -hw), sN: aN[0], eN: aN[1], hN: aN[2], sF: aF[0], eF: aF[1], hF: aF[2], yg };
@@ -218,15 +248,52 @@ function humanoid(p, g, P) {
   }
   if (g.tail) { const w = Math.sin(P.tail || 0) * 0.05 * H, b = [S.hip[0] - 0.03, S.hip[1] - 0.02, 0], m1 = [b[0] - 0.14 * H, b[1] + 0.08 * H, w], e = [m1[0] - 0.12 * H, m1[1] - 0.06 * H, w * 2.2]; p.chain([b, m1, e], [0.03 * H, 0.018 * H, 0.006 * H], skB, 6); }
   // legs and arms (both sides: the depth test sorts out which is in front)
-  if (!g.float) for (const [hp, k, f, t] of [[S.hipN, S.kN, S.fN, S.tN], [S.hipF, S.kF, S.fF, S.tF]]) {
+  if (!g.float && !g.robe) for (const [hp, k, f, t] of [[S.hipN, S.kN, S.fN, S.tN], [S.hipF, S.kF, S.fF, S.tF]]) {
     p.chain([hp, k, f, t], [thR, shR, shR * 0.8, shR * 0.6], pants || sk, 3);
     if (g.digi) p.ell(t[0] + 0.01, t[1] - 0.005, t[2], 0.03 * H, 0.016 * H, 0.022 * H, mat(g.horn[2]), 3);
   }
+  const metal = mat(g.metal[0], { grit: 0.16 }), metalD = mat(g.metal[2], { grit: 0.2 });
   for (const [s, e, h, near] of [[S.sN, S.eN, S.hN, 1], [S.sF, S.eF, S.hF, 0]]) {
+    if (near && g.cannon) {
+      // a gunner's near forearm is a cannon: a heavy barrel from the elbow, banded, its bore dark
+      p.chain([s, e], [uaR * 1.1, faR * 1.05], sk, 4);
+      const dx = h[0] - e[0], dy = h[1] - e[1], m2 = [e[0] + dx * 1.7, e[1] + dy * 1.7, e[2] * 1.05];
+      p.cap(e, m2, faR * 1.75, faR * 1.5, metal, 4);
+      for (let k = 1; k < 4; k++) { const u = k / 4; p.at(lerp(e[0], m2[0], u), lerp(e[1], m2[1], u), lerp(e[2], m2[2], u) + faR, faR * 0.9, (i) => p.tint(i, g.metal[2], 0.7), 4); }
+      p.at(...m2, faR * 1.1, (i, f) => { p.tint(i, [8, 6, 6], clamp(f * 2, 0, 1)); p.Z[i] -= f * faR * p.n; }, 4);
+      if (P.fire) p.glow(m2[0] + 0.01, m2[1], m2[2], 0.06 * H, g.glow);
+      S.muzzle = m2;
+      continue;
+    }
     p.chain([s, e, h], [uaR * (near ? 1.05 : 1), faR, faR * 0.85], sk, 4);
-    claws(p, e, h, 0.05 * H * (kind === 'wraith' ? 1.8 : kind === 'demon' ? 1.3 : 1), 0.009 * H * Math.sqrt(bk), claw);
+    claws(p, e, h, 0.05 * H * (kind === 'wraith' ? 1.8 : kind === 'demon' ? 1.3 : 1) * (g.clawK || 1), 0.009 * H * Math.sqrt(bk), claw);
+    // shackles on the wrists, a length of broken chain hanging
+    if (g.shackles) { const w = [lerp(e[0], h[0], 0.8), lerp(e[1], h[1], 0.8), h[2]]; p.ell(...w, faR * 1.35, faR * 0.7, faR * 1.35, metal, 4); for (let k = 1; k < 4; k++) p.ell(w[0] - 0.004 * k, w[1] + 0.022 * k * H, w[2], faR * 0.5, faR * 0.62, faR * 0.35, metalD, 4); }
   }
-  if (P.fire) p.glow(S.hN[0] + 0.02, S.hN[1], S.hN[2], 0.05 * H, g.glow);
+  // what the hands hold: a butcher's cleaver and meat hook, a priest's skull-topped staff
+  if (g.cleaver) {
+    const e = S.eN, h = S.hN, dx = h[0] - e[0], dy = h[1] - e[1], l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l, tip = [h[0] + ux * 0.05 * H, h[1] + uy * 0.05 * H, h[2] + 0.01];
+    p.cap(h, tip, 0.012 * H, 0.012 * H, mat(g.cloth[2]), 4);
+    const nx = -uy, ny = ux, L2 = 0.2 * H, W2 = 0.09 * H, b0 = tip, b1 = [b0[0] + ux * L2, b0[1] + uy * L2, b0[2]], c0 = [b0[0] + nx * W2, b0[1] + ny * W2, b0[2]], c1 = [b1[0] + nx * W2, b1[1] + ny * W2, b1[2]];
+    const blade = mat(g.metal[0], { grit: 0.35 });
+    p.tri(b0, b1, c1, blade, 4); p.tri(b0, c1, c0, blade, 4);
+    p.at(lerp(b0[0], c1[0], 0.5), lerp(b0[1], c1[1], 0.5), b0[2], W2 * 0.8, (i, f) => { if (f > 0.25) p.tint(i, g.blood[1], 0.55); });
+  }
+  if (g.hook) { const h = S.hF; p.cap(h, [h[0] + 0.01, h[1] + 0.07 * H, h[2]], 0.006 * H, 0.006 * H, metalD, 4); p.cap([h[0] + 0.01, h[1] + 0.07 * H, h[2]], [h[0] + 0.045 * H, h[1] + 0.085 * H, h[2]], 0.007 * H, 0.002 * H, metal, 4); }
+  if (g.staff) {
+    const h = S.hN, top = [h[0] + 0.01, h[1] - 0.42 * H, h[2] + 0.01], bot = [h[0] - 0.01, Math.min(0.95, h[1] + 0.3 * H), h[2]];
+    p.cap(bot, top, 0.009 * H, 0.011 * H, mat(g.horn[2]), 4);
+    p.ell(top[0], top[1] - 0.03 * H, top[2], 0.035 * H, 0.04 * H, 0.032 * H, mat(g.bone[0]), 4);
+    for (const s2 of [1, -1]) p.cap([top[0], top[1] - 0.05 * H, top[2] + s2 * 0.02 * H], [top[0] - 0.03 * H, top[1] - 0.13 * H, top[2] + s2 * 0.07 * H], 0.008 * H, 0.002 * H, mat(g.bone[1]), 4);
+    if (!P.dead) { for (const s2 of [1, -1]) p.glow(top[0] + 0.03 * H, top[1] - 0.035 * H, top[2] + s2 * 0.012 * H, 0.008 * H, g.glow); if (P.fire) p.glow(top[0], top[1] - 0.09 * H, top[2], 0.05 * H, g.glow, 0.9); }
+  }
+  if (P.fire && !g.cannon && !g.staff) p.glow(S.hN[0] + 0.02, S.hN[1], S.hN[2], 0.05 * H, g.glow);
+  if (g.robe) {
+    const m = mat(g.cloth[0], { grit: 0.32 }), w = 0.1 * H;
+    p.cap([S.top[0], S.top[1] + 0.02, 0], [S.hip[0] - 0.01, 0.9, 0], w * 0.8, w * 1.5, m, 2);
+    for (let k = 0; k < 9; k++) { const a = (k / 9) * TAU, sway = Math.sin((P.wave || 0) + k * 2.1) * 0.012 * H, b = [S.hip[0] + Math.cos(a) * w * 1.2, 0.86, Math.sin(a) * w * 1.2]; p.cap(b, [b[0] + Math.cos(a) * 0.015 + sway, 0.95, b[2] + Math.sin(a) * 0.015], w * 0.45, w * 0.3, m, 2); }
+    p.part(2, (i, x, y, z) => { if (Math.floor(y * 90) % 7 === 0 && vnoise3(x * 9, y * 9, z * 9, g.ns + 5) > 0.4) p.tint(i, g.cloth[2], 0.5); });
+  }
   // a wraith trails a tattered shroud in place of legs: a flaring hem hung with ragged strips
   if (g.float) {
     const m = mat(g.cloth[0], { grit: 0.35 }), w = 0.11 * H;
@@ -237,12 +304,19 @@ function humanoid(p, g, P) {
     }
     if (g.hood) p.ell(S.head[0] - 0.012, S.head[1] - 0.005, 0, g.headR * 1.4, g.headR * 1.45, g.headR * 1.4, mat(g.cloth[2]), 2);
   }
+  if (g.robe && g.hood) p.ell(S.head[0] - 0.014, S.head[1] - 0.008, 0, g.headR * 1.45, g.headR * 1.5, g.headR * 1.42, mat(g.cloth[2], { grit: 0.3 }), 2);
   // the body
-  const chest = [lerp(S.hip[0], S.top[0], 0.62), lerp(S.hip[1], S.top[1], 0.62), 0], dep = (kind === 'demon' ? 0.12 : 0.065) * H * bk ** 0.5, wid = (kind === 'demon' ? 0.16 : 0.11) * H * bk ** 0.6;
+  const wide = kind === 'demon' || g.wide, chest = [lerp(S.hip[0], S.top[0], 0.62), lerp(S.hip[1], S.top[1], 0.62), 0], dep = (wide ? 0.12 : 0.065) * H * bk ** 0.5, wid = (wide ? 0.16 : 0.11) * H * bk ** 0.6;
+  if (g.tank) { const b = [chest[0] - dep * 1.3, chest[1] + 0.01, 0]; p.cap([b[0], b[1] - 0.09 * H, 0], [b[0], b[1] + 0.07 * H, 0], 0.055 * H, 0.055 * H, metal, 6); for (const s2 of [1, -1]) p.chain([[b[0], b[1] - 0.05 * H, s2 * 0.03 * H], [b[0] + 0.02, b[1] - 0.13 * H, s2 * 0.08 * H], S.eN], [0.01 * H, 0.01 * H, 0.009 * H], metalD, 6); }
   p.cap(S.hip, S.top, dep * 0.95, dep * 1.05, sk, 1);
   p.ell(chest[0] + 0.008, chest[1], 0, dep * 1.1, dep * 1.25, wid, sk, 1);
   p.ell(S.hip[0], S.hip[1] - 0.01, 0, dep * 0.95, dep, S.hw * 1.6, pants || sk, 1);
-  if (kind === 'demon') p.ell(S.sh[0] - 0.015, S.sh[1] + 0.01, 0, dep * 0.9, dep * 0.8, S.sw * 1.15, sk, 1);
+  if (wide) p.ell(S.sh[0] - 0.015, S.sh[1] + 0.01, 0, dep * 0.9, dep * 0.8, S.sw * 1.15, sk, 1);
+  // a belly: hanging and swollen (butchers), drum-tight and ready to burst (bloaters)
+  if (g.belly) { const b = [lerp(S.hip[0], S.top[0], 0.3) + dep * 0.55, lerp(S.hip[1], S.top[1], 0.3), 0], br = g.belly * H * (1 + Math.sin(P.pulse || 0) * 0.03); p.ell(b[0], b[1], 0, br * 0.85, br, br * 0.95, sk, 1); S.belly = [b, br]; }
+  if (g.apron) p.part(1, (i, x, y, z) => { if (x > S.hip[0] - 0.01 && y > S.sh[1] + 0.02 && Math.abs(z) < wid * 1.05) { p.tint(i, g.cloth[2], 0.9); if (vnoise3(x * 20, y * 20, z * 20, g.ns + 13) > 0.55) p.tint(i, g.blood[0], 0.75); } });
+  if (g.pust && S.belly) { const [b, br] = S.belly; for (let k = 0; k < 9; k++) { const a = g.R() * 2.4 - 1.2, c = g.R() * 2 - 1, q = [b[0] + Math.cos(a) * br * 0.9, b[1] + Math.sin(c) * br * 0.7, Math.sin(a) * br * 0.9], r2 = br * (0.12 + g.R() * 0.1); p.at(...q, r2, (i, f) => { p.tint(i, shadeC(g.skin[1], 0.35), f); p.Z[i] += f * r2 * p.n * 0.5; }, 1); if (k % 3 === 0 && !P.dead) p.glow(q[0] + 0.004, q[1], q[2], r2 * 0.4, g.glow, 0.7); } }
+  if (g.metalSkin) for (let k = 0; k < 3; k++) { const u = 0.35 + k * 0.2, c = [lerp(S.hip[0], S.top[0], u) + dep * 0.75, lerp(S.hip[1], S.top[1], u), 0]; p.ell(c[0], c[1], 0, dep * 0.45, 0.035 * H, wid * 0.85, metal, 6); for (const s2 of [-1, 1]) p.at(c[0] + dep * 0.4, c[1], s2 * wid * 0.6, 0.008 * H, (i) => { p.tint(i, g.metal[1], 1); p.Z[i] += 0.006 * p.n; }, 6); }
   if (g.plates) for (let k = 0; k < 4; k++) { const u = 0.15 + k * 0.17; p.at(lerp(S.hip[0], S.top[0], u) + dep, lerp(S.hip[1], S.top[1], u), 0, wid * 0.55, (i, f) => { if (f > 0.25) p.tint(i, g.skin[2], 0.5); }, 1); }
   if (g.spikes) for (let k = 0; k < 4; k++) { const u = 0.35 + k * 0.17, b = [lerp(S.hip[0], S.top[0], u) - dep * 0.9, lerp(S.hip[1], S.top[1], u), 0]; p.cap(b, [b[0] - 0.06 * H, b[1] - 0.03 * H, 0], 0.014 * H, 0.002 * H, mat(g.horn[0]), 1); }
   // clothes and what shows through their tears: patterns in body space, so they turn with it
@@ -253,25 +327,60 @@ function humanoid(p, g, P) {
     for (let k = 0; k < g.wounds; k++) { const u = g.R(), a = g.R() * TAU; p.wound(lerp(S.hip[0], S.top[0], u) + Math.cos(a) * dep, lerp(S.hip[1], S.top[1], u), Math.sin(a) * wid, 0.018 * H + g.R() * 0.02 * H); }
   }
   if (kind === 'wraith') p.part(1, (i, x, y, z) => { if (vnoise3(x * 12, y * 12, z * 12, g.ns + 4) > 0.42) p.tint(i, g.cloth[0], 0.9); });
+  // detail under the skin: dark veins running over it, the ridge of the spine, ribs, crude stitching
+  if (g.veins) for (const pt of [1, 3, 4]) p.part(pt, (i, x, y, z) => { const v = vnoise3(x * 26, y * 26, z * 26, g.ns + 17); if (Math.abs(v - 0.5) < 0.018) p.tint(i, shadeC(g.blood[2], 0.1), 0.6); });
+  if (g.spine) for (let k = 0; k < 7; k++) { const u = 0.15 + k * 0.12, b = [lerp(S.hip[0], S.top[0], u) - dep * 0.92, lerp(S.hip[1], S.top[1], u), 0]; p.ell(b[0], b[1], 0, 0.014 * H, 0.012 * H, 0.016 * H, mat(g.bone[2]), 1); }
+  if (g.ribs && kind !== 'zombie') p.part(1, (i, x, y, z) => { if (Math.abs(z) > wid * 0.35 && y > S.sh[1] && y < S.hip[1] - 0.04 * H && Math.floor(y * 95) % 4 === 0) { p.tint(i, g.bone[0], 0.75); p.Z[i] += 0.006 * p.n; } else if (Math.abs(z) > wid * 0.35 && y > S.sh[1] && y < S.hip[1] - 0.04 * H) p.tint(i, g.skin[2], 0.35); });
+  if (g.stitches) for (let k = 0; k < 9; k++) { const u = 0.2 + k * 0.07, x = lerp(S.hip[0], S.top[0], u) + dep * 0.98, y = lerp(S.hip[1], S.top[1], u); p.at(x, y, 0, 0.006 * H, (i) => p.tint(i, [30, 14, 12], 1)); if (k % 2) p.at(x, y, 0.012 * H, 0.004 * H, (i) => { p.tint(i, g.metal[1], 1); p.Z[i] += 0.004 * p.n; }); }
   // the head
   const hr = g.headR, hc = S.head, fwd = (d, up, z = 0) => [hc[0] + d * hr, hc[1] + up * hr, z * hr];
-  if (kind === 'demon' || kind === 'imp') {
+  if (g.head === 'sack') {
+    // a burlap sack over the head, tied at the neck, two ragged eye holes and a stitched-shut mouth
+    const sc = mat(g.cloth[1], { grit: 0.4 });
+    p.ell(hc[0], hc[1] + hr * 0.1, 0, hr * 1.12, hr * 1.25, hr * 1.05, sc, 2);
+    p.ell(hc[0] - hr * 0.1, hc[1] + hr * 1.05, 0, hr * 0.75, hr * 0.25, hr * 0.75, mat(g.cloth[2]), 2);
+    p.part(2, (i, x, y, z) => { if ((Math.floor(x * 140) + Math.floor(y * 140)) % 5 === 0) p.tint(i, g.cloth[2], 0.35); });
+    for (const s2 of [1, -1]) { const e = fwd(0.95, -0.15, s2 * 0.4); p.at(...e, hr * 0.24, (i, f) => { p.tint(i, [8, 5, 5], clamp(f * 2.2, 0, 1)); p.Z[i] -= f * hr * p.n * 0.3; }, 2); if (!P.dead) p.glow(...e, hr * 0.08, g.glow, 0.8); }
+    for (let k = 0; k < 5; k++) p.at(...fwd(0.98, 0.5, (k - 2) * 0.16), hr * 0.07, (i) => p.tint(i, [26, 12, 10], 1), 2);
+    if (g.R() < 0.7) p.wound(...fwd(0.6, 0.6, 0.5), hr * 0.35);
+  } else if (g.head === 'faceless') {
+    // a long smooth skull with no eyes at all; the mouth splits it top to bottom, full of teeth
+    p.ell(hc[0], hc[1] - hr * 0.25, 0, hr * 0.95, hr * 1.6, hr * 0.85, sk, 2);
+    const open = 0.4 + (P.jaw - g.jaw) * 1.4 + g.jaw * 0.4;
+    p.at(...fwd(0.92, -0.2), hr * 0.25 * (0.6 + open), (i, f) => { p.tint(i, [16, 6, 8], clamp(f * 2, 0, 1)); p.Z[i] -= f * hr * p.n * 0.4; }, 2);
+    for (let k = 0; k < 9; k++) { const y = -1.2 + k * 0.28; for (const s2 of [1, -1]) p.at(...fwd(0.95, y, s2 * 0.13 * (0.6 + open)), hr * 0.06, (i) => { p.tint(i, g.bone[1], 1); p.Z[i] += hr * p.n * 0.12; }, 2); }
+  } else if (g.head === 'frog') {
+    // wide and flat, the mouth all the way across, little lit eyes up on top
+    p.ell(hc[0], hc[1], 0, hr * 1.15, hr * 0.8, hr * 1.3, sk, 2);
+    p.cap(fwd(0.2, 0.55), [hc[0] + hr * 1.05, hc[1] + hr * (0.55 + P.jaw * 0.6), 0], hr * 0.55, hr * 0.42, sk, 2);
+    p.at(...fwd(1.0, 0.4), hr * (0.4 + P.jaw * 0.35), (i, f) => { p.tint(i, [30, 10, 12], clamp(f * 2, 0, 1)); p.Z[i] -= f * hr * p.n * 0.3; }, 2);
+    for (let k = 0; k < 7; k++) p.at(...fwd(1.0, 0.2, (k - 3) * 0.28), hr * 0.07, (i) => { p.tint(i, g.bone[1], 1); p.Z[i] += hr * p.n * 0.12; }, 2);
+    if (!P.dead) for (const s2 of [1, -1]) for (const q of [0.25, 0.55]) p.glow(...fwd(0.45, -0.7, s2 * q), hr * 0.1, g.glow);
+  } else if (g.head === 'visor') {
+    // an iron-jawed head, a riveted band across where the eyes were and one lens burning in it
+    p.ell(hc[0], hc[1], 0, hr * 1.05, hr * 1.05, hr * 0.95, sk, 2);
+    p.cap(fwd(0.2, 0.55), [hc[0] + hr * 0.9, hc[1] + hr * 0.75, 0], hr * 0.45, hr * 0.38, metal, 2);
+    p.at(...fwd(0.9, -0.15), hr * 0.5, (i, f) => { p.tint(i, g.metal[2], 1); p.Z[i] += f * hr * p.n * 0.15; }, 2);
+    if (!P.dead) p.glow(...fwd(1.0, -0.15, 0.2), hr * 0.18, g.glow);
+  } else if (kind === 'demon' || kind === 'imp') {
     p.ell(hc[0], hc[1], 0, hr * 1.05, hr * 0.95, hr * 0.95, sk, 2);
     p.ell(...fwd(0.55, 0.3), hr * 0.55, hr * 0.45, hr * 0.6, sk, 2);
     if (g.horns) for (const s of [1, -1]) { const b = fwd(-0.1, -0.6, s * 0.45), c1 = [b[0] - hr * 0.5, b[1] - hr * 1.1, s * hr * 0.9], c2 = [c1[0] - hr * 0.8, c1[1] + hr * 0.1, s * hr * 1.2]; p.chain([b, c1, c2], [hr * 0.3, hr * 0.18, hr * 0.05], horn, 2); }
     if (g.ears) for (const s of [1, -1]) p.cap(fwd(-0.3, -0.2, s * 0.7), fwd(-1.3, -1.1, s * 1.4), hr * 0.28, hr * 0.05, sk, 2);
   } else {
     // a skull's shape under the skin; the jaw hangs
-    const sm = kind === 'wraith' ? mat(g.bone[0]) : sk;
+    const sm = kind === 'wraith' || g.bone === true || kind === 'priest' ? mat(g.bone[0]) : sk;
     p.ell(hc[0], hc[1], 0, hr, hr * 1.08, hr * 0.9, sm, 2);
     p.cap(fwd(0.35, 0.45), [hc[0] + hr * 0.85 * Math.cos(P.jaw * 0.5), hc[1] + hr * (0.6 + P.jaw * 0.7), 0], hr * 0.34, hr * 0.27, sm, 2);
     if (kind === 'zombie' && g.hair) for (let k = 0; k < 6; k++) { const a = -2.3 + (k % 3) * 0.4, z = (k < 3 ? 1 : -1) * 0.5; p.cap([hc[0] + Math.cos(a) * hr * 0.9, hc[1] + Math.sin(a) * hr * 0.9, z * hr], [hc[0] + Math.cos(a) * hr * 1.25 - 0.02, hc[1] + Math.sin(a) * hr * 1.05 + 0.03, z * hr * 1.3], hr * 0.12, hr * 0.05, mat(g.cloth[2]), 2); }
     if (kind === 'zombie' && g.R() < 0.6) p.wound(...fwd(-0.1, -0.85, 0.3), hr * 0.45);
   }
   // mouth, teeth and eyes on the front of the face
+  if (['sack', 'faceless', 'frog', 'visor'].includes(g.head)) return;
   const mo = fwd(0.95, kind === 'demon' || kind === 'imp' ? 0.42 : 0.5);
   p.at(...mo, hr * (0.25 + P.jaw * 0.22), (i, f) => { p.tint(i, [20, 8, 8], clamp(f * 2, 0, 1)); p.Z[i] -= f * hr * p.n * 0.25; }, 2);
-  for (let k = 0; k < 4; k++) p.at(mo[0], mo[1] - hr * 0.12, (k - 1.5) * hr * 0.17, hr * 0.07, (i) => { p.tint(i, g.bone[1], 1); p.Z[i] += hr * p.n * 0.15; }, 2);
+  for (let k = 0; k < 6; k++) p.at(mo[0], mo[1] - hr * 0.12, (k - 2.5) * hr * 0.14, hr * 0.065, (i) => { p.tint(i, g.bone[1], 1); p.Z[i] += hr * p.n * 0.15; }, 2);
+  for (let k = 0; k < 5; k++) p.at(mo[0], mo[1] + hr * (0.12 + P.jaw * 0.25), (k - 2) * hr * 0.15, hr * 0.06, (i) => { p.tint(i, g.bone[0], 1); p.Z[i] += hr * p.n * 0.12; }, 2);
   for (const s of [1, -1]) {
     const e = fwd(0.82, -0.2, s * 0.38);
     p.at(...e, hr * 0.26, (i, f) => { p.tint(i, [12, 8, 8], clamp(f * 1.6, 0, 0.95)); p.Z[i] -= f * hr * p.n * 0.2; }, 2);
@@ -318,16 +427,19 @@ function abomination(p, g, P) {
 }
 // a hellhound: flayed, spined, jaws open, on four legs
 function hound(p, g, P) {
-  const L = g.len, by = g.bodyY - (P.bob || 0), cx = 0.48, sk = mat(g.skin[0]), legL = 0.955 - by, w = 0.09, s = P.gait || 0;
-  const leg = (x, a, z, back) => { const top = [x, by, z], k1 = [x + Math.sin(a) * legL * 0.5 + (back ? -0.02 : 0.01), by + Math.cos(a) * legL * 0.5, z * 1.15], k2 = [k1[0] + Math.sin(a * 0.4 + (back ? 0.5 : -0.2)) * legL * 0.5, 0.94, z * 1.2], ft = [k2[0] + 0.03, 0.95, z * 1.2]; p.chain([top, k1, k2, ft], [0.042, 0.03, 0.022, 0.016], sk, 3); };
+  const L = g.len, by = g.bodyY - (P.bob || 0), cx = 0.48, sk = mat(g.skin[0]), legL = 0.955 - by, bk = g.bulk || 1, w = 0.09 * bk, s = P.gait || 0;
+  const leg = (x, a, z, back) => { const top = [x, by, z], k1 = [x + Math.sin(a) * legL * 0.5 + (back ? -0.02 : 0.01), by + Math.cos(a) * legL * 0.5, z * 1.15], k2 = [k1[0] + Math.sin(a * 0.4 + (back ? 0.5 : -0.2)) * legL * 0.5, 0.94, z * 1.2], ft = [k2[0] + 0.03, 0.95, z * 1.2]; p.chain([top, k1, k2, ft], [0.042 * bk, 0.03 * bk, 0.022 * bk, 0.016 * bk], sk, 3); if (g.horns) p.ell(ft[0] + 0.01, ft[1] - 0.008, ft[2], 0.024 * bk, 0.014, 0.02 * bk, mat(g.horn[2]), 3); };
   leg(cx + L * 0.36, s * 0.5, w, false); leg(cx + L * 0.36, -s * 0.5, -w, false); leg(cx - L * 0.4, -s * 0.5, w, true); leg(cx - L * 0.4, s * 0.5, -w, true);
   if (g.tail) { const t = Math.sin(P.tail || 0) * 0.05; p.chain([[cx - L * 0.5, by - 0.04, 0], [cx - L * 0.75, by - 0.1, t], [cx - L * 0.92, by - 0.06, t * 2]], [0.025, 0.014, 0.004], mat(g.skin[0], { k: 0.85 }), 6); }
-  p.ell(cx - L * 0.22, by, 0, L * 0.32, 0.085, 0.11, sk, 1);
-  p.ell(cx + L * 0.25, by - 0.01, 0, 0.12, 0.105, 0.13, sk, 1);
+  p.ell(cx - L * 0.22, by, 0, L * 0.32, 0.085 * bk, 0.11 * bk, sk, 1);
+  p.ell(cx + L * 0.25, by - 0.01 - (bk - 1) * 0.04, 0, 0.12 * bk, 0.105 * bk * 1.1, 0.13 * bk, sk, 1);
+  if (g.plates) for (let k = 0; k < 5; k++) { const x = cx - L * 0.3 + k * L * 0.14; p.ell(x, by - 0.075 * bk - (k > 2 ? 0.02 : 0), 0, 0.04 * bk, 0.022, 0.07 * bk, mat(g.horn[1], { grit: 0.3 }), 1); }
   if (g.ribs) p.part(1, (i, x, y, z) => { if (Math.abs(z) > 0.04 && x > cx - L * 0.15 && x < cx + L * 0.3 && Math.floor(x * 110) % 4 === 0 && y > by - 0.05) { p.tint(i, g.bone[0], 0.8); p.Z[i] += 0.008 * p.n; } });
   if (g.spikes) for (let k = 0; k < 5; k++) { const x = cx - L * 0.35 + k * L * 0.15; p.cap([x, by - 0.08, 0], [x - 0.03, by - 0.15, 0], 0.012, 0.002, mat(g.horn[0]), 1); }
   // head: skull, snout, jaw open, ears
-  const nk = [cx + L * 0.45, by - 0.08, 0], hc = [nk[0] + 0.06, nk[1] - 0.01 + (P.lunge || 0) * 0.04, 0], hr = g.headR, jaw = g.jaw + (P.bite || 0) * 0.5;
+  const low = g.horns ? 0.05 + (P.lunge || 0) * 0.05 : 0, nk = [cx + L * 0.45, by - 0.08 + low, 0], hc = [nk[0] + 0.06, nk[1] - 0.01 + (P.lunge || 0) * 0.04, 0], hr = g.headR, jaw = g.jaw + (P.bite || 0) * 0.5;
+  if (g.horns) for (const s2 of [1, -1]) { const b = [hc[0] - hr * 0.2, hc[1] - hr * 0.7, s2 * hr * 0.7], c1 = [b[0] + hr * 0.2, b[1] - hr * 1.1, s2 * hr * 1.8], c2 = [c1[0] + hr * 1.3, c1[1] - hr * 0.2, s2 * hr * 1.6]; p.chain([b, c1, c2], [hr * 0.38, hr * 0.24, hr * 0.06], mat(g.horn[1]), 2); }
+  if (g.tusks) for (const s2 of [1, -1]) p.cap([hc[0] + hr * 1.1, hc[1] + hr * 0.5, s2 * hr * 0.4], [hc[0] + hr * 1.6, hc[1] - hr * 0.4, s2 * hr * 0.7], hr * 0.16, hr * 0.03, mat(g.bone[0]), 2);
   p.cap([cx + L * 0.3, by - 0.03, 0], nk, 0.07, 0.05, sk, 2);
   p.ell(hc[0], hc[1], 0, hr * 1.1, hr, hr * 1.15, sk, 2);
   p.cap(hc, [hc[0] + hr * 1.6, hc[1] + hr * 0.15, 0], hr * 0.5, hr * 0.35, sk, 2);
@@ -354,10 +466,72 @@ function spider(p, g, P) {
   if (g.fangs) for (const s of [1, -1]) p.cap([cx + 0.13, cy + 0.04, s * 0.015], [cx + 0.15, cy + 0.08 + (P.bite || 0) * 0.02, s * 0.02], 0.008, 0.002, mat(g.bone[1]), 2);
 }
 
+// a skitter: a flayed human head running on six long finger-legs, its spine dragging behind
+function skitter(p, g, P) {
+  const cx = 0.5, cy = 0.68 - (P.bob || 0), hr = g.headR, sk = mat(g.skin[0], { grit: 0.3 }), bone = mat(g.bone[0]);
+  for (const side of [1, -1]) for (let k = 0; k < 3; k++) {
+    const t = k - 1, ph = (P.gait || 0) + k * 2.1 + (side > 0 ? 0 : Math.PI), lift = Math.max(0, Math.sin(ph)) * 0.05 * (P.walk ? 1 : 0);
+    const b = [cx + t * hr * 0.55, cy + hr * 0.35, side * hr * 0.55], kn = [b[0] + t * 0.09, P.curl ? cy - 0.03 : cy - hr - 0.06 - lift, side * (hr + 0.09)], k2 = [b[0] + t * 0.15, P.curl ? cy + 0.02 : cy - hr * 0.2 - lift, side * (hr + 0.17)], ft = [b[0] + t * 0.19, P.curl ? cy + 0.06 : 0.95 - lift * 0.5, side * (hr + 0.22)];
+    p.chain([b, kn, k2, ft], [0.019, 0.015, 0.012, 0.006], sk, 3);
+    p.ell(...kn, 0.017, 0.017, 0.017, mat(g.skin[1]), 3); p.ell(...ft, 0.009, 0.006, 0.009, mat(g.bone[1]), 3);
+  }
+  for (let k = 0; k < 7; k++) p.ell(cx - hr * (0.85 + k * 0.32), cy + hr * 0.25 + Math.sin(k * 0.9 + (P.tail || 0)) * 0.012 + k * 0.01, Math.sin(k * 0.7 + (P.tail || 0)) * 0.012, hr * 0.2 * (1 - k * 0.09), hr * 0.17, hr * 0.2, bone, 6);
+  p.ell(cx, cy, 0, hr * 1.05, hr, hr * 0.92, sk, 2);
+  p.part(2, (i, x, y, z) => { const v = vnoise3(x * 22, y * 22, z * 22, g.ns + 3); if (x < cx && v > 0.46) p.tint(i, g.bone[0], 0.85); else if (Math.abs(v - 0.43) < 0.02) p.tint(i, g.blood[2], 0.8); });
+  const fwd = (d, up, z = 0) => [cx + d * hr, cy + up * hr, z * hr], jaw = g.jaw + (P.bite || 0) * 0.6;
+  p.cap(fwd(0.35, 0.45), [cx + hr * 0.85, cy + hr * (0.55 + jaw * 0.7), 0], hr * 0.34, hr * 0.26, sk, 2);
+  const mo = fwd(0.95, 0.5);
+  p.at(...mo, hr * (0.25 + jaw * 0.2), (i, f) => { p.tint(i, [18, 6, 8], clamp(f * 2, 0, 1)); p.Z[i] -= f * hr * p.n * 0.25; }, 2);
+  for (let k = 0; k < 6; k++) p.at(mo[0], mo[1] - hr * 0.12, (k - 2.5) * hr * 0.14, hr * 0.06, (i) => { p.tint(i, g.bone[1], 1); p.Z[i] += hr * p.n * 0.15; }, 2);
+  for (const s2 of [1, -1]) { const e = fwd(0.82, -0.2, s2 * 0.38); p.at(...e, hr * 0.25, (i, f) => { p.tint(i, [12, 8, 8], clamp(f * 1.6, 0, 0.95)); p.Z[i] -= f * hr * p.n * 0.2; }, 2); if (!P.dead) p.glow(...e, hr * 0.1, g.glow, 0.9); }
+}
+// a watcher: one great eye, veined and bloodshot, in a socket of flesh, nerves hanging down
+function eyeball(p, g, P) {
+  const R0 = g.eyeR, cx = 0.5, cy = 0.42 + Math.sin(P.wave || 0) * 0.012 - (P.bob || 0), sk = mat(g.skin[0], { grit: 0.32 }), skD = mat(g.skin[2]);
+  for (let k = 0; k < g.tents; k++) {
+    const a = (k / g.tents) * TAU, ph = (P.wig || 0) + k * 1.3, b = [cx - R0 * 0.25 + Math.cos(a) * R0 * 0.45, cy + R0 * 0.65, Math.sin(a) * R0 * 0.5];
+    const m1 = [b[0] + Math.sin(ph) * 0.03 - 0.03, b[1] + 0.11, b[2] * 1.25], e = [m1[0] + Math.sin(ph * 1.4) * 0.05 - 0.03, m1[1] + 0.1 + (k % 3) * 0.05, m1[2] * 1.3];
+    p.chain([b, m1, e], [0.024, 0.014, 0.004], k % 2 ? sk : skD, 3);
+  }
+  p.ell(cx - R0 * 0.4, cy, 0, R0 * 0.85, R0 * 0.98, R0 * 0.98, sk, 1);
+  p.part(1, (i, x, y, z) => { const v = vnoise3(x * 30, y * 30, z * 30, g.ns + 21); if (v > 0.6) p.tint(i, g.skin[2], 0.6); });
+  p.ell(cx + R0 * 0.05, cy, 0, R0, R0, R0, mat([214, 204, 182], { grit: 0.16 }), 2);
+  p.part(2, (i, x, y, z) => { const v = vnoise3(x * 24, y * 24, z * 24, g.ns + 5); if (Math.abs(v - 0.5) < 0.028) p.tint(i, [148, 18, 22], 0.85); else if (x < cx - R0 * 0.2) p.tint(i, [120, 70, 60], 0.35); });
+  const lid = P.dead ? 0.85 : P.lid ?? 0.25;
+  for (const s2 of [-1, 1]) p.ell(cx + R0 * 0.2, cy + s2 * R0 * (0.98 - lid * 0.6), 0, R0 * 0.82, R0 * 0.36, R0 * 1.04, sk, 1);
+  const fx = cx + R0 * 1.02;
+  p.at(fx, cy, 0, R0 * 0.48, (i, f) => p.tint(i, g.iris, clamp(f * 3, 0, 1)), 2);
+  p.at(fx, cy, 0, R0 * 0.48, (i, f) => { if (f < 0.25) p.tint(i, shadeC(g.iris, -0.5), 0.8); }, 2);
+  if (!P.dead) p.glow(fx, cy, 0, R0 * (P.fire ? 0.26 : 0.17), P.fire ? shadeC(g.glow, 0.4) : g.glow);
+  else p.at(fx, cy, 0, R0 * 0.2, (i) => p.tint(i, [10, 8, 8], 1), 2);
+}
+// a burrowing worm risen out of the floor: ringed segments, a flared head, a round maw of teeth
+function worm(p, g, P) {
+  const sk = mat(g.skin[0], { grit: 0.28 }), skL = mat(g.skin[1], { grit: 0.25 }), N = g.segs, wave = P.wave || 0, rise = P.rise ?? 1, th = g.thick;
+  const pts = [];
+  for (let k = 0; k <= N; k++) { const u = k / N; pts.push([0.46 + Math.sin(u * 2.4 + wave) * 0.07 * u + u * 0.06 * (P.lunge || 0), 0.97 - u * 0.7 * rise, Math.cos(u * 2 + wave) * 0.035 * u]); }
+  for (let k = 0; k < N; k++) {
+    const u = k / N, [x, y, z] = pts[k], r = th * (1.2 - u * 0.42);
+    p.ell(x, y, z, r, r * 0.78, r, k % 2 ? sk : skL, 1);
+    p.at(x + r * 0.9, y + r * 0.1, z, r * 0.6, (i, f) => p.tint(i, g.skin[1], f * 0.5), 1);
+    p.at(x, y - r * 0.7, z, r * 0.95, (i, f) => { if (f < 0.35) p.tint(i, g.skin[2], 0.65); }, 1);
+  }
+  const [hx, hy, hz] = pts[N], hr = th * 1.3, open = 0.55 + (P.maw || 0) * 0.45;
+  p.ell(hx, hy, hz, hr * 0.85, hr, hr, sk, 2);
+  for (let k = 0; k < 6; k++) { const a = (k / 6) * TAU + 0.3; p.cap([hx + hr * 0.4, hy + Math.sin(a) * hr * 0.8, hz + Math.cos(a) * hr * 0.8], [hx + hr * (1.1 + open * 0.3), hy + Math.sin(a) * hr * 1.25, hz + Math.cos(a) * hr * 1.25], hr * 0.22, hr * 0.05, k % 2 ? sk : skL, 2); }
+  p.at(hx + hr * 0.8, hy, hz, hr * 0.68 * open, (i, f) => { p.tint(i, [26, 6, 8], clamp(f * 2.2, 0, 1)); p.Z[i] -= f * hr * p.n * 0.45; }, 2);
+  for (let ring = 0; ring < 2; ring++) for (let k = 0; k < 12; k++) { const a = (k / 12) * TAU + ring * 0.26, q = hr * (0.6 - ring * 0.25) * open; p.at(hx + hr * (0.85 - ring * 0.1), hy + Math.sin(a) * q, hz + Math.cos(a) * q, hr * 0.09, (i) => { p.tint(i, g.bone[1], 1); p.Z[i] += hr * p.n * 0.1; }, 2); }
+  if (!P.dead) for (let k = 0; k < 4; k++) p.glow(hx + hr * 0.3, hy - hr * 0.75, hz + (k - 1.5) * hr * 0.35, hr * 0.07, g.glow, 0.8);
+  p.ell(0.48, 0.955, 0, 0.22, 0.028, 0.2, mat(g.horn[2], { grit: 0.45 }), 7);
+  for (let k = 0; k < 6; k++) { const a = (k / 6) * TAU; p.ell(0.48 + Math.cos(a) * 0.17, 0.94, Math.sin(a) * 0.15, 0.03, 0.022, 0.03, mat(g.horn[1], { grit: 0.5 }), 7); }
+}
+
 // ---------------------------------------------------------------- poses
 function pose(g, type, t) {
   const P = { lean: g.lean ?? 0, tilt: g.tilt ?? 0, bob: 0, thN: 0, knN: 0.15, thF: 0.02, knF: 0.2, shN: g.reach ?? 0.4, elN: 0.3, shF: (g.reach ?? 0.4) * (g.kind === 'zombie' ? 0.75 : -0.25), elF: 0.4, jaw: g.jaw ?? 0.3, wing: 0, tail: 0, wave: 0, pulse: 0, wig: 0, gait: 0 };
   const zomb = g.kind === 'zombie';
+  if (g.kind === 'eye') P.lid = type === 'attack' ? 0 : type === 'hurt' ? 0.7 : 0.25;
+  if (g.kind === 'worm') P.rise = type === 'dead' ? 0.35 : type === 'attack' && t === 1 ? 0.88 : 1;
   if (type === 'idle') { P.bob = t ? 0.006 : 0; P.shN += t ? 0.06 : -0.03; P.shF += t ? -0.05 : 0.03; P.lean += t ? 0.02 : 0; P.jaw += t ? 0.1 : 0; P.wing = t; P.tail = t * 1.5; P.wave = t * 1.6; P.pulse = t * 1.6; P.wig = t * 0.9; }
   else if (type === 'walk') {
     const s = Math.sin(t * TAU), c = Math.cos(t * TAU), a = g.stride ?? 0.3;
@@ -365,7 +539,14 @@ function pose(g, type, t) {
     P.shN = (g.reach ?? 0.4) + (zomb ? s * 0.12 : -s * 0.45); P.shF += zomb ? -s * 0.12 : s * 0.5; P.bob = Math.abs(c) * 0.014;
     P.lean += s * 0.03; P.tail = t * TAU; P.wave = t * TAU; P.pulse = t * TAU; P.wig = t * TAU; P.gait = s; P.walk = true; P.wing = Math.abs(s);
   } else if (type === 'attack') {
-    const demon = g.kind === 'demon';
+    const demon = g.kind === 'demon' || g.kind === 'butcher';
+    if (g.cannon || g.staff) {
+      // gunners level the cannon arm; priests raise the staff
+      if (t === 1) { P.shN = g.staff ? 2.6 : 1.3; P.elN = g.staff ? 0.2 : -0.2; P.lean -= 0.06; P.jaw += 0.2; }
+      else if (t === 2) { P.shN = g.staff ? 2.9 : 1.5; P.elN = g.staff ? 0.1 : -0.35; P.fire = true; P.jaw += 0.4; P.lean += g.staff ? -0.1 : 0.05; }
+      else { P.shN = g.staff ? 2 : 1.2; P.elN = 0; }
+      return P;
+    }
     if (t === 1) { P.shN = demon ? 2.7 : -0.5; P.elN = demon ? 0.3 : 0.8; P.shF = demon ? 2.5 : P.shF; P.lean -= 0.12; P.jaw += 0.25; P.maw = 0.4; P.bite = 0.3; P.fire = g.kind === 'imp'; P.wing = 1; }
     else if (t === 2) { P.shN = demon ? 1.2 : 1.55; P.elN = 0.05; P.shF = demon ? 1.3 : P.shF + 0.3; P.lean += 0.28; P.thN = 0.35; P.jaw += 0.55; P.maw = 1; P.lash = true; P.bite = 1; P.lunge = 1; P.fire = g.kind === 'imp'; }
     else { P.shN = 0.9; P.elN = 0.25; P.lean += 0.1; P.jaw += 0.2; P.maw = 0.5; P.bite = 0.4; }
@@ -377,12 +558,12 @@ function paintFrame(g, n, type, t, phi) {
   const p = new Paint(n, g, phi), P = pose(g, type, t), k = g.kind;
   if (P.dead) {
     // laid down: bipeds on their backs, beasts on their backs with their legs curled, heaps and shrouds squashed flat
-    if (k === 'abom' || k === 'wraith') p.xf = { px: 0.5, py: 0.955, sy: k === 'abom' ? 0.5 : 0.4 };
-    else if (k === 'hound' || k === 'spider') p.xf = { px: 0.5, py: 0.66, rot: Math.PI, oy: 0.14 };
+    if (k === 'abom' || k === 'wraith' || k === 'eye' || k === 'worm' || k === 'bloater') p.xf = { px: 0.5, py: 0.955, sy: k === 'abom' || k === 'bloater' ? 0.5 : k === 'eye' ? 0.55 : 0.4 };
+    else if (k === 'hound' || k === 'spider' || k === 'skitter' || k === 'charger') p.xf = { px: 0.5, py: 0.66, rot: Math.PI, oy: 0.14 };
     else p.xf = { px: 0.5, py: 0.5, rot: -Math.PI / 2, oy: 0.37 };
     const xf = p.xf; p.xf = null; p.ell(0.5, 0.945, 0, 0.36, 0.03, 0.3, mat(g.blood[2], { grit: 0.2 }), 7); p.xf = xf;
   }
-  if (k === 'abom') abomination(p, g, P); else if (k === 'hound') hound(p, g, P); else if (k === 'spider') spider(p, g, P); else humanoid(p, g, P);
+  if (k === 'abom') abomination(p, g, P); else if (k === 'hound' || k === 'charger') hound(p, g, P); else if (k === 'spider') spider(p, g, P); else if (k === 'skitter') skitter(p, g, P); else if (k === 'eye') eyeball(p, g, P); else if (k === 'worm') worm(p, g, P); else humanoid(p, g, P);
   return p;
 }
 
@@ -492,7 +673,7 @@ export function horror(seed, size = 32, opts = {}) {
     return cv;
   };
   const hide = toHex(g.skin[0]);
-  const out = { view, dirs: 8, frames: [view('idle', 0), view('idle', 1)], name: g.name, species: g.species, element: ELEMENT[g.kind], kind: g.kind, floats: !!g.float, tier: g.tier, size: S, horror: true, hue: 0, genome: g,
+  const out = { view, dirs: 8, frames: [view('idle', 0), view('idle', 1)], name: g.name, species: g.species, element: ELEMENT[g.kind], kind: g.kind, floats: !!g.float && g.kind !== 'priest', tier: g.tier, size: S, horror: true, hue: 0, genome: g,
     palette: { body: hide, shade: toHex(g.skin[2]), dark: toHex(shadeC(g.skin[2], -0.3)), light: toHex(g.skin[1]), belly: toHex(g.skin[1]), accent: toHex(g.horn[1]), glow: toHex(g.glow), glowDeep: toHex(shadeC(g.glow, -0.4)), eye: toHex(g.glow), outline: '#0b0809', colors: [g.skin[0], g.skin[1], g.cloth[0], g.bone[0], g.blood[1]].map(toHex) } };
   const lazy = (k, fn) => { let v; Object.defineProperty(out, k, { get: () => v || (v = fn()), enumerable: true }); };
   lazy('walk', () => ANIM.walk.map((_, k) => view('walk', k)));
@@ -501,7 +682,7 @@ export function horror(seed, size = 32, opts = {}) {
   lazy('dead', () => view('dead'));
   lazy('big', () => { g.R = mulberry32(seed * 31 + 5); return bake(g, paintFrame(g, 320, 'idle', 0, PHI[1]), 160, true); });
   lazy('anatomy', () => {
-    const fl = g.kind === 'abom' || g.kind === 'hound' ? g.skin[1] : shadeC([170, 70, 66], -0.1), dem = g.kind === 'demon' || g.kind === 'imp';
+    const fl = ['abom', 'hound', 'bloater', 'skitter', 'eye', 'worm'].includes(g.kind) ? g.skin[1] : shadeC([170, 70, 66], -0.1), dem = g.kind === 'demon' || g.kind === 'imp' || g.kind === 'charger' || g.kind === 'gunner';
     return { hide, fur: toHex(g.skin[1]), flesh: toHex(fl), blood: toHex(dem ? [70, 6, 10] : g.kind === 'zombie' ? [76, 20, 14] : g.blood[0]), glow: g.kind === 'wraith' ? toHex(g.glow) : dem && (g.seed & 1) ? toHex(g.glow) : null, spirit: false, horror: true,
       organs: [{ kind: 'heart', col: '#7a1018', size: 1 }, { kind: 'liver', col: '#4a1a12', size: 1.1 }, { kind: 'lungs', col: '#9a5a5a', size: 1 }, { kind: 'gut', col: g.kind === 'zombie' ? '#6a6a3a' : '#8a4a4a', size: 1.3 }, { kind: 'bone', col: toHex(g.bone[0]), size: 0.9 }, { kind: 'eye', col: '#e8e0c8', size: 0.5 }] };
   });

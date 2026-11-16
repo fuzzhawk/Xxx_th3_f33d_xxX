@@ -72,9 +72,20 @@ const ARMS = {
   squid: { label: 'SQUID', names: ['Ink-Squid Cannon', 'Octo-Mortar', 'Cephalopod Cannon'], rate: 0.85, dmg: 22, speed: 15, grav: 3, n: 1, ammo: 8, give: 5, shot: 'squid', carve: 0.6 },
   fork: { label: 'FORK', names: ['Chain-Lightning Tuning Fork', 'Thunder Fork', 'Humming Trident'], rate: 0.5, dmg: 20, n: 1, chain: 4, ammo: 40, give: 25, shot: 'zap', carve: 0.25 },
   marble: { label: 'MARBLE', names: ['Black-Hole Marble', 'Void Marble', 'Event-Horizon Slingshot'], rate: 1.5, dmg: 30, speed: 8, n: 1, ammo: 3, give: 2, shot: 'marble', carve: 1.2 },
-  relic: { label: 'RELIC', names: ['Relic Mortar', 'Heirloom Lobber', 'Junk Howitzer'], rate: 0.95, dmg: 45, speed: 14, grav: 8, n: 1, ammo: 8, give: 5, shot: 'relic', splash: 2.6, carve: 1.1 }
+  relic: { label: 'RELIC', names: ['Relic Mortar', 'Heirloom Lobber', 'Junk Howitzer'], rate: 0.95, dmg: 45, speed: 14, grav: 8, n: 1, ammo: 8, give: 5, shot: 'relic', splash: 2.6, carve: 1.1 },
+  // the second armoury
+  chaingun: { label: 'CHAIN', names: ['Chaingun', 'Minigun', 'Bone Mill', 'Ripsaw Gatling'], rate: 0.065, dmg: 8, speed: 42, spread: 0.05, n: 1, shot: 'bullet', ammo: 200, give: 90, carve: 0.12, gun: true },
+  flamer: { label: 'FLAME', names: ['Flamethrower', 'Pyre Hose', 'Immolator', 'Hellbreath'], rate: 0.05, dmg: 4, speed: 11, spread: 0.1, n: 1, shot: 'flame', ammo: 220, give: 110, carve: 0.04, burn: 3, gun: true },
+  railgun: { label: 'RAIL', names: ['Railgun', 'Gauss Lance', 'Spine Driver'], rate: 1.25, dmg: 95, n: 1, shot: 'rail', ammo: 15, give: 8, carve: 0.8, gun: true },
+  stakegun: { label: 'STAKE', names: ['Stake Gun', 'Impaler', 'Pin Launcher'], rate: 0.85, dmg: 55, speed: 30, grav: 2, n: 1, shot: 'stake', ammo: 20, give: 10, pierce: 3, carve: 0.35, gun: true },
+  ripper: { label: 'SAWS', names: ['Saw Launcher', 'Ripper', 'Disc Thrower'], rate: 0.45, dmg: 30, speed: 20, n: 1, shot: 'saw', ammo: 30, give: 15, bounce: 4, carve: 0.4, gun: true },
+  chainsaw: { label: 'SAW', names: ['Chainsaw', 'Bone Saw', 'Gut Ripper'], rate: 0.08, dmg: 7, n: 1, shot: 'melee', carve: 0.1, gun: true },
+  mines: { label: 'MINES', names: ['Mine Layer', 'Toe Popper', 'Proximity Lobber'], rate: 0.7, dmg: 65, speed: 9, grav: 10, n: 1, shot: 'mine', ammo: 12, give: 6, splash: 3, carve: 1.2, gun: true },
+  acid: { label: 'BILE', names: ['Bile Spewer', 'Acid Mortar', 'Gallbladder Gun'], rate: 0.7, dmg: 18, speed: 14, grav: 9, n: 1, shot: 'acid', ammo: 25, give: 12, carve: 0.3 },
+  soul: { label: 'SOUL', names: ['Soul Cannon', 'Wailing Orb', 'Ghost Engine'], rate: 1.6, dmg: 60, speed: 8, n: 1, shot: 'soul', ammo: 6, give: 3, splash: 4, carve: 1.2 },
+  hook: { label: 'HOOK', names: ['Harpoon Gun', 'Meat Hook Launcher', 'Grappler'], rate: 0.9, dmg: 28, speed: 26, n: 1, shot: 'hook', ammo: 16, give: 8, carve: 0.3 }
 };
-const GRIT = ['shotgun', 'nailgun', 'rocket', 'grenade', 'plasma'], WEIRD = ['chicken', 'hive', 'flail', 'squid', 'fork', 'marble', 'relic'];
+const GRIT = ['shotgun', 'nailgun', 'rocket', 'grenade', 'plasma', 'chaingun', 'flamer', 'railgun', 'stakegun', 'ripper', 'chainsaw', 'mines'], WEIRD = ['chicken', 'hive', 'flail', 'squid', 'fork', 'marble', 'relic', 'acid', 'soul', 'hook'];
 const AFFIX = {
   explosive: { name: 'Explosive', fx: (A) => { A.splash = Math.max(A.splash || 0, 1.5); A.carve = (A.carve || 0.2) + 0.5; A.dmg *= 0.9; } },
   ricochet: { name: 'Ricocheting', fx: (A) => { A.bounce = (A.bounce || 0) + 2; } },
@@ -102,13 +113,25 @@ function rollArm(R, k, plain) {
   return A;
 }
 // the garrison, from the horror forge: px is how big its sprites are drawn
+// (px: sprite size, more for more detail; lvl: the first level a second-wave role can turn up on)
 const ROLES = [
-  { role: 'grunt', kind: 'zombie', px: 48, hp: 55, speed: 2.5, size: 1.85, melee: 13 },
-  { role: 'spitter', kind: 'imp', px: 40, hp: 38, speed: 2.6, size: 1.5, ranged: 10 },
-  { role: 'floater', kind: 'wraith', px: 44, hp: 34, speed: 2.4, size: 1.75, ranged: 8, fly: true },
-  { role: 'hound', kind: 'hound', px: 40, hp: 28, speed: 4.6, size: 1.45, melee: 8 },
-  { role: 'brute', kind: 'demon', px: 64, hp: 190, speed: 1.7, size: 2.9, ranged: 16, melee: 24, heavy: true },
-  { role: 'crawler', kind: 'spider', px: 48, hp: 46, speed: 3.6, size: 1.6, melee: 11 }
+  { role: 'grunt', kind: 'zombie', px: 56, hp: 55, speed: 2.5, size: 1.85, melee: 13 },
+  { role: 'spitter', kind: 'imp', px: 48, hp: 38, speed: 2.6, size: 1.5, ranged: 10 },
+  { role: 'floater', kind: 'wraith', px: 52, hp: 34, speed: 2.4, size: 1.75, ranged: 8, fly: true },
+  { role: 'hound', kind: 'hound', px: 48, hp: 28, speed: 4.6, size: 1.45, melee: 8 },
+  { role: 'brute', kind: 'demon', px: 72, hp: 190, speed: 1.7, size: 2.9, ranged: 16, melee: 24, heavy: true },
+  { role: 'crawler', kind: 'spider', px: 56, hp: 46, speed: 3.6, size: 1.6, melee: 11 },
+  // the second wave: each has its own way of killing you
+  { role: 'butcher', kind: 'butcher', px: 72, hp: 240, speed: 1.6, size: 3, melee: 30, heavy: true, armor: 0.3, knock: 7, lvl: 1 },
+  { role: 'stalker', kind: 'stalker', px: 64, hp: 50, speed: 4.3, size: 2.3, melee: 16, ghost: true, lvl: 1 },
+  { role: 'bloater', kind: 'bloater', px: 56, hp: 60, speed: 1.5, size: 2, burst: 34, lvl: 0 },
+  { role: 'skitter', kind: 'skitter', px: 32, hp: 12, speed: 5.2, size: 0.85, melee: 5, pack: true, lvl: 0 },
+  { role: 'watcher', kind: 'eye', px: 48, hp: 70, speed: 1.6, size: 1.6, beam: 24, fly: true, lvl: 1 },
+  { role: 'priest', kind: 'priest', px: 56, hp: 90, speed: 2, size: 2.1, ranged: 9, summon: true, lvl: 2 },
+  { role: 'charger', kind: 'charger', px: 64, hp: 160, speed: 2.4, size: 2.4, melee: 18, charge: 34, heavy: true, lvl: 1 },
+  { role: 'leaper', kind: 'leaper', px: 52, hp: 45, speed: 3.2, size: 1.8, melee: 14, leap: true, lvl: 0 },
+  { role: 'worm', kind: 'worm', px: 56, hp: 120, speed: 3.4, size: 2.6, melee: 20, burrow: true, lvl: 2 },
+  { role: 'gunner', kind: 'gunner', px: 64, hp: 150, speed: 1.6, size: 2.5, mortar: 22, ranged: 22, heavy: true, lvl: 1 }
 ];
 // gritty palettes in the manner of Quake's browns and Heretic's mossy stone: three walls, the floor,
 // metal, fog, the torches' light, the liquid, and the sky
@@ -147,7 +170,26 @@ const ART = {
     for (let y = 0; y < len; y++) { const k = y / len, w = Math.round(3 + Math.sin(Math.min(1, k * 1.3) * Math.PI) * (v === 1 ? 4 : 5)); rect(x, '#5a1a16', 8 - w, top + y, w * 2, 1); rect(x, '#7a2a22', 8 - w + 1, top + y, Math.max(1, w - 1), 1); if (k > 0.25 && k < 0.75 && y % 3 === 0) rect(x, '#c8b090', 8 - w + 1, top + y, w * 2 - 2, 1); rect(x, '#2a0806', 8 + w - 2, top + y, 2, 1); }
     rect(x, '#4a0a0a', 7, 37, 1, 3); rect(x, '#4a0a0a', 9, 36, 1, 2);
   }),
+  // a dead tree: a split, twisted trunk and bare black branches (three of them)
+  deadtree: (v) => pc(36, 60, (x) => {
+    const R = mulberry32(31 + v * 7), lim = (x0, y0, a, len, w, d) => { let px = x0, py = y0; for (let k = 0; k < len; k++) { const ww = Math.max(1, Math.round(w * (1 - k / len))); rect(x, '#1e1814', Math.round(px - ww / 2), Math.round(py), ww, 1); rect(x, '#3a2e26', Math.round(px - ww / 2), Math.round(py), Math.max(1, ww >> 1), 1); px += Math.cos(a) * 1.1; py += Math.sin(a) * 1.1; a += (R() - 0.5) * 0.35; if (d < 3 && k > 3 && R() < 0.12) lim(px, py, a + (R() < 0.5 ? -1 : 1) * (0.5 + R() * 0.6), Math.floor(len * 0.5), ww, d + 1); } };
+    for (let y = 60; y > 24; y--) { const t = (60 - y) / 36, w = Math.round(8 - t * 5 + (y > 56 ? 4 : 0)), cx = 18 + Math.sin(y * 0.18 + v) * 2; rect(x, '#1c1612', Math.round(cx - w / 2), y, w, 1); rect(x, '#3e322a', Math.round(cx - w / 2), y, Math.max(1, w >> 2), 1); if (y % 5 === v % 5) rect(x, '#0c0a08', Math.round(cx), y, 1, 2); }
+    for (let k = 0; k < 4; k++) lim(18 + (R() - 0.5) * 3, 26 + k * 3, -Math.PI / 2 + (k % 2 ? 0.7 : -0.7) + (R() - 0.5) * 0.4, 14 + Math.floor(R() * 8), 3, 0);
+  }),
+  // a stake with a head on it, and what ran down
+  stake: (v) => pc(10, 38, (x) => {
+    rect(x, '#3a2a1c', 4, 10, 3, 28); rect(x, '#5a4430', 4, 10, 1, 28); rect(x, '#2a1c12', 5, 6, 1, 5);
+    const sk = ['#c8bca0', '#8a6a5a', '#6a7a5a'][v % 3]; rect(x, sk, 2, 3, 7, 7); rect(x, sk, 3, 2, 5, 9); rect(x, '#0c0806', 3, 5, 2, 2); rect(x, '#0c0806', 6, 5, 2, 2); rect(x, '#2a0606', 4, 8, 3, 1);
+    rect(x, '#5a0a0a', 4, 10, 2, 10 + v * 3); rect(x, '#3a0606', 5, 12, 1, 14);
+  }),
+  stones: (v) => pc(22, 11, (x) => { const R = mulberry32(5 + v); for (let k = 0; k < 7; k++) { const cx = 3 + R() * 16, cy = 5 + R() * 5, rr = 1.5 + R() * 2.5; x.fillStyle = ['#4a443e', '#5a524a', '#3a3530'][k % 3]; x.beginPath(); x.ellipse(cx, cy, rr * 1.3, rr, 0, 0, TAU); x.fill(); x.fillStyle = 'rgba(255,240,220,.18)'; x.fillRect(Math.round(cx - rr * 0.6), Math.round(cy - rr * 0.7), 2, 1); } }),
   eyes: (col) => pc(12, 4, (x) => { rect(x, 'rgba(255,40,10,.35)', 0, 0, 5, 4); rect(x, 'rgba(255,40,10,.35)', 7, 0, 5, 4); rect(x, col, 1, 1, 3, 2); rect(x, col, 8, 1, 3, 2); rect(x, '#ffffff', 2, 1, 1, 1); rect(x, '#ffffff', 9, 1, 1, 1); }),
+  stakeS: () => pc(20, 4, (x) => { rect(x, '#5a3e24', 0, 1, 15, 2); rect(x, '#7a5a38', 0, 1, 15, 1); rect(x, '#9aa0a8', 15, 1, 3, 2); rect(x, '#d0d6de', 18, 1, 2, 1); rect(x, '#3a2616', 0, 0, 2, 4); }),
+  sawdisc: () => pc(14, 14, (x) => { x.fillStyle = '#8a8e96'; x.beginPath(); x.arc(7, 7, 5.5, 0, TAU); x.fill(); x.fillStyle = '#c8ccd4'; for (let k = 0; k < 10; k++) { const a = (k / 10) * TAU; x.fillRect(Math.round(7 + Math.cos(a) * 6) - 1, Math.round(7 + Math.sin(a) * 6) - 1, 2, 2); } x.fillStyle = '#2a2c30'; x.beginPath(); x.arc(7, 7, 1.8, 0, TAU); x.fill(); x.fillStyle = 'rgba(160,20,20,.7)'; x.fillRect(3, 8, 3, 2); }),
+  mineS: (on) => pc(14, 9, (x) => { rect(x, '#3a3c34', 1, 3, 12, 5); rect(x, '#5a5c50', 2, 3, 10, 1); rect(x, '#1e201a', 0, 7, 14, 2); rect(x, '#8a8a7a', 6, 1, 2, 2); rect(x, on ? '#ff3020' : '#5a1010', 6, 0, 2, 1); }),
+  acidglob: () => pc(10, 10, (x) => { x.fillStyle = '#5a9a1a'; x.beginPath(); x.arc(5, 5, 4.2, 0, TAU); x.fill(); x.fillStyle = '#a8f04a'; x.fillRect(3, 3, 2, 2); x.fillStyle = '#3a6a10'; x.fillRect(5, 6, 3, 2); }),
+  soulorb: (k) => pc(20, 20, (x) => { const g = x.createRadialGradient(10, 10, 1, 10, 10, 10); g.addColorStop(0, '#f0fff8'); g.addColorStop(0.4, 'rgba(150,255,200,.8)'); g.addColorStop(1, 'rgba(40,120,90,0)'); x.fillStyle = g; x.fillRect(0, 0, 20, 20); x.fillStyle = 'rgba(10,30,20,.85)'; x.fillRect(6, 7, 3, 3 + k); x.fillRect(11, 7, 3, 3 + k); x.fillRect(8, 12 - k, 4, 3 + k * 2); }),
+  hookart: () => pc(12, 12, (x) => { rect(x, '#7a7e86', 0, 5, 7, 2); rect(x, '#a8acb4', 7, 3, 2, 6); rect(x, '#a8acb4', 9, 1, 2, 3); rect(x, '#a8acb4', 9, 8, 2, 3); rect(x, '#d0d4dc', 10, 0, 2, 2); rect(x, '#d0d4dc', 10, 10, 2, 2); }),
   bullet: () => pc(3, 8, (x) => { rect(x, '#fff6c0', 1, 0, 1, 8); rect(x, '#ffc040', 0, 2, 3, 4); }),
   pellet: () => pc(3, 3, (x) => { rect(x, '#ffe0a0', 0, 0, 3, 3); rect(x, '#fff', 1, 1, 1, 1); }),
   nail: () => pc(10, 3, (x) => { rect(x, '#9aa0a8', 0, 1, 8, 1); rect(x, '#d0d6de', 0, 0, 2, 3); rect(x, '#ffd080', 8, 1, 2, 1); }),
@@ -178,6 +220,13 @@ const ART = {
     else if (k === 'rocket') { rect(x, '#4e5a44', 0, 1, 20, 5); rect(x, '#7a866a', 0, 1, 20, 1); rect(x, '#2a2e26', 8, 6, 4, 4); rect(x, '#c83a20', 18, 2, 2, 3); }
     else if (k === 'grenade') { rect(x, m, 4, 1, 10, 7); rect(x, h, 0, 3, 5, 3); rect(x, w, 14, 4, 7, 4); }
     else if (k === 'plasma') { rect(x, '#4a4e68', 2, 1, 16, 6); rect(x, '#9fe8ff', 4, 3, 10, 2); rect(x, '#2a2c40', 14, 6, 4, 4); }
+    else if (k === 'chaingun') { for (let q = 0; q < 3; q++) rect(x, q % 2 ? h : m, 0, 1 + q * 2, 14, 2); rect(x, '#3a3c40', 12, 0, 8, 8); rect(x, '#b89040', 16, 7, 3, 3); }
+    else if (k === 'flamer') { rect(x, m, 0, 2, 14, 3); rect(x, '#7a2a1a', 12, 0, 8, 9); rect(x, '#ff8a2a', 0, 3, 2, 1); }
+    else if (k === 'railgun') { rect(x, m, 0, 3, 18, 3); rect(x, '#9fe8ff', 2, 2, 14, 1); rect(x, '#3a3c40', 14, 4, 6, 6); }
+    else if (k === 'stakegun') { rect(x, m, 2, 2, 12, 4); rect(x, '#7a5a38', 0, 3, 4, 2); rect(x, w, 14, 3, 8, 5); }
+    else if (k === 'ripper') { rect(x, m, 4, 3, 14, 6); x.fillStyle = '#c8ccd4'; x.beginPath(); x.arc(6, 4, 3.5, 0, TAU); x.fill(); }
+    else if (k === 'chainsaw') { rect(x, '#8a8e96', 0, 3, 12, 3); rect(x, '#c84a1a', 11, 1, 9, 8); rect(x, '#2a2c30', 0, 3, 12, 1); }
+    else if (k === 'mines') { rect(x, m, 2, 1, 14, 7); rect(x, '#3a3c34', 0, 2, 4, 5); rect(x, '#ff3020', 1, 3, 1, 1); }
     else { rect(x, m, 6, 2, 10, 3); rect(x, '#3a3226', 12, 4, 4, 6); }
   }),
   exit: () => pc(24, 40, (x) => { for (let k = 0; k < 3; k++) { x.strokeStyle = ['#7affd0', '#ffffff', '#3ad7ff'][k]; x.lineWidth = 2; x.beginPath(); x.ellipse(12, 20, 10 - k * 3, 18 - k * 4, 0, 0, TAU); x.stroke(); } })
@@ -251,6 +300,19 @@ function gunParts(R) {
 // the grime over a weapon: a field of grit, rust, scratches and old blood (made once per weapon,
 // fixed to it), and the pass that lays it on: soot round the silhouette, darker low down, a dark
 // outline, and the colours dithered down to a few dirty tones
+// the view model's perspective: drawn in 180×120, shown in 180×GUN_H; the far end is GUN_FAR as wide as the near
+const GUN_H = 60, GUN_FAR = 0.5;
+// where a point of the upright drawing lands in the laid-down one: [x, y, width scale]
+// lay the upright drawing down: each row of the result takes the row of the drawing at its depth,
+// narrowed to that depth's width (the far, muzzle end GUN_FAR as wide as the near)
+function warpGun(src, out) {
+  out ||= pc(180, GUN_H, () => {});
+  const x = out.getContext('2d');
+  x.clearRect(0, 0, 180, GUN_H); x.imageSmoothingEnabled = false;
+  for (let j = 0; j < GUN_H; j++) { const t = (j + 0.5) / GUN_H, inv = GUN_FAR + t * (1 - GUN_FAR), v = (1 / GUN_FAR - 1 / inv) / (1 / GUN_FAR - 1), sy = Math.min(119, Math.floor(v * 120)), w = 180 * inv; x.drawImage(src, 0, sy, 180, 1, 90 - w / 2, j, w, 1); }
+  return out;
+}
+function gunWarp(x, y) { const v = clamp(y / 120, 0, 1), inv = 1 / (1 / GUN_FAR - v * (1 / GUN_FAR - 1)); return [90 + (x - 90) * inv, ((inv - GUN_FAR) / (1 - GUN_FAR)) * GUN_H, inv]; }
 const grimeFields = new Map();
 function grimeField(seed, w, h) {
   let F = grimeFields.get(seed);
@@ -340,10 +402,44 @@ function grimeSprite(cv) {
       d[j] = clamp(Math.round((r + bq) / 14) * 14, 0, 255); d[j + 1] = clamp(Math.round((g + bq) / 14) * 14, 0, 255); d[j + 2] = clamp(Math.round((b + bq) / 14) * 14, 0, 255);
     }
   }
+  melt(d, w, h);
   out = pc(w, h, () => {});
   out.getContext('2d').putImageData(sd, 0, 0);
   grimed.set(cv, out);
   return out;
+}
+// The meltdown: in about a third of the columns the lower part of each run of body slumps, its pixels
+// sorted by brightness so the light sinks to the bottom (pixel sorting, run downward), and now and
+// then it runs on past the body as a drip a few pixels long. Glowing pixels (eyes) are left where they are.
+function melt(d, w, h) {
+  const hs = (a, b) => { let q = (a * 374761393 + b * 668265263 + 0x51ed) | 0; q = Math.imul(q ^ (q >>> 13), 1274126177); return ((q ^ (q >>> 16)) >>> 0) / 4294967296; };
+  const lum = (j) => d[j] * 0.3 + d[j + 1] * 0.59 + d[j + 2] * 0.11, hot = (j) => { const mx = Math.max(d[j], d[j + 1], d[j + 2]), mn = Math.min(d[j], d[j + 1], d[j + 2]); return mx > 215 && mx - mn > 90; };
+  const seg = [];
+  for (let x = 0; x < w; x++) {
+    if (hs(x, w) > 0.34) continue;
+    let y = 0, run = 0;
+    while (y < h) {
+      while (y < h && d[(y * w + x) * 4 + 3] < 8) y++;
+      const y0 = y;
+      while (y < h && d[(y * w + x) * 4 + 3] >= 8) y++;
+      const y1 = y, len = y1 - y0;
+      run++;
+      if (len < 5) continue;
+      const s0 = y0 + Math.floor(len * (0.3 + 0.45 * hs(x, run * 7 + y0))), s1 = y1 - 1;   // the last pixel is the outline: it stays at the edge
+      if (s1 - s0 < 3) continue;
+      seg.length = 0;
+      let skip = false;
+      for (let q = s0; q < s1; q++) { const j = (q * w + x) * 4; if (hot(j)) { skip = true; break; } seg.push([lum(j), d[j], d[j + 1], d[j + 2]]); }
+      if (skip) continue;
+      seg.sort((a, b) => a[0] - b[0]);
+      for (let q = s0; q < s1; q++) { const j = (q * w + x) * 4, c = seg[q - s0]; d[j] = c[1]; d[j + 1] = c[2]; d[j + 2] = c[3]; }
+      // a drip off the bottom of it, darker as it goes, ending in ink
+      if (y1 < h * 0.86 && hs(x, y1 * 3 + run) < 0.45) {
+        const n = 1 + Math.floor(hs(x + 11, y1) * 4), c = seg[seg.length - 1];
+        for (let k = 0; k < n && y1 + k < h; k++) { const j = ((y1 + k) * w + x) * 4; if (d[j + 3] >= 8) break; const f = k === n - 1 ? 0.18 : 0.75 - k * 0.12; d[j] = c[1] * f; d[j + 1] = c[2] * f; d[j + 2] = c[3] * f; d[j + 3] = 255; }
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------- level generator (pure data)
@@ -353,6 +449,7 @@ function grimeSprite(cv) {
 // sectors (daises, pools, pits, skylights, a canal); slabs are boxes standing in sectors (bridge,
 // railings, steps, doors, a gallery's walkway). The grid grows with the level, with more loops.
 const shp = (k, rad, cx, cy) => (k === 'sq' ? ngon(4, rad * 1.25, Math.PI / 4, cx, cy) : k === 'hex' ? ngon(6, rad, 0, cx, cy) : k === 'oct' ? ngon(8, rad, Math.PI / 8, cx, cy) : ngon(12, rad, 0, cx, cy));
+const dx2 = (a, b) => a.x - b.x, dy2 = (a, b) => a.y - b.y;
 function genLevel(seed, lv) {
   const R = mulberry32(seed), r = (a, b) => a + R() * (b - a), ri = (a, b) => Math.floor(r(a, b + 1)), pick = (a) => a[Math.floor(R() * a.length)];
   const GX = [4, 4, 5, 5][Math.min(3, lv)], GY = [3, 4, 4, 5][Math.min(3, lv)];
@@ -378,14 +475,21 @@ function genLevel(seed, lv) {
   for (const rm of rooms) if (rm.par) rm.h = clamp(rm.par.h + pick([0, 0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2]), -3, 3);
   const hallC = rooms.filter((x) => x !== start && x !== exit && x !== secret && x.links.length >= 2);
   const hall = hallC.length && R() < 0.9 ? pick(hallC) : null;
+  const claimed = new Set();
   for (const rm of rooms) {
-    rm.kind = rm === hall ? 'hall' : rm === exit ? 'shrine' : rm === secret ? 'secret' : R() < 0.24 ? 'yard' : 'room';
+    const kr = R();
+    rm.kind = rm === hall ? 'hall' : rm === exit ? 'shrine' : rm === secret ? 'secret' : kr < 0.2 ? 'yard' : kr < 0.36 ? 'wild' : 'room';
+    // open ground spreads into an empty cell next to it, if there is one: a courtyard or a wild place twice the size
+    if (rm.kind === 'yard' || rm.kind === 'wild') {
+      const opts = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([di, dj]) => { const i = rm.i + di, j = rm.j + dj; return i >= 0 && j >= 0 && i < GX && j < GY && !at.has(K(i, j)) && !claimed.has(K(i, j)); });
+      if (opts.length && R() < 0.8) { rm.ext = pick(opts); claimed.add(K(rm.i + rm.ext[0], rm.j + rm.ext[1])); }
+    }
     // a gallery: a tall square room with a walkway round three sides and a stair up the fourth
     rm.gal = rm.kind === 'room' && R() < 0.26;
-    rm.shape = rm.gal || rm.kind === 'hall' ? 'rect' : rm.kind === 'yard' ? pick(['rect', 'cham', 'round', 'cave']) : rm.kind === 'secret' ? 'oct' : pick(['rect', 'cham', 'oct', 'round', 'cross', 'L', 'cave', 'oct', 'cham']);
-    const big = rm.kind === 'hall' || rm.kind === 'yard';
+    rm.shape = rm.kind === 'wild' ? 'wild' : rm.ext ? 'ext' : rm.gal || rm.kind === 'hall' ? 'rect' : rm.kind === 'yard' ? pick(['rect', 'cham', 'round', 'cave']) : rm.kind === 'secret' ? 'oct' : pick(['rect', 'cham', 'oct', 'round', 'cross', 'L', 'cave', 'oct', 'cham']);
+    const big = rm.kind === 'hall' || rm.kind === 'yard' || rm.kind === 'wild';
     rm.R = big ? r(6.6, 7) : rm.kind === 'secret' ? r(3.8, 4.6) : rm.gal ? r(6, 6.8) : r(5, 6.5);
-    const sq = rm.shape === 'rect' || rm.shape === 'cham' || rm.shape === 'L';
+    const sq = rm.shape === 'rect' || rm.shape === 'cham' || rm.shape === 'L' || rm.shape === 'ext';
     rm.a = rm.R * (sq && !big ? r(rm.gal ? 0.9 : 0.82, 1) : 1); rm.b = rm.R * (sq && !big ? r(rm.gal ? 0.9 : 0.82, 1) : 1);
     rm.t = r(2.8, 3.4); rm.ch = r(0.9, 1.8); rm.qx = pick([-1, 1]); rm.qy = pick([-1, 1]);
     rm.lim = rm.shape === 'cross' ? rm.t - 0.25 : rm.shape === 'L' ? Math.max(3, Math.min(rm.a, rm.b) * 0.5) - 0.3 : 0.55 * Math.min(rm.a, rm.b);
@@ -405,8 +509,20 @@ function genLevel(seed, lv) {
     else if (R() < 0.22) l.door = { at: R() < 0.5 ? 'a' : 'b' };
   }
   const base = (rm) => {
-    const { a, b, R: Rr } = rm;
+    const { a, b, R: Rr } = rm, [di, dj] = rm.ext || [0, 0];
     switch (rm.shape) {
+      // a courtyard over two cells: a long rectangle running into the empty one
+      case 'ext': return box(di < 0 ? -a - CELL : -a, dj < 0 ? -b - CELL : -b, di > 0 ? a + CELL : a, dj > 0 ? b + CELL : b);
+      // a wild place: a rough blob, built as the distance out from this cell's middle in every direction
+      // (so it can never fold over itself), over two cells if it spreads
+      case 'wild': {
+        const ox = (di * CELL) / 2, oy = (dj * CELL) / 2, rx = a + (Math.abs(di) * CELL) / 2 - 0.4, ry = b + (Math.abs(dj) * CELL) / 2 - 0.4, n = 30, ph = r(0, TAU), ph2 = r(0, TAU);
+        return Array.from({ length: n }, (_, k) => {
+          const t = (k / n) * TAU, c = Math.cos(t), sn = Math.sin(t), A2 = (c / rx) ** 2 + (sn / ry) ** 2, B2 = -2 * ((ox * c) / rx ** 2 + (oy * sn) / ry ** 2), C2 = (ox / rx) ** 2 + (oy / ry) ** 2 - 1;
+          const d = (-B2 + Math.sqrt(Math.max(0, B2 * B2 - 4 * A2 * C2))) / (2 * A2), q = d * (0.86 + 0.08 * Math.sin(t * 3 + ph) + 0.05 * Math.sin(t * 7 + ph2));
+          return [c * q, sn * q];
+        });
+      }
       case 'rect': return box(-a, -b, a, b);
       case 'cham': { const c = rm.ch; return [[a, -b + c], [a, b - c], [a - c, b], [-a + c, b], [-a, b - c], [-a, -b + c], [-a + c, -b], [a - c, -b]]; }
       case 'oct': return ngon(8, Rr / Math.cos(Math.PI / 8), Math.PI / 8, 0, 0);
@@ -448,10 +564,10 @@ function genLevel(seed, lv) {
     // the gallery's stair goes up a side with no doorway in it
     const freeSide = [0, 1, 2, 3].filter((sd) => !rm.ports.some((p) => p.ax === (sd % 2 ? 'y' : 'x') && p.sgn === (sd < 2 ? 1 : -1)));
     if (rm.gal && !freeSide.length) rm.gal = false;
-    const sky = rm.kind === 'yard' || (rm.kind === 'hall' && R() < 0.5), ch = sky ? r(5, 7.5) : rm.kind === 'hall' ? r(6, 7) : rm.kind === 'secret' ? 3 : rm.gal ? r(5, 5.8) : r(3.2, 5);
-    const S = { poly: P, holes: [], f: flat(h), c: flat(h + ch), sky, light: sky ? r(1, 1.15) : rm.kind === 'shrine' ? 0.62 : rm.kind === 'secret' ? 1 : r(0.55, 0.95), room: rm,
-      tex: { wall: rm.kind === 'yard' ? 'wall1' : rm.kind === 'secret' ? 'wall2' : pick(['wall0', 'wall0', 'wall1']), floor: rm.kind === 'yard' ? 'rock' : 'floor0', ceil: 'ceil' } };
-    let feat = rm.kind === 'hall' ? 'canal' : rm.kind === 'shrine' ? 'dais' : rm.kind === 'secret' ? 'none' : rm === start ? pick(rm.gal ? ['none', 'none'] : ['none', 'sky']) : rm.gal ? pick(['none', 'pool', 'columns', 'pit', 'none']) : rm.kind === 'yard' ? pick(['blocks', 'pool', 'none', 'blocks', 'baffles']) : pick(['pillars', 'pillars', 'dais', 'pool', 'pit', 'sky', 'none', 'columns', 'baffles', 'baffles']);
+    const wild = rm.kind === 'wild', sky = rm.kind === 'yard' || (wild && R() < 0.85) || (rm.kind === 'hall' && R() < 0.5), ch = sky ? r(wild ? 6.5 : 5, wild ? 9 : 7.5) : wild ? r(4.2, 5.5) : rm.kind === 'hall' ? r(6, 7) : rm.kind === 'secret' ? 3 : rm.gal ? r(5, 5.8) : r(3.2, 5);
+    const S = { poly: P, holes: [], f: flat(h), c: flat(h + ch), sky, light: sky ? r(1, 1.15) : wild ? r(0.6, 0.8) : rm.kind === 'shrine' ? 0.62 : rm.kind === 'secret' ? 1 : r(0.55, 0.95), room: rm,
+      tex: { wall: wild ? 'cliff' : rm.kind === 'yard' ? 'wall1' : rm.kind === 'secret' ? 'wall2' : pick(['wall0', 'wall0', 'wall1']), floor: wild ? 'dirt' : rm.kind === 'yard' ? 'rock' : 'floor0', ceil: wild ? 'rock' : 'ceil' } };
+    let feat = wild ? 'wild' : rm.kind === 'hall' ? 'canal' : rm.kind === 'shrine' ? 'dais' : rm.kind === 'secret' ? 'none' : rm === start ? pick(rm.gal ? ['none', 'none'] : ['none', 'sky']) : rm.gal ? pick(['none', 'pool', 'columns', 'pit', 'none']) : rm.kind === 'yard' ? pick(['blocks', 'pool', 'none', 'blocks', 'baffles']) : pick(['pillars', 'pillars', 'dais', 'pool', 'pit', 'sky', 'none', 'columns', 'baffles', 'baffles']);
     if (feat === 'baffles' && rn < 4.2) feat = 'pillars';
     if (!sky && !rm.gal && rm.kind === 'room' && R() < 0.35) { const g = r(-0.13, 0.13), ax = R() < 0.5; S.c = { h: h + ch + 0.9, gx: ax ? g : 0, gy: ax ? 0 : g, ox: rm.cx, oy: rm.cy }; }
     if (rm.kind === 'room' && !rm.gal && rm !== start && R() < 0.15) { const g = r(-0.07, 0.07), ax = R() < 0.5; S.f = { h, gx: ax ? g : 0, gy: ax ? 0 : g, ox: rm.cx, oy: rm.cy }; if (feat !== 'pillars') feat = 'none'; }
@@ -472,6 +588,18 @@ function genLevel(seed, lv) {
       }
     }
     else if (feat === 'blocks') { const n = ri(2, 3), a0 = r(0, TAU); for (let k = 0; k < n; k++) { const a = a0 + (k * TAU) / n, d = rn * 0.52, s = r(0.8, 1.4); S.holes.push(cw(box(rm.cx + Math.cos(a) * d - s, rm.cy + Math.sin(a) * d - s, rm.cx + Math.cos(a) * d + s, rm.cy + Math.sin(a) * d + s))); } }
+    else if (feat === 'wild') {
+      // rough ground: rock shelves a step or two up, boulders, a pond; kept clear of the doorways and the middle
+      const mouths = rm.ports.map((q) => q.mid), put2 = [], blob = (x, y, rr, n = 12) => { const ph = r(0, TAU); return Array.from({ length: n }, (_, k) => { const t = (k / n) * TAU, q = rr * (0.82 + 0.18 * Math.sin(t * 2 + ph) * Math.cos(t * 3 - ph)); return [x + Math.cos(t) * q, y + Math.sin(t) * q]; }); };
+      const [di, dj] = rm.ext || [0, 0], ex0 = rm.cx + (di < 0 ? -rm.a - CELL : -rm.a), ex1 = rm.cx + (di > 0 ? rm.a + CELL : rm.a), ey0 = rm.cy + (dj < 0 ? -rm.b - CELL : -rm.b), ey1 = rm.cy + (dj > 0 ? rm.b + CELL : rm.b);
+      const room4 = (x, y, rr) => { for (let k = 0; k < 12; k++) { const t = (k / 12) * TAU; if (!inPoly(P, x + Math.cos(t) * (rr + 1.3), y + Math.sin(t) * (rr + 1.3))) return false; } return mouths.every(([mx, my]) => Math.hypot(mx - x, my - y) > rr + 3.2) && put2.every(([qx, qy, qr]) => Math.hypot(qx - x, qy - y) > rr + qr + 1.8) && Math.hypot(x - rm.cx, y - rm.cy) > rr + 1.6; };
+      const spot = (rr) => { for (let t = 0; t < 40; t++) { const x = r(ex0, ex1), y = r(ey0, ey1); if (room4(x, y, rr)) { put2.push([x, y, rr]); return [x, y]; } } return null; };
+      const rk = { floor: 'rock', riser: 'cliff', wall: 'cliff' };
+      for (let k = 0, n = rm.ext ? ri(2, 3) : ri(1, 2); k < n; k++) { const rr = r(1.7, 2.6), q = spot(rr); if (q) nest(S, R() < 0.55 ? [{ p: blob(q[0], q[1], rr), h: h + 0.45, tex: rk }, { p: blob(q[0], q[1], rr * 0.55, 10), h: h + 0.9, tex: rk }] : [{ p: blob(q[0], q[1], rr), h: h + 0.42, tex: rk }]); }
+      for (let k = 0, n = rm.ext ? ri(3, 5) : ri(2, 3); k < n; k++) { const rr = r(0.6, 1.3), q = spot(rr); if (q) S.holes.push(cw(blob(q[0], q[1], rr, 9))); }
+      if (R() < 0.55) { const rr = r(1.8, 2.6), q = spot(rr); if (q) nest(S, [{ p: blob(q[0], q[1], rr, 14), h: h - 0.35, liq: true, tex: { floor: 'liquid' }, light: S.light * 0.85 }]); }
+      rm.wildSpots = put2;
+    }
     else if (feat === 'canal') {
       // room over room: a sunken canal with steps at one end and a railed bridge across it
       const along = R() < 0.5, M = along ? (u, v) => [rm.cx + u, rm.cy + v] : (u, v) => [rm.cx + v, rm.cy + u];
@@ -481,6 +609,15 @@ function genLevel(seed, lv) {
       for (const s of [-1, 1]) slabs.push({ poly: q(-w, yb + s * bw - 0.07, w, yb + s * bw + 0.07), b: h - 0.3, t: h + 0.85, tex: 'metal', light: S.light, rail: true });
       for (let k = 1; k <= 5; k++) slabs.push({ poly: q(-w, ext - k * 0.65, w, ext - (k - 1) * 0.65), b: h - D, t: h - (k * D) / 6, tex: 'step', light: S.light * 0.8 });
       rm.bridge = { x: M(0, yb)[0], y: M(0, yb)[1], z: h };
+    }
+    if (rm.ext && rm.kind === 'yard') {
+      // a courtyard's far end: a rampart up a stair, railed along its edge, to look out over the yard from
+      const [di, dj] = rm.ext, U1 = (di ? rm.a : rm.b) + CELL, V = di ? rm.b : rm.a, M = (u, v) => [rm.cx + di * u - dj * v, rm.cy + dj * u + di * v];
+      const q = (u0, v0, u1, v1) => ccw([M(u0, v0), M(u1, v0), M(u1, v1), M(u0, v1)]), dw = 1.7, zt = h + 2.35, zb = zt - 0.25, n = 6, sl = 0.62, lt = S.light;
+      slabs.push({ poly: q(U1 - dw, -V, U1, V), b: zb, t: zt, tex: 'plank', light: lt });
+      slabs.push({ poly: q(U1 - dw - 0.12, -V + 1.3, U1 - dw, V), b: zb, t: zt + 0.85, tex: 'metal', light: lt, rail: true });
+      for (let k = 1; k <= n; k++) slabs.push({ poly: q(U1 - dw - (n - k + 1) * sl, -V, U1 - dw - (n - k) * sl, -V + 1.3), b: h, t: h + (k * (zt - h)) / n, tex: 'step', light: lt * 0.9 });
+      rm.walk = { z: zt, x: M(U1 - dw / 2, 0)[0], y: M(U1 - dw / 2, 0)[1] };
     }
     if (rm.gal) {
       // the walkway over two metres up, round three walls with a rail on its inner edge, and a stair up along the fourth
@@ -503,15 +640,16 @@ function genLevel(seed, lv) {
     if (D && D.at === 'a') { run.push({ s, e: s + 0.5, h: ha, door: true }); s += 0.5; }
     if (D && D.at === 'b') { tail = { s: e - 0.5, e, h: hb, door: true }; e -= 0.5; }
     const dh = hb - ha, len = e - s;
-    if (l.win) run.push({ s, e, h: Math.max(ha, hb) + 1.05, ch: 1.25, win: true });
+    if (l.win) { const wide = R() < 0.6; run.push({ s, e, h: Math.max(ha, hb) + (wide ? 0.95 : 1.05), ch: wide ? 2.1 : 1.25, win: true }); }
     else if (Math.abs(dh) <= 0.5) run.push({ s, e, h: Math.abs(dh) <= 0.3 ? ha : (ha + hb) / 2 });
     else if (l.ramp && Math.abs(dh) / len < 0.75) run.push({ s, e, h: ha, g: dh / len });
     else { const m = Math.ceil(Math.abs(dh) / 0.42), n = m - 1; for (let k = 0; k < n; k++) run.push({ s: k ? s + (k * len) / n : s, e: k === n - 1 ? e : s + ((k + 1) * len) / n, h: ha + (dh * (k + 1)) / m, stair: true }); }
     if (tail) run.push(tail);
+    const open = !D && !l.win && l.a.S?.sky && l.b.S?.sky;
     for (const q of run) {
       const fp = q.g ? { h: q.h, gx: l.ax === 'x' ? q.g : 0, gy: l.ax === 'y' ? q.g : 0, ox: l.ax === 'x' ? q.s : 0, oy: l.ax === 'y' ? q.s : 0 } : flat(q.h);
-      const S = { poly: quad(q.s, q.e), holes: [], f: fp, c: { ...fp, h: q.h + (q.ch || l.ch) }, light: q.win ? l.light + 0.15 : l.light, link: l, win: q.win,
-        tex: { wall: l.wall, floor: 'grate', ceil: 'ceil', riser: q.stair ? 'step' : null } };
+      const S = { poly: quad(q.s, q.e), holes: [], f: fp, c: { ...fp, h: q.h + (open ? 6 : q.ch || l.ch) }, light: open ? 1.02 : q.win ? l.light + 0.15 : l.light, link: l, win: q.win, sky: open || undefined,
+        tex: open ? { wall: 'cliff', floor: 'rock', ceil: 'ceil', riser: q.stair ? 'cliff' : null } : { wall: l.wall, floor: 'grate', ceil: 'ceil', riser: q.stair ? 'step' : null } };
       secs.push(S);
       if (q.door) {
         const t = q.h + l.ch, sl = { poly: S.poly, b: q.h, t, b0: q.h, t0: t, tex: D.secret ? D.room.S.tex.wall : D.key != null ? 'doorK' : 'door', light: l.light, door: { ...D, open: 0, sec: S, x: (S.poly[0][0] + S.poly[2][0]) / 2, y: (S.poly[0][1] + S.poly[2][1]) / 2, z: q.h } };
@@ -534,7 +672,7 @@ function genLevel(seed, lv) {
   // torches on solid walls
   const lamps = [];
   for (const rm of rooms) {
-    if (rm.kind === 'yard') continue;
+    if (rm.kind === 'yard' || (rm.kind === 'wild' && rm.S.sky)) continue;
     const S = rm.S, es = S.edges.filter((e) => !e.o && e.len > 1.4 && S.poly.some((p) => p[0] === e.ax && p[1] === e.ay));
     for (let k = 0; k < (rm.kind === 'shrine' ? 4 : ri(1, 3)) && es.length; k++) {
       const e = es.splice(Math.floor(R() * es.length), 1)[0], x = (e.ax + e.bx) / 2 + e.nx * 0.3, y = (e.ay + e.by) / 2 + e.ny * 0.3;
@@ -772,7 +910,7 @@ export class HellMaze extends Game {
     this.arms = [rollArm(this.rng, this.rng() < 0.75 ? 'pistol' : 'tooth', this.rng() < 0.6), ...sh(pool).map((k) => rollArm(this.rng, k))];
     this.relicImg = this.skin.pick('relic', 'item', 'ball');
     this.ammoImg = this.arms.map((a, i) => this.skin.pick(`ammo${i}`, 'item', 'ball'));
-    this.crew = ROLES.map((ro, k) => { const m = horror((s * 13 + k * 101) >>> 0, ro.px, { kind: ro.kind, tier: 1 }); return { ...ro, m, fly: ro.fly || !!m.floats, name: m.name }; });
+    this.crew = ROLES.map((ro, k) => { let m = null; const c = { ...ro, fly: !!ro.fly }; Object.defineProperty(c, 'm', { get: () => (m ||= horror((s * 13 + k * 101) >>> 0, ro.px, { kind: ro.kind, tier: 1 })), enumerable: true }); Object.defineProperty(c, 'name', { get: () => c.m.name, enumerable: true }); return c; });
     this.knowSecret = this.rng() < 0.6;
     loadThree().then(() => { this.ready = true; }).catch((e) => { this.failed = String(e?.message || e); });
     this.newLevel(true);
@@ -817,7 +955,7 @@ export class HellMaze extends Game {
   }
   addFoe(ro, x, y, z, mul = 1) {
     const size = ro.size * this.S;
-    const f = { ...ro, x, y, z: z + (ro.fly ? 1.4 : 0), vz: 0, kx: 0, ky: 0, hp: ro.hp * mul, max: ro.hp * mul, size, rad: Math.min(0.65, size * 0.2), ht: size * 0.78, awake: false, cd: this.r(0.5, 2), anim: this.r(0, 3), face: 1, ang: this.r(0, TAU), actT: 0, hitT: 0, blind: 0, losT: this.r(0, 0.3), los: false, fireAt: 0, sec: this.wd.sAt(x, y, null), id: (this.fid = (this.fid || 0) + 1), hover: this.r(1.1, 2) };
+    const f = { ...ro, x, y, z: z + (ro.fly ? 1.4 : 0), vz: 0, kx: 0, ky: 0, hp: ro.hp * mul, max: ro.hp * mul, size, rise: 1, cst: null, cT: 0, rad: Math.min(0.65, size * 0.2), ht: size * 0.78, awake: false, cd: this.r(0.5, 2), anim: this.r(0, 3), face: 1, ang: this.r(0, TAU), actT: 0, hitT: 0, blind: 0, losT: this.r(0, 0.3), los: false, fireAt: 0, sec: this.wd.sAt(x, y, null), id: (this.fid = (this.fid || 0) + 1), hover: this.r(1.1, 2) };
     this.foes.push(f);
     return f;
   }
@@ -826,7 +964,17 @@ export class HellMaze extends Game {
     const sd = wd.bfs(wd.nodeAt(this.p.x, this.p.y, this.p.z, 4), false, null, 'spawn').dist;
     const rooms = L.rooms.filter((rm) => rm !== L.start && rm !== L.secret), far = (v) => sd[v] < 0 || sd[v] > 18;
     const n = Math.round((3 + L.rooms.length * 0.55 + this.level * 1.5) * (this.mods.swarm ? 1.7 : 1)), mul = 1 + this.level * 0.15;
-    for (let i = 0; i < n; i++) { const v = wd.randomNode(R, pick(rooms), far); if (v >= 0) this.addFoe(this.crew[i % 7 === 6 ? 4 : pick([0, 0, 1, 2, 3, 5, 0, 1])], ...wd.nodeXY(v), mul); }
+    // who haunts this level: the old garrison and three or four of the second wave (more, deeper down)
+    const fresh = ROLES.map((_, k) => k).filter((k) => k >= 6 && ROLES[k].lvl <= this.level + 1);
+    for (let i = fresh.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [fresh[i], fresh[j]] = [fresh[j], fresh[i]]; }
+    const wave = fresh.slice(0, Math.min(fresh.length, 3 + (this.level >= 2 ? 1 : 0))), cast = [0, 0, 0, 1, 1, 2, 3, 5, ...wave, ...wave];
+    this.cast = [...new Set([...cast, 4, ...(wave.includes(11) ? [9] : [])])];
+    for (let i = 0; i < n; i++) {
+      const v = wd.randomNode(R, pick(rooms), far); if (v < 0) continue;
+      const ro = this.crew[i % 7 === 6 ? 4 : pick(cast)], [x, y, z] = wd.nodeXY(v);
+      if (ro.pack) { for (let k = 0, m = 3 + Math.floor(R() * 3); k < m; k++) { const f = this.addFoe(ro, x + this.r(-0.8, 0.8), y + this.r(-0.8, 0.8), z, mul); wd.collide(f, f.rad, 0.6, STEP); } }
+      else { const f = this.addFoe(ro, x, y, z, mul); if (ro.burrow) f.under = true; }
+    }
     const bv = wd.randomNode(R, L.exit); if (bv >= 0) this.addFoe(this.boss(), ...wd.nodeXY(bv), 1 + this.level * 0.25);
     this.total = this.foes.length;
     const item = (kind, v, o) => { if (v < 0) return; const [x, y, z] = wd.nodeXY(v); this.items.push({ kind, x, y, z, bob: this.r(0, 6), sec: wd.sAt(x, y, null), ...o }); };
@@ -839,7 +987,7 @@ export class HellMaze extends Game {
     for (let i = 0; i < 3 + rooms.length / 2; i++) item('ammo', wd.randomNode(R, pick(rooms)), { w: pick(ammoW) });
     if (L.secret) for (const k of ['armor', 'health', 'ammo', 'ammo']) item(k, wd.randomNode(R, L.secret), { w: pick(ammoW), secret: true });
     // the furniture of the place: crates, barrels, corpses, candles and skulls
-    this.barrels = [];
+    this.barrels = []; this.treeN = 0;
     const roomsReached = () => { const d = wd.bfs(wd.nodeAt(this.p.x, this.p.y, this.p.z, 4), false, null, 'spawn').dist, got = new Set(); for (let k = 0; k < d.length; k++) if (d[k] >= 0) { const [x, y] = wd.nodeXY(k), s = wd.sAt(x, y, null); if (s?.room) got.add(s.room); } return got.size; }, reached = roomsReached();
     const taken = [...this.items, ...this.foes].map((o) => [o.x, o.y]), free = (x, y, r) => taken.every(([a, b]) => Math.hypot(a - x, b - y) > r) && Math.hypot(x - this.p.x, y - this.p.y) > 3;
     // never in a doorway (a crate there would wall off everything beyond it)
@@ -866,8 +1014,18 @@ export class HellMaze extends Game {
         const v = wd.randomNode(R, rm); if (v < 0) continue;
         const [x, y, z] = wd.nodeXY(v), kind = ['corpse', 'corpse', 'candles', 'skulls'][Math.floor(R() * 4)];
         if (!free(x, y, 0.9)) continue;
-        this.deco.push({ x, y, z, kind, dir: Math.floor(R() * 8), m: this.crew[Math.floor(R() * this.crew.length)].m, ph: R() * 6, sec: wd.sAt(x, y, null) });
+        this.deco.push({ x, y, z, kind, dir: Math.floor(R() * 8), m: this.crew[this.cast[Math.floor(R() * this.cast.length)]].m, ph: R() * 6, sec: wd.sAt(x, y, null) });
         if (kind === 'corpse') this.pool(x, y, z, this.goreOf(this.crew[0].m), this.r(0.8, 1.5));
+      }
+      // wild places: dead trees (their trunks are in the way), heads on stakes, heaps of stones
+      if (rm.kind === 'wild') for (let k = 0, n = 3 + Math.floor(R() * 4); k < n; k++) {
+        const v = wd.randomNode(R, rm); if (v < 0) continue;
+        const [x, y, z] = wd.nodeXY(v), kind = k < n - 2 ? 'deadtree' : R() < 0.6 ? 'stake' : 'stones';
+        if (!free(x, y, 1.4) || !clear(x, y, 2.6) || (kind === 'deadtree' && wd.near(x, y, z, 0.8))) continue;
+        taken.push([x, y]);
+        const d = { x, y, z, kind, v: Math.floor(R() * 3), sec: wd.sAt(x, y, null), ph: R() * 6 };
+        if (kind === 'deadtree') { d.sl = { poly: box(x - 0.22, y - 0.22, x + 0.22, y + 0.22), b: z, t: z + 3.2, tex: 'plank', light: 0.6 }; wd.addSlab(d.sl); this.treeN = (this.treeN || 0) + 1; }
+        this.deco.push(d);
       }
       // carcasses on hooks under the ceiling, dripping into a pool
       const S0 = rm.S, nH = !S0.sky && rm !== L.start && rm.kind !== 'secret' ? (R() < 0.55 ? 1 + Math.floor(R() * 3) : 0) : 0;
@@ -879,7 +1037,7 @@ export class HellMaze extends Game {
         this.pool(x, y, z, this.goreOf(this.crew[0].m), this.r(0.5, 0.9));
       }
       // old blood smeared on the walls and dragged across the floor
-      const g0 = this.goreOf(this.crew[Math.floor(R() * this.crew.length)].m);
+      const g0 = this.goreOf(this.crew[this.cast[Math.floor(R() * this.cast.length)]].m);
       for (let k = 0; k < (rm.kind === 'shrine' ? 5 : 2); k++) { const v = wd.randomNode(R, rm); if (v < 0) continue; const [x, y, z] = wd.nodeXY(v), a = R() * TAU; this.wallSplat(x, y, z + this.r(0.6, 1.8), Math.cos(a), Math.sin(a), { blood: mixc(g0.blood, [0, 0, 0], 0.35) }, this.r(0.7, 1.4), 6); }
       if (R() < 0.35) { const v = wd.randomNode(R, rm); if (v >= 0) { const [x, y, z] = wd.nodeXY(v), a = R() * TAU; for (let q = 0; q < 7; q++) this.decal(x + Math.cos(a) * q * 0.35, y + Math.sin(a) * q * 0.35, z, null, mixc(g0.blood, [0, 0, 0], 0.45), 0.42 - q * 0.03); } }
       // a pair of eyes in a dark corner: they watch, they blink, and they are gone when you come close
@@ -888,17 +1046,17 @@ export class HellMaze extends Game {
         if (v >= 0) { const [x, y, z] = wd.nodeXY(v); this.deco.push({ x, y, z: z + this.r(1.2, 1.9), kind: 'eyes', ph: R() * 6, a: 0, sec: wd.sAt(x, y, null), col: R() < 0.6 ? '#ff2a10' : '#ffd23a' }); }
       }
     }
-    if (this.vox.crates.length || this.barrels.length) {
+    if (this.vox.crates.length || this.barrels.length || this.treeN) {
       wd.buildNav();
       // and every room can still be reached: furniture that walls one off goes, the nearest a doorway first
-      const near = (o) => Math.min(...mouths.map(([a, b]) => Math.hypot(a - o.x, b - o.y))), stuff = [...this.vox.crates.map((C) => ({ x: C.x0 + C.nx * VX / 2, y: C.y0 + C.ny * VX / 2, o: C })), ...this.barrels.map((q) => ({ x: q.x, y: q.y, o: q }))].sort((a, b) => near(a) - near(b));
+      const near = (o) => Math.min(...mouths.map(([a, b]) => Math.hypot(a - o.x, b - o.y))), stuff = [...this.vox.crates.map((C) => ({ x: C.x0 + C.nx * VX / 2, y: C.y0 + C.ny * VX / 2, o: C })), ...this.barrels.map((q) => ({ x: q.x, y: q.y, o: q })), ...this.deco.filter((d) => d.sl).map((d) => ({ x: d.x, y: d.y, o: d }))].sort((a, b) => near(a) - near(b));
       while (stuff.length && roomsReached() < reached) { const { o } = stuff.shift(); o.gone = true; o.sl.t = o.sl.b = -99; wd.buildNav(); }
     }
     this.lamps = L.lamps.map((l) => ({ ...l, sec: wd.sAt(l.x, l.y, null), ph: this.r(0, 6), dying: this.rng() < 0.28 }));
     const top = L.exit.top || L.exit.S;
     this.exitPos = { x: L.exit.cx, y: L.exit.cy, z: fz(top, L.exit.cx, L.exit.cy), sec: top };
   }
-  exitOK() { return this.foes.filter((f) => f.hp > 0).length <= this.total * 0.3 || this.lvT > 150; }
+  exitOK() { return this.foes.filter((f) => f.hp > 0 && !f.summoned).length <= this.total * 0.3 || this.lvT > 150; }
   canUse(i) { return this.owned[i] && this.ammo[i] > 0 && !(this.arms[i].k === 'flail' && this.skullOut); }
 
   // ------------------------------------------------------------------ simulation
@@ -968,12 +1126,13 @@ export class HellMaze extends Game {
         if (f.hp <= 0) { this.killFoe(f, 12, 0, 0, 'fire'); continue; }
       }
       const dx = p.x - f.x, dy = p.y - f.y, dist = Math.hypot(dx, dy) || 0.01, ux = dx / dist, uy = dy / dist;
+      if (f.under || f.charge || f.leap || f.beam || f.summon || f.burst) { if (this.foeSpecial(f, dt, dist, ux, uy)) continue; }
       f.losT -= dt;
       if (f.losT <= 0) { f.losT = 0.25 + this.rng() * 0.15; f.los = !this.dead && dist < 22 && wd.los(f.x, f.y, f.z + f.ht * 0.8, p.x, p.y, pe); if (f.los && dist < 16) f.awake = true; }
       let mx = 0, my = 0;
       if (f.awake && f.actT <= 0 && !this.dead) {
         if (f.blind > 0) { mx = Math.cos(f.anim * 1.7 + f.id); my = Math.sin(f.anim * 1.3 + f.id * 2); }
-        else if (f.los && (f.ranged ? dist > 7 : dist > f.rad + PR + 0.3)) { mx = ux; my = uy; }
+        else if (f.los && (f.ranged ? dist > (f.mortar || f.summon ? 10 : 7) : dist > f.rad + PR + 0.3)) { mx = ux; my = uy; }
         else if (f.los && f.ranged) { const sw = Math.sin(f.anim * 0.9 + f.id); mx = -uy * sw - (dist < 4 ? ux : 0); my = ux * sw - (dist < 4 ? uy : 0); }
         else if (!f.los) {
           const v = this.flow ? wd.nodeAt(f.x, f.y, f.fly ? f.z - f.hover : f.z, 2) : -1, nx = v >= 0 && this.flow.dist[v] > 0 ? this.flow.prev[v] : -1;
@@ -982,12 +1141,15 @@ export class HellMaze extends Game {
         }
       }
       if (f.awake && !this.dead && f.blind <= 0 && f.actT <= 0 && f.cd <= 0) {
-        if (f.melee && dist < f.rad + PR + 0.6 && Math.abs(p.z - f.z) < 1.6) { f.actT = 0.5; f.act = 'bite'; f.cd = f.heavy ? 1.3 : 0.85; f.fireAt = this.t + 0.22; }
+        if (f.burst && dist < 2.1 && Math.abs(p.z - f.z) < 1.4 && f.los) { f.actT = 0.7; f.act = 'swell'; f.cd = 9; f.fireAt = this.t + 0.6; }
+        else if (f.melee && dist < f.rad + PR + 0.6 && Math.abs(p.z - f.z) < 1.6) { f.actT = 0.5; f.act = 'bite'; f.cd = f.heavy ? 1.3 : 0.85; f.fireAt = this.t + 0.22; }
         else if (f.ranged && f.los && dist < 18 && dist > 1.4) { f.actT = 0.65; f.act = 'spit'; f.cd = this.r(1.5, 2.8) * (f.heavy ? 1.2 : 1); f.fireAt = this.t + 0.3; }
       }
       if (f.fireAt && this.t >= f.fireAt) {
         f.fireAt = 0;
-        if (f.act === 'bite') { if (dist < f.rad + PR + 0.9 && Math.abs(p.z - f.z) < 1.8) this.hitPlayer(f.melee * (1 + this.level * 0.1)); }
+        if (f.act === 'bite') { if (dist < f.rad + PR + 0.9 && Math.abs(p.z - f.z) < 1.8) { this.hitPlayer(f.melee * (1 + this.level * 0.1)); if (f.knock) { p.vx += ux * f.knock; p.vy += uy * f.knock; this.shake = Math.max(this.shake || 0, 0.3); } } }
+        else if (f.act === 'swell') { this.burstFoe(f); continue; }
+        else if (f.mortar) this.lob(f, dist);
         else {
           const g = this.goreOf(f.m), col = g.glow || mixc(g.blood, [1, 0.9, 0.4], 0.35), sz = f.z + f.ht * 0.7, n = f.heavy ? 3 : 1;
           for (let k = 0; k < n; k++) {
@@ -1018,16 +1180,130 @@ export class HellMaze extends Game {
         const d = Math.sqrt(d2), k = (rr - d) / d / 2; a.x -= dx * k; a.y -= dy * k; b.x += dx * k; b.y += dy * k;
       }
       const dx = a.x - this.p.x, dy = a.y - this.p.y, rr = a.rad + PR, d2 = dx * dx + dy * dy;
-      if (d2 < rr * rr && d2 > 1e-6 && Math.abs(a.z - this.p.z) < 1.5) { const d = Math.sqrt(d2), k = (rr - d) / d; a.x += dx * k; a.y += dy * k; }
+      if (!a.under && d2 < rr * rr && d2 > 1e-6 && Math.abs(a.z - this.p.z) < 1.5) { const d = Math.sqrt(d2), k = (rr - d) / d; a.x += dx * k; a.y += dy * k; }
     }
   }
+  // ------------------------------------------------------------------ the second wave's own ways
+  // true when the foe's whole turn was handled here
+  foeSpecial(f, dt, dist, ux, uy) {
+    const p = this.p, wd = this.wd, sees = () => (f.losT2 = (f.losT2 || 0) - dt) > 0 ? f.los2 : (f.losT2 = 0.25, f.los2 = wd.los(f.x, f.y, f.z + f.ht * 0.7, p.x, p.y, p.eye - 0.1));
+    const move = (vx, vy, st = STEP) => { f.x += vx * dt; f.y += vy * dt; const ox = f.x, oy = f.y; wd.collide(f, f.rad, Math.min(f.ht, PH), st); f.sec = wd.sAt(f.x, f.y, f.sec); return Math.hypot(f.x - ox, f.y - oy) > Math.hypot(vx, vy) * dt * 0.5; };
+    const ground = () => { const fl = wd.floorAt(f.x, f.y, f.z, f.sec); if (f.z <= fl + 0.001 || (f.z - fl < 0.45 && f.vz <= 0)) { f.z = fl; f.vz = 0; return true; } f.vz -= 18 * dt; f.z = Math.max(fl, f.z + f.vz * dt); return false; };
+    // the worm: under the floor it goes where it likes, only a stir of dust to show; near you it bursts up
+    if (f.burrow) {
+      if (f.under) {
+        if (!f.awake) { if (dist < 16 && this.rng() < dt * 2) f.awake = true; return true; }
+        f.rise = Math.max(0, f.rise - dt * 2.4);
+        f.cT -= dt;
+        if (dist < 2.3 && f.cT <= 0 && Math.abs(p.z - f.z) < 1.2 && this.dead <= 0) { f.under = false; f.cst = 'up'; f.cT = 3.4; f.ang = Math.atan2(uy, ux); this.puff(f.x, f.y, f.z + 0.2, [0.3, 0.24, 0.18], 30, 4); this.decal(f.x, f.y, f.z, null, [0.08, 0.06, 0.05], 1.6); this.shake = Math.max(this.shake || 0, 0.25); return true; }
+        const v = this.flow ? wd.nodeAt(f.x, f.y, f.z, 2) : -1, nx = v >= 0 && this.flow.dist[v] > 0 ? this.flow.prev[v] : -1;
+        let mx = ux, my = uy;
+        if (nx >= 0 && dist > 3) { const [tx, ty, tz] = wd.nodeXY(this.flow.prev[nx] >= 0 ? this.flow.prev[nx] : nx); mx = tx - f.x; my = ty - f.y; const l = Math.hypot(mx, my) || 1; mx /= l; my /= l; f.z += (tz - f.z) * Math.min(1, dt * 6); }
+        move(mx * f.speed * 1.3, my * f.speed * 1.3, 1.2);
+        if (this.rng() < dt * 9) this.puff(f.x + this.r(-0.3, 0.3), f.y + this.r(-0.3, 0.3), f.z + 0.05, [0.28, 0.22, 0.17], 2, 1.2);
+        return true;
+      }
+      f.rise = Math.min(1, f.rise + dt * 2.2); f.cT -= dt;
+      f.ang += angTo(f.ang, Math.atan2(uy, ux)) * Math.min(1, dt * 5);
+      if (f.cT <= 0 || (dist > 6 && f.cT < 2.4)) { f.under = true; f.cT = 1.6; f.actT = 0; this.puff(f.x, f.y, f.z + 0.2, [0.3, 0.24, 0.18], 18, 3); return true; }
+      if (f.rise >= 1 && f.actT <= 0 && f.cd <= 0 && dist < f.rad + PR + 1.1) { f.actT = 0.5; f.act = 'bite'; f.cd = 0.9; f.fireAt = this.t + 0.25; }
+      if (f.fireAt && this.t >= f.fireAt) { f.fireAt = 0; if (dist < f.rad + PR + 1.4) this.hitPlayer(f.melee * (1 + this.level * 0.1)); }
+      return true;
+    }
+    if (!f.awake || this.dead > 0) return false;
+    // the charger: a stamp and a lowered head, then a straight run; a wall stops it cold
+    if (f.charge) {
+      if (f.cst === 'wind') { f.cT -= dt; f.actT = 0.2; f.act = 'bite'; if (f.cT <= 0) { f.cst = 'run'; f.cT = 1.5; } return true; }
+      if (f.cst === 'run') {
+        f.cT -= dt; f.moving = true; f.anim += dt * 1.6;
+        const free = move(f.cdx * 9.5, f.cdy * 9.5); ground();
+        if (this.rng() < dt * 20) this.puff(f.x, f.y, f.z + 0.1, [0.3, 0.25, 0.2], 2, 1.5);
+        if (dist < f.rad + PR + 0.45 && Math.abs(p.z - f.z) < 1.5) { this.hitPlayer(f.charge * (1 + this.level * 0.1)); p.vx += f.cdx * 10; p.vy += f.cdy * 10; this.shake = Math.max(this.shake || 0, 0.5); f.cst = 'rest'; f.cT = 0.8; f.cd = 3; }
+        else if (!free) { f.cst = 'stun'; f.cT = 1.3; f.cd = 3; this.shake = Math.max(this.shake || 0, 0.2); this.puff(f.x + f.cdx * f.rad, f.y + f.cdy * f.rad, f.z + f.ht * 0.5, [0.5, 0.45, 0.4], 14, 3); }
+        else if (f.cT <= 0) { f.cst = 'rest'; f.cT = 0.6; f.cd = 2.5; }
+        return true;
+      }
+      if (f.cst === 'stun' || f.cst === 'rest') { f.cT -= dt; f.moving = false; f.hitT = f.cst === 'stun' ? Math.max(f.hitT, 0.05) : f.hitT; ground(); if (f.cT <= 0) f.cst = null; return true; }
+      if (f.cd <= 0 && dist > 3.5 && dist < 15 && Math.abs(p.z - f.z) < 1 && sees()) { f.cst = 'wind'; f.cT = 0.55; f.cdx = ux; f.cdy = uy; f.ang = Math.atan2(uy, ux); return true; }
+      return false;
+    }
+    // the leaper: a crouch, then a long arc down onto you
+    if (f.leap) {
+      if (f.cst === 'crouch') { f.cT -= dt; f.actT = 0.3; f.act = 'bite'; if (f.cT <= 0) { const T = clamp(dist / 7.5, 0.45, 1.2); f.cst = 'air'; f.lvx = (dx2(p, f) / T); f.lvy = (dy2(p, f) / T); f.vz = (p.z - f.z + 0.5 * 18 * T * T) / T; f.z += 0.06; } return true; }
+      if (f.cst === 'air') {
+        f.actT = 0.2; move(f.lvx, f.lvy, 0.3);
+        if (ground()) { f.cst = null; f.cd = 2.6; this.puff(f.x, f.y, f.z + 0.1, [0.3, 0.25, 0.2], 10, 2.5); if (dist < f.rad + PR + 0.9 && Math.abs(p.z - f.z) < 1.4) { this.hitPlayer(f.melee * 1.4 * (1 + this.level * 0.1)); this.shake = Math.max(this.shake || 0, 0.25); } }
+        return true;
+      }
+      if (f.cd <= 0 && dist > 3.5 && dist < 9.5 && Math.abs(p.z - f.z) < 2 && sees()) { f.cst = 'crouch'; f.cT = 0.35; f.ang = Math.atan2(uy, ux); return true; }
+      return false;
+    }
+    // the watcher: it fixes on you, a red thread drawn tight while it charges, then the beam
+    if (f.beam) {
+      if (f.cst === 'aim') {
+        f.cT -= dt; f.actT = 0.3; f.act = 'spit';
+        const ex = f.x + Math.cos(f.ang) * f.rad, ey = f.y + Math.sin(f.ang) * f.rad, ez = f.z + f.ht * 0.6;
+        if (f.cT > 0.35) { f.aim = [p.x + p.vx * 0.15, p.y + p.vy * 0.15, p.eye - 0.25]; f.ang = Math.atan2(f.aim[1] - f.y, f.aim[0] - f.x); }
+        const a = f.aim, L = Math.hypot(a[0] - ex, a[1] - ey, a[2] - ez) || 1, far = [ex + ((a[0] - ex) / L) * 26, ey + ((a[1] - ey) / L) * 26, ez + ((a[2] - ez) / L) * 26], h = wd.hitWall(ex, ey, ez, ...far), end = h ? [h.x, h.y, h.z] : far;
+        this.bolts.push({ pts: [[ex, ey, ez], end], life: dt * 1.5, beam: true, col: f.cT < 0.25 ? 'rgba(255,60,40,.95)' : 'rgba(255,30,20,.45)', w: f.cT < 0.25 ? 2 : 1 });
+        if (f.cT <= 0) {
+          f.cst = null; f.cd = this.r(3, 4.5);
+          this.bolts.push({ pts: [[ex, ey, ez], end], life: 0.18, beam: true, col: '#ffd0b0', w: 4 });
+          // did it catch you? the nearest point of the beam to your chest
+          const vx = end[0] - ex, vy = end[1] - ey, l2 = vx * vx + vy * vy || 1, tq = clamp(((p.x - ex) * vx + (p.y - ey) * vy) / l2, 0, 1), qx = ex + vx * tq, qy = ey + vy * tq;
+          if (Math.hypot(p.x - qx, p.y - qy) < PR + 0.3 && this.dead <= 0) { this.hitPlayer(f.beam * (1 + this.level * 0.1)); this.puff(p.x, p.y, p.eye - 0.4, [1, 0.3, 0.2], 12, 3, true); }
+          this.puff(...end, [1, 0.5, 0.3], 10, 3, true); if (h) this.decal(...end, h, [0.1, 0.02, 0.02], 0.4);
+        }
+        return true;
+      }
+      if (f.cd <= 0 && dist < 20 && f.los && sees()) { f.cst = 'aim'; f.cT = 1.0; return true; }
+      return false;
+    }
+    // the priest: raises a fallen one near it, or calls up skitters, then backs away
+    if (f.summon) {
+      if (f.cst === 'chant') {
+        f.cT -= dt; f.actT = 0.3; f.act = 'spit';
+        if (this.rng() < dt * 30) this.puff(f.x + this.r(-0.4, 0.4), f.y + this.r(-0.4, 0.4), f.z + f.ht * this.r(0.3, 1), [0.7, 0.4, 1], 1, 1, true);
+        if (f.cT <= 0) {
+          f.cst = null; f.cd = this.r(7, 10);
+          const dead = this.foes.find((o) => o.hp <= 0 && !o.gone && !o.boss && !o.raised && o !== f && Math.hypot(o.x - f.x, o.y - f.y) < 10);
+          if (dead) { dead.raised = true; dead.hp = dead.max * 0.6; dead.awake = true; dead.hitT = 0.4; dead.spurt = 0; dead.under = false; dead.summoned = true; this.puff(dead.x, dead.y, dead.z + dead.ht * 0.5, [0.8, 0.4, 1], 28, 3, true); this.say('THE DEAD RISE', 1.6); }
+          else if (this.foes.filter((o) => o.hp > 0 && o.summoned).length < 6) for (let k = 0; k < 2; k++) { const a = this.r(0, TAU), o = this.addFoe(this.crew[9], f.x + Math.cos(a) * 1.2, f.y + Math.sin(a) * 1.2, f.z, 1 + this.level * 0.15); o.awake = true; o.summoned = true; wd.collide(o, o.rad, 0.6, STEP); o.sec = wd.sAt(o.x, o.y, f.sec); this.puff(o.x, o.y, o.z + 0.3, [0.6, 0.3, 0.9], 14, 2, true); }
+        }
+        return true;
+      }
+      if (f.cd <= 0 && dist < 18 && f.los && sees()) { f.cst = 'chant'; f.cT = 1.1; return true; }
+      return false;
+    }
+    return false;
+  }
+  // a bloater bursts: acid over everything near, it and its own kind included
+  burstFoe(f) {
+    if (f.burstDone) return;
+    f.burstDone = true;
+    const p = this.p, d = Math.hypot(p.x - f.x, p.y - f.y), g = { blood: [0.42, 0.62, 0.12], glow: [0.6, 0.95, 0.2], art: this.goreOf(f.m).art };
+    if (d < 3 && Math.abs(p.z - f.z) < 1.8 && this.dead <= 0) this.hitPlayer(f.burst * (1 - d / 4.2) * (1 + this.level * 0.1));
+    for (const o of this.foes) if (o !== f && o.hp > 0 && !o.under && Math.hypot(o.x - f.x, o.y - f.y) < 3) this.hurtFoe(o, f.burst * 0.8, o.x - f.x, o.y - f.y, o.z + o.ht * 0.5, 'ink');
+    this.puff(f.x, f.y, f.z + f.ht * 0.5, [0.55, 0.85, 0.15], 46, 5, true); this.puff(f.x, f.y, f.z + f.ht * 0.5, [0.3, 0.42, 0.08], 24, 3);
+    for (let k = 0; k < 6; k++) { const a = this.r(0, TAU); this.wallSplat(f.x, f.y, f.z + f.ht * this.r(0.2, 0.8), Math.cos(a), Math.sin(a), g, this.r(0.8, 1.4), 4); }
+    this.pool(f.x, f.y, f.z, g, 2.4);
+    this.shake = Math.max(this.shake || 0, clamp(0.5 - d / 12, 0, 0.5));
+    if (f.hp > 0) { f.hp = 0; this.kills++; this.score += Math.round(f.max); }
+    this.gib(f, 0, 0);
+  }
+  // a gunner's mortar: lobbed to land where you will be
+  lob(f, dist) {
+    const p = this.p, T = clamp(dist / 9, 0.7, 1.6), tx = p.x + p.vx * T * 0.6, ty = p.y + p.vy * T * 0.6, sz = f.z + f.ht * 0.75, G = 14;
+    this.shoot('mortar', f.x + Math.cos(f.ang) * f.rad, f.y + Math.sin(f.ang) * f.rad, sz, (tx - f.x) / T, (ty - f.y) / T, (p.z + 0.2 - sz + 0.5 * G * T * T) / T, { dmg: f.mortar * (1 + this.level * 0.1), col: [1, 0.55, 0.2], r: 0.22, life: 4, grav: G, bounce: 0, splash: 2.6 });
+  }
+
   // ------------------------------------------------------------------ weapons and projectiles
   shoot(k, x, y, z, vx, vy, vz, o) { const b = { k, x, y, z, vx, vy, vz, life: 3, r: 0.12, grav: 0, bounce: 0, t: 0, spin: this.r(-9, 9), sec: this.wd.sAt(x, y, this.p.sec), ...o }; this.shots.push(b); return b; }
   autoAim(cone = 0.13) {
     const p = this.p, ez = p.eye - 0.28;
     let best = null, bs = 1e9;
     for (const f of this.foes) {
-      if (f.hp <= 0) continue;
+      if (f.hp <= 0 || f.under) continue;
       const dx = f.x - p.x, dy = f.y - p.y, d = Math.hypot(dx, dy), da = angTo(p.a, Math.atan2(dy, dx));
       if (d > 22 || Math.abs(da) > cone + 0.3 / Math.max(1, d)) continue;
       const sc = Math.abs(da) * 8 + d * 0.1;
@@ -1040,10 +1316,12 @@ export class HellMaze extends Game {
     if (!this.canUse(this.weapon)) { if (this.arms[this.weapon].k === 'flail' && this.skullOut) return; this.weapon = 0; }
     const i = this.weapon, A = this.arms[i], p = this.p;
     if (this.ammo[i] !== Infinity) this.ammo[i]--;
-    this.cool = A.rate; this.flash = 0.08; this.recoil = 1;
+    this.cool = A.rate; this.flash = A.shot === 'melee' || A.shot === 'flame' ? 0 : 0.08; this.recoil = A.k === 'chaingun' ? 0.35 : A.k === 'flamer' ? 0.15 : A.k === 'chainsaw' ? 0.25 : A.k === 'railgun' ? 1.6 : 1; this.fireT = this.t;
     for (const f of this.foes) if (!f.awake && Math.abs(f.x - p.x) < 9 && Math.abs(f.y - p.y) < 9) f.awake = true;
     const aim = this.autoAim(), ez = p.eye - 0.28, ex = p.x + Math.cos(p.a) * 0.3, ey = p.y + Math.sin(p.a) * 0.3;
     if (A.k === 'fork') return this.zap(A, aim, ex, ey, ez);
+    if (A.shot === 'rail') return this.rail(A, aim, ex, ey, ez);
+    if (A.shot === 'melee') return this.sawHit(A, aim, ex, ey, ez);
     const kind = A.shot;
     if (kind === 'rocket' || kind === 'grenade') this.shake = Math.max(this.shake || 0, 0.12);
     for (let n = 0; n < A.n; n++) {
@@ -1051,11 +1329,38 @@ export class HellMaze extends Game {
       let vz = aim ? aim.dz / t : 0;
       if (A.grav) vz += 0.5 * A.grav * this.G * t;
       if (kind === 'marble') vz = -1;
-      const life = kind === 'skull' ? 3.5 : kind === 'marble' ? 1.3 : kind === 'grenade' ? A.fuse || 1.8 : kind === 'rocket' ? 4 : 3;
-      const r = { chicken: 0.16, tooth: 0.08, bullet: 0.07, pellet: 0.06, nail: 0.07, rocket: 0.16, grenade: 0.14, plasma: 0.13 }[kind] || 0.18;
+      const life = kind === 'skull' ? 3.5 : kind === 'marble' ? 1.3 : kind === 'grenade' ? A.fuse || 1.8 : kind === 'rocket' ? 4 : kind === 'flame' ? this.r(0.45, 0.6) : kind === 'soul' ? 5 : kind === 'mine' ? 4 : 3;
+      const r = { chicken: 0.16, tooth: 0.08, bullet: 0.07, pellet: 0.06, nail: 0.07, rocket: 0.16, grenade: 0.14, plasma: 0.13, flame: 0.22, stake: 0.08, saw: 0.16, mine: 0.12, acid: 0.14, soul: 0.3, hook: 0.1 }[kind] || 0.18;
       const b = this.shoot(kind, ex, ey, ez, Math.cos(a) * sp, Math.sin(a) * sp, vz + this.r(-1, 1) * (A.spread || 0) * sp, { mine: true, dmg: A.dmg, grav: kind === 'marble' ? 10 : A.grav || 0, bounce: A.bounce || 0, life, r, hits: {}, A, pierce: A.pierce || 0 });
       if (kind === 'skull') this.skullOut = b;
+      if (kind === 'hook') this.hookOut = b;
     }
+  }
+  // the railgun: one instant line through everything in it, to the wall
+  rail(A, aim, ex, ey, ez) {
+    const p = this.p, a = p.a + (aim ? aim.da : 0), sl = aim ? aim.dz / Math.max(1, aim.d) : this.pitch || 0, far = [ex + Math.cos(a) * 34, ey + Math.sin(a) * 34, ez + sl * 34];
+    const h = this.wd.hitWall(ex, ey, ez, ...far), end = h ? [h.x, h.y, h.z] : far, L = Math.hypot(end[0] - ex, end[1] - ey) || 1;
+    for (const f of this.foes) {
+      if (f.hp <= 0 || f.under) continue;
+      const t = ((f.x - ex) * (end[0] - ex) + (f.y - ey) * (end[1] - ey)) / (L * L), qx = ex + (end[0] - ex) * t, qy = ey + (end[1] - ey) * t, qz = ez + (end[2] - ez) * t;
+      if (t < 0 || t > 1 || Math.hypot(f.x - qx, f.y - qy) > f.rad + 0.25 || qz < f.z - 0.2 || qz > f.z + f.ht + 0.2) continue;
+      this.hurtFoe(f, A.dmg, Math.cos(a), Math.sin(a), qz, 'rail');
+    }
+    this.bolts.push({ pts: [[ex, ey, ez], end], life: 0.32, beam: true, col: 'rgba(90,170,255,.55)', w: 6 }, { pts: [[ex, ey, ez], end], life: 0.24, beam: true, col: '#f0f8ff', w: 2 });
+    for (let k = 1; k < 8; k++) { const u = k / 8; this.puff(ex + (end[0] - ex) * u, ey + (end[1] - ey) * u, ez + (end[2] - ez) * u, [0.6, 0.8, 1], 2, 0.6, true); }
+    this.puff(...end, [0.7, 0.9, 1], 14, 4, true);
+    if (h) { this.decal(...end, h, [0.06, 0.08, 0.14], 0.5); this.carve(...end, A.carve, h); }
+    this.shake = Math.max(this.shake || 0, 0.2);
+  }
+  // the chainsaw: whatever is in reach in front of you, chewed
+  sawHit(A, aim, ex, ey, ez) {
+    const p = this.p;
+    let best = null, bd = 2;
+    for (const f of this.foes) { if (f.hp <= 0 || f.under) continue; const d = Math.hypot(f.x - p.x, f.y - p.y) - f.rad, da = Math.abs(angTo(p.a, Math.atan2(f.y - p.y, f.x - p.x))); if (d < bd && da < 0.65 && Math.abs(f.z - p.z) < 1.7) { bd = d; best = f; } }
+    this.shake = Math.max(this.shake || 0, 0.05);
+    if (best) { this.hurtFoe(best, A.dmg, best.x - p.x, best.y - p.y, best.z + best.ht * 0.55, 'saw'); best.kx *= 0.3; best.ky *= 0.3; return; }
+    const hx = ex + Math.cos(p.a) * 1.3, hy = ey + Math.sin(p.a) * 1.3, h = this.wd.hitWall(ex, ey, ez, hx, hy, ez);
+    if (h) { this.puff(h.x, h.y, h.z, [1, 0.85, 0.5], 3, 2, true); if (this.rng() < 0.3) this.carve(h.x, h.y, h.z, A.carve, h); }
   }
   zap(A, aim, ex, ey, ez) {
     const p = this.p, start = [ex, ey, ez];
@@ -1081,6 +1386,17 @@ export class HellMaze extends Game {
     for (const b of this.shots) {
       b.life -= dt; b.t += dt;
       if (b.k === 'hole') { this.holeStep(b, dt); continue; }
+      if (b.k === 'mineSet') {
+        if (b.life <= 0 || (this.t > b.arm && this.foes.some((f) => f.hp > 0 && !f.under && Math.hypot(f.x - b.x, f.y - b.y) < 1.7 && Math.abs(f.z - b.z) < 1.6))) { this.explode(b.x, b.y, b.z + 0.2, b.A?.splash || 3, b.dmg, {}); b.life = 0; }
+        continue;
+      }
+      if (b.k === 'flame') { b.vx *= 1 - dt * 1.2; b.vy *= 1 - dt * 1.2; b.vz += dt * 2.2; b.r = 0.22 + b.t * 0.9; }
+      if (b.k === 'soul' && (b.zapT = (b.zapT || 0) - dt) <= 0) {
+        b.zapT = 0.22;
+        let best = null, bd = 5.5;
+        for (const f of this.foes) if (f.hp > 0 && !f.under) { const d = Math.hypot(f.x - b.x, f.y - b.y); if (d < bd && this.wd.los(b.x, b.y, b.z, f.x, f.y, f.z + f.ht * 0.6)) { bd = d; best = f; } }
+        if (best) { const q = [best.x, best.y, best.z + best.ht * 0.6]; this.bolts.push({ pts: [[b.x, b.y, b.z], q], life: 0.16, col: ['rgba(140,255,200,.4)', '#e8fff0'] }); this.hurtFoe(best, b.dmg * 0.18, q[0] - b.x, q[1] - b.y, q[2], 'zap'); best.zapT = 0.2; }
+      }
       if (b.life <= 0) { this.expire(b); continue; }
       if (b.k === 'bee') this.beeSteer(b, dt);
       if (b.k === 'rocket' && (b.trail = (b.trail || 0) - dt) <= 0) { b.trail = 0.035; this.booms.push({ kind: 'smoke', x: b.x - b.vx * 0.02, y: b.y - b.vy * 0.02, z: b.z, vz: 0.4, t: 0, life: 0.7, s: 0.28, id: (this.bid = (this.bid || 0) + 1) }); this.puff(b.x, b.y, b.z, [1, 0.7, 0.3], 1, 1, true); }
@@ -1103,6 +1419,8 @@ export class HellMaze extends Game {
           continue;
         }
         if (hit.e.slab?.barrel && b.mine) this.barrelHit(hit.e.slab.barrel, b.dmg);
+        if (b.k === 'flame') { if (this.rng() < 0.15) this.decal(hit.x, hit.y, hit.z, hit, [0.05, 0.04, 0.03], 0.35); b.life = 0; continue; }
+        if (b.k === 'mine') { Object.assign(b, { k: 'mineSet', x: hit.x - b.vx * 0.01, y: hit.y - b.vy * 0.01, z: hit.z, vx: 0, vy: 0, vz: 0, arm: this.t + 0.6, life: 25 }); continue; }
         this.impact(b, hit.x - b.vx * 0.005, hit.y - b.vy * 0.005, hit.z, hit, null); b.life = 0; continue;
       }
       b.x = nx; b.y = ny; b.z = nz; b.sec = wd.sAt(b.x, b.y, b.sec);
@@ -1110,6 +1428,8 @@ export class HellMaze extends Game {
       if (b.z - b.r < fl && !b.ret) {
         if (b.k === 'marble') { b.z = fl + b.r; b.vz = 0; }
         else if (b.bounce > 0 || b.k === 'bee') { b.z = fl + b.r; b.vz = Math.abs(b.vz) * 0.55; if (b.k !== 'bee') b.bounce--; }
+        else if (b.k === 'mine') { Object.assign(b, { k: 'mineSet', z: fl + 0.05, vx: 0, vy: 0, vz: 0, arm: this.t + 0.6, life: 25 }); continue; }
+        else if (b.k === 'flame') { b.z = fl + b.r; b.vz = Math.abs(b.vz) * 0.3; }
         else { this.impact(b, b.x, b.y, fl + 0.05, null, null); b.life = 0; continue; }
       }
       if (b.z + b.r > cl && !b.ret && !b.sec?.sky) {
@@ -1118,19 +1438,41 @@ export class HellMaze extends Game {
       }
       if (b.mine) {
         for (const f of this.foes) {
-          if (f.hp <= 0 || Math.abs(f.x - b.x) > 1.6 || Math.abs(f.y - b.y) > 1.6) continue;
+          if (f.hp <= 0 || f.under || Math.abs(f.x - b.x) > 1.6 || Math.abs(f.y - b.y) > 1.6) continue;
           if (Math.hypot(f.x - b.x, f.y - b.y) < f.rad + b.r + 0.12 && b.z > f.z - 0.15 && b.z < f.z + f.ht + 0.15 && this.hitFoe(b, f)) break;
         }
       } else if (Math.hypot(p.x - b.x, p.y - b.y) < PR + b.r && b.z > p.z - 0.1 && b.z < p.z + PH + 0.1) {
+        if (b.k === 'mortar') { this.shellBurst(b); b.life = 0; continue; }
         this.hitPlayer(b.dmg); b.life = 0; this.puff(b.x, b.y, b.z, b.col, 8, 2);
       }
+      if (b.k === 'mortar' && this.rng() < dt * 30) this.puff(b.x, b.y, b.z, [1, 0.5, 0.15], 1, 0.6, true);
     }
     this.shots = this.shots.filter((b) => b.life > 0);
+    for (const q of this.acids || []) {
+      q.life -= dt;
+      for (const f of this.foes) if (f.hp > 0 && !f.under && !f.fly && Math.hypot(f.x - q.x, f.y - q.y) < q.r && Math.abs(f.z - q.z) < 0.8) this.hurtFoe(f, 12 * dt, 0, 0, f.z + 0.3, 'pull');
+      if (this.rng() < dt * 10) this.puff(q.x + this.r(-q.r, q.r) * 0.7, q.y + this.r(-q.r, q.r) * 0.7, q.z + 0.05, [0.5, 0.9, 0.2], 1, 0.6, true);
+    }
+    if (this.acids) this.acids = this.acids.filter((q) => q.life > 0);
+    for (const f of this.foes) {
+      if (!(f.hookT > 0) || f.hp <= 0) continue;
+      f.hookT -= dt;
+      const dx = p.x - f.x, dy = p.y - f.y, d = Math.hypot(dx, dy) || 1, pull = f.boss ? 2 : f.heavy ? 4 : 10;
+      f.kx = (dx / d) * pull; f.ky = (dy / d) * pull;
+      this.bolts.push({ pts: [[p.x + Math.cos(p.a) * 0.4, p.y + Math.sin(p.a) * 0.4, p.eye - 0.35], [f.x, f.y, f.z + f.ht * 0.55]], life: dt * 1.5, beam: true, col: '#6a6460', w: 2 });
+      if (d < f.rad + 1.2) { f.hookT = 0; this.hurtFoe(f, 18, -dx, -dy, f.z + f.ht * 0.5, 'saw'); }
+    }
+    const hb = this.hookOut;
+    if (hb && hb.life > 0) this.bolts.push({ pts: [[p.x + Math.cos(p.a) * 0.4, p.y + Math.sin(p.a) * 0.4, p.eye - 0.35], [hb.x, hb.y, hb.z]], life: dt * 1.5, beam: true, col: '#6a6460', w: 2 }); else this.hookOut = null;
     for (const bo of this.bolts) bo.life -= dt;
     this.bolts = this.bolts.filter((bo) => bo.life > 0);
   }
   hitFoe(b, f) {
     const k = b.k;
+    if (k === 'flame') { if (b.hits[f.id]) return false; b.hits[f.id] = 1; this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, 'fire'); if (f.hp > 0) f.burnT = this.t + (b.A?.burn || 3); return false; }
+    if (k === 'saw') { if ((b.hits[f.id] || 0) > this.t) return false; b.hits[f.id] = this.t + 0.3; this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, 'saw'); b.dmg *= 0.85; return false; }
+    if (k === 'hook') { this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, 'saw'); if (f.hp > 0) f.hookT = 0.9; b.life = 0; this.hookOut = null; return true; }
+    if (k === 'soul') { this.impact(b, b.x, b.y, b.z, null, f); b.life = 0; return true; }
     // a piercing round goes on through, once per foe
     if (b.pierce > 0 && b.mine && k !== 'rocket' && k !== 'grenade') { if (b.hits[f.id]) return false; b.hits[f.id] = 1; b.pierce--; this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, k); this.affix(b, b.x, b.y, b.z, null, f); return false; }
     if (k === 'skull') { if ((b.hits[f.id] || 0) > this.t) return false; b.hits[f.id] = this.t + 0.35; this.hurtFoe(f, b.dmg, b.vx, b.vy, b.z, k); return false; }
@@ -1141,8 +1483,17 @@ export class HellMaze extends Game {
     this.impact(b, b.x, b.y, b.z, null, f); b.life = 0;
     return true;
   }
+  // where an enemy shell lands: fire, and you hurt if you are in it
+  shellBurst(b) {
+    const p = this.p, d = Math.hypot(p.x - b.x, p.y - b.y), rad = b.splash || 2.4;
+    this.explode(b.x, b.y, b.z, rad, b.dmg * 0.5, { small: true });
+    if (d < rad && Math.abs(p.z + 0.8 - b.z) < rad && this.dead <= 0) this.hitPlayer(b.dmg * (1 - (d / rad) * 0.6));
+  }
   impact(b, x, y, z, hit, f) {
     const k = b.k, A = b.A;
+    if (k === 'mortar') { b.x = x; b.y = y; b.z = z; this.shellBurst(b); return; }
+    if (k === 'soul') { this.explode(x, y, z, A?.splash || 4, b.dmg, { hit }); this.puff(x, y, z, [0.6, 1, 0.8], 30, 6, true); return; }
+    if (k === 'acid') { const fl = this.wd.floorAt(x, y, z + 0.3, this.wd.sAt(x, y, b.sec)); (this.acids ||= []).push({ x, y, z: fl, r: 1.7, life: 4.5 }); this.pool(x, y, fl, { blood: [0.35, 0.65, 0.1], glow: true }, 1.6); this.puff(x, y, z, [0.55, 0.95, 0.2], 18, 3, true); if (hit) this.decal(x, y, z, hit, [0.3, 0.6, 0.1], 0.6, true); this.blast(x, y, z, 1.4, b.dmg, 'ink'); this.carve(x, y, z, A?.carve || 0.3, hit); return; }
     if (k === 'hive') { for (let i = 0; i < 7; i++) this.shoot('bee', x, y, z + 0.2, this.r(-4, 4), this.r(-4, 4), this.r(1, 4), { mine: true, dmg: 6, life: this.r(4.5, 6.5), r: 0.1, sec: b.sec }); this.puff(x, y, z, [0.85, 0.6, 0.2], 14, 3); this.carve(x, y, z, 0.4, hit); }
     else if (k === 'squid') { this.blast(x, y, z, 2.8, b.dmg, 'ink'); this.ink(x, y, z, hit); this.carve(x, y, z, 0.6, hit); }
     else if (k === 'relic' || k === 'rocket' || k === 'grenade') this.explode(x, y, z, A?.splash || 2.8, b.dmg, { hit });
@@ -1192,6 +1543,8 @@ export class HellMaze extends Game {
     b.vx += ((tx / l) * sp - b.vx) * k; b.vy += ((ty / l) * sp - b.vy) * k; b.vz += ((tz / l) * sp - b.vz) * k;
   }
   expire(b) {
+    if (b.k === 'soul' || b.k === 'mineSet') { if (b.k === 'mineSet') this.explode(b.x, b.y, b.z + 0.2, b.A?.splash || 3, b.dmg, {}); else this.impact(b, b.x, b.y, b.z, null, null); return; }
+    if (b.k === 'hook') { this.hookOut = null; return; }
     if (b.k === 'hive' || b.k === 'squid' || b.k === 'relic' || b.k === 'rocket' || b.k === 'grenade') this.impact(b, b.x, b.y, b.z, null, null);
     else if (b.k === 'marble') { this.makeHole(b, b.x, b.y, b.z); b.life = 3.2; }
     else if (b.k === 'skull') this.skullOut = null;
@@ -1238,7 +1591,9 @@ export class HellMaze extends Game {
   }
   // ------------------------------------------------------------------ damage and gore
   hurtFoe(f, dmg, dx, dy, hz, kind) {
-    if (f.hp <= 0) return;
+    if (f.hp <= 0 || f.under) return;
+    if (f.armor) dmg *= 1 - f.armor;
+    if (f.cst === 'stun') dmg *= 1.5;
     f.hp -= dmg; f.awake = true; f.hitT = kind === 'pull' ? f.hitT : 0.14;
     const g = this.goreOf(f.m), l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l, z = hz ?? f.z + f.ht * 0.6;
     if (kind !== 'pull' || this.rng() < 0.08) this.spray(f.x - ux * f.rad * 0.4, f.y - uy * f.rad * 0.4, z, ux, uy, g, Math.min(28, 5 + dmg * 0.8));
@@ -1247,6 +1602,7 @@ export class HellMaze extends Game {
     if (f.hp <= 0) this.killFoe(f, dmg, ux, uy, kind);
   }
   killFoe(f, dmg, ux, uy, kind) {
+    if (f.burst) { this.burstFoe(f); return; }
     this.kills++; this.score += Math.round(f.max) + (f.boss ? 500 : 0);
     const g = this.goreOf(f.m), gib = !f.boss && (dmg > f.max * 0.45 || ['relic', 'hole', 'ink'].includes(kind) || this.rng() < 0.35);
     f.dieT = this.t;
@@ -1381,7 +1737,9 @@ export class HellMaze extends Game {
     let best = 0, bs = -1;
     this.arms.forEach((A, i) => {
       if (!this.canUse(i)) return;
-      const big = f?.heavy || f?.boss, s = { pistol: 1.2, shotgun: d < 6 ? 6.5 : 1.3, nailgun: d < 14 ? 4 : 1.5, rocket: d > 4 ? 5.5 + (big ? 2 : 0) : 0.2, grenade: d > 3 && d < 11 ? 4.6 + (big ? 1 : 0) : 0.3, plasma: d < 14 ? 4.8 : 1.6, tooth: 1, chicken: d < 5 ? 6 : 1.5, hive: d > 3 ? 4 + (big ? 2 : 0) : 0.5, flail: d < 11 ? 4.5 : 1, squid: d > 2.5 && d < 11 ? 4 : 1, fork: d < 15 ? 5 : 1, marble: d > 5 && big ? 7 : d > 5 ? 2.5 : 0, relic: d > 3.5 ? 5 + (big ? 1 : 0) : 0.3 }[A.k] + ((i * 7 + this.level * 3) % 5) * 0.2;
+      const big = f?.heavy || f?.boss, s = { pistol: 1.2, shotgun: d < 6 ? 6.5 : 1.3, nailgun: d < 14 ? 4 : 1.5, rocket: d > 4 ? 5.5 + (big ? 2 : 0) : 0.2, grenade: d > 3 && d < 11 ? 4.6 + (big ? 1 : 0) : 0.3, plasma: d < 14 ? 4.8 : 1.6, tooth: 1, chicken: d < 5 ? 6 : 1.5, hive: d > 3 ? 4 + (big ? 2 : 0) : 0.5, flail: d < 11 ? 4.5 : 1, squid: d > 2.5 && d < 11 ? 4 : 1, fork: d < 15 ? 5 : 1, marble: d > 5 && big ? 7 : d > 5 ? 2.5 : 0, relic: d > 3.5 ? 5 + (big ? 1 : 0) : 0.3,
+        chaingun: d < 16 ? 5.2 : 2, flamer: d < 4.5 ? 7 : 0.2, railgun: d > 4 ? 6 + (big ? 2 : 0) : 1.5, stakegun: d < 18 ? 4.6 + (big ? 1 : 0) : 1.5, ripper: d < 12 ? 4.8 : 1.4, chainsaw: d < 1.8 ? 8 : 0.05,
+        mines: d > 2.5 && d < 7 ? 3.6 : 0.3, acid: d > 3 && d < 11 ? 4.3 : 0.5, soul: d > 4.5 ? 6 + (big ? 2 : 0) : 0.2, hook: d > 2.5 && d < 14 ? 4.4 : 0.6 }[A.k] + ((i * 7 + this.level * 3) % 5) * 0.2;
       if (s > bs) { bs = s; best = i; }
     });
     return best;
@@ -1390,7 +1748,7 @@ export class HellMaze extends Game {
     const p = this.p, ez = p.eye - 0.1;
     let best = null, bs = 1e9;
     for (const f of this.foes) {
-      if (f.hp <= 0) continue;
+      if (f.hp <= 0 || f.under) continue;
       const d = Math.hypot(f.x - p.x, f.y - p.y);
       if (d > 18 || (!f.awake && d > 12)) continue;
       const s = d + Math.abs(angTo(p.a, Math.atan2(f.y - p.y, f.x - p.x))) * 3;
@@ -1439,7 +1797,20 @@ export class HellMaze extends Game {
       bt = tc; const v = Math.sqrt(v2), side = cx * -b.vy + cy * b.vx > 0 ? -1 : 1;
       best = [(-b.vy / v) * side, (b.vx / v) * side];
     }
-    return best;
+    if (best) return best;
+    // a shell coming down near you: away from where it will land
+    for (const b of this.shots) {
+      if (b.k !== 'mortar' || b.life <= 0) continue;
+      const G = b.grav || 14, dz = b.z - p.z, tl = (b.vz + Math.sqrt(Math.max(0, b.vz * b.vz + 2 * G * dz))) / G, lx = b.x + b.vx * tl, ly = b.y + b.vy * tl, d = Math.hypot(p.x - lx, p.y - ly);
+      if (d < 3 && tl < 1.4) return d > 0.2 ? [(p.x - lx) / d, (p.y - ly) / d] : [Math.cos(p.a + Math.PI / 2), Math.sin(p.a + Math.PI / 2)];
+    }
+    // a watcher about to fire, a charger coming: out of the line
+    for (const f of this.foes) {
+      if (f.hp <= 0 || !(f.cst === 'aim' && f.cT < 0.7) && !(f.cst === 'wind' || f.cst === 'run')) continue;
+      const lx = f.cst === 'aim' ? p.x - f.x : f.cdx, ly = f.cst === 'aim' ? p.y - f.y : f.cdy, l = Math.hypot(lx, ly) || 1, side = (p.x - f.x) * -ly + (p.y - f.y) * lx > 0 ? 1 : -1;
+      if (Math.hypot(f.x - p.x, f.y - p.y) < 16) return [(-ly / l) * side, (lx / l) * side];
+    }
+    return null;
   }
   // a way to the nearest health (or armour) the player can reach, for falling back when hurt
   planHeal() {
@@ -1571,7 +1942,7 @@ export class HellMaze extends Game {
     gl.kit = {
       wall0: mk('brick', Wt[0], ph(1)), wall1: mk('stone', Wt[1], ph(2)), wall2: mk('panel', Wt[2], tiles[lv % tiles.length]), metal: mk('panel', mixc(grey, Wt[2], 0.3), ph(3)),
       floor0: mk('tile', F, ph(4)), tile: mk('tile', mixc(F, [0.95, 0.82, 0.6], 0.45), ph(4)), rock: mk('rock', mixc(F, [0.42, 0.46, 0.3], 0.5), ph(5)), grate: mk('grate', mixc(grey, F, 0.35), ph(6)),
-      ceil: mk('ceil', mixc(Wt[1], [0.42, 0.42, 0.44], 0.5), ph(7)), plank: mk('plank', [0.6, 0.42, 0.24], ph(8)), liquid: mk('liquid', M.lc, null),
+      ceil: mk('ceil', mixc(Wt[1], [0.42, 0.42, 0.44], 0.5), ph(7)), cliff: mk('cliff', mixc(Wt[1], [0.5, 0.42, 0.34], 0.45), ph(5)), dirt: mk('dirt', mixc(F, [0.4, 0.32, 0.22], 0.5), ph(4)), plank: mk('plank', [0.6, 0.42, 0.24], ph(8)), liquid: mk('liquid', M.lc, null),
       step: mk('panel', mixc(grey, Wt[0], 0.3), ph(3), (x) => { for (let i = 0; i < 64; i += 8) { x.fillStyle = '#e8c020'; x.fillRect(i, 0, 4, 5); x.fillStyle = '#161616'; x.fillRect(i + 4, 0, 4, 5); } }),
       door: mk('door', mixc(grey, Wt[2], 0.4), ph(3)), doorK: mk('door', mixc(grey, Wt[2], 0.4), ph(3), (x) => { x.fillStyle = M.key[1]; x.fillRect(6, 28, 52, 7); x.fillRect(29, 6, 6, 52); })
     };
@@ -1838,11 +2209,12 @@ export class HellMaze extends Game {
     const t = this.tex(gl, img);
     let s = gl.spr.get(key);
     if (!s) {
-      s = new T.Sprite(new T.SpriteMaterial({ map: t, alphaTest: o.add ? 0 : 0.5, transparent: !!o.add, blending: o.add ? T.AdditiveBlending : T.NormalBlending, depthWrite: !o.add, fog: true }));
+      s = new T.Sprite(new T.SpriteMaterial({ map: t, alphaTest: o.add ? 0 : 0.5, transparent: !!o.add || o.op != null, blending: o.add ? T.AdditiveBlending : T.NormalBlending, depthWrite: !o.add, fog: true }));
       s.center.set(0.5, o.mid ? 0.5 : 0); gl.scene.add(s); gl.spr.set(key, s);
     }
     if (s.material.map !== t) s.material.map = t;
     s.position.set(x, z, y); s.scale.set(w * (o.flip ? -1 : 1), h, 1); s.material.rotation = o.rot || 0;
+    if (o.op != null || s.material.opacity !== 1) { if (!s.material.transparent) { s.material.transparent = true; s.material.needsUpdate = true; } s.material.opacity = o.op ?? 1; }
     if (Array.isArray(l)) s.material.color.setRGB(l[0], l[1], l[2]); else s.material.color.setRGB(l, l, l);
     s.f = gl.frame;
     return s;
@@ -1892,6 +2264,10 @@ export class HellMaze extends Game {
       // the view of it from where you stand (Doom's eight rotations)
       const d = viewDir(f.ang, Math.atan2(this.p.y - f.y, this.p.x - f.x));
       if (f.hp <= 0) return m.view('dead', 0, d);
+      if (f.cst === 'run') return m.view('walk', Math.floor(f.anim * 12) % 4, d);
+      if (f.cst === 'wind' || f.cst === 'crouch' || f.cst === 'aim' || f.cst === 'chant') return m.view('attack', f.cst === 'aim' && f.cT < 0.3 ? 2 : 1, d);
+      if (f.cst === 'air') return m.view('attack', 2, d);
+      if (f.cst === 'stun') return m.view('hurt', 0, d);
       if (f.actT > 0) return m.view('attack', clamp(Math.floor((1 - f.actT / (f.act === 'bite' ? 0.5 : 0.65)) * 3), 0, 2), d);
       if (f.hitT > 0) return m.view('hurt', 0, d);
       if (f.moving) return m.view('walk', Math.floor(f.anim * (f.speed > 3.5 ? 9 : 6)) % 4, d);
@@ -1909,7 +2285,7 @@ export class HellMaze extends Game {
     // creature sheets are built lazily: touch one cycle per frame so the first fight does not hitch
     if (!this.warm) {
       this.warm = true;
-      const ms = [...this.crew.map((c) => c.m), ...this.foes.filter((f) => f.boss).map((f) => f.m)];
+      const ms = [...new Set(this.foes.map((f) => f.m))];
       this.warmList = ms.flatMap((m) => [() => m.anatomy, ...[0, 1, 2, 3, 4].flatMap((d) => [['idle', 0], ['idle', 1], ['walk', 0], ['walk', 1], ['walk', 2], ['walk', 3], ['attack', 0], ['attack', 1], ['attack', 2], ['hurt', 0], ['dead', 0]].map(([a, k]) => () => grimeSprite(m.view(a, k, d))))]);
     }
     if (this.warmList.length) this.warmList.shift()();   // one a frame: each is a sheet frame drawn, read back and grimed
@@ -1946,10 +2322,14 @@ export class HellMaze extends Game {
       S.bolt.visible = fl > 0.08; S.bolt.material.opacity = Math.min(1, fl * 1.6);
     }
     for (const f of this.foes) {
-      if (f.gone) continue;
+      if (f.gone || (f.under && f.rise <= 0.01)) continue;
       const im = this.frameOf(f), L = light(f.sec), dead = f.hp <= 0;
       const col = f.hitT > 0 && !dead ? [1.6, 0.45, 0.4] : f.zapT > 0 ? [0.8, 1.1, 1.8] : f.burnT > this.t && !dead ? [1.5, 0.75, 0.4] : f.blind > 0 ? [L * 0.5, L * 0.5, L * 0.75] : L * (f.boss ? 1.1 : 1);
-      this.put(gl, f, im, f.x, f.y, f.z - (dead ? 0.05 : 0) - f.size * 0.04, f.size, f.size, col, { flip: !f.m.view && f.face < 0 });
+      // a stalker is hardly there until it is close (or hurt, or striking): a shimmer in the dark
+      const near = Math.hypot(f.x - p.x, f.y - p.y), op = f.ghost && !dead ? (near < 4 || f.hitT > 0 || f.actT > 0 ? 1 : clamp(0.08 + (Math.random() < 0.06 ? 0.3 : 0) + Math.max(0, 1 - (near - 4) / 3) * 0.6, 0.06, 0.9)) : null;
+      // a worm comes up out of the floor (the floor hides what is still below it)
+      const sink = f.burrow ? (1 - f.rise) * f.size * 0.95 : 0;
+      this.put(gl, f, im, f.x, f.y, f.z - (dead ? 0.05 : 0) - f.size * 0.04 - sink, f.size, f.size, col, { flip: !f.m.view && f.face < 0, op });
     }
     for (const it of this.items) {
       if (it.got) continue;
@@ -1957,7 +2337,7 @@ export class HellMaze extends Game {
       if (k === 'health' || k === 'armor') this.put(gl, it, this.art(k), it.x, it.y, it.z + bob, 0.55, k === 'armor' ? 0.64 : 0.43, L);
       else if (k === 'key') this.put(gl, it, this.art('key', this.mood.key[1]), it.x, it.y, it.z + bob + 0.2, 0.5, 0.33, 1.2);
       else {
-        const Aw = this.arms[it.w], pi = Aw.gun ? null : { tooth: 'tooth', chicken: 'chicken', hive: 'hive', flail: 'skull', squid: 'squid', fork: 'fork', marble: 'marble', relic: 'relic' }[Aw.k];
+        const Aw = this.arms[it.w], pi = Aw.gun ? null : { tooth: 'tooth', chicken: 'chicken', hive: 'hive', flail: 'skull', squid: 'squid', fork: 'fork', marble: 'marble', relic: 'relic', acid: 'acidglob', soul: 'soulorb', hook: 'hookart' }[Aw.k];
         const png = k === 'ammo' ? this.ammoImg[it.w] : null, im = png && ready(png) ? png : pi ? this.art(pi) : this.art('gunicon', Aw.k), iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, h = k === 'gun' ? (Aw.gun ? 0.4 : 0.75) : 0.5;
         this.put(gl, it, im, it.x, it.y, it.z + bob, (h * iw) / ih, h, k === 'gun' ? [L * 1.2, L * 1.1, L * 0.8] : L);
       }
@@ -1966,6 +2346,9 @@ export class HellMaze extends Game {
       if (d.kind === 'corpse') this.put(gl, d, grimeSprite(d.m.view('dead', 0, d.dir)), d.x, d.y, d.z - 0.06, 1.8, 1.8, light(d.sec) * 0.85);
       else if (d.kind === 'candles') this.put(gl, d, this.art('candles', Math.floor(t * 6 + d.ph) % 2), d.x, d.y, d.z, 0.5, 0.58, 1.3);
       else if (d.kind === 'skulls') this.put(gl, d, this.art('skulls'), d.x, d.y, d.z, 0.72, 0.5, light(d.sec));
+      else if (d.kind === 'deadtree' && !d.gone) this.put(gl, d, grimeSprite(this.art('deadtree', d.v)), d.x, d.y, d.z - 0.05, 2.6, 4.4, light(d.sec) * 0.9);
+      else if (d.kind === 'stake') this.put(gl, d, grimeSprite(this.art('stake', d.v)), d.x, d.y, d.z, 0.55, 2.1, light(d.sec));
+      else if (d.kind === 'stones') this.put(gl, d, this.art('stones', d.v), d.x, d.y, d.z, 1.1, 0.55, light(d.sec));
       else if (d.kind === 'hang') { const sw = Math.sin(t * 0.9 + d.ph) * 0.05, h = Math.min(2.6, d.top - d.z - 0.7); this.put(gl, d, grimeSprite(this.art('hang', d.v)), d.x + sw, d.y - sw * 0.6, d.top - h, h * 0.42, h, light(d.sec) * 0.95); }
       else if (d.kind === 'eyes' && !d.gone) {
         const dd = Math.hypot(d.x - p.x, d.y - p.y), see = dd > 7.5 && dd < 22 && this.wd.los(p.x, p.y, p.eye, d.x, d.y, d.z);
@@ -1984,6 +2367,14 @@ export class HellMaze extends Game {
       const k = b.k, spin = t * b.spin;
       if (k === 'hole') this.put(gl, b, this.art('hole'), b.x, b.y, b.z, 1.7 + Math.sin(t * 9) * 0.15, 1.7, 1, { add: true, mid: true, rot: t * 6 });
       else if (k === 'spit') this.put(gl, b, this.art('ball', `rgb(${b.col.map((v) => Math.round(v * 255)).join(',')})`), b.x, b.y, b.z, b.r * 2.4, b.r * 2.4, 1.3, { mid: true });
+      else if (k === 'flame') { const u = b.t / Math.max(0.01, b.t + b.life), s2 = 0.35 + b.t * 1.8; this.put(gl, b, this.art('boom', Math.min(4, Math.floor(u * 5))), b.x, b.y, b.z, s2, s2, 1, { add: true, mid: true, rot: b.spin * b.t }); }
+      else if (k === 'stake') this.put(gl, b, this.art('stakeS'), b.x, b.y, b.z, 0.62, 0.12, light(b.sec) + 0.2, { mid: true, flip: b.vx * -Math.sin(p.a) + b.vy * Math.cos(p.a) < 0 });
+      else if (k === 'saw') this.put(gl, b, this.art('sawdisc'), b.x, b.y, b.z, 0.34, 0.34, light(b.sec) + 0.4, { mid: true, rot: t * 30 });
+      else if (k === 'mine' || k === 'mineSet') this.put(gl, b, this.art('mineS', k === 'mineSet' && this.t > b.arm && Math.floor(t * 4) % 2 ? 1 : 0), b.x, b.y, b.z, 0.32, 0.2, light(b.sec) + 0.2, { mid: k === 'mine' });
+      else if (k === 'acid') this.put(gl, b, this.art('acidglob'), b.x, b.y, b.z, 0.3, 0.3, 1.2, { mid: true, rot: spin });
+      else if (k === 'soul') this.put(gl, b, this.art('soulorb', Math.floor(t * 8) % 2), b.x, b.y, b.z, 0.9, 0.9, 1, { add: true, mid: true });
+      else if (k === 'hook') this.put(gl, b, this.art('hookart'), b.x, b.y, b.z, 0.36, 0.36, light(b.sec) + 0.2, { mid: true, rot: Math.atan2(b.vz, Math.hypot(b.vx, b.vy)) });
+      else if (k === 'mortar') this.put(gl, b, this.art('plasma'), b.x, b.y, b.z, 0.6, 0.6, [1.6, 0.7, 0.25], { add: true, mid: true });
       else if (k === 'relic') this.put(gl, b, ready(this.relicImg) ? this.relicImg : this.art('relic'), b.x, b.y, b.z, 0.45, 0.45, 1, { mid: true, rot: spin });
       else if (k === 'plasma') this.put(gl, b, this.art('plasma'), b.x, b.y, b.z, 0.42, 0.42, 1, { add: true, mid: true });
       else if (k === 'bullet' || k === 'pellet' || k === 'nail' || k === 'rocket' || k === 'grenade') {
@@ -2046,10 +2437,11 @@ export class HellMaze extends Game {
     for (const bo of this.bolts) {
       const a = this.proj(gl, ...bo.pts[0]), b = this.proj(gl, ...bo.pts[1]);
       if (!a || !b) continue;
+      if (bo.beam) { c.strokeStyle = bo.col; c.lineWidth = bo.w || 1; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); continue; }
       const pts = [a];
       for (let k = 1; k < 7; k++) { const t = k / 7, j = (Math.random() - 0.5) * 18 * Math.sin(t * Math.PI); pts.push([a[0] + (b[0] - a[0]) * t + j, a[1] + (b[1] - a[1]) * t + (Math.random() - 0.5) * 14 * Math.sin(t * Math.PI)]); }
       pts.push(b);
-      for (const [w, col] of [[6, 'rgba(90,170,255,.35)'], [2, '#e8f6ff']]) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke(); }
+      for (const [w, col] of [[6, bo.col?.[0] || 'rgba(90,170,255,.35)'], [2, bo.col?.[1] || '#e8f6ff']]) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke(); }
     }
     const s = this.skullOut;
     if (s && s.life > 0) { const q = this.proj(gl, s.x, s.y, s.z); if (q) { const ax = W / 2 + 4, ay = VH - 70; c.fillStyle = '#8a8a90'; for (let k = 1; k < 14; k++) { const t = k / 14; c.fillRect(ax + (q[0] - ax) * t - 1.5, ay + (q[1] - ay) * t - 1.5 + Math.sin(t * Math.PI) * 10, 3, 3); } } }
@@ -2061,34 +2453,41 @@ export class HellMaze extends Game {
   // That is only redone when the weapon changes (or, for the strange ones that move, a dozen times a
   // second). On the card it takes the light of where you stand and the flash of its own shots.
   drawGun(c) {
-    const A = this.arms[this.weapon], t = this.t, p = this.p, anim = !A.gun || (A.k === 'nailgun' && this.cool > A.rate * 0.6);
-    const tq = anim ? Math.floor(t * 12) / 12 : 0, cs = A.k === 'fork' ? (this.cool > 0 ? Math.floor(t * 30) % 2 : 2) : A.k === 'marble' || A.k === 'relic' ? (this.cool > 0 ? 1 : 0) + (this.cool < 0.3 ? 2 : 0) + (this.ammo[this.weapon] > 0 ? 4 : 0) : 0;
+    const A = this.arms[this.weapon], t = this.t, p = this.p, spin = t - (this.fireT ?? -9) < 0.3, anim = !A.gun || (['nailgun', 'chaingun', 'chainsaw', 'ripper'].includes(A.k) && spin);
+    const tq = anim ? Math.floor(t * 12) / 12 : 0, cs = A.k === 'fork' ? (this.cool > 0 ? Math.floor(t * 30) % 2 : 2) : A.k === 'marble' || A.k === 'relic' ? (this.cool > 0 ? 1 : 0) + (this.cool < 0.3 ? 2 : 0) + (this.ammo[this.weapon] > 0 ? 4 : 0) : ['stakegun', 'ripper', 'hook', 'mines'].includes(A.k) ? (this.cool < A.rate * 0.4 && this.ammo[this.weapon] > 0 ? 1 : 0) + (A.k === 'hook' && this.hookOut ? 2 : 0) : 0;
     const key = `${this.weapon}|${A.seed}|${tq}|${cs}|${this.skullOut ? 1 : 0}|${ready(this.relicImg) ? 1 : 0}`;
-    if (key !== this.vmKey) { this.vmKey = key; this.vmMz = this.buildGun(A, tq); this.vmG = grimeGun(this.vm, A.seed, this.vmG); }
-    const mz = this.vmMz, vl = (this.vmL ||= pc(180, 120, () => {})), x = vl.getContext('2d');
+    if (key !== this.vmKey) { this.vmKey = key; this.vmMz = this.buildGun(A, tq); this.vmG = grimeGun(this.vm, A.seed, this.vmG); this.vmW = warpGun(this.vmG, this.vmW); }
+    // lit and glowing in its laid-down form (G puts a glow given in the upright drawing's terms where it lands)
+    const mz0 = this.vmMz, fw = gunWarp(mz0[0], mz0[1]), mz = [fw[0], fw[1]], vl = (this.vmL ||= pc(180, GUN_H, () => {})), x = vl.getContext('2d');
+    const G = (col, x0, y0, w0, h0) => { const a = gunWarp(x0, y0), b = gunWarp(x0 + w0, y0 + h0); x.fillStyle = col; x.fillRect(Math.round(a[0]), Math.round(a[1]), Math.max(1, Math.round(b[0] - a[0])), Math.max(1, Math.round(b[1] - a[1]))); };
     const mv = Math.min(1, Math.hypot(p.vx, p.vy) / 3), bx = Math.sin(p.bob) * 4 * mv, by = Math.abs(Math.cos(p.bob)) * 3 * mv + this.recoil * 8 + (this.dead > 0 ? 70 : 0);
-    x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, 180, 120); x.drawImage(this.vmG, 0, 0);
+    x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, 180, GUN_H); x.drawImage(this.vmW, 0, 0);
     // the light where you stand: the room's own, guttering, warmer near a torch; then the shot's flash
     let warm = 0;
     for (const l of this.lamps || []) { const d = Math.hypot(l.x - p.x, l.y - p.y); if (d < 5) warm = Math.max(warm, 1 - d / 5); }
     const L = clamp((p.sec?.light ?? 0.8) * (0.92 + 0.06 * Math.sin(t * 7.3) + 0.04 * Math.sin(t * 17.1)) + warm * 0.25, 0.45, 1);
     x.globalCompositeOperation = 'source-atop';
-    x.fillStyle = `rgba(5,3,2,${((1 - L) * 0.6).toFixed(3)})`; x.fillRect(0, 0, 180, 120);
-    if (warm > 0) { const lc = this.mood.lamp; x.fillStyle = `rgba(${Math.round(lc[0] * 255)},${Math.round(lc[1] * 200)},${Math.round(lc[2] * 150)},${(warm * 0.16).toFixed(3)})`; x.fillRect(0, 0, 180, 120); }
+    x.fillStyle = `rgba(5,3,2,${((1 - L) * 0.6).toFixed(3)})`; x.fillRect(0, 0, 180, GUN_H);
+    if (warm > 0) { const lc = this.mood.lamp; x.fillStyle = `rgba(${Math.round(lc[0] * 255)},${Math.round(lc[1] * 200)},${Math.round(lc[2] * 150)},${(warm * 0.16).toFixed(3)})`; x.fillRect(0, 0, 180, GUN_H); }
     if (this.flash > 0 && A.k !== 'flail') {
-      const k = clamp(this.flash / 0.06, 0, 1), cool = A.k === 'fork' || A.k === 'plasma', g = x.createRadialGradient(mz[0], mz[1], 2, mz[0], mz[1], 95);
-      g.addColorStop(0, cool ? `rgba(150,215,255,${0.6 * k})` : `rgba(255,205,120,${0.6 * k})`); g.addColorStop(1, 'rgba(255,140,60,0)'); x.fillStyle = g; x.fillRect(0, 0, 180, 120);
+      const k = clamp(this.flash / 0.06, 0, 1), cool = A.k === 'fork' || A.k === 'plasma' || A.k === 'railgun', g = x.createRadialGradient(mz[0], mz[1], 1, mz[0], mz[1], 46);
+      g.addColorStop(0, cool ? `rgba(150,215,255,${0.38 * k})` : `rgba(255,205,120,${0.38 * k})`); g.addColorStop(1, 'rgba(255,140,60,0)'); x.fillStyle = g; x.fillRect(0, 0, 180, GUN_H);
     }
     x.globalCompositeOperation = 'source-over';
     // what glows on it glows whatever the light: the plasma's coils and the seeker's lamp
-    if (A.k === 'plasma') { const gl2 = 0.55 + 0.45 * Math.sin(t * 9); for (let q = 0; q < 3; q++) { x.fillStyle = `rgba(110,215,255,${(0.35 + gl2 * 0.45).toFixed(2)})`; x.fillRect(71, 67 + q * 14, 38, 2); } x.fillStyle = `rgba(190,240,255,${(0.6 + gl2 * 0.4).toFixed(2)})`; x.fillRect(83, 29, 14, 3); }
-    if (A.affixes?.includes('seek') && Math.floor(t * 4) % 2) { x.fillStyle = '#7aff5a'; x.fillRect(108, 62, 3, 3); }
-    if (A.affixes?.includes('burn')) { x.fillStyle = `rgba(255,${110 + Math.round(Math.sin(t * 13) * 40)},40,.8)`; x.fillRect(72, 100, 36, 2); }
-    c.imageSmoothingEnabled = false; c.drawImage(vl, Math.round(bx) * 2, VH - 240 + Math.round(by) * 2, 360, 240);
-    // the muzzle flash: a ragged pixel star, white-hot in the middle
+    if (A.k === 'plasma') { const gl2 = 0.55 + 0.45 * Math.sin(t * 9); for (let q = 0; q < 3; q++) G(`rgba(110,215,255,${(0.35 + gl2 * 0.45).toFixed(2)})`, 71, 67 + q * 14, 38, 2); G(`rgba(190,240,255,${(0.6 + gl2 * 0.4).toFixed(2)})`, 83, 29, 14, 3); }
+    if (A.affixes?.includes('seek') && Math.floor(t * 4) % 2) G('#7aff5a', 108, 62, 3, 3);
+    if (A.k === 'flamer') { const f2 = Math.random(); G('rgba(90,150,255,.85)', 87, 19 - Math.round(f2 * 2), 6, 3); G('rgba(255,170,60,.9)', 88, 16 - Math.round(f2 * 3), 4, 3); if (this.t - (this.fireT ?? -9) < 0.1) for (let q = 0; q < 6; q++) G('rgba(255,200,90,.9)', 84 + Math.random() * 12, 6 + Math.random() * 12, 3, 3); }
+    if (A.k === 'railgun') { const gl2 = clamp((this.t - (this.fireT ?? -9)) / A.rate, 0, 1); for (let q = 0; q < 8; q++) G(`rgba(120,210,255,${(0.25 + gl2 * 0.6).toFixed(2)})`, 77, 20 + q * 10, 26, 2); G(`rgba(200,240,255,${(0.3 + gl2 * 0.6).toFixed(2)})`, 82, 14, 16, 2); }
+    if (A.k === 'soul') { const gl2 = 0.5 + 0.5 * Math.sin(t * 5); G(`rgba(150,255,200,${(0.35 + gl2 * 0.4).toFixed(2)})`, 80, 44, 20, 26); G('rgba(10,30,20,.9)', 83, 50, 4, 5); G('rgba(10,30,20,.9)', 93, 50, 4, 5); G('rgba(10,30,20,.9)', 86, 58 + Math.round(gl2 * 2), 8, 6); }
+    if (A.k === 'mines' && Math.floor(t * 3) % 2) G('#ff3020', 89, 42, 3, 2);
+    if (A.affixes?.includes('burn')) G(`rgba(255,${110 + Math.round(Math.sin(t * 13) * 40)},40,.8)`, 72, 100, 36, 2);
+    c.imageSmoothingEnabled = false; c.drawImage(vl, Math.round(bx) * 2, VH - GUN_H * 2 + Math.round(by) * 2, 360, GUN_H * 2);
+    // the muzzle flash: a ragged pixel star, white-hot in the middle, as far off as the muzzle is
     if (this.flash > 0 && A.k !== 'flail') {
-      const fx = (mz[0] + Math.round(bx)) * 2, fy = VH - 240 + (mz[1] + Math.round(by)) * 2, cool = A.k === 'fork' || A.k === 'plasma', R2 = this.rng;
-      for (const [r, col] of [[22, cool ? '#3a8cff' : '#c8401a'], [15, cool ? '#9fd8ff' : '#ffa030'], [8, cool ? '#e8f8ff' : '#ffe8a0'], [3, '#ffffff']]) {
+      const fx = (fw[0] + Math.round(bx)) * 2, fy = VH - GUN_H * 2 + (fw[1] + Math.round(by)) * 2, cool = A.k === 'fork' || A.k === 'plasma' || A.k === 'railgun', R2 = this.rng, fk = 0.55 + fw[2] * 0.6;
+      for (const [r0, col] of [[22, cool ? '#3a8cff' : '#c8401a'], [15, cool ? '#9fd8ff' : '#ffa030'], [8, cool ? '#e8f8ff' : '#ffe8a0'], [3, '#ffffff']]) {
+        const r = r0 * fk;
         c.fillStyle = col;
         for (let k = 0; k < 7; k++) { const a = (k / 7) * TAU + R2() * 0.5, l = r * (0.6 + R2() * 0.6); for (let q = 0; q < l; q += 3) c.fillRect(Math.round(fx + Math.cos(a) * q - 2), Math.round(fy + Math.sin(a) * q * 0.8 - 2), 4, 4); }
         c.fillRect(fx - r / 2, fy - r / 2.4, r, r / 1.2);
@@ -2149,6 +2548,26 @@ export class HellMaze extends Game {
         if (this.ammo[this.weapon] > 0 && this.cool < 0.3) { x.fillStyle = '#160c26'; x.beginPath(); x.arc(90 + bx, 62 + pull + by, 6, 0, TAU); x.fill(); x.strokeStyle = '#9a4cff'; x.beginPath(); x.arc(90 + bx, 62 + pull + by, 3.5, t * 4, t * 4 + 3); x.stroke(); R('#e8dcff', 87, 58 + pull, 2, 2); }
         mz = [90, 56]; break;
       }
+      case 'acid': {
+        // a swollen bladder of bile in a frame of tubes, dripping
+        P.cyl('#5a7a22', 66, 50, 48, 52); for (let q = 0; q < 6; q++) R('#3a5a12', 70 + q * 7, 54 + (q % 3) * 12, 3, 22); R('#8ab43a', 72, 54, 6, 30);
+        P.cyl(P.sh('#4a4e3a', 1), 82, 26, 16, 28); P.bore(85, 24, 10, 4); R('#a8f04a', 86, 25, 8, 2);
+        for (let q = 0; q < 3; q++) { const dy2 = (t * 18 + q * 9) % 26; R('#7ab42a', 74 + q * 14, 100 + dy2 * 0.4, 2, 3); }
+        P.grain('#3a2a1a', 74, 100, 32, 20); P.hand(92, 102); mz = [90, 26]; break;
+      }
+      case 'soul': {
+        // an iron cage with something pale and wailing inside it
+        P.cyl('#3a3c40', 66, 80, 48, 40); P.box('#2a2c30', 70, 38, 40, 8); P.box('#2a2c30', 70, 74, 40, 8);
+        for (let q = 0; q < 6; q++) P.cyl('#4a4e54', 70 + q * 7, 44, 4, 32);
+        P.hand(92, 100); mz = [90, 36]; break;
+      }
+      case 'hook': {
+        // a harpoon gun: the tube, a coil of chain on the side, the barbed hook sitting ready
+        P.cyl('#4a4e54', 80, 34, 20, 70); for (let q = 0; q < 3; q++) P.box('#2a2c30', 78, 44 + q * 18, 24, 4);
+        if (this.cool < 0.4 && !this.hookOut) { P.cyl('#8a8e96', 88, 16, 4, 20); R('#c8ccd4', 84, 12, 2, 6); R('#c8ccd4', 94, 12, 2, 6); R('#c8ccd4', 86, 10, 8, 3); }
+        for (let q = 0; q < 6; q++) { R('#5a5650', 104, 60 + q * 6, 8, 4); R('#8a8680', 105, 61 + q * 6, 6, 1); }
+        P.grain('#4a2e18', 72, 98, 36, 22); P.handL(64, 66); P.hand(92, 102); mz = [90, 22]; break;
+      }
       default:
         P.cyl('#5a4218', 66, 44, 48, 76); R('#3a2a10', 66, 70, 48, 5); R(body, 66, 96, 48, 5); R('#1a120a', 72, 40, 36, 8); P.hand(104, 102);
         if (this.cool < 0.3 && ready(this.relicImg)) { const im = this.relicImg, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, s2 = 28 / Math.max(iw, ih); x.drawImage(im, 90 + bx - (iw * s2) / 2, 40 + by - ih * s2, iw * s2, ih * s2); }
@@ -2157,7 +2576,7 @@ export class HellMaze extends Game {
   }
   // the gritty guns, built from parts in the weapon's own metal and wood, with what its affixes add
   gritGun(R, P, A, t) {
-    const [m, hi, lo] = A.metal, wd = A.wood, firing = this.cool > A.rate * 0.6, k = A.k, af = A.affixes || [];
+    const [m, hi, lo] = A.metal, wd = A.wood, firing = this.t - (this.fireT ?? -9) < 0.3, k = A.k, af = A.affixes || [], loaded = this.cool < A.rate * 0.4 && this.ammo[this.weapon] > 0;
     let mz = [90, 40];
     if (k === 'pistol') {
       P.cyl(lo, 82, 44, 16, 14); P.bore(86, 44, 8, 5); R(hi, 88, 40, 4, 4);
@@ -2188,6 +2607,50 @@ export class HellMaze extends Game {
       P.cyl(m, 62, 60, 56, 46); for (let q = 0; q < 4; q++) { R('#080605', 69 + q * 12, 70, 9, 9); R(P.sh(m, 1.3), 69 + q * 12, 79, 9, 1); }
       for (let q = 0; q < 3; q++) R(P.sh(m, 0.55), 62, 90 + q * 5, 56, 1);
       P.grain(wd, 72, 104, 36, 16); P.handL(58, 64); P.hand(92, 102); mz = [90, 30];
+    } else if (k === 'chaingun') {
+      // six barrels round a hub (three show), turning while it fires; a belt of brass feeding in
+      const sp = firing ? Math.floor(t * 50) % 3 : 0;
+      for (let q = 0; q < 5; q++) { const ox = 66 + q * 10, sh2 = (q + sp) % 3; P.cyl(sh2 === 0 ? hi : sh2 === 1 ? m : lo, ox, 22, 8, 44); P.bore(ox + 2, 19, 4, 4); }
+      P.box(lo, 62, 56, 56, 8); P.box(lo, 62, 26, 56, 4); P.cyl(m, 60, 64, 60, 56); for (let q = 0; q < 4; q++) P.rivet(64, 70 + q * 11);
+      for (let q = 0; q < 6; q++) { R('#8a6a2a', 114 + (q % 2), 66 + q * 6, 7, 4); R('#c8a04a', 114 + (q % 2), 66 + q * 6, 7, 1); }
+      P.handL(56, 70); P.hand(96, 100); mz = [90, 20];
+    } else if (k === 'flamer') {
+      // a fuel tank slung on the left, a hose, the long nozzle tube with its pilot flame
+      P.cyl('#6a2418', 58, 62, 26, 54); for (let q = 0; q < 3; q++) R(P.sh('#6a2418', 0.5), 58, 70 + q * 14, 26, 2); R('#c8b48a', 63, 84, 14, 4);
+      P.cyl(m, 82, 24, 18, 82); P.box(lo, 80, 20, 22, 8); P.bore(85, 18, 10, 4); for (let q = 0; q < 4; q++) P.box(lo, 81, 40 + q * 14, 20, 3);
+      for (let q = 0; q < 5; q++) R(q % 2 ? '#2a2420' : '#3a322c', 76 - q, 70 + q * 4, 8, 4);
+      P.hand(94, 100); mz = [90, 16];
+    } else if (k === 'railgun') {
+      // a long slim barrel ringed with coils, a capacitor box behind it
+      P.cyl(m, 82, 14, 16, 92); for (let q = 0; q < 8; q++) P.box(lo, 76, 20 + q * 10, 28, 4); P.bore(86, 12, 8, 3);
+      P.box(lo, 68, 88, 44, 30); P.box(m, 72, 92, 12, 10); R('#16323e', 74, 94, 8, 6); P.rivet(104, 94);
+      P.handL(62, 70); P.hand(94, 104); mz = [90, 12];
+    } else if (k === 'stakegun') {
+      // a heavy tube and a wooden stock; a sharpened stake waits in the mouth
+      P.cyl(m, 78, 30, 24, 70); for (let q = 0; q < 3; q++) P.box(lo, 76, 40 + q * 18, 28, 4); P.bore(83, 28, 14, 4);
+      if (loaded) { R(wd, 87, 12, 6, 20); R(P.sh(wd, 1.3), 87, 12, 2, 20); R('#9aa0a8', 88, 6, 4, 6); R('#d0d6de', 89, 3, 2, 3); }
+      P.grain(wd, 72, 98, 36, 22); P.box(lo, 70, 84, 40, 14);
+      P.handL(62, 64); P.hand(92, 102); mz = [90, 24];
+    } else if (k === 'ripper') {
+      // a flat housing with a saw disc sitting in the top, spinning while it fires
+      P.box(m, 60, 58, 60, 42); P.box(lo, 64, 48, 52, 12); for (let q = 0; q < 4; q++) P.rivet(64 + q * 16, 62);
+      if (loaded || firing) { const cx = 90, cy = 46, rr = 18, sp = firing ? Math.floor(t * 40) % 4 : 0; for (let yy = -rr; yy <= rr; yy++) for (let xx = -rr; xx <= rr; xx++) { const d = Math.hypot(xx, yy); if (d > rr || yy > 4) continue; const a = Math.atan2(yy, xx) + sp * 0.4, tooth = d > rr - 3 && Math.floor(((a + Math.PI) / TAU) * 24) % 2 === 0; if (d > rr - 3 && !tooth) continue; R(d < 4 ? lo : tooth ? hi : P.sh(hi, 0.8 - (d / rr) * 0.25), cx + xx, cy + yy, 1, 1); } }
+      P.grain(wd, 74, 100, 32, 20); P.hand(92, 102); mz = [90, 30];
+    } else if (k === 'chainsaw') {
+      // the engine, a front handle, the long guide bar and its chain, running while it cuts
+      const sp = firing ? Math.floor(t * 40) % 2 : 0;
+      P.box('#7e8288', 82, 10, 16, 72); R('#4a4e54', 83, 12, 14, 68);
+      for (let q = 0; q < 24; q++) { const yy = 10 + q * 3 + sp; R(q % 2 ? '#2a2c30' : '#c8ccd2', 80, yy, 2, 2); R(q % 2 ? '#c8ccd2' : '#2a2c30', 98, yy, 2, 2); }
+      R('#c8ccd2', 84, 8, 12, 2);
+      P.box('#b8401a', 64, 78, 52, 40); for (let q = 0; q < 5; q++) R(P.sh('#b8401a', 0.5), 68, 84 + q * 6, 18, 2); P.box(lo, 92, 82, 20, 14);
+      P.box(lo, 60, 70, 60, 5); P.box(lo, 60, 70, 5, 20); P.box(lo, 115, 70, 5, 20);
+      P.handL(58, 66); P.hand(98, 102); mz = [90, 12];
+    } else if (k === 'mines') {
+      // a squat launcher with a drum of mines, one sitting in the mouth
+      P.cyl(m, 64, 50, 52, 60); P.box(lo, 70, 38, 40, 14); P.bore(76, 36, 28, 6);
+      if (loaded) { R('#3a3c34', 80, 32, 20, 8); R('#5a5c50', 82, 32, 16, 2); }
+      for (let q = 0; q < 4; q++) { R('#14120e', 70 + q * 11, 68, 8, 8); R('#5a5c50', 71 + q * 11, 69, 6, 6); }
+      P.grain(wd, 74, 100, 32, 20); P.handL(58, 62); P.hand(94, 102); mz = [90, 36];
     } else {
       P.cyl(m, 66, 54, 48, 66); for (let q = 0; q < 3; q++) { R('#06080a', 70, 66 + q * 14, 40, 4); R('#1a3a48', 71, 67 + q * 14, 38, 2); }
       P.cyl(lo, 78, 30, 24, 28); R('#16323e', 82, 28, 16, 6); for (let q = 0; q < 4; q++) P.rivet(69, 58 + q * 14);
@@ -2227,10 +2690,16 @@ export class HellMaze extends Game {
     this.msgs.forEach((m, i) => { c.globalAlpha = Math.min(1, m.t * 2); this.text(c, m.text, W / 2 + 1, 63 + i * 16, 12, '#000'); this.text(c, m.text, W / 2, 62 + i * 16, 12, '#ffe2a8'); });
     c.globalAlpha = 1;
     const wd = this.wd, s = 74 / Math.max(wd.mw, wd.mh), ox = W - 80, oy = 34, p = this.p;
-    c.save(); c.globalAlpha = 0.75; c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(ox - 3, oy - 3, wd.mw * s + 6, wd.mh * s + 6);
-    c.lineWidth = 1; c.strokeStyle = '#d8c8a0'; c.beginPath();
-    for (const sec of wd.secs) if (sec.seen) for (const e of sec.edges) if (!e.o || Math.abs(fz(sec, e.ax, e.ay) - fz(e.o, e.ax, e.ay)) > 0.7) { c.moveTo(ox + e.ax * s, oy + e.ay * s); c.lineTo(ox + e.bx * s, oy + e.by * s); }
-    c.stroke();
+    // the map of what you have seen: drawn again only when there is more of it
+    const nSeen = wd.secs.reduce((a, q) => a + (q.seen ? 1 : 0), 0), MS = 2;
+    if (!this.mapCv || this.mapCv.wd !== wd || this.mapCv.n !== nSeen) {
+      const cv = (this.mapCv ||= document.createElement('canvas')); cv.width = Math.ceil((wd.mw * s + 6) * MS); cv.height = Math.ceil((wd.mh * s + 6) * MS); cv.wd = wd; cv.n = nSeen;
+      const m = cv.getContext('2d'); m.scale(MS, MS); m.fillStyle = 'rgba(0,0,0,.35)'; m.fillRect(0, 0, wd.mw * s + 6, wd.mh * s + 6);
+      m.lineWidth = 1; m.strokeStyle = '#d8c8a0'; m.beginPath();
+      for (const sec of wd.secs) if (sec.seen) for (const e of sec.edges) if (!e.o || Math.abs(fz(sec, e.ax, e.ay) - fz(e.o, e.ax, e.ay)) > 0.7) { m.moveTo(3 + e.ax * s, 3 + e.ay * s); m.lineTo(3 + e.bx * s, 3 + e.by * s); }
+      m.stroke();
+    }
+    c.save(); c.globalAlpha = 0.75; c.drawImage(this.mapCv, ox - 3, oy - 3, wd.mw * s + 6, wd.mh * s + 6);
     if (this.exitPos.sec.seen) { c.fillStyle = '#7affd0'; c.fillRect(ox + this.exitPos.x * s - 2, oy + this.exitPos.y * s - 2, 4, 4); }
     c.fillStyle = '#fff'; c.fillRect(ox + p.x * s - 1.5, oy + p.y * s - 1.5, 3, 3);
     c.strokeStyle = '#fff'; c.beginPath(); c.moveTo(ox + p.x * s, oy + p.y * s); c.lineTo(ox + (p.x + Math.cos(p.a) * 4) * s, oy + (p.y + Math.sin(p.a) * 4) * s); c.stroke();
@@ -2264,6 +2733,8 @@ const PAT = {
   ceil: (x, y, h) => { const u = x & 31, v = y & 31; if (u === 0 || v === 0) return 0.55; if (u > 11 && u < 21 && v > 11 && v < 21 && h(x >> 5, y >> 5) > 0.55) return 1.9; return 0.78; },
   rock: (x, y, h) => 0.68 + h(x >> 3, y >> 3) * 0.45 + h(x >> 1, y >> 1) * 0.12 - ((x * 3 + y * 5) % 17 === 0 ? 0.3 : 0),
   door: (x, y) => { if (x < 3 || x > 60 || y < 2) return 0.4; if (x > 30 && x < 34) return 0.5; if ((y & 15) === 8 && (x & 7) === 4) return 1.4; return 0.9 + ((y >> 3) & 1) * 0.06; },
+  cliff: (x, y, h) => { const band = Math.sin((y + h(x >> 4, 3) * 9) * 0.45) * 0.12 + Math.sin(y * 1.7 + (x >> 3)) * 0.04, crack = ((x + Math.floor(h(y >> 3, 5) * 13)) & 15) === 0 ? 0.55 : 1; return (0.7 + band + h(x >> 2, y >> 3) * 0.32) * crack - ((y & 7) === 0 && h(x >> 3, y >> 3) > 0.6 ? 0.25 : 0); },
+  dirt: (x, y, h) => 0.66 + h(x >> 2, y >> 2) * 0.3 + h(x, y) * 0.16 - (h(x >> 1, y >> 1) > 0.9 ? 0.3 : 0) + (h(x >> 1, (y >> 1) + 9) > 0.94 ? 0.35 : 0),
   liquid: (x, y) => 0.7 + 0.3 * Math.sin(((x + 4 * Math.sin((y * TAU) / 32)) * TAU) / 16) * Math.sin((y * TAU) / 32)
 };
 function photoPx(img) {

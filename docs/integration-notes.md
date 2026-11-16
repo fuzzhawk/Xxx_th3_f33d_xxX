@@ -276,3 +276,52 @@ The garden is rebuilt as a wordless dream to walk through. Same world sizes; old
   - Carcasses on hooks dripping into pools, old blood smeared on walls and dragged across floors, and pairs of eyes in dark corners that blink and vanish when you come within 6.5 m.
   - Ash and embers under the sky, dust indoors.
 - **Performance:** swiftshader, view frozen: 41–43 fps with everything on (overlays now cost about 1 fps, the gun about 5). Warm-up is the slow part: reading back each new sheet frame costs about 4 ms, so it is spread one frame at a time.
+
+## Hell Maze: the second wave (2026-11-16)
+- **Ten new enemies** (`horror.js` kinds plus Hell Maze `ROLES` 6–15). Each level casts the old garrison plus 3–4 of the new ones (more from level 3), chosen by seed. Sheets are built only for the roles a level uses (`this.cast`; crew sprites are lazy).
+
+  | Enemy | Look | Behaviour |
+  |---|---|---|
+  | Butcher | sack-hooded, leather apron, cleaver and hook | 30% armour, knocks you back |
+  | Stalker | tall, faceless, vertical mouth | almost invisible (flickering opacity) until within 4 m, fast |
+  | Bloater | swollen, glowing pustules | swells and bursts in acid near you or when killed; hurts you and its own kind |
+  | Skitter | flayed head on six finger-legs | packs of 3–5 |
+  | Watcher | floating eye trailing nerves | a red aiming thread, then a beam along it: step out of the line |
+  | Priest | robe, bone mask, skull staff | raises a nearby corpse or summons two skitters; summoned foes don't count toward the exit |
+  | Charger | horned, tusked, plated | wind-up, straight charge (34 damage and knockback), stunned by walls (takes 1.5× damage) |
+  | Leaper | crouched, frog-mouthed | pounces in an arc from 3.5–9.5 m |
+  | Worm | segmented, ring-maw of teeth | travels hidden under the floor as a dust trail, bursts up within 2.3 m, untargetable while under |
+  | Gunner | flesh and iron, cannon arm, fuel tank | lobs mortar shells that lead you and burst on landing |
+
+  - The autopilot sidesteps beam lines, charges and where shells will land.
+- **More detail in the models (all games):** veins, spine ridges, six upper and five lower teeth, shackles and stitches on zombies, exposed ribs. Sprites are bigger in Hell Maze (56–72 px). The old kinds keep their names (detail is rolled after the name; checked on 1,592 names).
+- **Meltdown** (`melt`, in `grimeSprite`): in about a third of the columns, the lower part of each body run is pixel-sorted by brightness (light sinks), sometimes with a 1–4 px drip below. Glowing pixels are untouched.
+- **Levels:**
+  - Rooms can now be **wild**: open-sky canyons or caves with cliff walls, dirt floors, rock shelves 0.45 and 0.9 up, boulders, ponds, dead trees (trunks block), heads on stakes and stone heaps.
+  - Yards and wild areas spread into an empty neighbour cell (`rm.ext`). A double courtyard gets a railed rampart with a stair at its far end (`rm.walk`).
+  - Corridors between two open areas run under the sky with canyon walls. About 60% of windows are wide lookouts (sill 0.95, opening 2.1).
+  - New textures: `cliff`, `dirt`.
+  - Per 120 levels: 214 wild areas, 73 courtyards (every rampart reachable), 153 open corridors. Over 160 levels, 0 bad starts, 0 unreachable exits, 0 cut-off rooms.
+- **Ten new weapons:**
+
+  | Weapon | Kind | What it does |
+  |---|---|---|
+  | Chaingun | gritty | spinning barrels |
+  | Flamethrower | gritty | passes through, sets alight |
+  | Railgun | gritty | instant, pierces everything to the wall |
+  | Stake gun | gritty | pierces 3 |
+  | Saw launcher | gritty | ricochets, cuts through |
+  | Chainsaw | gritty | melee, infinite |
+  | Mine layer | gritty | proximity mines that arm after 0.6 s |
+  | Bile spewer | strange | acid pools that eat feet for 4.5 s |
+  | Soul cannon | strange | slow orb zapping everything within 5.5 m, then a 4 m blast |
+  | Harpoon | strange | chains a foe and drags it in, ripping it at the end |
+
+  - Each has a view model, pickup art, rounds, and an autopilot score in `bestWeapon`.
+- **Perspective view model:** the weapon is still drawn upright in 180×120 and grimed, then laid onto a receding plane (`warpGun`, `gunWarp`). Rows compress toward the muzzle, and the far end is `GUN_FAR` (0.5) as wide as the near end. Result: 180×60 shown at 360×120, half the old height, pointing ahead.
+  - The warp is cached per look. Lighting, the flash and glows are applied after it (glows mapped through `gunWarp`).
+- **Corner map:** cached and redrawn only when more of the level has been seen.
+- **Tested:**
+  - **Autopilot (headless):** from level 1, 1 death in 24 min and about 5.4 levels per 10 min; from level 4 with the new cast, 2 deaths in 24 min. Never stuck.
+  - **Frame rate** (swiftshader, view frozen): 49–55 fps with everything on.
+  - Crypt Hack, Crystal Quest and Hell Maze run without errors.
