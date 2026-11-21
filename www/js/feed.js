@@ -185,6 +185,10 @@ export class Feed {
   // Weighted round-robin: the category furthest behind its target share goes next.
   nextPost() {
     const now = Date.now();
+    // the author pit: fourteen writers making a book together, early on and then every couple of dozen
+    // posts, morning, day or evening
+    this.pitN = (this.pitN || 0) + 1;
+    if (!this.focus && settings.authorPit !== false && this.pitN - (this.lastPit ?? -21) >= 29) { this.lastPit = this.pitN; return { id: `pit-${now.toString(36)}-${this.pitN}`, cat: 'pit', title: 'The Author Pit' }; }
     if (this.mode && this.mode !== 'day' && !this.focus) return this.nextModePost();
     // the garden visits the day feed too, every couple of dozen posts
     if (!this.focus && settings.gardenInFeed !== false && this.total - (this.lastDayGarden ?? -10) >= 22) { this.lastDayGarden = this.total; this.total++; return gardenPost('day', this.total); }

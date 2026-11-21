@@ -20,6 +20,7 @@ import { writingBody, creatorMedia } from './studio.js';
 import { rhymeBody } from './rhymes.js';
 import { readBody } from './reads.js';
 import { mindView, quoteView, MIND_HANDLE } from './mindful.js';
+import { pitView } from './authorpit.js';
 
 const TOPIC_COLOR = {
   humanbody: '#e58f7a', neuro: '#9b8ad8', nootropics: '#6fb38a', breath: '#6fb0c9', mystic: '#a283c4', dreams: '#6d7fc4', scifi: '#4fa3a8',
@@ -27,7 +28,7 @@ const TOPIC_COLOR = {
   animals: '#d8a25a', retrogaming: '#5b9aa9', vintagescifi: '#a77bd0', theory: '#d9b26f', math: '#5b8fd0', biology: '#5fa86a', offbeat: '#c98a3a'
 };
 const TOPIC_GLYPH = { humanbody: '♡', neuro: '✧', nootropics: '❀', breath: '∾', mystic: '☉', dreams: '☾', scifi: '✦', music: '♫', literature: '¶', science: '∿', history: '⌛', transgressive: '✶', mysteries: '?', occult: '☉', theory: '𝄞', math: '∑', biology: '❦', offbeat: '⚘' };
-const CAT_FACE = { news: ['◉', '#8a2b2b'], garden: ['✿', '#6aa86a'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], read: ['❧', '#6a5a3a'], studio: ['✎', '#3a6a5a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'] };
+const CAT_FACE = { pit: ['✒', '#5a3a6a'], news: ['◉', '#8a2b2b'], garden: ['✿', '#6aa86a'], game: ['◐', '#5e6b3a'], wiki: ['W', '#3a3530'], video: ['▶', '#9b3d1f'], meme: ['☺', '#8c5a3c'], product: ['✦', '#c9952b'], psych: ['✺', '#6d4a8c'], selfcare: ['☘', '#4f7a6f'], web: ['⌘', '#3a5a6a'], read: ['❧', '#6a5a3a'], studio: ['✎', '#3a6a5a'], oracle: ['☯', '#5a3a6a'], power: ['⚔', '#8a4a1a'] };
 let soundOn = false;
 
 export function labelOf(post) {
@@ -49,6 +50,7 @@ const handleFor = (post, ctx) => {
     case 'read': return [post.source?.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'longread', `${post.contemporary ? 'Contemporary erotica' : post.erotica ? 'Erotica' : post.kind === 'poem' ? 'Poem' : post.kind === 'novel' ? 'From a novel' : 'Long read'}${post.author ? ` · ${post.author}` : ''}`];
     case 'power': return ['power.scale', post.sub === 'tier' ? 'Tier list · binding in no jurisdiction' : 'Who would win?'];
     case 'mind': return MIND_HANDLE[post.sub] || ['good.morning', ''];
+    case 'pit': return ['author.pit', 'Fourteen writers, one book · live'];
     case 'quote': return [post.mode === 'evening' ? 'night.thoughts' : 'morning.pages', `${post.author} · Wikiquote`];
     default: return [post.cat, ''];
   }
@@ -526,7 +528,15 @@ export function notice(title, text, buttons = []) {
   return el('article.notice', el('h3', title), el('p', text), el('div.btnrow', { style: { justifyContent: 'center' } }, buttons));
 }
 
-const RENDER = { wiki, video, game, psych, meme, product, selfcare, web, news: web, oracle, power, studio, read, mind, quote };
+// ------------------------------------------------ the author pit
+// fourteen writers in a sunken garden, making one book together; it plays while it is on screen
+function pit(p, ctx) {
+  const v = pitView(el), media = el('div.media', v.stage);
+  const card = post('pit', p, ctx, { media, caption: capt('author.pit', 'Wilson, Burroughs, Lovecraft, Colin Wilson, Le Guin, Butler, Sartre, Reich, Joyce, Tolkien, Nietzsche, Hesse, Dick and Atwood make one thing together · ', el('span.muted', 'tap to move it on')), mediaInteractive: true });
+  card._activate = v.activate; card._deactivate = v.deactivate; card._heavy = true;
+  return card;
+}
+const RENDER = { wiki, video, game, psych, meme, product, selfcare, web, news: web, oracle, power, studio, read, mind, quote, pit };
 export function renderCard(p, ctx) {
   const fn = RENDER[p.cat];
   if (!fn) return null;

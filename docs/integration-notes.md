@@ -379,3 +379,113 @@ The garden is rebuilt as a wordless dream to walk through. Same world sizes; old
   - **Tested (headless):**
     - Pointer lock, walking, strafing, jumping, firing, weapon keys and wheel, the autopilot toggle, pause and resume, a level change, and no errors.
     - Headless Chromium's pointer-locked mouse moves cancel out, so mouse look was checked with real `movementX` events.
+
+## Garden: the metropolis, the works under it, the railway (2026-11-21)
+World v6 (`garden-metro.js`, run by `loadGarden` on a v5 save and by `newGarden`). Older gardens are upgraded in place and keep everything sown, found and carried. Each part runs in its own `try`, so one that fails is logged and the rest still happen.
+- **Five new kinds of country** (`BIOMES` 10–14, `B_JUNGLE … B_LAGOON`, only on worlds with `S.bv = 2`):
+
+  | Country | Look | Grows |
+  |---|---|---|
+  | Jungle | steaming green | kapok hung with vines, monstera, orchids |
+  | Bamboo grove | jade green | bamboo clumps |
+  | Salt flats | white crust round pink brine | saltbush, salt crystals |
+  | Ash fields | cinders with glowing cracks, hot springs | ember trees, fire lilies |
+  | Lagoon | turquoise water, white sand | coral, palms |
+
+  - **Older worlds:** the patches that become a new country lose their wild plants and animals, and their chunks are grown again as you come near.
+  - Each country also has its village style, motes and map names.
+- **The metropolis** (`S.metro`; `districtAt(Rm, x, y)` in `garden-world.js`): about 160×136 tiles round the old city's centre.
+  - **Districts:**
+
+    | District | Paving | What stands there |
+    |---|---|---|
+    | High-tech centre | pale stone with seams of light | glass towers and needle spires round the hologram plaza, sky gardens |
+    | Neon quarter | (the old city's style) | the old neon city |
+    | Old town | cobbles | brick rowhouses, shops, a clock tower and market in its square |
+    | Ironworks | concrete | factories, warehouses, gasometers, silos, smokestacks, cranes, cooling towers, coal and carts |
+    | Suburbs | asphalt with kerbs | little houses with gardens and trees, parks with ponds |
+
+  - Rivers through it become canals; streets bridge them, except where a street runs along one.
+  - **Buildings** are `{t: 'bldg', k, x, y, w, d, h, v}`, drawn by `garden-metro-art.js` `bldgSprite`. They walk, tap, veil and light like towers. Chimneys, factories and cooling towers smoke.
+  - **People:** the centre and neon quarter have Sci-fi citizens; the old town, ironworks and suburbs have present-day ones.
+  - **Creatures:** each district has its own (`CITY_FAUNA`).
+  - **Air:** each district has its own dusk (`metK`): the neon quarter has its drizzle, the centre a little dusk, the ironworks haze.
+- **The works under the city** (`genWorks`): three cave-kind realms built on a lattice of corridors and halls.
+
+  | Realm | Built of | Water | Machinery |
+  |---|---|---|---|
+  | Steam tunnels (`steam`, 192²) | brick, copper pipes, valves, gauges | murky canals | boilers, tanks, pistons |
+  | Clockworks (`gears`, 160²) | brass plate and grates | oil pits with catwalks | turning gears, a clock face |
+  | Boiler heart (`furnace`, 160²) | basalt | molten iron, not crossable | furnaces |
+
+  - **Drawing:** painted by `paintWorks` (palettes with `steam: 1|2|3`) with no soft edges. Gas lamps light them and vents puff steam.
+  - **Treasure:** brass safes, the chest kind `safe`.
+  - **Way down:** lift cages (style `cage`) link the undercity, two street corners in the ironworks, and each level to the next.
+- **Railway:**
+  - **Stops:** a central station in the centre, five towns, and two country halts by ways up or down or forest-path places, chosen to spread round the map.
+  - **Towns:** villages the line serves gain a ring of houses and a footpath to their station.
+  - **Routing:** A* on 3-tile cells with a turn cost, avoiding water, gorges, rock and protected places. Buildings and portals are never crossed.
+  - **Track:** ground `RAIL`, painted by `paintRail`: ballast and sleepers, curves in quarter circles, trestles over water and gorges (`S.railBrW`/`railBrC`). It shows on the map.
+  - **Trains** (`garden-rail.js`): two steam trains half a lap apart, to a timetable from `Date.now()`. They ease in and out and wait 9 s at each platform.
+    - **Riding:** tap a train standing at a platform near you to get on, and tap again to get off at the next stop.
+    - **Autopilot:** it sometimes rides one to three stops.
+- **Twenty new creatures** (`garden-fauna.js`):
+
+  | Where | Creatures |
+  |---|---|
+  | The new countries | parrot, jaguar, tree frog, red panda, crane, panda, flamingo, fennec, fire newt, ash moth, turtle, dolphin, seal |
+  | The city | pigeon, dog, raccoon |
+  | The works | clockwork beetle, brass rat, cog owl, steam golem |
+
+- **Twelve treasures:** once all 12 wisps are found, a prompt offers a new world (also a menu entry, "New world").
+  - **New world:** `renew()` grows a fresh garden from a new seed. Seeds, food and gems come along; the wisps reset.
+  - **Stay:** sets `G.offered`, so the prompt doesn't ask again.
+- **Map:** names the districts (`districtSpots`), stations (train glyph, "Central Station", "… Halt") and the new realms.
+- **Tested (headless):**
+  - **Fresh world:** ready in 2.6 s.
+  - **v5 save upgraded:** made with the previous commit's code, then loaded: v6, sown plants, inventory and visited realms kept, metropolis and railway built, 16 realms. 1.6 s.
+  - Every district, the train passing and ridden, the three works levels, the map, and the prompt (accepting it grows a new seed).
+  - **Frame rate** at 4× CPU throttle: 52–60 fps in the city and the works.
+  - No errors.
+
+## Rail Raider (in the road racer's place, 2026-11-21)
+`railraider.js` and `railraider-art.js`. The `racer` key is kept, so old packages show it; their "Road Racer" titles read "Rail Raider" (`cards.js`), and the builder names it so from now on. `racer.js` is gone.
+- **The game:** an original steampunk shooter on rails, in the spirit of the early-90s arcade rail shooters. The cart drives itself; you drag to aim and hold to fire. The twin repeaters overheat.
+  - **Stages:** five, in a seeded order:
+
+    | Stage | Setting | Boss |
+    |---|---|---|
+    | Coal seams | tunnel arch with timber frames and lanterns | armoured locomotive |
+    | Foundry | hall with a molten channel | spider tank |
+    | Smog line | viaduct over a city of chimneys and airships | airship |
+    | Clockworks | brass hall with turning gears | spider tank |
+    | Deadwood trestle | canyon, mesas | armoured locomotive |
+
+  - **Enemies:** troopers, bombers lobbing dynamite, drones, bat swarms, turrets, and goons on handcars along the next track. Incoming bolts and dynamite can be shot down.
+  - **Junction:** one per stage, with two arrows. Both branches are built and visible until you pick.
+  - **Crates:** steam (health), spread shot, rapid fire, explosive rounds.
+  - **Boss:** at each stage's end; shoot out its glowing cores.
+- **Drawing:** like Hell Maze: three.js at 240×280, nearest filtering, unlit materials with lamplight baked into vertex colours.
+  - **Track:** streamed in 40-unit chunks ahead of the cart (rails, sleepers, ballast, tunnel tube or hall walls, viaduct or trestle posts, billboards).
+  - **Billboards:** props and foes are sprites painted in code and sooted (`soot`: grit, rust and soot blotches, sepia, Bayer-dithered palette, an ink outline). Foes, shots, crates and effects share a pool of 140 sprites.
+  - **Far layers:** panorama rings that turn slower than you do, under film grain, a vignette and the stage's tint.
+  - **Mutators:** the colour mutators (acid, negative, mono, party, trails) are off for this game.
+- **Tested** (autopilot at 3× speed): coal seams with its boss, then the foundry with its boss, then the smog line. JavaScript costs under 1 ms a frame; the rest is the GPU (swiftshader 24–34 fps at 4× throttle).
+
+## The Author Pit (a new card, 2026-11-21)
+`authorpit.js` (the scene) and `authorpit-script.js` (the cast and the script); `cat: 'pit'` in `cards.js`, with its own header and face.
+- **In the feed:** comes about the 8th post and then every 29, in every mode (`feed.js`, `settings.authorPit`).
+- **The cast:** fourteen writers as Crystal Sprite characters, each dressed in colours that suggest them, with name tags: Wilson, Burroughs, Lovecraft, Colin Wilson, Le Guin, Butler, Sartre, Reich, Joyce, Tolkien, Nietzsche, Hesse, Dick and Atwood.
+- **The place:** a sunken garden. At its middle is a table with a blank book. Round it: a café, a crypt door, a cut-up table, an old oak, an orgone box, the river with a bench, a chalkboard, and a fire pit.
+- **The script:** 154 beats, about 13½ minutes of real time. Each beat is a line of dialogue with an emote, a walk, an act, a door or a stage note.
+  - **The six acts:**
+    1. The summons.
+    2. What shall it be?
+    3. Quarrels in pairs (each pair in its corner).
+    4. The hinge, where they settle on a book of doors.
+    5. The making: fourteen doors, one per writer, shown as pages of *The Book of Doors*.
+    6. By the fire.
+  - **Light:** it changes with each act, from dusk to night.
+  - **The lines** are written for the card in the spirit of each writer's ideas, with a few words of theirs at most.
+- **Playing:** it runs while the card is on screen and keeps its place (`localStorage` `pit.beat`). A tap moves it on, and it loops.
+- **Tested:** it plays through, all 14 characters bake, the camera follows each pair, and the card shows and plays in the feed. No errors.
