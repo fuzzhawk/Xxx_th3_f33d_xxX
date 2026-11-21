@@ -14,8 +14,8 @@
 // Strange creatures are added chunk by chunk as you come near (populateDream).
 import { mulberry32 } from '../util.js';
 
-const STYLE = ['cottage', 'timber', 'cottage', 'stilt', 'stone', 'timber', 'adobe', 'treehouse', 'igloo', 'shroom'];   // by kind of country
-const LAMP = ['lamp', 'stonelamp', 'lamp', 'lamp', 'stonelamp', 'lamp', 'lamp', 'stonelamp', 'stonelamp', 'shroomlamp'];
+const STYLE = ['cottage', 'timber', 'cottage', 'stilt', 'stone', 'timber', 'adobe', 'treehouse', 'igloo', 'shroom', 'treehouse', 'timber', 'adobe', 'stone', 'stilt'];   // by kind of country
+const LAMP = ['lamp', 'stonelamp', 'lamp', 'lamp', 'stonelamp', 'lamp', 'lamp', 'stonelamp', 'stonelamp', 'shroomlamp', 'lamp', 'stonelamp', 'lamp', 'stonelamp', 'lamp'];
 const FLOWERS5 = ['daisy', 'tulip', 'poppy', 'lavender', 'bluebell', 'cosmos'];
 
 export function dreamify(G, W) {
@@ -369,11 +369,17 @@ function giants(D) {
 // ------------------------------------------------ strange creatures, glints and the gorge's flora, as you come near
 const FAUNA = [
   [['mossling', 0.06], ['snail', 0.05], ['tortoise', 0.014]], [['kodama', 0.1], ['mossling', 0.06]], [['kirin', 0.025], ['snail', 0.06], ['tortoise', 0.02]], [['jelly', 0.16], ['axolotl', 0.12]], [['spiritfox', 0.05], ['moonhare', 0.06]],
-  [['spiritfox', 0.06], ['mothdeer', 0.04]], [['gecko', 0.12], ['emberbird', 0.06], ['tortoise', 0.02]], [['stag', 0.035], ['kodama', 0.14], ['mothdeer', 0.06]], [['moonhare', 0.1], ['stag', 0.025], ['spiritfox', 0.04]], [['mothdeer', 0.12], ['jelly', 0.16], ['crab', 0.06]]
+  [['spiritfox', 0.06], ['mothdeer', 0.04]], [['gecko', 0.12], ['emberbird', 0.06], ['tortoise', 0.02]], [['stag', 0.035], ['kodama', 0.14], ['mothdeer', 0.06]], [['moonhare', 0.1], ['stag', 0.025], ['spiritfox', 0.04]], [['mothdeer', 0.12], ['jelly', 0.16], ['crab', 0.06]],
+  // jungle, bamboo, salt flats, ash fields, lagoon
+  [['parrot', 0.2], ['treefrog', 0.18], ['jaguar', 0.03]], [['redpanda', 0.08], ['panda', 0.04], ['crane', 0.06]], [['flamingo', 0.14], ['fennec', 0.07], ['gecko', 0.06]], [['firenewt', 0.14], ['ashmoth', 0.16], ['emberbird', 0.05]], [['turtle', 0.06], ['dolphin', 0.1], ['seal', 0.08], ['crab', 0.08]]
 ];
 const REALM_FAUNA = { mountain: [['stag', 0.03], ['moonhare', 0.06], ['phoenix', 0.012]], canyon: [['gecko', 0.12], ['emberbird', 0.07]], gorge: [['emberbird', 0.12], ['gecko', 0.1], ['crab', 0.1], ['jelly', 0.08]], cave: [['kodama', 0.07], ['crab', 0.1], ['axolotl', 0.1]], deep: [['kodama', 0.08], ['crab', 0.12], ['axolotl', 0.1], ['jelly', 0.06]],
-  abyss: [['angler', 0.3], ['emberbird', 0.12], ['crab', 0.1]], under: [['cat', 0.22], ['drone', 0.28], ['koi', 0.12]], sky: [['manta', 0.08], ['koi', 0.05]], high: [['manta', 0.1], ['phoenix', 0.03], ['koi', 0.06]], stars: [['jelly', 0.1], ['moonhare', 0.06], ['koi', 0.05]], canopy: [['kodama', 0.12], ['mothdeer', 0.06]], roofs: [['cat', 0.22], ['drone', 0.3], ['koi', 0.12]] };
-const FLYERS = new Set(['jelly', 'emberbird', 'angler', 'manta', 'koi', 'phoenix', 'drone']);
+  abyss: [['angler', 0.3], ['emberbird', 0.12], ['crab', 0.1]], under: [['cat', 0.22], ['drone', 0.28], ['koi', 0.12]], sky: [['manta', 0.08], ['koi', 0.05]], high: [['manta', 0.1], ['phoenix', 0.03], ['koi', 0.06]], stars: [['jelly', 0.1], ['moonhare', 0.06], ['koi', 0.05]], canopy: [['kodama', 0.12], ['mothdeer', 0.06]], roofs: [['cat', 0.22], ['drone', 0.3], ['koi', 0.12], ['pigeon', 0.2]],
+  steam: [['brassrat', 0.3], ['clockbeetle', 0.25], ['raccoon', 0.05]], gears: [['clockbeetle', 0.3], ['cogowl', 0.16], ['brassrat', 0.15]], furnace: [['golem', 0.12], ['firenewt', 0.2], ['clockbeetle', 0.12]] };
+// the metropolis's districts each have their own (centre, neon quarter, old town, ironworks, suburbs)
+const CITY_FAUNA = [null, [['drone', 0.4], ['pigeon', 0.3]], [['cat', 0.35], ['drone', 0.4], ['koi', 0.2]], [['pigeon', 0.4], ['cat', 0.25]], [['raccoon', 0.25], ['pigeon', 0.3], ['brassrat', 0.12]], [['dog', 0.25], ['cat', 0.18], ['pigeon', 0.18], ['raccoon', 0.06]]];
+const FLYERS = new Set(['jelly', 'emberbird', 'angler', 'manta', 'koi', 'phoenix', 'drone', 'parrot', 'ashmoth', 'cogowl']);
+const SWIMMERS = new Set(['axolotl', 'dolphin']);
 export function populateDream(G, Rm, cx, cy, W) {
   const C = Math.ceil(Rm.w / W.CH);
   if (!Rm.pop5 || Rm.pop5.length !== C * C) Rm.pop5 = new Uint8Array(C * C);
@@ -385,13 +391,13 @@ export function populateDream(G, Rm, cx, cy, W) {
   const spot = (ok) => { for (let t = 0; t < 24; t++) { const x = x0 + Math.floor(R() * W.CH), y = y0 + Math.floor(R() * W.CH); if (W.inside(Rm, x, y) && x > 2 && y > 2 && x < Rm.w - 3 && y < Rm.h - 3 && ok(Rm.ground[ix(x, y)], x, y)) return [x, y]; } return null; };
   const land = (g) => [W.GRASS, W.FOREST, W.FLOWERS, W.SAND, W.PATH, W.STREET].includes(g), mx = Math.min(Rm.w - 1, x0 + 8), my = Math.min(Rm.h - 1, y0 + 8);
   const inCity = Rm.city && mx >= Rm.city.x0 && mx <= Rm.city.x1 && my >= Rm.city.y0 && my <= Rm.city.y1;
-  const list = inCity ? [['cat', 0.35], ['drone', 0.4], ['koi', 0.2]] : Rm.name === 'surface' ? FAUNA[W.biomeMap(Rm)[my * Rm.w + mx]] : REALM_FAUNA[Rm.name] || [];
+  const list = inCity ? (Rm.metro ? CITY_FAUNA[W.districtAt(Rm, mx, my)] || [] : [['cat', 0.35], ['drone', 0.4], ['koi', 0.2]]) : Rm.name === 'surface' ? FAUNA[W.biomeMap(Rm)[my * Rm.w + mx]] || [] : REALM_FAUNA[Rm.name] || [];
   for (const [k, pr] of list) {
     if (R() >= pr) continue;
-    const p = spot(k === 'axolotl' ? (g) => g === W.WATER : FLYERS.has(k) ? (g) => g !== W.ROCK : (g, x, y) => land(g) && !Rm.wild[ix(x, y)]);
+    const p = spot(SWIMMERS.has(k) ? (g) => g === W.WATER : FLYERS.has(k) ? (g) => g !== W.ROCK : (g, x, y) => land(g) && !Rm.wild[ix(x, y)]);
     if (!p) continue;
     W.critter(G, Rm, k, p[0], p[1]);
-    if (k === 'kodama' || k === 'jelly' || k === 'moonhare') for (let q = 0; q < 2; q++) W.critter(G, Rm, k, p[0], p[1]);
+    if (k === 'kodama' || k === 'jelly' || k === 'moonhare' || k === 'pigeon' || k === 'flamingo' || k === 'brassrat') for (let q = 0; q < 2; q++) W.critter(G, Rm, k, p[0], p[1]);
   }
   // a glint in the grass: something small and bright to find
   if (R() < (Rm.kind === 'surface' ? 0.13 : 0.1)) { const p = spot((g, x, y) => land(g) && !Rm.wild[ix(x, y)] && !Rm.decor.some((o) => o.x === x && o.y === y)); if (p) { Rm.decor.push({ t: 'glint', x: p[0], y: p[1] }); delete Rm.dIdx; } }

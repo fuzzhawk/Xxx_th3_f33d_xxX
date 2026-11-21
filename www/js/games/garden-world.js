@@ -5,24 +5,41 @@
 // The dream (garden-dream.js) is laid over it: villages, the neon city with its undercity and
 // rooftops, forest paths, treasure, the gorge and the abyss below the canyons, the high sky and the
 // star sea above the islands. Art for it is in garden-art.js; shared pixel helpers in garden-kit.js.
+// The metropolis (garden-metro.js) grows the city into districts round a high-tech centre, digs
+// three steampunk levels under it, and lays a railway out to the towns (v6).
 import { W, H, noiseMap } from './engine.js';
 import { mulberry32 } from '../util.js';
 import { idbGet, idbSet } from '../store.js';
 import { mk, ell, px, rgbOf, hexOf, tone, mixHex, crisp, hash2, vnoise, vivid } from './garden-kit.js';
 import { treeSprite, creatureSprite, STRANGE } from './garden-art.js';
 import { dreamify, populateDream } from './garden-dream.js';
+import { metropolis } from './garden-metro.js';
 export { tone };
 
 export const T = 16, CH = 16, HR = 3600e3, KEY = 'garden-v2', OLD = 'garden-v1';
-export const GRASS = 0, WATER = 2, PATH = 3, SAND = 4, STONE = 5, BRIDGE = 6, ROCK = 7, PORTAL = 8, FOREST = 9, FLOWERS = 10, VOID = 11, CHASM = 12, ICE = 13, STREET = 14;
+export const GRASS = 0, WATER = 2, PATH = 3, SAND = 4, STONE = 5, BRIDGE = 6, ROCK = 7, PORTAL = 8, FOREST = 9, FLOWERS = 10, VOID = 11, CHASM = 12, ICE = 13, STREET = 14, RAIL = 15;
 // realm sizes in tiles (a world about fifty times the first garden's area) and what each realm is
 // like underfoot: meadow-like ground, cave dark, or islands in open air
-export const SIZE = { surface: 900, canyon: 384, mountain: 384, cave: 192, deep: 256, sky: 192, canopy: 192, gorge: 256, abyss: 192, high: 192, stars: 192, under: 160, roofs: 160 };
-export const KIND = { surface: 'surface', canyon: 'surface', mountain: 'surface', cave: 'cave', deep: 'cave', sky: 'sky', canopy: 'sky', gorge: 'surface', abyss: 'cave', high: 'sky', stars: 'sky', under: 'cave', roofs: 'sky' };
+export const SIZE = { surface: 900, canyon: 384, mountain: 384, cave: 192, deep: 256, sky: 192, canopy: 192, gorge: 256, abyss: 192, high: 192, stars: 192, under: 160, roofs: 160, steam: 192, gears: 160, furnace: 160 };
+export const KIND = { surface: 'surface', canyon: 'surface', mountain: 'surface', cave: 'cave', deep: 'cave', sky: 'sky', canopy: 'sky', gorge: 'surface', abyss: 'cave', high: 'sky', stars: 'sky', under: 'cave', roofs: 'sky', steam: 'cave', gears: 'cave', furnace: 'cave' };
 // how high each realm sits (which way a lift goes), and the realms where it is always night
-export const ALT = { abyss: -3, deep: -2, gorge: -2, cave: -1, canyon: -1, under: -1, surface: 0, canopy: 1, mountain: 1, roofs: 1, sky: 2, high: 3, stars: 4 };
+export const ALT = { abyss: -3, deep: -2, gorge: -2, cave: -1, canyon: -1, under: -1, surface: 0, canopy: 1, mountain: 1, roofs: 1, sky: 2, high: 3, stars: 4, steam: -2, gears: -3, furnace: -4 };
 export const NIGHT = { stars: 1, roofs: 1 };
 export const REALM_NAME = { surface: 'The meadows', cave: 'The caverns', sky: 'The sky islands' };
+// the metropolis's districts: the high-tech centre, the neon quarter, the old town, the ironworks and
+// the suburbs round them all. Worked out from the city's centre and shape (Rm.metro), never saved.
+export const D_CORE = 1, D_NEON = 2, D_OLD = 3, D_WORKS = 4, D_SUBS = 5;
+export function districtAt(Rm, x, y) {
+  const m = Rm.metro;
+  if (!m) return Rm.city && x >= Rm.city.x0 && x <= Rm.city.x1 && y >= Rm.city.y0 && y <= Rm.city.y1 ? D_NEON : 0;
+  const dx = (x - m.cx) / m.rx, dy = (y - m.cy) / m.ry, r = Math.hypot(dx, dy) + (vnoise(x * 0.06, y * 0.06, m.s) - 0.5) * 0.2;
+  if (r >= 1) return 0;
+  if (r < 0.3) return D_CORE;
+  const a = (((Math.atan2(dy, dx) - m.a0 + (vnoise(x * 0.03, y * 0.03, m.s + 3) - 0.5) * 0.7) % 6.2832) + 6.2832) % 6.2832, sec = Math.floor(a / 2.0944);
+  if (sec >= 2) return r < 0.9 ? D_WORKS : D_SUBS;
+  if (r < 0.6) return sec === 0 ? D_NEON : D_OLD;
+  return D_SUBS;
+}
 export const now = () => Date.now();
 
 // ------------------------------------------------ what grows
@@ -69,7 +86,17 @@ export const PLANTS = {
   acacia: { type: 'tree', hours: 30, name: 'Acacia', leaf: '#8aa850', shape: 'umbrella' },
   baobab: { type: 'tree', hours: 50, name: 'Baobab', leaf: '#7aa860', shape: 'baobab' },
   mangrove: { type: 'tree', hours: 26, name: 'Mangrove', leaf: '#5a9a6a', shape: 'mangrove' },
-  crystaltree: { type: 'tree', hours: 36, name: 'Crystal tree', leaf: '#9ff0f0', shape: 'crystal', bark: 'crystal', glow: '#9ff0f0' }
+  crystaltree: { type: 'tree', hours: 36, name: 'Crystal tree', leaf: '#9ff0f0', shape: 'crystal', bark: 'crystal', glow: '#9ff0f0' },
+  // the five new countries' own: bamboo groves, jungle giants hung with vines, burnt trees with ember
+  // hearts on the ash fields, saltbush, coral in the lagoon shallows, orchids and fire lilies
+  bamboo: { type: 'tree', hours: 14, name: 'Bamboo', leaf: '#7ac06a', shape: 'bamboo' },
+  kapok: { type: 'tree', hours: 40, name: 'Kapok', leaf: '#2f8a3e', shape: 'vines' },
+  charred: { type: 'tree', hours: 30, name: 'Ember tree', leaf: '#3a2a24', shape: 'charred', bark: 'charred', glow: '#ff6a2a' },
+  monstera: { type: 'shrub', hours: 7, name: 'Monstera', leaf: '#2a8a4a', fern: true },
+  saltbush: { type: 'shrub', hours: 8, name: 'Saltbush', leaf: '#a8b4a0', bloom: '#ffffff' },
+  coral: { type: 'shrub', hours: 9, name: 'Sea coral', leaf: '#ff7a8a', coral: true },
+  orchid: { type: 'flower', hours: 3, name: 'Orchid', petal: '#e05ad8', mid: '#fff3a8', bell: true },
+  firelily: { type: 'flower', hours: 3, name: 'Fire lily', petal: '#ff6a2a', mid: '#ffd24a', glow: '#ff8a3a' }
 };
 PLANTS.bigshroom.shape = 'shroom';
 export const COMMON = ['daisy', 'tulip', 'poppy', 'lavender', 'bluebell', 'cosmos', 'sunflower', 'berrybush', 'rosebush', 'hydrangea', 'apple', 'cherry', 'willow', 'birch', 'oak'];
@@ -106,7 +133,19 @@ export const ANIMALS = {
   emberbird: { strange: 1, fly: true, speed: 36, cap: 0, glow: '#ffb23a', icon: 'sun' }, angler: { strange: 1, fly: true, speed: 9, cap: 0, glow: '#d8ffa0', icon: 'fish' },
   manta: { strange: 1, fly: true, speed: 22, cap: 0, icon: 'drop', big: 1 }, koi: { strange: 1, fly: true, speed: 18, cap: 0, glow: '#ffb08a', icon: 'fish' },
   phoenix: { strange: 1, fly: true, speed: 40, cap: 0, glow: '#ffb23a', icon: 'sun', big: 1 }, drone: { strange: 1, fly: true, speed: 30, cap: 0, glow: '#5af0ff', icon: 'note' },
-  cat: { strange: 1, speed: 28, cap: 0, icon: 'heart', eats: true }, gecko: { strange: 1, speed: 26, cap: 0, icon: 'sun' }
+  cat: { strange: 1, speed: 28, cap: 0, icon: 'heart', eats: true }, gecko: { strange: 1, speed: 26, cap: 0, icon: 'sun' },
+  // twenty more (garden-fauna.js): the new countries' animals, the city's, and the clockwork things
+  // that live in the tunnels under it
+  parrot: { strange: 1, fly: true, speed: 32, cap: 0, icon: 'note' }, jaguar: { strange: 1, speed: 30, cap: 0, icon: 'star', big: 1 },
+  treefrog: { strange: 1, speed: 14, cap: 0, hop: true, icon: 'drop' }, redpanda: { strange: 1, speed: 20, cap: 0, icon: 'heart', eats: true },
+  crane: { strange: 1, speed: 16, cap: 0, icon: 'moon', big: 1 }, panda: { strange: 1, speed: 8, cap: 0, icon: 'leaf', eats: true, big: 1 },
+  flamingo: { strange: 1, speed: 12, cap: 0, icon: 'heart', big: 1 }, fennec: { strange: 1, speed: 32, cap: 0, icon: 'sun', eats: true },
+  firenewt: { strange: 1, speed: 12, cap: 0, glow: '#ff8a3a', icon: 'sun' }, ashmoth: { strange: 1, fly: true, speed: 14, cap: 0, glow: '#ffb23a', icon: 'spiral' },
+  turtle: { strange: 1, speed: 5, cap: 0, icon: 'drop', big: 1 }, dolphin: { strange: 1, speed: 30, cap: 0, water: true, icon: 'fish', big: 1 },
+  seal: { strange: 1, speed: 10, cap: 0, icon: 'fish', eats: true }, pigeon: { strange: 1, speed: 18, cap: 0, icon: 'note', eats: true },
+  dog: { strange: 1, speed: 30, cap: 0, icon: 'heart', eats: true }, raccoon: { strange: 1, speed: 22, cap: 0, icon: 'gem', eats: true },
+  clockbeetle: { strange: 1, speed: 12, cap: 0, glow: '#ffd88a', icon: 'gem' }, brassrat: { strange: 1, speed: 30, cap: 0, icon: 'gem', eats: true },
+  cogowl: { strange: 1, fly: true, speed: 20, cap: 0, glow: '#ffd88a', icon: 'moon' }, golem: { strange: 1, speed: 6, cap: 0, glow: '#ff8a3a', icon: 'star', big: 1 }
 };
 
 // ruins: [type, name, lore, rare seed, w, h, solid]
@@ -167,6 +206,11 @@ const DERIVE = {
   high: (m) => shiftPal(PAL.sky[m] || PAL.sky.day, '#ffc8f0', 0.26, { bg: m === 'evening' ? ['#2e2270', '#f08ab0'] : m === 'morning' ? ['#ffd8c8', '#c8e8ff'] : ['#4a7af0', '#f0d8ff'], cloud: m === 'evening' ? '#ffd0e8' : '#ffffff' }),
   stars: () => ({ grass: ['#8a9ad8', '#7e8ecc', '#98a8e4'], dot: ['#fff6c8', '#9fd8ff', '#ffffff', '#e0a8ff'], under: '#4a4a8a', under2: '#2e2e5e', mist: '#c8d0ff', cloud: '#b8c0f8', bg: ['#060820', '#2a1a5a'], night: 1 }),
   roofs: () => ({ grass: ['#4a5068', '#444a60', '#525872'], dot: ['#5af0ff', '#ff5ad8', '#ffd24a'], under: '#1c1a2e', under2: '#14121f', mist: '#a8b0d0', cloud: '#6a70a0', bg: ['#0a0818', '#2a1438'], night: 1, roofs: 1 }),
+  // under the city: brick tunnels lined with copper pipes; the brass clockworks over pits of oil; the
+  // boiler heart with its channels of molten iron
+  steam: () => ({ floor: ['#5a4a40', '#524238', '#62524a'], wall: '#1e1612', wall2: '#5a3424', wall3: '#8a5a3a', water: '#3a3a24', water2: '#6a6a3a', rubble: ['#5a4a40', '#4a3a30', '#6a5a4a'], moss: '#5a6a3a', plank: '#7a5a3a', dot: ['#ffb24a', '#ffd88a'], steam: 1, pipe: '#b8743a', pipe2: '#e0a05a', brick: '#6a3a28' }),
+  gears: () => ({ floor: ['#6a5a3a', '#625232', '#726242'], wall: '#18120c', wall2: '#4a3a1c', wall3: '#a8843a', water: '#120e0a', water2: '#3a2e1a', rubble: ['#6a5a3a', '#5a4a2a', '#7a6a4a'], moss: '#5a5a2a', plank: '#a8843a', dot: ['#ffd88a', '#fff0c0'], steam: 2, pipe: '#c89a3a', pipe2: '#f0d07a', brick: '#4a3a24' }),
+  furnace: () => ({ floor: ['#3e3230', '#362a28', '#463a38'], wall: '#120a08', wall2: '#3a1a12', wall3: '#8a3a1a', water: '#ff6a1a', water2: '#ffc04a', rubble: ['#3e3230', '#2e2220', '#4e4240'], moss: '#4a3a2a', plank: '#5a4a40', dot: ['#ff8a3a', '#ffd24a'], steam: 3, lava: 1, pipe: '#8a5a3a', pipe2: '#c8804a', brick: '#4a2018' }),
   canopy: (m) => shiftPal(PAL.sky[m] || PAL.sky.day, '#3f7a3a', 0.45, { under: '#5a4030', under2: '#3d2b20', mist: '#cfe8c0', cloud: '#7fb86a', bg: m === 'evening' ? ['#1f1a24', '#0c0a0e'] : ['#24321f', '#0f160d'], planks: true })
 };
 // the dream's colour: every palette is pushed toward richer colour (the living things most, stone
@@ -208,9 +252,22 @@ export const BIOMES = [
   { id: 'frost', wet: 0, wood: 0.02, blades: 0, fog: [232, 240, 250], fogK: 1.4, tex: { grass: 'snow', forest: 'snow', path: 'path', sand: 'snow', rock: 'rock' }, snow: 1,
     pal: pal(['#e4ecf2', '#dae4ec', '#eef4f8'], ['#b8c8cc', '#aebfc4', '#c4d2d6'], ['#c8d8e0', '#bccdd6', '#b0c2cc'], '#d0dce4', '#b8b0a8', '#d8dce0', '#6a9ac0', '#a8cce4', '#a8acb4', '#888c96', '#9ab0a8', '#8e96a4', '#6a7280', '#b4bcc8', '#8a7060', ['#ffffff', '#cfe8ff', '#e8f4ff'], { ice: '#b8dcf0', ice2: '#e8f6fd' }) },
   { id: 'fungal', wet: 0.005, wood: 0.1, blades: 0.5, fog: [196, 184, 232], fogK: 1.5, tex: { grass: 'moss', forest: 'forest', path: 'path', sand: 'sand', rock: 'rock' }, litter: ['#8ff0d8', '#c8a8ff'], spores: 1,
-    pal: pal(['#6a6a9a', '#62628e', '#7474a6'], ['#4a4a7a', '#424270', '#525286'], ['#5a5090', '#4e4682', '#423c74'], '#7a78b0', '#a08ab0', '#b0a0c0', '#3a7aa0', '#6ac0d0', '#9a94aa', '#78728a', '#5a9a8a', '#827c96', '#605a74', '#a29cb6', '#6a5070', ['#8ff0d8', '#c8a8ff', '#ffb8e8', '#9fd8ff']) }
+    pal: pal(['#6a6a9a', '#62628e', '#7474a6'], ['#4a4a7a', '#424270', '#525286'], ['#5a5090', '#4e4682', '#423c74'], '#7a78b0', '#a08ab0', '#b0a0c0', '#3a7aa0', '#6ac0d0', '#9a94aa', '#78728a', '#5a9a8a', '#827c96', '#605a74', '#a29cb6', '#6a5070', ['#8ff0d8', '#c8a8ff', '#ffb8e8', '#9fd8ff']) },
+  // five more (worlds from v6 on): steaming jungle, bamboo groves, white salt flats round pink brine
+  // lakes, black ash fields with ember cracks and hot springs, and a turquoise lagoon with coral
+  { id: 'jungle', wet: -0.03, wood: 0.2, blades: 1.1, fog: [190, 226, 200], fogK: 1.9, tex: { grass: 'moss', forest: 'forest', path: 'mud', sand: 'sand', rock: 'rock' }, litter: ['#2a6a3a', '#8a5a2a', '#ff3a6a'],
+    pal: pal(['#3fa856', '#36a04e', '#4ab460'], ['#1f7a3e', '#1a7038', '#258646'], ['#2f8a48', '#287e40', '#1f7038'], '#3aa452', '#a07a4a', '#d8c08a', '#3a9a9a', '#7ad0c8', '#8a9a88', '#6a7a68', '#3a9a4a', '#7a8a7a', '#5a6a5a', '#9aaa9a', '#7a5a3a', ['#ff3a6a', '#ffd23f', '#ff8a2a', '#d050ff']) },
+  { id: 'bamboo', wet: 0, wood: 0.14, blades: 0.9, fog: [214, 232, 210], fogK: 1.4, tex: { grass: 'moss', forest: 'forest', path: 'path', sand: 'sand', rock: 'rock' }, litter: ['#c8b860', '#a8a050'],
+    pal: pal(['#8ac070', '#80b866', '#94c87a'], ['#5a9a5a', '#529052', '#64a464'], ['#6aa860', '#5e9a56', '#528c4c'], '#8ac070', '#d0bc90', '#e4d4a8', '#5aa8b8', '#9ad8e0', '#b8b4a4', '#98947e', '#7aaa5a', '#a8a698', '#848274', '#c8c6b8', '#9a8a5a', ['#ffffff', '#ffd6e4', '#fff3a8']) },
+  { id: 'salt', wet: 0.04, wood: -0.3, blades: 0.15, fog: [248, 244, 240], fogK: 0.4, tex: { grass: 'sand', forest: 'dune', path: 'sand', sand: 'sand', rock: 'rock' }, dry: 1, salt: 1,
+    pal: pal(['#ece6dc', '#e4ddd2', '#f4efe6'], ['#b8c0a8', '#aeb69e', '#c2cab2'], ['#c8ccb8', '#bcc0ac', '#b0b4a0'], '#d8d8c8', '#e0d4c0', '#f6f2ea', '#e8a0b8', '#f8d0dc', '#d4ccc0', '#b8ae9e', '#c0c8a8', '#c8bcb0', '#a89c90', '#e4dad0', '#a88a6a', ['#ffffff', '#ffd0e0', '#c8e8ff']) },
+  { id: 'ash', wet: 0.02, wood: -0.12, blades: 0.2, fog: [150, 130, 136], fogK: 1.2, tex: { grass: 'sand', forest: 'rock', path: 'path', sand: 'sand', rock: 'rock' }, litter: ['#ff6a2a', '#ffb23a'], dry: 1, ash: 1,
+    pal: pal(['#5a5258', '#524a50', '#625a60'], ['#3a3234', '#342c2e', '#40383a'], ['#4a4248', '#423a40', '#3a3238'], '#6a6268', '#6a5a52', '#4a4446', '#3a8a8a', '#6ac8c0', '#5a5458', '#45404a', '#6a7a5a', '#3e383c', '#2a2628', '#5a5256', '#5a4a40', ['#ff6a2a', '#ffb23a', '#ffd24a']) },
+  { id: 'lagoon', wet: -0.05, wood: -0.06, blades: 0.8, fog: [214, 240, 240], fogK: 0.7, tex: { grass: 'grass', forest: 'forest', path: 'sand', sand: 'sand', rock: 'rock' },
+    pal: pal(['#7ad08a', '#70c880', '#86d894'], ['#3aa070', '#349868', '#42aa78'], ['#5ab878', '#50aa6e', '#469c64'], '#7ad08a', '#f0e4c4', '#fbf2d8', '#2ac8d0', '#9af0f0', '#e0d8c8', '#c4bca8', '#6ab87a', '#d0c4b0', '#a89c88', '#ece2d0', '#c09a6a', ['#ff7aa8', '#ffd23f', '#ffffff', '#5ad8ff']) }
 ];
 export const B_MEADOW = 0, B_WOODS = 1, B_DOWNS = 2, B_MARSH = 3, B_HEATH = 4, B_AUTUMN = 5, B_DUNES = 6, B_ANCIENT = 7, B_FROST = 8, B_FUNGAL = 9;
+export const B_JUNGLE = 10, B_BAMBOO = 11, B_SALT = 12, B_ASH = 13, B_LAGOON = 14;
 // morning is paler and cooler, evening dusky; the light grade (garden.js) does the rest
 const MODE_MIX = { morning: ['#ffeaf0', 0.27], day: null, evening: ['#3e3a96', 0.2] };
 const biomePals = new Map();
@@ -231,12 +288,13 @@ export function biomeMap(Rm) {
   if (Rm.bio) return Rm.bio;
   const N = Rm.w, C = Math.ceil(N / 8), R = mulberry32(Rm.seed ^ 0xb10e);
   const rank = (a) => { const idx = Array.from(a.keys()).sort((p, q) => a[p] - a[q]), out = new Float32Array(a.length); idx.forEach((k, r) => { out[k] = r / a.length; }); return out; };
-  const t = rank(noiseMap(R, C, 3, 4)), m = rank(noiseMap(R, C, 3, 5)), q = rank(noiseMap(R, C, 2, 7)), cell = new Uint8Array(C * C), M = C >> 1;
+  const t = rank(noiseMap(R, C, 3, 4)), m = rank(noiseMap(R, C, 3, 5)), q = rank(noiseMap(R, C, 2, 7)), cell = new Uint8Array(C * C), M = C >> 1, v2 = (Rm.bv || 1) >= 2;
   for (let i = 0; i < C * C; i++) {
     const T0 = t[i], M0 = m[i], Q = q[i], cx = i % C, cy = (i / C) | 0;
     cell[i] = Math.hypot(cx - M, cy - M) < 2.6 ? B_MEADOW
-      : Q > 0.93 ? B_FUNGAL : Q < 0.07 ? B_ANCIENT : T0 < 0.15 ? B_FROST : T0 > 0.84 && M0 < 0.55 ? B_DUNES
-      : M0 > 0.8 ? B_MARSH : M0 > 0.56 ? (T0 < 0.5 ? B_WOODS : B_AUTUMN) : M0 < 0.26 ? (T0 < 0.5 ? B_HEATH : B_DOWNS) : B_MEADOW;
+      : Q > 0.93 ? B_FUNGAL : Q < 0.07 ? B_ANCIENT : v2 && Q > 0.86 ? B_ASH : v2 && Q < 0.13 ? B_LAGOON : T0 < 0.15 ? B_FROST : T0 > 0.84 && M0 < 0.55 ? B_DUNES
+      : v2 && T0 > 0.66 && M0 < 0.22 ? B_SALT
+      : M0 > 0.8 ? (v2 && T0 > 0.6 ? B_JUNGLE : B_MARSH) : M0 > 0.56 ? (T0 < 0.5 ? (v2 && T0 > 0.36 ? B_BAMBOO : B_WOODS) : B_AUTUMN) : M0 < 0.26 ? (T0 < 0.5 ? B_HEATH : B_DOWNS) : B_MEADOW;
   }
   const out = new Uint8Array(N * N), s1 = Rm.seed & 0xffff, s2 = s1 ^ 0x5a5a;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
@@ -297,6 +355,13 @@ export function plantSprite(k, st, fruit, v = 0) {
       [cv, c] = mk(14, h);
       px(c, 5, 2, tone(P.leaf, -0.25), 4, h - 2); px(c, 5, 2, P.leaf, 3, h - 2); px(c, 6, 3, tone(P.leaf, 0.22), 1, h - 5); ell(c, 7, 2.5, 2, 1.6, P.leaf);
       if (big) { px(c, 1, 8, P.leaf, 2, 6); px(c, 1, 13, P.leaf, 5, 2); px(c, 11, 5, P.leaf, 2, 6); px(c, 8, 10, P.leaf, 5, 2); px(c, 6, 0, P.bloom, 2, 2); }
+    }
+    else if (P.coral) {
+      // sea coral: branching fans in pinks and corals, a little white at the tips
+      const big = st === 3, w = big ? 18 : 12, h = big ? 15 : 9;
+      [cv, c] = mk(w, h);
+      const R = mulberry32(st * 53 + 11);
+      for (let b = 0; b < (big ? 7 : 4); b++) { let x = w / 2 + (b - (big ? 3 : 1.5)) * 1.6, y = h - 1; const a = -Math.PI / 2 + (b - (big ? 3 : 1.5)) * 0.32, col = ['#ff7a8a', '#ff9a6a', '#ff5a9a', '#ffb0c0'][b % 4]; for (let q = 0; q < (big ? 11 : 7); q++) { x += Math.cos(a) * 0.9 + (R() - 0.5) * 0.8; y += Math.sin(a) * 0.9; px(c, Math.round(x), Math.round(y), q > (big ? 8 : 5) ? '#fff0f0' : col, 1 + (q < 3 ? 1 : 0), 1); } }
     }
     else if (P.fern) {
       const big = st === 3, w = big ? 18 : 12, h = big ? 12 : 8;
@@ -495,6 +560,17 @@ export function liftSprite(style) {
     c.fillStyle = '#0c0e1a'; c.beginPath(); c.ellipse(20, 37.5, 6, 2, 0, 0, 7); c.fill();
     c.fillStyle = '#3a3850'; c.beginPath(); c.ellipse(20, 18, 13, 9, 0, 0, 7); c.fill(); c.fillStyle = '#565470'; c.beginPath(); c.ellipse(19, 17, 11, 7, 0, 0, 7); c.fill();
     c.fillStyle = '#5af0ff'; c.fillRect(13, 16, 12, 1); c.fillStyle = '#2a2838'; c.fillRect(7, 20, 2, 18); c.fillRect(31, 20, 2, 18);
+  } else if (style === 'cage') {
+    // a lift cage under the city: a brass lattice on chains, a winding wheel on top, a lamp
+    [cv, c] = mk(40, 92);
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(20, 86, 17, 5, 0, 0, 7); c.fill();
+    c.fillStyle = '#3a2a1c'; c.fillRect(6, 80, 28, 7); c.fillStyle = '#8a6a3a'; c.fillRect(6, 80, 28, 2);
+    c.fillStyle = '#5a4428'; c.fillRect(7, 36, 2, 46); c.fillRect(31, 36, 2, 46); c.fillRect(6, 34, 28, 3);
+    c.fillStyle = '#c89a3a'; for (let y = 40; y < 80; y += 6) for (let x = 10; x < 31; x += 5) { c.fillRect(x, y, 1, 4); c.fillRect(x - 1, y + 2, 3, 1); }
+    c.fillStyle = '#2a1e14'; c.fillRect(19, 0, 2, 35); c.fillStyle = '#8a8a94'; for (let y = 2; y < 34; y += 3) c.fillRect(18 + (y % 2), y, 3, 1);
+    c.fillStyle = '#5a4428'; c.beginPath(); c.arc(20, 14, 10, 0, 7); c.fill(); c.fillStyle = '#d8aa4a'; c.beginPath(); c.arc(20, 14, 8, 0, 7); c.fill(); c.fillStyle = '#5a4428'; c.beginPath(); c.arc(20, 14, 3, 0, 7); c.fill();
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * 6.283; c.fillStyle = '#d8aa4a'; c.fillRect(Math.round(20 + Math.cos(a) * 10) - 1, Math.round(14 + Math.sin(a) * 10) - 1, 3, 3); }
+    c.fillStyle = '#ffd88a'; c.fillRect(34, 42, 3, 4); c.fillStyle = '#5a4428'; c.fillRect(33, 40, 5, 2);
   } else if (style === 'vine') {
     [cv, c] = mk(28, 70);
     c.strokeStyle = '#7a6a48'; c.lineWidth = 1;
@@ -793,6 +869,7 @@ function link(A, a, B, b, style) {
 // always a way to follow. One of each kind of way out lies within a short walk of the start.
 function genSurface4(G, R, avoid = () => false) {
   const Rm = mkRealm('surface', G.seed), N = Rm.w, M = N >> 1, k = N / 128, b = (v) => Math.max(2, Math.round(v * k));
+  Rm.bv = 2;   // the fifteen kinds of country
   const bio = biomeMap(Rm), far = N * 0.46;
   const hN = noiseMap(R, N, 5, b(3)), mN = noiseMap(R, N, 4, b(4)), wN = noiseMap(R, N, 4, b(6)), pN = noiseMap(R, N, 3, b(14));
   const qWater = quantS(hN, 0.11), qSand = quantS(hN, 0.14), qRock = quantS(hN, 0.9), qForest = quantS(mN, 0.68), qFlowers = quantS(mN, 0.24), qPond = quantS(pN, 0.22), qDune = quantS(wN, 0.3);
@@ -1026,7 +1103,8 @@ function populateBase(G, Rm, cx, cy) {
     let k = null;
     if (Rm.name === 'mountain') k = F ? (r < 0.25 ? 'snowpine' : r < 0.3 ? 'pine' : r < 0.36 ? 'fern' : null) : GR ? (r < (g === FLOWERS ? 0.07 : 0.015) ? pick(['bluebell', 'lavender', 'daisy', 'cosmos']) : null) : null;
     else if (Rm.name === 'canyon') k = (g === SAND || g === GRASS) && wet(x, y) ? (r < 0.3 ? 'reed' : null) : g === GRASS ? (r < 0.018 ? pick(['poppy', 'sunflower', 'lavender']) : r < 0.024 ? 'berrybush' : r < 0.032 ? 'cactus' : null) : null;
-    else if ((g === SAND || g === GRASS) && wet(x, y) && bi !== B_FROST) k = r < (bi === B_MARSH ? 0.35 : bi === B_DUNES ? 0.12 : 0.2) ? 'reed' : null;
+    else if ((g === SAND || g === GRASS) && wet(x, y) && bi === B_LAGOON) k = r < 0.1 ? 'coral' : !tree(x, y) && r < 0.16 ? 'palm' : null;
+    else if ((g === SAND || g === GRASS) && wet(x, y) && bi !== B_FROST && bi !== B_SALT && bi !== B_ASH) k = r < (bi === B_MARSH || bi === B_JUNGLE ? 0.35 : bi === B_DUNES ? 0.12 : 0.2) ? 'reed' : null;
     else switch (bi) {
       case B_WOODS: k = F ? tr(0.22, ['pine', 'oak', 'birch', 'pine', 'ginkgo', 'redwood']) || (r < 0.36 ? 'fern' : null) : GR ? (r < 0.03 ? 'fern' : tr(0.036, ['birch', 'oak'])) : null; break;
       case B_DOWNS: k = g === FLOWERS ? (r < 0.12 ? pick(FL) : null) : g === GRASS ? (r < 0.045 ? pick([...FL, 'sunflower']) : tr(0.05, ['cherry', 'jacaranda'])) : F ? tr(0.15, ['cherry', 'apple', 'birch', 'wisteria', 'jacaranda']) || (r < 0.22 ? 'rosebush' : null) : null; break;
@@ -1036,6 +1114,12 @@ function populateBase(G, Rm, cx, cy) {
       case B_DUNES: k = g === SAND || GR ? (r < 0.02 ? 'cactus' : tr(0.028, ['palm', 'acacia', 'baobab'])) : F ? (r < 0.08 ? 'cactus' : tr(0.16, ['acacia', 'palm', 'baobab'])) : null; break;
       case B_ANCIENT: k = F ? tr(0.2, ['pine', 'oak', 'willow', 'redwood', 'redwood']) || (r < 0.32 ? 'fern' : r < 0.36 ? 'hydrangea' : null) : GR ? (r < 0.03 ? 'fern' : null) : null; break;
       case B_FROST: k = F ? tr(0.24, ['snowpine']) : GR ? tr(0.008, ['snowpine']) || (r < 0.012 ? 'moonflower' : null) : null; break;
+      case B_JUNGLE: k = F ? tr(0.26, ['kapok', 'palm', 'kapok', 'mangrove', 'redwood']) || (r < 0.42 ? pick(['fern', 'monstera', 'monstera']) : r < 0.45 ? 'orchid' : null) : GR ? (r < 0.05 ? pick(['monstera', 'fern', 'orchid']) : tr(0.06, ['palm', 'kapok'])) : null; break;
+      case B_BAMBOO: k = F ? tr(0.3, ['bamboo', 'bamboo', 'bamboo', 'ginkgo', 'cherry']) || (r < 0.36 ? 'fern' : null) : GR ? tr(0.04, ['bamboo']) || (r < 0.06 ? pick(['fern', 'hydrangea']) : null) : null; break;
+      case B_SALT: k = g === SAND || GR ? (r < 0.012 ? 'saltbush' : r < 0.015 ? 'cactus' : null) : F ? (r < 0.14 ? 'saltbush' : tr(0.16, ['acacia'])) : null;
+        if (!k && (g === SAND || GR) && r > 0.994 && !Rm.decor.some((o) => o.x === x && o.y === y)) { Rm.decor.push({ t: 'crystal', x, y, c: '#ffffff' }); delete Rm.dIdx; } break;
+      case B_ASH: k = g === SAND || GR ? (r < 0.02 ? 'firelily' : tr(0.026, ['charred'])) : F ? tr(0.22, ['charred']) || (r < 0.28 ? 'firelily' : null) : null; break;
+      case B_LAGOON: k = GR ? tr(0.03, ['palm']) || (r < 0.05 ? pick(['hydrangea', 'orchid']) : null) : g === SAND ? tr(0.03, ['palm']) : F ? tr(0.18, ['palm', 'mangrove', 'palm']) || (r < 0.28 ? 'monstera' : null) : null; break;
       case B_FUNGAL: k = F ? tr(0.12, ['bigshroom']) || (r < 0.2 ? 'glowshroom' : tr(0.21, ['spirittree', 'crystaltree'])) : GR ? (r < 0.035 ? 'glowshroom' : r < 0.045 ? 'moonflower' : tr(0.05, ['bigshroom'])) : null; break;
       default: k = F ? tr(0.2, ['pine', 'oak', 'birch', 'cypress']) || (r < 0.32 ? 'fern' : null) : g === GRASS ? tr(0.005, ['apple', 'cherry']) : g === FLOWERS ? (r < 0.06 ? pick(FL) : null) : null;
     }
@@ -1098,6 +1182,7 @@ function newGarden(avoid, keep = {}) {
   for (const Rm of [S, Mt, Cn]) for (const k of ['mouths', 'giants', 'liftUps', 'liftDowns', 'skyUps']) delete Rm[k];
   G.R = { surface: S, cave: C, sky: K, canyon: Cn, mountain: Mt, deep: D.Rm, canopy: Cp };
   try { dreamify(G, API); } catch (e) { console.error('garden dream', e); }
+  try { metropolis(G, API); } catch (e) { console.error('garden metro', e); G.v = 6; }
   // the start and its neighbours are grown at once
   const M = (S.w >> 1) / CH | 0;
   for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) populate(G, S, M + x, M + y);
@@ -1166,7 +1251,7 @@ function upgrade4(old) {
 }
 
 // what the dream module (garden-dream.js) builds with
-const API = { get PLANTS() { return PLANTS; }, T, CH, HR, SIZE, KIND, GRASS, WATER, PATH, SAND, STONE, BRIDGE, ROCK, PORTAL, FOREST, FLOWERS, VOID, CHASM, ICE, STREET, B: { B_MEADOW, B_WOODS, B_DOWNS, B_MARSH, B_HEATH, B_AUTUMN, B_DUNES, B_ANCIENT, B_FROST, B_FUNGAL },
+const API = { get PLANTS() { return PLANTS; }, T, CH, HR, SIZE, KIND, GRASS, WATER, PATH, SAND, STONE, BRIDGE, ROCK, PORTAL, FOREST, FLOWERS, VOID, CHASM, ICE, STREET, RAIL, B: { B_MEADOW, B_WOODS, B_DOWNS, B_MARSH, B_HEATH, B_AUTUMN, B_DUNES, B_ANCIENT, B_FROST, B_FUNGAL, B_JUNGLE, B_BAMBOO, B_SALT, B_ASH, B_LAGOON }, D: { D_CORE, D_NEON, D_OLD, D_WORKS, D_SUBS }, districtAt, noiseMap, rle, chunks: () => chunks,
   ix, inside, now, mkRealm, caField, quantS, joinRegions, spotIn, openGround, clearAt, link, natural, critter, genCave, genSky, biomeMap, biomeAt, hash2, vnoise };
 
 // ------------------------------------------------ saving
@@ -1177,7 +1262,7 @@ function rle(a) {
   return Uint8Array.from(out);
 }
 function unrle(b, n) { const out = new Uint8Array(n); let j = 0; for (let i = 0; i < b.length; i += 2) { out.fill(b[i + 1], j, j + b[i]); j += b[i]; } return out; }
-const packR = (Rm) => ({ ...Rm, tone: undefined, soil: undefined, wear: undefined, biome: undefined, bio: undefined, pIdx: undefined, pIdxA: undefined, dIdx: undefined, dIdxA: undefined, cv: undefined, mini: undefined, enc: 'rle', wild: rle(Rm.wild), ground: rle(Rm.ground), seen: rle(Rm.seen) });
+const packR = (Rm) => ({ ...Rm, _rw: undefined, _rc: undefined, tone: undefined, soil: undefined, wear: undefined, biome: undefined, bio: undefined, pIdx: undefined, pIdxA: undefined, dIdx: undefined, dIdxA: undefined, cv: undefined, mini: undefined, enc: 'rle', wild: rle(Rm.wild), ground: rle(Rm.ground), seen: rle(Rm.seen) });
 const unpackR = (o) => {
   const n = o.w * o.h, kind = KIND[o.name] || o.name;
   if (o.enc === 'rle') return { ...o, kind, wild: unrle(o.wild, n), ground: unrle(o.ground, n), seen: unrle(o.seen, n), pop: o.pop ? Uint8Array.from(o.pop) : undefined };
@@ -1190,19 +1275,31 @@ export async function loadGarden() {
   if (G) return G;
   loading ||= (async () => {
     let g = null;
-    try { const o = await idbGet('kv', KEY); if (o?.v >= 2 && o?.v <= 5) g = { ...o, R: Object.fromEntries(Object.entries(o.R).map(([k, v]) => [k, unpackR(v)])) }; } catch { /* a fresh one */ }
+    try { const o = await idbGet('kv', KEY); if (o?.v >= 2 && o?.v <= 6) g = { ...o, R: Object.fromEntries(Object.entries(o.R).map(([k, v]) => [k, unpackR(v)])) }; } catch { /* a fresh one */ }
     if (!g) { try { const o = await idbGet('kv', OLD); if (o?.v === 1) g = fromV1(o); } catch { /* a fresh one */ } }
     // older gardens move into the newest world (v1/v2: as they were, into its middle; v3: rebuilt)
     if (g && g.v < 3) { try { g = upgrade3(g); } catch (e) { console.error('garden upgrade', e); } }
     else if (g && g.v === 3) { try { g = upgrade4(g); } catch (e) { console.error('garden upgrade', e); } }
     // a v4 world keeps everything it has and gains the dream on top: villages, the city, deeper and higher realms
     if (g && g.v === 4) { try { dreamify(g, API); } catch (e) { console.error('garden dream', e); } }
+    // a v5 world grows the metropolis, its tunnels and the railway (and the five new countries)
+    if (g && g.v === 5) { try { metropolis(g, API); } catch (e) { console.error('garden metro', e); g.v = 6; } }
     G = g || newGarden();
     G.away = catchUp(G);
     saveGarden(true);
     return G;
   })();
   return loading;
+}
+// all twelve treasures found: the garden is grown again from a new seed. What you carry comes with
+// you (seeds, food, gems); the wisps go back to the world they came from.
+export function renew() {
+  const old = G, g = newGarden();
+  g.inv = { ...g.inv, ...old.inv, wisps: 0 };
+  Object.assign(g, { gen: (old.gen || 0) + 1, firstVisit: 0, created: old.created || g.created, log: [] });
+  chunks.clear();
+  G = g; saveGarden(true);
+  return G;
 }
 export function saveGarden(soon = false) {
   if (!G) return;
@@ -1374,6 +1471,7 @@ function paintGround(c, Rm, P, x, y, X, Y, mode) {
     if (g === PORTAL) { c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 1.5; c.beginPath(); c.ellipse(X + 8, Y + 9, 7, 4, 0, 0, 7); c.stroke(); c.beginPath(); c.ellipse(X + 8, Y + 9, 4, 2, 0, 0, 7); c.stroke(); }
     return;
   }
+  if (realm === 'cave' && P.steam) { paintWorks(c, Rm, P, x, y, X, Y, i, g, R, at); return; }
   if (realm === 'cave') {
     if (g === ROCK) {
       c.fillStyle = P.wall; c.fillRect(X, Y, T, T); texture(c, 'cave', X, Y, x, y, soilOf(Rm)[i], 0.6);
@@ -1459,7 +1557,10 @@ function paintGround(c, Rm, P, x, y, X, Y, mode) {
     }
     return;
   }
+  if (g === RAIL) { paintRail(c, Rm, P, x, y, X, Y, i, R, at); return; }
   if (g === STREET) {
+    const dk = districtAt(Rm, x, y);
+    if (dk && dk !== D_NEON) { paintPaving(c, Rm, dk, x, y, X, Y, R, at); return; }
     // the city's wet paving: dark slabs with a seam, neon caught in the puddles, a drain here and there
     const h1 = hash2(x, y, 61);
     c.fillStyle = h1 < 0.5 ? '#3a3a58' : '#404264'; c.fillRect(X, Y, T, T);
@@ -1499,8 +1600,11 @@ function paintGround(c, Rm, P, x, y, X, Y, mode) {
     if (y > 0 && Rm.wild[ix(Rm, x, y - 1)]) { c.fillStyle = 'rgba(30,60,30,.16)'; c.fillRect(X, Y, T, 4); c.fillStyle = 'rgba(30,60,30,.08)'; c.fillRect(X, Y + 4, T, 3); }
   } else {
     for (let k = 0; k < 5; k++) { c.fillStyle = 'rgba(0,0,0,.06)'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 2, 1); }
+    // salt crust: a net of pale ridges; ash: cinders, and now and then a crack still glowing
+    if (g === SAND && B.salt) { c.fillStyle = 'rgba(190,170,170,.55)'; const ox = X + (R() * 6 | 0), oy = Y + (R() * 6 | 0); c.fillRect(ox, oy, 7, 1); c.fillRect(ox + 6, oy, 1, 6); c.fillRect(ox + 2, oy + 6, 5, 1); c.fillStyle = 'rgba(255,255,255,.8)'; c.fillRect(X + (R() * 14 | 0), Y + (R() * 14 | 0), 2, 1); }
+    else if (g === SAND && B.ash) { for (let k = 0; k < 4; k++) { c.fillStyle = R() < 0.5 ? '#2e282c' : '#6e666a'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 1 + (R() * 2 | 0), 1); } if (R() < 0.14) { c.fillStyle = '#ff6a2a'; let cx0 = X + 2 + (R() * 10 | 0), cy0 = Y + 2 + (R() * 10 | 0); for (let k = 0; k < 5; k++) { c.fillRect(cx0, cy0, 1, 1); cx0 += R() < 0.5 ? 1 : 0; cy0 += 1; } c.fillStyle = '#ffd24a'; c.fillRect(cx0, cy0 - 2, 1, 1); } }
     // dunes: wind ripples across the sand
-    if (g === SAND && B.dry) for (let k = 0; k < 3; k++) { const yy = Y + 3 + k * 5 + (R() * 2 | 0); c.fillStyle = tone(P.sand, -0.1); c.fillRect(X, yy, 6 + (R() * 6 | 0), 1); c.fillStyle = tone(P.sand, 0.12); c.fillRect(X + 4 + (R() * 6 | 0), yy - 1, 6, 1); }
+    else if (g === SAND && B.dry) for (let k = 0; k < 3; k++) { const yy = Y + 3 + k * 5 + (R() * 2 | 0); c.fillStyle = tone(P.sand, -0.1); c.fillRect(X, yy, 6 + (R() * 6 | 0), 1); c.fillStyle = tone(P.sand, 0.12); c.fillRect(X + 4 + (R() * 6 | 0), yy - 1, 6, 1); }
     // a path through the woods: flat stepping stones, moss at the rims, fallen petals
     if (g === PATH && (at(1, 0) === FOREST || at(-1, 0) === FOREST || at(0, 1) === FOREST || at(0, -1) === FOREST)) {
       for (let k = 0; k < 2; k++) { const sx = X + 2 + (R() * 9 | 0), sy = Y + 2 + k * 7 + (R() * 3 | 0); c.fillStyle = tone(P.stone2, -0.1); c.fillRect(sx, sy + 1, 5, 3); c.fillStyle = P.stone; c.fillRect(sx, sy, 5, 3); c.fillStyle = tone(P.stone, 0.25); c.fillRect(sx, sy, 3, 1); }
@@ -1510,11 +1614,122 @@ function paintGround(c, Rm, P, x, y, X, Y, mode) {
     if (clump && (g === PATH || g === SAND)) for (let k = 0; k < 3; k++) { c.fillStyle = R() < 0.5 ? P.stone2 : P.stone; c.fillRect(X + 1 + (R() * 13 | 0), Y + 1 + (R() * 13 | 0), 2, 1); }
   }
 }
+// The levels under the city. Walls are soot-black with their face toward the floor in courses of
+// brick (or riveted brass in the clockworks) and a copper pipe along it, flanged where the tiles
+// meet, with now and then a red valve wheel, a pressure gauge or a pipe running down to the floor.
+// Floors: brick pavers in the tunnels, brass plates and grates in the clockworks, cracked basalt by
+// the furnace. Water is murky, oil, or molten iron; bridges are iron catwalks.
+function paintWorks(c, Rm, P, x, y, X, Y, i, g, R, at) {
+  const k = P.steam, h = hash2(x, y, 131);
+  if (g === ROCK) {
+    c.fillStyle = P.wall; c.fillRect(X, Y, T, T);
+    if (h < 0.2) { c.fillStyle = tone(P.wall, 0.14); c.fillRect(X + (R() * 12 | 0), Y + (R() * 12 | 0), 2, 2); }
+    if (at(0, 1) === ROCK) return;
+    if (k === 2) {
+      c.fillStyle = P.wall2; c.fillRect(X, Y + 3, T, 13); c.fillStyle = P.wall3; c.fillRect(X, Y + 3, T, 1); c.fillStyle = tone(P.wall2, -0.25); c.fillRect(X + T - 1, Y + 3, 1, 13);
+      c.fillStyle = P.pipe2; for (const [rx, ry] of [[2, 5], [13, 5], [2, 14], [13, 14]]) c.fillRect(X + rx, Y + ry, 1, 1);
+    } else {
+      for (let row = 0; row < 4; row++) { const yy = Y + 4 + row * 3, off = (row + y) % 2 ? 4 : 0; c.fillStyle = row % 2 ? P.brick : tone(P.brick, -0.1); c.fillRect(X, yy, T, 3); c.fillStyle = tone(P.brick, -0.4); c.fillRect(X, yy + 2, T, 1); for (let bx = off; bx < T; bx += 8) c.fillRect(X + bx, yy, 1, 2); }
+      if (k === 3 && h < 0.4) { c.fillStyle = '#ff6a1a'; c.fillRect(X + (R() * 12 | 0), Y + 6 + (R() * 3 | 0) * 3, 3, 1); }
+    }
+    const py = Y + 6;
+    c.fillStyle = tone(P.pipe, -0.35); c.fillRect(X, py + 2, T, 1); c.fillStyle = P.pipe; c.fillRect(X, py, T, 2); c.fillStyle = P.pipe2; c.fillRect(X, py, T, 1);
+    if (x % 3 === 0) { c.fillStyle = tone(P.pipe, -0.18); c.fillRect(X + 2, py - 1, 2, 5); }
+    if (h > 0.9) { c.fillStyle = '#a82a1a'; c.beginPath(); c.arc(X + 9, py + 1, 3.5, 0, 7); c.fill(); c.fillStyle = '#e86a4a'; c.fillRect(X + 8, py - 3, 2, 8); c.fillRect(X + 5, py, 8, 2); c.fillStyle = '#3a2a20'; c.fillRect(X + 8, py, 2, 2); }
+    else if (h > 0.83) { c.fillStyle = '#2a2420'; c.beginPath(); c.arc(X + 9, Y + 12, 3.5, 0, 7); c.fill(); c.fillStyle = '#e8e0cc'; c.beginPath(); c.arc(X + 9, Y + 12, 2.6, 0, 7); c.fill(); c.fillStyle = '#c83a2a'; c.fillRect(X + 9, Y + 11, 2, 1); c.fillStyle = P.pipe; c.fillRect(X + 8, Y + 9, 2, 1); }
+    else if (h < 0.08 && k !== 2) { c.fillStyle = P.pipe; c.fillRect(X + 11, py, 2, T - 6); c.fillStyle = P.pipe2; c.fillRect(X + 11, py, 1, T - 6); c.fillStyle = tone(P.pipe, -0.2); c.fillRect(X + 10, Y + 12, 4, 1); }
+    return;
+  }
+  if (g === WATER) {
+    c.fillStyle = P.water; c.fillRect(X, Y, T, T);
+    if (k === 3) for (let n = 0; n < 3; n++) { c.fillStyle = R() < 0.5 ? P.water2 : '#ffe08a'; c.fillRect(X + (R() * 14 | 0), Y + (R() * 14 | 0), 2 + (R() * 3 | 0), 1); }
+    else for (let n = 0; n < 2; n++) { c.fillStyle = k === 2 ? 'rgba(130,100,210,.35)' : 'rgba(150,160,90,.45)'; c.fillRect(X + (R() * 13 | 0), Y + (R() * 14 | 0), 3, 1); }
+    for (const [dx, dy] of near4) { const n = at(dx, dy); if (n === WATER || n === BRIDGE) continue; c.fillStyle = k === 3 ? '#3a1a10' : tone(P.floor[1], -0.35); c.fillRect(X + (dx === 1 ? T - 2 : 0), Y + (dy === 1 ? T - 2 : 0), dx ? 2 : T, dy ? 2 : T); }
+    return;
+  }
+  if (g === BRIDGE) {
+    c.fillStyle = P.water; c.fillRect(X, Y, T, T); c.fillStyle = tone(P.pipe, -0.4); c.fillRect(X + 1, Y + 1, T - 2, T - 2);
+    c.fillStyle = tone(P.plank, -0.1); for (let q = 0; q < 5; q++) { c.fillRect(X + 2 + q * 3, Y + 2, 1, T - 4); c.fillRect(X + 2, Y + 2 + q * 3, T - 4, 1); }
+    c.fillStyle = P.pipe2; c.fillRect(X, Y, T, 1); c.fillRect(X, Y + T - 1, T, 1);
+    return;
+  }
+  const f = P.floor[(x * 7 + y * 3) % 3];
+  c.fillStyle = f; c.fillRect(X, Y, T, T);
+  if (k === 1) for (let row = 0; row < 4; row++) { c.fillStyle = tone(f, -0.24); c.fillRect(X, Y + row * 4 + 3, T, 1); const off = (row + y) % 2 ? 0 : 4; for (let bx = off; bx < T; bx += 8) c.fillRect(X + bx, Y + row * 4, 1, 3); }
+  else if (k === 2) {
+    c.fillStyle = tone(f, -0.3); c.fillRect(X, Y + T - 1, T, 1); c.fillRect(X + T - 1, Y, 1, T); c.fillStyle = tone(f, 0.2); c.fillRect(X, Y, T - 1, 1); c.fillRect(X, Y, 1, T - 1);
+    c.fillStyle = P.pipe2; for (const [rx, ry] of [[2, 2], [13, 2], [2, 13], [13, 13]]) c.fillRect(X + rx, Y + ry, 1, 1);
+    if (h < 0.1) { c.fillStyle = tone(f, -0.45); for (let q = 0; q < 4; q++) c.fillRect(X + 4, Y + 4 + q * 2, 8, 1); }
+  } else {
+    c.fillStyle = tone(f, -0.28); let cx0 = X + (R() * 10 | 0), cy0 = Y; for (let q = 0; q < 8; q++) { c.fillRect(cx0, cy0, 1, 2); cx0 += R() < 0.5 ? -1 : 1; cy0 += 2; }
+    if (h < 0.14) { c.fillStyle = '#ff6a1a'; c.fillRect(X + 3 + (R() * 9 | 0), Y + 3 + (R() * 9 | 0), 2, 1); }
+  }
+  if (h > 0.94 && k !== 3) { c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(X + 8, Y + 9, 5, 2.5, 0, 0, 7); c.fill(); }
+  if (g === PORTAL) { c.fillStyle = 'rgba(255,220,160,.25)'; c.beginPath(); c.ellipse(X + 8, Y + 8, 8, 6, 0, 0, 7); c.fill(); c.fillStyle = P.pipe; c.fillRect(X + 5, Y - 2, 1, 14); c.fillRect(X + 11, Y - 2, 1, 14); for (let q = 0; q < 4; q++) c.fillRect(X + 5, Y + q * 3, 7, 1); }
+}
+// The railway: sleepers on grey ballast and two steel rails; curves turn in quarter circles round the
+// corner they share; where the line crosses water or a gorge it runs on a timber trestle.
+function paintRail(c, Rm, P, x, y, X, Y, i, R, at) {
+  const over = (Rm._rw ||= new Set(Rm.railBrW || [])).has(i) ? 'w' : (Rm._rc ||= new Set(Rm.railBrC || [])).has(i) ? 'c' : '';
+  const L = at(-1, 0) === RAIL, Rr = at(1, 0) === RAIL, U = at(0, -1) === RAIL, D = at(0, 1) === RAIL, hz = L || Rr, vt = U || D, n = L + Rr + U + D;
+  if (over === 'w') { c.fillStyle = P.water; c.fillRect(X, Y, T, T); c.fillStyle = P.water2; c.fillRect(X + (R() * 10 | 0), Y + (R() * 14 | 0), 4, 1); }
+  else if (over === 'c') { c.fillStyle = '#1a1014'; c.fillRect(X, Y, T, T); }
+  else {
+    const b = mixHex('#8a8078', P.path || '#a09080', 0.25);
+    c.fillStyle = b; c.fillRect(X, Y, T, T);
+    for (let k = 0; k < 10; k++) { c.fillStyle = R() < 0.5 ? tone(b, -0.2) : tone(b, 0.15); c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 1 + (R() < 0.3 ? 1 : 0), 1); }
+  }
+  const tie = over ? '#5a3e28' : '#6a4a32', tieD = '#3a281a', steel = '#d0d4dc', steelD = '#5a5a66';
+  if (over) { c.fillStyle = '#3a2a1c'; if (hz && !vt) { c.fillRect(X, Y + 2, T, 12); c.fillStyle = '#24180e'; c.fillRect(X + 3, Y + 14, 2, 2); c.fillRect(X + 11, Y + 14, 2, 2); } else if (vt && !hz) c.fillRect(X + 2, Y, 12, T); else c.fillRect(X + 2, Y + 2, 12, 12); }
+  const sH = () => { for (let q = 1; q < T; q += 4) { c.fillStyle = tieD; c.fillRect(X + q, Y + 3, 3, 11); c.fillStyle = tie; c.fillRect(X + q, Y + 3, 2, 10); } c.fillStyle = steelD; c.fillRect(X, Y + 6, T, 1); c.fillRect(X, Y + 11, T, 1); c.fillStyle = steel; c.fillRect(X, Y + 5, T, 1); c.fillRect(X, Y + 10, T, 1); };
+  const sV = () => { for (let q = 1; q < T; q += 4) { c.fillStyle = tieD; c.fillRect(X + 2, Y + q, 12, 3); c.fillStyle = tie; c.fillRect(X + 2, Y + q, 11, 2); } c.fillStyle = steelD; c.fillRect(X + 6, Y, 1, T); c.fillRect(X + 11, Y, 1, T); c.fillStyle = steel; c.fillRect(X + 5, Y, 1, T); c.fillRect(X + 10, Y, 1, T); };
+  if (n === 2 && hz && vt) {
+    const px0 = Rr ? X + T : X, py0 = D ? Y + T : Y, sx = Rr ? -1 : 1, sy = D ? -1 : 1, a1 = Math.atan2(sy, 0), a2 = sx > 0 ? 0 : Math.PI;
+    let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI;
+    c.lineWidth = 2.6; c.strokeStyle = tie;
+    for (let q = 0; q < 4; q++) { const a = a1 + (d * (q + 0.5)) / 4; c.beginPath(); c.moveTo(px0 + Math.cos(a) * 2.5, py0 + Math.sin(a) * 2.5); c.lineTo(px0 + Math.cos(a) * 13.5, py0 + Math.sin(a) * 13.5); c.stroke(); }
+    c.lineWidth = 1.2;
+    for (const [r, col] of [[6.3, steelD], [11.3, steelD], [5.5, steel], [10.5, steel]]) { c.strokeStyle = col; c.beginPath(); c.arc(px0, py0, r, a1, a1 + d, d < 0); c.stroke(); }
+  } else if (hz && vt) { sH(); sV(); }
+  else if (vt) sV();
+  else sH();
+}
+// Each district's own paving: the centre's pale polished stone with seams of light, the old town's
+// cobbles, the ironworks' cracked concrete with oil and hazard paint, the suburbs' asphalt; a kerb
+// wherever it meets a lawn.
+function paintPaving(c, Rm, dk, x, y, X, Y, R, at) {
+  const h = hash2(x, y, 61);
+  if (dk === D_CORE) {
+    c.fillStyle = h < 0.5 ? '#8c96a8' : '#8690a2'; c.fillRect(X, Y, T, T);
+    c.fillStyle = '#6e7888'; c.fillRect(X, Y + T - 1, T, 1); c.fillRect(X + T - 1, Y, 1, T); c.fillStyle = '#a8b2c2'; c.fillRect(X, Y, T - 1, 1);
+    if (h > 0.6) { c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(X + 2 + (R() * 8 | 0), Y + 3, 4, 1); }
+    if (x % 6 === 0) { c.fillStyle = 'rgba(70,220,255,.42)'; c.fillRect(X + 7, Y, 2, T); }
+    if (y % 6 === 0) { c.fillStyle = 'rgba(70,220,255,.42)'; c.fillRect(X, Y + 7, T, 2); }
+    if (h > 0.93) { c.fillStyle = '#9aa4b4'; c.fillRect(X + 4, Y + 4, 8, 8); c.fillStyle = '#5a9a6a'; c.fillRect(X + 5, Y + 5, 6, 6); c.fillStyle = '#8ad07a'; c.fillRect(X + 6, Y + 5, 3, 2); }
+  } else if (dk === D_OLD) {
+    c.fillStyle = '#5a4e44'; c.fillRect(X, Y, T, T);
+    for (let ry = 0; ry < 4; ry++) for (let rx = 0; rx < 4; rx++) { const sx = X + rx * 4 + ((ry + y) % 2 ? 2 : 0), sy = Y + ry * 4, t2 = hash2(x * 4 + rx, y * 4 + ry, 7); if (sx > X + T - 2) continue; c.fillStyle = t2 < 0.33 ? '#8e7e70' : t2 < 0.66 ? '#9a8a7a' : '#7e7064'; c.fillRect(sx, sy, 3, 3); c.fillStyle = 'rgba(255,240,220,.22)'; c.fillRect(sx, sy, 2, 1); }
+  } else if (dk === D_WORKS) {
+    c.fillStyle = h < 0.5 ? '#77736c' : '#6f6b64'; c.fillRect(X, Y, T, T);
+    c.fillStyle = '#5c5852'; c.fillRect(X, Y + T - 1, T, 1); c.fillRect(X + T - 1, Y, 1, T);
+    for (let k = 0; k < 4; k++) { c.fillStyle = R() < 0.5 ? '#625e58' : '#87837c'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 2, 1); }
+    if (h > 0.86) { c.fillStyle = 'rgba(20,16,22,.35)'; c.beginPath(); c.ellipse(X + 8, Y + 8, 5, 3, 0, 0, 7); c.fill(); c.fillStyle = 'rgba(140,90,220,.25)'; c.fillRect(X + 6, Y + 7, 4, 1); }
+    else if (h < 0.06) { let cx0 = X + 3, cy0 = Y + 2; c.fillStyle = '#4e4a44'; for (let q = 0; q < 7; q++) { c.fillRect(cx0, cy0, 1, 2); cx0 += R() < 0.5 ? 1 : 2; cy0 += 2; } }
+    if ((x * 3 + y * 5) % 37 === 0) for (let q = 0; q < 4; q++) { c.fillStyle = q % 2 ? '#e8c020' : '#1e1c1a'; c.fillRect(X + q * 4, Y + 12, 4, 3); }
+  } else {
+    c.fillStyle = h < 0.5 ? '#55555e' : '#5a5a62'; c.fillRect(X, Y, T, T);
+    for (let k = 0; k < 6; k++) { c.fillStyle = R() < 0.5 ? '#4a4a52' : '#6a6a72'; c.fillRect(X + (R() * 15 | 0), Y + (R() * 15 | 0), 1, 1); }
+    const lr = at(-1, 0) === STREET && at(1, 0) === STREET, ud = at(0, -1) === STREET && at(0, 1) === STREET;
+    if (lr && !ud && x % 2 === 0) { c.fillStyle = '#e8d8a0'; c.fillRect(X + 4, Y + 7, 8, 1); }
+    else if (ud && !lr && y % 2 === 0) { c.fillStyle = '#e8d8a0'; c.fillRect(X + 7, Y + 4, 1, 8); }
+  }
+  for (const [dx, dy] of near4) { const nb = at(dx, dy); if (nb === STREET || nb === RAIL || nb === BRIDGE || nb === WATER || nb === PORTAL) continue; c.fillStyle = dk === D_CORE ? '#c8d2e0' : '#b8b2a6'; c.fillRect(X + (dx === 1 ? T - 2 : 0), Y + (dy === 1 ? T - 2 : 0), dx ? 2 : T, dy ? 2 : T); }
+}
 // Soft edges. Where two kinds of ground meet, the one that lies over the other (rock over forest over
 // grass over path over sand over water; cave wall over floor; island over air) spills a ragged
 // fringe a few pixels into its neighbour, with a darker rim where it meets water, and its outer
 // corners are rounded off; where two countries' grass meets, each scatters a little into the other.
-const RANK = { [WATER]: 0, [ICE]: 0, [SAND]: 1, [PATH]: 2, [GRASS]: 3, [FLOWERS]: 3, [FOREST]: 4, [ROCK]: 5, [STREET]: -1, [VOID]: -2 };
+const RANK = { [WATER]: 0, [ICE]: 0, [SAND]: 1, [PATH]: 2, [GRASS]: 3, [FLOWERS]: 3, [FOREST]: 4, [ROCK]: 5, [STREET]: -1, [RAIL]: -1, [VOID]: -2 };
 function edgeCol(Rm, P, x, y, mode) {
   const i = ix(Rm, x, y), g = Rm.ground[i];
   if (Rm.kind === 'cave') return g === ROCK ? P.wall : P.floor[1];
@@ -1527,7 +1742,7 @@ function edgeCol(Rm, P, x, y, mode) {
   return mixHex(base[1], base[n > 0.5 ? 2 : 0], Math.abs(n - 0.5) * 1.6);
 }
 function paintEdges(c, Rm, P, x, y, X, Y, mode) {
-  if (!inside(Rm, x, y)) return;
+  if (!inside(Rm, x, y) || P?.steam) return;   // the works under the city keep their hard edges
   const g = Rm.ground[ix(Rm, x, y)], kind = Rm.kind, ra = kind === 'cave' ? (g === ROCK ? 5 : -9) : kind === 'sky' ? (g === GRASS || g === PORTAL ? 3 : -9) : RANK[g] ?? -9;
   if (ra < 1) return;
   const at = (dx, dy) => (inside(Rm, x + dx, y + dy) ? Rm.ground[ix(Rm, x + dx, y + dy)] : g), rk = (q) => (kind === 'cave' ? (q === ROCK ? 5 : q === WATER ? 0 : 2) : kind === 'sky' ? (q === VOID ? -2 : 3) : RANK[q] ?? 9);
@@ -1560,7 +1775,7 @@ function paintEdges(c, Rm, P, x, y, X, Y, mode) {
   for (const [qx, qy, cxp, cyp] of [[0, 2, 1, 1], [1, 2, -1, 1], [0, 3, 1, -1], [1, 3, -1, -1]]) {
     if (!lower[qx] || !lower[qy] || !inside(Rm, x + cxp, y)) continue;
     const nb = at(cxp, 0);
-    if (kind === 'surface' && (nb === WATER || nb === STREET || nb === ICE)) continue;
+    if (kind === 'surface' && (nb === WATER || nb === STREET || nb === ICE || nb === RAIL)) continue;
     c.fillStyle = kind === 'sky' ? 'rgba(0,0,0,0)' : edgeCol(Rm, P, x + cxp, y, mode);
     const ex = cxp > 0 ? X + T : X, ey = cyp > 0 ? Y + T : Y;
     if (kind === 'sky') { c.clearRect(ex - (cxp > 0 ? 2 : 0), ey - (cyp > 0 ? 1 : 0), 2, 1); c.clearRect(ex - (cxp > 0 ? 1 : 0), ey - (cyp > 0 ? 2 : 0), 1, 2); }
@@ -1678,10 +1893,10 @@ const mixP = (v, r, g, b, k) => pack(Math.round((v & 255) * (1 - k) + r * k), Ma
 function mapTable(Rm, P) {
   const t = new Uint32Array(16), h = (c, d = '#888888') => { const [r, g, b] = rgbOf(c || d); return pack(r, g, b); };
   for (let g = 0; g < 16; g++) {
-    if (Rm.kind === 'cave') t[g] = g === ROCK ? h(P.wall) : g === WATER ? h(Rm.name === 'abyss' ? '#ff6a2a' : P.water) : g === PORTAL ? pack(255, 232, 168) : g === BRIDGE ? h(P.plank, '#8a6a48') : h(P.floor?.[1]);
+    if (Rm.kind === 'cave') t[g] = g === ROCK ? h(P.steam ? P.brick : P.wall) : g === WATER ? h(Rm.name === 'abyss' ? '#ff6a2a' : P.water) : g === PORTAL ? pack(255, 232, 168) : g === BRIDGE ? h(P.plank, '#8a6a48') : h(P.floor?.[1]);
     else if (Rm.kind === 'sky') t[g] = g === VOID ? (P.night ? pack(14, 16, 44) : P.roofs ? pack(20, 18, 36) : h(P.bg?.[1], '#9cc8ec')) : g === BRIDGE ? (P.roofs ? pack(90, 90, 130) : pack(236, 240, 250)) : g === PORTAL ? pack(255, 255, 255) : h(P.grass?.[1]);
     else t[g] = g === WATER ? h(P.water) : g === SAND ? h(P.sand) : g === PATH ? h(P.path) : g === STONE ? h(P.stone) : g === BRIDGE ? h(P.plank, '#b88a5a') : g === ROCK ? h(P.rock2, '#7f7a72')
-      : g === CHASM ? pack(44, 20, 24) : g === ICE ? h(P.ice, '#b8dcf0') : g === STREET ? pack(52, 52, 86) : g === PORTAL ? pack(24, 18, 22) : g === FOREST ? h(P.forest?.[1]) : g === FLOWERS ? mixP(h(P.grass?.[1]), ...rgbOf(P.dot?.[0] || '#ffffff'), 0.3) : h(P.grass?.[1]);
+      : g === CHASM ? pack(44, 20, 24) : g === ICE ? h(P.ice, '#b8dcf0') : g === STREET ? pack(52, 52, 86) : g === RAIL ? pack(58, 44, 40) : g === PORTAL ? pack(24, 18, 22) : g === FOREST ? h(P.forest?.[1]) : g === FLOWERS ? mixP(h(P.grass?.[1]), ...rgbOf(P.dot?.[0] || '#ffffff'), 0.3) : h(P.grass?.[1]);
   }
   return t;
 }

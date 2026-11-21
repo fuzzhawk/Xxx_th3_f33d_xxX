@@ -1353,7 +1353,7 @@ function assignThemes(games, kits) {
 // ------------------------------------------------------------------ procedural categories
 const GAME_NAMES = {
   garden: 'Garden', plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', tetris: 'Tetris', pong: 'Pong', peggle: 'Peg Shot', juggle: 'Juggle',
-  platformer: 'Platformer', racer: 'Road Racer', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot',
+  platformer: 'Platformer', racer: 'Rail Raider', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot',
   chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl',
   starfox: 'Sky Fox', expedition: 'Expeditions', ski: 'Downhill', graves: 'Grave Merge', survivors: 'Cave Horde', robotron: 'Robo Arena', crokinole: 'Crokinole',
   wordle: 'Five Letters', bee: 'Spelling Hive', wordsearch: 'Word Search', wheel: 'Letter Wheel', hangman: 'Hangman', vocab: 'Vocab Quiz', ladder: 'Word Ladder', t2048: '2048', arrows: 'Arrow Escape', jrpg: 'Crystal Quest', hack: 'Crypt Hack', outland: 'Outland'

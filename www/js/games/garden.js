@@ -13,6 +13,7 @@ import { settings } from '../state.js';
 import * as Wd from './garden-world.js';
 import { install } from './garden-live.js';
 import { install as installMap } from './garden-map.js';
+import { install as installRail } from './garden-rail.js';
 import { shadowSprite } from './garden-art.js';
 import { glowSprite } from './garden-kit.js';
 // a soft-edged disc, cached by radius: cut out of the caves' darkness wherever there is a light
@@ -198,7 +199,7 @@ export class Garden extends Game {
   }
   open(x, y) { const Rm = this.Rm; if (!inside(Rm, x, y)) return false; const i = ix(Rm, x, y), g = Rm.ground[i]; return !Rm.wild[i] && g !== WATER && g !== ROCK && g !== VOID && g !== CHASM && g !== ICE && !this.block[i]; }
   // can feet go here? tall grass, rubble and mist give way underfoot and water is swum, so they count
-  walkable(x, y) { const Rm = this.Rm; if (!inside(Rm, x, y)) return false; const i = ix(Rm, x, y), g = Rm.ground[i]; return g !== ROCK && g !== VOID && g !== CHASM && !this.block[i] && !(g === WATER && Rm.name === 'abyss'); }
+  walkable(x, y) { const Rm = this.Rm; if (!inside(Rm, x, y)) return false; const i = ix(Rm, x, y), g = Rm.ground[i]; return g !== ROCK && g !== VOID && g !== CHASM && !this.block[i] && !(g === WATER && (Rm.name === 'abyss' || Rm.name === 'furnace')); }
   // in the water (swimming) at a world point
   wet(x, y) { const Rm = this.Rm, tx = Math.floor(x / T), ty = Math.floor((y - 2) / T); return inside(Rm, tx, ty) && Rm.ground[ix(Rm, tx, ty)] === WATER; }
   path(goal, from = this.hero) {
@@ -291,9 +292,9 @@ export class Garden extends Game {
     if (plant) { this.reach(plant.x, plant.y, { kind: 'plant', p: plant }, 2); return; }
     if (ruin) { this.reach(tx, ty, { kind: 'ruin', r: ruin }, 3); return; }
     // water: a stone skips across it, three rings in a row
-    if (g === WATER && Rm.name !== 'abyss') { const h = this.hero, dx = wx - h.x, dy = wy - h.y, d = Math.hypot(dx, dy) || 1; for (let k = 0; k < 3; k++) this.later(k * 0.22, () => { const x = wx + (dx / d) * k * 14, y = wy + (dy / d) * k * 14; if (this.wet(x, y + 2)) { this.rip.poke(x, y, 3 - k * 0.7); this.fx.push({ kind: 'wake', x, y, t: 0, life: 0.6 }); } }); return; }
+    if (g === WATER && Rm.name !== 'abyss' && Rm.name !== 'furnace') { const h = this.hero, dx = wx - h.x, dy = wy - h.y, d = Math.hypot(dx, dy) || 1; for (let k = 0; k < 3; k++) this.later(k * 0.22, () => { const x = wx + (dx / d) * k * 14, y = wy + (dy / d) * k * 14; if (this.wet(x, y + 2)) { this.rip.poke(x, y, 3 - k * 0.7); this.fx.push({ kind: 'wake', x, y, t: 0, life: 0.6 }); } }); return; }
     // tall grass, rubble or mist: just walk through it (drag); rock and gorges: no
-    if (Rm.wild[i] || [WATER, VOID, ROCK, CHASM, ICE, Wd.STREET].includes(g)) return;
+    if (Rm.wild[i] || [WATER, VOID, ROCK, CHASM, ICE, Wd.STREET, Wd.RAIL, Wd.STONE].includes(g)) return;
     this.reach(tx, ty, { kind: 'plant-here', x: tx, y: ty }, 2);
   }
   frontierToward(x, y, tx, ty) {
@@ -1005,10 +1006,10 @@ export class Garden extends Game {
         canopies.push([o, S, x, y]);
       } else if (kind === 'lift') {
         // the pad (or the well, or the basket) sits on the lift's tile
-        const st = Wd.liftStyle(o), s = Wd.liftSprite(st), foot = st === 'spire' || st === 'tube' ? 87 : st === 'vine' ? 64 : 39;
+        const st = Wd.liftStyle(o), s = Wd.liftSprite(st), foot = st === 'spire' || st === 'tube' || st === 'cage' ? 87 : st === 'vine' ? 64 : 39;
         b.drawImage(s.cv, Math.round(o.x * T + 8 - cx - s.w / 2), Math.round(o.y * T + 10 - cy - foot));
       }
-      else if (kind === 'decor' || kind === 'holo' || kind === 'giantg') this.drawDream(b, kind, o, cx, cy);
+      else if (kind === 'decor' || kind === 'holo' || kind === 'giantg' || kind === 'train') this.drawDream(b, kind, o, cx, cy);
       else if (kind === 'ruin') { const s = Wd.ruinSprite(o.t, P); b.drawImage(s.cv, Math.round(o.x - cx - s.w / 2), Math.round(o.y - cy - s.h)); }
       else if (kind === 'crystal') { const s = Wd.crystalSprite(o.c); b.drawImage(s.cv, o.x * T + 2 - cx, o.y * T + 15 - cy - s.h); }
       else if (kind === 'animal') {
@@ -1328,3 +1329,4 @@ export class Garden extends Game {
 
 install(Garden, { VW, VH, Z, GAIT, HERO_SPEED });
 installMap(Garden);
+installRail(Garden);

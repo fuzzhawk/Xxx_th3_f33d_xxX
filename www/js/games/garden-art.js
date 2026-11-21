@@ -4,6 +4,7 @@
 // giant gardeners. Everything is small pixel art finished with the same crisp outline.
 import { mulberry32 } from '../util.js';
 import { mk, ell, px, tone, mixHex, crisp, vivid } from './garden-kit.js';
+import { faunaSprite, FAUNA20 } from './garden-fauna.js';
 
 const cache = new Map();
 const memo = (key, fn) => { let s = cache.get(key); if (!s) { const cv = fn(); s = { cv, w: cv.width, h: cv.height }; cache.set(key, s); } return s; };
@@ -36,7 +37,7 @@ function trunk(c, x, y0, y1, w, bark, o = {}) {
   }
   if (o.fork) for (const s of [-1, 1]) for (let k = 0; k < o.fork; k++) px(c, Math.round(x + lean + s * (1 + k)), y0 - k, k % 2 ? dk : bark, 1, 2);
 }
-const BARK = { oak: '#7a5a40', birch: '#ece6dc', pine: '#6a4a34', cherry: '#6a4a48', willow: '#77684a', maple: '#6a4638', palm: '#a08458', redwood: '#8a4a34', cypress: '#5e4a3a', ginkgo: '#77685a', baobab: '#a08a72', crystal: '#b8c8e8', wisteria: '#6e5a52', jacaranda: '#5e4a44', acacia: '#77603e', mangrove: '#6a5a48' };
+const BARK = { oak: '#7a5a40', birch: '#ece6dc', pine: '#6a4a34', cherry: '#6a4a48', willow: '#77684a', maple: '#6a4638', palm: '#a08458', redwood: '#8a4a34', cypress: '#5e4a3a', ginkgo: '#77685a', baobab: '#a08a72', crystal: '#b8c8e8', wisteria: '#6e5a52', jacaranda: '#5e4a44', acacia: '#77603e', mangrove: '#6a5a48', kapok: '#8a7a62', charred: '#2a2220' };
 // One tree: its species' shape, at a growth stage (2 young, 3 grown), in one of four variants.
 export function treeSprite(k, P, st, fruit, v = 0) {
   return memo(`tree|${k}|${st}|${fruit ? 1 : 0}|${v}`, () => {
@@ -82,6 +83,20 @@ export function treeSprite(k, P, st, fruit, v = 0) {
       const w = S(34), h = S(52); [cv, c] = mk(w, h);
       trunk(c, w / 2, S(26), h - 1, S(4), bark, { fork: 3 });
       for (let i = 0; i < 9; i++) { const a = -Math.PI / 2 + (i - 4) * 0.36 + (R() - 0.5) * 0.2, len = S(13 + R() * 11), bx = w / 2 + Math.cos(a) * S(5), by = S(27) + Math.sin(a) * S(5), ex = bx + Math.cos(a) * len, ey = by + Math.sin(a) * len, nx = -Math.sin(a) * S(3), ny = Math.cos(a) * S(3), col = i % 2 ? P.leaf : tone(P.leaf, 0.25); poly(c, tone(col, -0.25), [[bx - nx, by - ny], [ex, ey], [bx + nx, by + ny]]); poly(c, col, [[bx - nx, by - ny], [ex, ey], [bx, by]]); px(c, Math.round((bx + ex) / 2), Math.round((by + ey) / 2), '#ffffff', 1, 2); }
+    } else if (shape === 'bamboo') {
+      // a clump of culms: segmented green stalks, nodes ringed paler, sprays of narrow leaves up top
+      const w = S(30), h = S(66), n = big ? 6 : 4; [cv, c] = mk(w, h);
+      for (let q = 0; q < n; q++) {
+        const x = Math.round(w / 2 + (q - (n - 1) / 2) * S(4) + (R() - 0.5) * 2), top = Math.round(S(4) + R() * S(16)), cw = R() < 0.4 ? 3 : 2, col = q % 2 ? tone(L, -0.05) : L;
+        for (let y = top; y < h; y++) { px(c, x, y, col, cw, 1); px(c, x, y, tone(col, 0.25), 1, 1); if ((y - top) % S(8) === 0) px(c, x - 1, y, tone(col, -0.3), cw + 2, 1); }
+        for (let f = 0; f < 4; f++) { const fy = top + f * S(6) + 2, dir = (f + q) % 2 ? 1 : -1; for (let k2 = 0; k2 < S(7); k2++) px(c, x + dir * (k2 + 1), fy + Math.round(k2 * 0.35), k2 % 2 ? tone(L, 0.15) : tone(L, -0.15), 1, 1); }
+      }
+    } else if (shape === 'charred') {
+      // burnt and still warm: a black trunk and bare forks, embers glowing in its cracks
+      const w = S(34), h = S(50); [cv, c] = mk(w, h);
+      trunk(c, w / 2, S(12), h - 1, S(5), bark, { fork: 3 });
+      for (let b = 0; b < 5; b++) { const a = -Math.PI / 2 + (b - 2) * 0.5 + (R() - 0.5) * 0.3, len = S(10 + R() * 8); let x = w / 2, y = S(14) + b * 2; for (let k2 = 0; k2 < len; k2++) { x += Math.cos(a); y += Math.sin(a) * 0.9; px(c, Math.round(x), Math.round(y), k2 % 3 ? bark : tone(bark, 0.15), 1, 1); if (k2 === (len >> 1)) { const a2 = a + (R() < 0.5 ? 0.6 : -0.6); for (let q = 0; q < 4; q++) px(c, Math.round(x + Math.cos(a2) * q), Math.round(y + Math.sin(a2) * q), bark, 1, 1); } } }
+      for (let e = 0; e < (big ? 9 : 4); e++) { const y = S(16) + Math.round(R() * (h - S(20))), x = Math.round(w / 2 - 1 + (R() - 0.5) * S(3)); px(c, x, y, '#ff6a2a', 1, 2); px(c, x, y, '#ffd24a', 1, 1); }
     } else if (shape === 'baobab') {
       const w = S(44), h = S(50); [cv, c] = mk(w, h);
       for (let y = h - 1; y > S(16); y--) { const u = (h - y) / (h - S(16)), ww = S(15) * (1 - u * 0.35) + (u < 0.1 ? 3 : 0); px(c, Math.round(w / 2 - ww / 2), y, bark, Math.round(ww), 1); px(c, Math.round(w / 2 - ww / 2), y, tone(bark, 0.2), 2, 1); px(c, Math.round(w / 2 + ww / 2 - 3), y, tone(bark, -0.28), 3, 1); }
@@ -97,6 +112,7 @@ export function treeSprite(k, P, st, fruit, v = 0) {
       const pf = crown(c, R, x, cy, rx, ry, L, { flat: umb ? 0.7 : 1, puff: umb ? 0.9 : tallS ? 0.85 : 1 });
       if (shape === 'round' && big) { crown(c, R, x - rx * 0.55, cy + ry * 0.5, rx * 0.5, ry * 0.5, L, { n: 3 }); crown(c, R, x + rx * 0.55, cy + ry * 0.45, rx * 0.5, ry * 0.5, tone(L, -0.05), { n: 3 }); }
       if (shape === 'willow') for (let i = 0; i < S(26); i++) { const xx = Math.round(x - rx + 1 + R() * (rx * 2 - 2)), y0 = Math.round(cy - ry * 0.2 + R() * ry), len = S(14 + R() * 12); for (let q = 0; q < len; q++) px(c, xx + (Math.sin(q * 0.35 + i) > 0.6 ? 1 : 0), y0 + q, q % 3 ? tone(L, i % 2 ? -0.12 : 0.1) : tone(L, -0.3), 1, 1); }
+      if (shape === 'vines') for (let i = 0; i < S(22); i++) { const xx = Math.round(x - rx + 1 + R() * (rx * 2 - 2)), y0 = Math.round(cy + R() * ry * 0.7), len = S(10 + R() * 16); for (let q = 0; q < len; q++) px(c, xx + (q % 4 === 1 ? 1 : 0), y0 + q, q % 3 ? tone(L, -0.2) : tone(L, 0.1), 1, 1); if (R() < 0.3) px(c, xx, y0 + len, ['#ff3a6a', '#ffd23f', '#d050ff'][i % 3], 2, 2); }
       if (shape === 'wisteria') for (let i = 0; i < S(16); i++) { const xx = Math.round(x - rx + 2 + R() * (rx * 2 - 4)), y0 = Math.round(cy + R() * ry * 0.8), len = S(7 + R() * 8); for (let q = 0; q < len; q++) px(c, xx + (q % 3 === 1 ? 1 : 0), y0 + q, q % 2 ? P.bloom : tone(P.bloom, q > len * 0.6 ? 0.35 : -0.15), q < len * 0.7 ? 2 : 1, 1); }
       if (P.blossom || shape === 'blossom') flecks(pf, P.bloom || '#ffd6e4', big ? 46 : 16), flecks(pf, '#ffffff', big ? 20 : 7);
       if (shape === 'ginkgo') flecks(pf, tone(P.leaf, 0.4), big ? 30 : 10);
@@ -248,7 +264,7 @@ export function neonSprite(kind, f = 0) {
 }
 
 // ------------------------------------------------ strange and mythical creatures (two frames, facing right)
-export const STRANGE = ['kirin', 'spiritfox', 'mothdeer', 'mossling', 'jelly', 'snail', 'tortoise', 'stag', 'moonhare', 'axolotl', 'crab', 'kodama', 'emberbird', 'angler', 'manta', 'koi', 'phoenix', 'drone', 'cat', 'gecko'];
+export const STRANGE = ['kirin', 'spiritfox', 'mothdeer', 'mossling', 'jelly', 'snail', 'tortoise', 'stag', 'moonhare', 'axolotl', 'crab', 'kodama', 'emberbird', 'angler', 'manta', 'koi', 'phoenix', 'drone', 'cat', 'gecko', ...FAUNA20];
 export function creatureSprite(k, f) {
   return memo(`cr|${k}|${f}`, () => {
     const B = '#2a2224'; let cv, c, raw = false;
@@ -274,7 +290,7 @@ export function creatureSprite(k, f) {
       case 'drone': [cv, c] = mk(12, 9); raw = true; px(c, 3, 3, '#3a3850', 6, 4); px(c, 4, 4, '#5af0ff', 2, 2); px(c, 0, f ? 1 : 2, '#8a88a0', 4, 1); px(c, 8, f ? 2 : 1, '#8a88a0', 4, 1); px(c, 5, 7, '#ff5ad8', 2, 1); break;
       case 'cat': [cv, c] = mk(14, 11); ell(c, 6, 7, 4.5, 2.8, '#2a2838'); ell(c, 10.5, 5, 2.6, 2.4, '#2a2838'); px(c, 9, 2, '#2a2838', 1, 2); px(c, 12, 2, '#2a2838', 1, 2); px(c, 10, 5, '#8aff8a'); px(c, 12, 5, '#8aff8a'); px(c, 9, 7, '#ff5ad8', 3, 1); px(c, 0, 3 + f, '#2a2838', 1, 4); px(c, 1, 6, '#2a2838', 2, 1); legs([3, 8], 9, '#1c1a2a', 2); break;
       case 'gecko': [cv, c] = mk(13, 6); px(c, 2, 2, '#e8a03c', 8, 2); ell(c, 11, 3, 1.8, 1.6, '#f0b85a'); px(c, 12, 2, B); px(c, 0, 3, '#e8a03c', 2, 1); for (const x of [4, 8]) { px(c, x + f, 0, '#c8802a'); px(c, x - f, 4, '#c8802a'); } px(c, 5, 2, '#8a4a1a'); px(c, 8, 3, '#8a4a1a'); break;
-      default: [cv, c] = mk(6, 6); ell(c, 3, 3, 2.5, 2.5, '#fff');
+      default: { const o = faunaSprite(k, f); if (o) return o; [cv, c] = mk(6, 6); ell(c, 3, 3, 2.5, 2.5, '#fff'); }
     }
     return raw ? cv : crisp(cv);
   });

@@ -1,5 +1,5 @@
 import { Platformer } from './platformer.js';
-import { Racer } from './racer.js';
+import { RailRaider } from './railraider.js';
 import { Garden } from './garden.js';
 import { Rocks } from './rocks.js';
 import { HellMaze } from './hellmaze.js';
@@ -29,7 +29,7 @@ import { Pong } from './pong.js';
 import { PegShot } from './peggle.js';
 import { Juggle } from './juggle.js';
 
-export const GAMES = { garden: Garden, plinko: Plinko, breakout: Breakout, merge: Merge, dash: Dash, flappy: Flap, tetris: Tetris, pong: Pong, peggle: PegShot, juggle: Juggle, platformer: Platformer, racer: Racer, raycast: HellMaze, rocks: Rocks, sling: Sling,
+export const GAMES = { garden: Garden, plinko: Plinko, breakout: Breakout, merge: Merge, dash: Dash, flappy: Flap, tetris: Tetris, pong: Pong, peggle: PegShot, juggle: Juggle, platformer: Platformer, racer: RailRaider, raycast: HellMaze, rocks: Rocks, sling: Sling,
   chess: Chess, dice: Dice, cards: Cards, monsters: Monsters, fighter: Fighter,
   starfox: Flight, ski: Ski, robotron: Robotron, crokinole: Crokinole, survivors: Survivors, graves: Graves, expedition: Expedition,
   wordle: Wordle, bee: Bee, wordsearch: WordSearch, wheel: Wheel, hangman: Hangman, vocab: Vocab, ladder: Ladder, t2048: Twenty48, arrows: Arrows, jrpg: Jrpg, hack: Hack, outland: Outland };
@@ -37,7 +37,7 @@ export const GAMES = { garden: Garden, plinko: Plinko, breakout: Breakout, merge
 export const GAME_NAMES = {
   garden: 'Garden',
   plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', tetris: 'Tetris', pong: 'Pong', peggle: 'Peg Shot', juggle: 'Juggle',
-  platformer: 'Platformer', racer: 'Road Racer', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot', outland: 'Outland',
+  platformer: 'Platformer', racer: 'Rail Raider', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot', outland: 'Outland',
   chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl',
   starfox: 'Sky Fox', expedition: 'Expeditions', ski: 'Downhill', graves: 'Grave Merge', survivors: 'Cave Horde', robotron: 'Robo Arena', crokinole: 'Crokinole',
   wordle: 'Five Letters', bee: 'Spelling Hive', wordsearch: 'Word Search', wheel: 'Letter Wheel', hangman: 'Hangman', vocab: 'Vocab Quiz', ladder: 'Word Ladder', t2048: '2048', arrows: 'Arrow Escape', jrpg: 'Crystal Quest', hack: 'Crypt Hack'
@@ -56,7 +56,7 @@ export const GAME_HINT = {
   garden: 'drag to walk · tap what you find: houses, lamps, chests, creatures, whales, giants · tap open ground to plant',
   plinko: 'tap to drop a ball', breakout: 'drag to move the paddle', merge: 'drag to aim, release to drop · two alike merge (on the planet, aim around the core)', dash: 'tap to jump (twice to double-jump)',
   flappy: 'tap to flap', tetris: 'tap beside the piece to move, tap the piece to turn, drag to slide, swipe down to drop, swipe up to hold · every full line is lifted out as a saying', pong: 'drag to move your paddle', peggle: 'aim, release to shoot', juggle: 'tap the balls to keep them up',
-  platformer: 'tap to jump, twice to double-jump · ladders, pads and springs work by themselves · grab power-ups', racer: 'hold left or right to steer, tap to change lane · pass the gates for extra time', raycast: 'drag sideways to turn, up/down to walk · tap to fire, hold to keep firing · tap the weapon bar to switch · find the key, reach the glowing exit',
+  platformer: 'tap to jump, twice to double-jump · ladders, pads and springs work by themselves · grab power-ups', racer: 'drag to aim, hold to fire · shoot down bolts and dynamite · crates hold steam and upgrades · tap an arrow at a junction to pick your line', raycast: 'drag sideways to turn, up/down to walk · tap to fire, hold to keep firing · tap the weapon bar to switch · find the key, reach the glowing exit',
   rocks: 'tap to shoot, hold to thrust toward your finger', sling: 'drag back from the sling and let go · tap in flight for the shot\'s trick · drag the sky to look around',
   chess: 'tap a white piece, then its destination', dice: 'tap the cup or ROLL to shake, tap dice to hold, tap a row to score',
   cards: 'tap up to five cards, then play or discard', monsters: 'tap the map to walk · tall grass hides wild spirits · weaken one, then throw an ORB · 必殺 when the SP gauge is full', fighter: '◀ ▶ walk (hold away to block) · ▲ jump · ▼ crouch for sweeps and uppercuts · P K S attack · land hits to chain combos, fill the meter for an ULTRA · on autopilot, bet on the fight',

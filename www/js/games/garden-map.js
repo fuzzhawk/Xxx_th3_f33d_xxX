@@ -19,13 +19,13 @@ const MW = 148, MI = 40, MX1 = W - 10, MY0 = BY + BR + 8;      // the menu: widt
 const RX = W - 24, RY = H - 24, RR = 14;                       // the map's come-back-to-me button
 const TOP = 46;                                                // the map's title bar
 
-const NAME = { surface: 'The Meadows', cave: 'The Caverns', deep: 'The Deep', canyon: 'The Canyons', gorge: 'The Violet Gorge', abyss: 'The Abyss', mountain: 'The Mountains', canopy: 'The Treetops', sky: 'The Sky Islands', high: 'The High Sky', stars: 'The Star Sea', under: 'The Undercity', roofs: 'The Rooftops' };
-const SHORT = { surface: 'Meadows', cave: 'Caverns', deep: 'The Deep', canyon: 'Canyons', gorge: 'Violet Gorge', abyss: 'Abyss', mountain: 'Mountains', canopy: 'Treetops', sky: 'Sky Islands', high: 'High Sky', stars: 'Star Sea', under: 'Undercity', roofs: 'Rooftops' };
+const NAME = { surface: 'The Meadows', cave: 'The Caverns', deep: 'The Deep', canyon: 'The Canyons', gorge: 'The Violet Gorge', abyss: 'The Abyss', mountain: 'The Mountains', canopy: 'The Treetops', sky: 'The Sky Islands', high: 'The High Sky', stars: 'The Star Sea', under: 'The Undercity', roofs: 'The Rooftops', steam: 'The Steam Tunnels', gears: 'The Clockworks', furnace: 'The Boiler Heart' };
+const SHORT = { surface: 'Meadows', cave: 'Caverns', deep: 'The Deep', canyon: 'Canyons', gorge: 'Violet Gorge', abyss: 'Abyss', mountain: 'Mountains', canopy: 'Treetops', sky: 'Sky Islands', high: 'High Sky', stars: 'Star Sea', under: 'Undercity', roofs: 'Rooftops', steam: 'Steam Tunnels', gears: 'Clockworks', furnace: 'Boiler Heart' };
 // highest first, as ‹ › walks through them
-const ORDER = ['stars', 'high', 'sky', 'mountain', 'canopy', 'roofs', 'surface', 'cave', 'canyon', 'under', 'deep', 'gorge', 'abyss'];
+const ORDER = ['stars', 'high', 'sky', 'mountain', 'canopy', 'roofs', 'surface', 'cave', 'canyon', 'under', 'steam', 'deep', 'gorge', 'gears', 'abyss', 'furnace'];
 const BG = { surface: '#15121e', cave: '#07060b', sky: '#0e1428' };
 // where a way up or down leads, by colour
-const LIFT = { mountain: '#9fd8ff', sky: '#ffffff', canyon: '#ff9a5a', canopy: '#7ad06a', cave: '#ffd98a', deep: '#c8a8ff', gorge: '#b080ff', abyss: '#ff6a2a', high: '#ffc8f0', stars: '#fff6c8', under: '#5af0ff', roofs: '#ff5ad8', surface: '#bfe8b0' };
+const LIFT = { mountain: '#9fd8ff', sky: '#ffffff', canyon: '#ff9a5a', canopy: '#7ad06a', cave: '#ffd98a', deep: '#c8a8ff', gorge: '#b080ff', abyss: '#ff6a2a', high: '#ffc8f0', stars: '#fff6c8', under: '#5af0ff', roofs: '#ff5ad8', surface: '#bfe8b0', steam: '#ffb24a', gears: '#d8b05a', furnace: '#ff6a1a' };
 const PLACE = { chest: ['Hidden Glade', '#ffd23f'], ring: ['Fairy Ring', '#8ff0d8'], pond: ['Moon Pond', '#9fd8ff'], ribbon: ['Ribbon Tree', '#ff9ac0'], shrine: ['Forest Shrine', '#ff7a5a'], crystal: ['Crystal Grove', '#c8a8ff'] };
 // names for the kinds of country (garden-world's B_* order) and for villages, picked from the spot
 const COUNTRY = [
@@ -33,7 +33,9 @@ const COUNTRY = [
   [['Flower', 'Rolling', 'Bright', 'Poppy', 'Butterfly', 'Petal'], 'Downs'], [['Misty', 'Reed', 'Frog', 'Willow', 'Heron', 'Lily'], 'Marsh'],
   [['Heather', 'Windy', 'Purple', 'Bramble', 'Gorse', 'Lonely'], 'Heath'], [['Amber', 'Russet', 'Maple', 'Ember', 'Golden', 'Harvest'], 'Wood'],
   [['Singing', 'Golden', 'Shifting', 'Sun', 'Whisper', 'Dust'], 'Dunes'], [['Elder', 'Ancient', 'Sleeping', 'Moon', 'Spirit', 'First'], 'Grove'],
-  [['Frost', 'Snow', 'Silver', 'Winter', 'Crystal', 'White'], 'Fields'], [['Glow', 'Spore', 'Puffball', 'Moon', 'Lantern', 'Velvet'], 'Glade']
+  [['Frost', 'Snow', 'Silver', 'Winter', 'Crystal', 'White'], 'Fields'], [['Glow', 'Spore', 'Puffball', 'Moon', 'Lantern', 'Velvet'], 'Glade'],
+  [['Emerald', 'Tangled', 'Howling', 'Orchid', 'Steaming', 'Parrot'], 'Jungle'], [['Jade', 'Rustling', 'Whisper', 'Lantern', 'Crane', 'Misty'], 'Bamboo'],
+  [['White', 'Glass', 'Mirror', 'Bone', 'Pale', 'Shimmer'], 'Flats'], [['Ember', 'Cinder', 'Smoking', 'Black', 'Ash', 'Scorched'], 'Wastes'], [['Coral', 'Turquoise', 'Pearl', 'Shell', 'Lazy', 'Sunlit'], 'Lagoon']
 ];
 const VPRE = { cottage: ['Clover', 'Honey', 'Bramble', 'Fern', 'Thistle', 'Primrose'], timber: ['Oak', 'Ash', 'Hazel', 'Rowan', 'Alder', 'Birch'], stone: ['Flint', 'Grey', 'Crag', 'Slate', 'High', 'Cairn'], igloo: ['Frost', 'Snow', 'Rime', 'White', 'Ice', 'Winter'], adobe: ['Sun', 'Red', 'Dust', 'Amber', 'Clay', 'Ochre'], shroom: ['Spore', 'Puff', 'Glow', 'Cap', 'Moon', 'Mallow'], stilt: ['Reed', 'Heron', 'Mire', 'Rush', 'Fen', 'Lily'], treehouse: ['Leaf', 'Bough', 'Moss', 'Acorn', 'Elder', 'Owl'], cloud: ['Cloud', 'Nimbus', 'Feather', 'Breeze', 'Halo', 'Drift'] };
 const VSUF = ['wick', 'by', 'ford', 'dale', 'mere', 'stead', 'combe', 'field', ' Hollow', ' Haven'];
@@ -82,6 +84,22 @@ function mapIcon(c, x, y, col) {
   c.beginPath(); c.moveTo(x - 3, y - 8); c.lineTo(x - 3, y + 6); c.moveTo(x + 3, y - 6); c.lineTo(x + 3, y + 8); c.stroke();
   c.fillStyle = '#ff7a9a'; c.beginPath(); c.arc(x + 6, y - 1, 1.8, 0, 7); c.fill();
 }
+function trainGlyph(c, x, y, s, fill) { c.fillStyle = fill; c.strokeStyle = INK; c.lineWidth = 1.2; c.beginPath(); c.rect(x - s, y - s * 0.6, s * 2, s * 1.1); c.fill(); c.stroke(); c.fillStyle = INK; c.fillRect(x - s * 0.6, y - s * 0.35, s * 0.5, s * 0.4); c.fillRect(x + s * 0.15, y - s * 0.35, s * 0.5, s * 0.4); c.beginPath(); c.arc(x - s * 0.5, y + s * 0.65, s * 0.28, 0, 7); c.arc(x + s * 0.5, y + s * 0.65, s * 0.28, 0, 7); c.fill(); }
+function seedIcon(c, x, y, col) { c.strokeStyle = col; c.lineWidth = 1.5; c.lineCap = 'round'; c.beginPath(); c.ellipse(x, y + 4, 5, 3.4, 0, 0, 7); c.stroke(); c.beginPath(); c.moveTo(x, y + 1); c.lineTo(x, y - 5); c.stroke(); c.fillStyle = '#9ad87a'; c.beginPath(); c.ellipse(x - 3, y - 6, 3, 1.7, -0.5, 0, 7); c.fill(); c.beginPath(); c.ellipse(x + 3, y - 7, 3, 1.7, 0.5, 0, 7); c.fill(); }
+// the metropolis's districts, each labelled at a spot well inside it
+const DISTRICT = [null, 'High Centre', 'Neon Quarter', 'Old Town', 'Ironworks', 'Suburbs'];
+const distCache = new WeakMap();
+function districtSpots(Rm) {
+  const m = Rm.metro; if (!m) return [];
+  let L = distCache.get(m); if (L) return L;
+  const by = [[], [], [], [], [], []], at = (x, y) => Wd.districtAt(Rm, x, y);
+  for (let y = m.cy - m.ry; y <= m.cy + m.ry; y += 3) for (let x = m.cx - m.rx; x <= m.cx + m.rx; x += 3) { const d = at(x, y); if (d && [[7, 0], [-7, 0], [0, 7], [0, -7], [5, 5], [-5, -5]].every(([dx, dy]) => at(x + dx, y + dy) === d)) by[d].push([x, y]); }
+  L = [];
+  by.forEach((pts, d) => { if (!pts.length) return; const mx = pts.reduce((s, p) => s + p[0], 0) / pts.length, my = pts.reduce((s, p) => s + p[1], 0) / pts.length; const b = pts.reduce((q, p) => (Math.hypot(p[0] - mx, p[1] - my) < Math.hypot(q[0] - mx, q[1] - my) ? p : q)); L.push({ d, x: b[0], y: b[1] }); });
+  distCache.set(m, L);
+  return L;
+}
+const HALT = { spire: 'Spire Halt', shaft: 'Canyon Halt', vine: 'Grove Halt', hatch: 'Halt', chest: 'Glade Halt', ring: 'Fairy Halt', pond: 'Moon Pond Halt', ribbon: 'Ribbon Halt', shrine: 'Shrine Halt', crystal: 'Crystal Halt' };
 function roundBtn(c, x, y, r) {
   c.fillStyle = 'rgba(18,14,32,.58)'; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
   c.strokeStyle = 'rgba(255,255,255,.42)'; c.lineWidth = 1.2; c.stroke();
@@ -100,9 +118,14 @@ export function install(Garden) {
   Object.assign(Garden.prototype, {
     uiState() { return (this.ui ||= { btnA: 0, still: 0, menu: null, map: null, press: null }); },
     // the card keeps you in control (no autopilot) while the menu or map is open
-    holdPlay() { const U = this.ui; return !!(U && (U.menu || U.map)); },
+    holdPlay() { const U = this.ui; return !!(U && (U.menu || U.map || U.prompt)); },
+    menuItems() { return (Wd.G?.inv?.wisps || 0) >= 12 ? [...MENU, { id: 'renew', label: 'New world', icon: 'seed' }] : MENU; },
+    openPrompt() { const U = this.uiState(); U.menu = null; U.press = null; U.prompt = { t: 0 }; },
+    // the prompt: two buttons along its foot
+    promptBox() { const pw = 260, ph = 176, x0 = (W - pw) / 2, y0 = (H - ph) / 2 - 8; return { x0, y0, pw, ph, nw: [x0 + 16, y0 + ph - 50, x0 + pw / 2 - 6, y0 + ph - 14], st: [x0 + pw / 2 + 6, y0 + ph - 50, x0 + pw - 16, y0 + ph - 14] }; },
+    promptHit(x, y) { const B = this.promptBox(), inB = (b) => x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]; return inB(B.nw) ? 'new' : inB(B.st) ? 'stay' : null; },
     onModeChange(auto) { if (auto) this.closeUI(); },
-    closeUI() { const U = this.ui; if (!U) return; U.menu = null; U.press = null; if (U.map) { U.map = null; this.lastDraw = 0; } },
+    closeUI() { const U = this.ui; if (!U) return; U.menu = null; U.press = null; U.prompt = null; if (U.map) { U.map = null; this.lastDraw = 0; } },
 
     // ------------------------------------------------ every step
     stepUI(dt) {
@@ -113,6 +136,9 @@ export function install(Garden) {
       const to = !this.auto && !U.map && (U.menu || U.still > 0.35) ? 1 : 0;
       U.btnA += (to - U.btnA) * Math.min(1, dt * (to > U.btnA ? 7 : 16));
       if (U.menu) U.menu.t = Math.min(1, U.menu.t + dt * 9);
+      if (U.prompt) U.prompt.t = Math.min(1, U.prompt.t + dt * 5);
+      // all twelve treasures found: ask once, when you are in control and standing still
+      else if (!this.auto && !U.map && !U.menu && !this.fade && !this.ride && U.still > 1.2 && (Wd.G?.inv?.wisps || 0) >= 12 && !Wd.G.offered) this.openPrompt();
       const V = U.map;
       if (!V) return;
       V.t += dt;
@@ -125,6 +151,7 @@ export function install(Garden) {
     uiDown(x, y, id) {
       const U = this.uiState();
       if (U.map) { if (!U.map.closing) this.mapDown(x, y, id ?? 0); return true; }
+      if (U.prompt) { U.press = { prompt: this.promptHit(x, y) }; return true; }
       if (U.menu) { U.press = { item: this.menuHit(x, y) }; return true; }
       if (U.btnA > 0.5 && Math.hypot(x - BX, y - BY) < BHIT) { U.press = { btn: true }; return true; }
       return false;
@@ -133,7 +160,7 @@ export function install(Garden) {
       const U = this.ui;
       if (!U) return false;
       if (U.map) { if (!U.map.closing) this.mapMove(x, y, id ?? 0); return true; }
-      return !!U.press;
+      return !!U.press || !!U.prompt;
     },
     uiUp(x, y, id) {
       const U = this.ui;
@@ -141,6 +168,11 @@ export function install(Garden) {
       if (U.map) { if (!U.map.closing) this.mapUp(x, y, id ?? 0); return true; }
       const p = U.press;
       U.press = null;
+      if (U.prompt) {
+        const hit = this.promptHit(x, y);
+        if (hit && p?.prompt === hit) { if (hit === 'new') { Wd.G.offered = 1; U.prompt = null; this.renewWorld(); } else { Wd.G.offered = 1; Wd.saveGarden(true); U.prompt = null; } }
+        return true;
+      }
       if (!p) return false;
       if (p.btn) { if (Math.hypot(x - BX, y - BY) < BHIT) U.menu = U.menu ? null : { t: 0 }; return true; }
       // a press while the menu was open: on an entry, that entry; anywhere else, the menu closes
@@ -151,17 +183,19 @@ export function install(Garden) {
     // a tap that arrives on its own (the card's first tap): the button, if it is showing
     uiTap(x, y) {
       const U = this.uiState();
-      if (U.map || U.menu) { this.uiDown(x, y, 0); this.uiUp(x, y, 0); return true; }
+      if (U.map || U.menu || U.prompt) { this.uiDown(x, y, 0); this.uiUp(x, y, 0); return true; }
       if (U.btnA > 0.5 && Math.hypot(x - BX, y - BY) < BHIT) { U.menu = { t: 0 }; return true; }
       return false;
     },
     menuHit(x, y) {
-      if (x < MX1 - MW || x > MX1 || y < MY0 + 4 || y > MY0 + 4 + MENU.length * MI) return null;
-      return MENU[Math.min(MENU.length - 1, Math.floor((y - MY0 - 4) / MI))];
+      const L = this.menuItems();
+      if (x < MX1 - MW || x > MX1 || y < MY0 + 4 || y > MY0 + 4 + L.length * MI) return null;
+      return L[Math.min(L.length - 1, Math.floor((y - MY0 - 4) / MI))];
     },
     menuDo(m) {
       this.ui.menu = null;
       if (m.id === 'map') this.openMap();
+      else if (m.id === 'renew') this.openPrompt();
     },
 
     // ------------------------------------------------ the map
@@ -255,8 +289,10 @@ export function install(Garden) {
       if (C) {
         let f = false;
         for (let y = C.y0; y <= C.y1 && !f; y += 4) for (let x = C.x0; x <= C.x1 && !f; x += 4) f = !!Rm.seen[ix(Rm, x, y)];
-        if (f) F.push({ k: 'city', x: C.cx, y: C.y0 - 2, C, label: 'Neon City', pri: 0 });
+        if (f) F.push({ k: 'city', x: C.cx, y: C.y0 - 2, C, label: Rm.metro ? 'The Metropolis' : 'Neon City', pri: 0 });
       }
+      for (const q of districtSpots(Rm)) if (sn(q.x, q.y, 6)) F.push({ k: 'district', x: q.x, y: q.y, label: DISTRICT[q.d], pri: 1 });
+      for (const s of Rm.rail?.stops || []) if (sn(s.x, s.y, 5)) F.push({ k: 'station', x: s.x, y: s.y - 1, fill: s.kind === 'central' ? '#ffd98a' : '#f0e6d0', label: s.kind === 'central' ? 'Central Station' : s.kind === 'halt' ? HALT[s.near] || 'Halt' : '', pri: 1 });
       for (const v of Rm.villages || []) if (sn(v.x, v.y, 7)) F.push({ k: 'village', x: v.x, y: v.y, label: villageName(v), fill: v.style === 'cloud' ? '#ffffff' : '#ffe0a0', pri: 1 });
       for (const d of Rm.decor) if (d.t === 'lift' && sn(d.x, d.y)) F.push({ k: 'way', x: d.x, y: d.y, up: !!d.up, fill: LIFT[d.to] || '#ffffff', label: SHORT[d.to] || '', pri: 2 });
       const stair = Rm.ruins.some((r) => r.t === 'cloudstair' && r.found);
@@ -284,18 +320,41 @@ export function install(Garden) {
         c.restore();
       }
       if (U.menu) {
-        const e = 1 - (1 - U.menu.t) ** 3, x0 = MX1 - MW, y0 = MY0 - (1 - e) * 6, hh = MENU.length * MI + 8;
+        const L = this.menuItems(), e = 1 - (1 - U.menu.t) ** 3, x0 = MX1 - MW, y0 = MY0 - (1 - e) * 6, hh = L.length * MI + 8;
         c.save(); c.globalAlpha = e;
         roundRect(c, x0, y0, MW, hh, 10); c.fillStyle = 'rgba(20,16,36,.9)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.14)'; c.lineWidth = 1; c.stroke();
-        MENU.forEach((m, n) => {
+        L.forEach((m, n) => {
           const iy = y0 + 4 + n * MI;
           if (U.press?.item === m) { roundRect(c, x0 + 4, iy, MW - 8, MI, 7); c.fillStyle = 'rgba(255,255,255,.09)'; c.fill(); }
           if (n) { c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(x0 + 12, iy, MW - 24, 1); }
           if (m.icon === 'map') mapIcon(c, x0 + 24, iy + MI / 2, '#f6f0e2');
+          else if (m.icon === 'seed') seedIcon(c, x0 + 24, iy + MI / 2, '#f6f0e2');
           c.font = F_MENU; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = '#f6f0e2'; c.fillText(m.label, x0 + 44, iy + MI / 2 + 0.5);
         });
         c.restore();
       }
+      if (U.prompt) this.drawPrompt(c);
+    },
+    drawPrompt(c) {
+      const U = this.ui, e = 1 - (1 - U.prompt.t) ** 3, B = this.promptBox(), { x0, y0, pw, ph } = B, t = this.t;
+      c.save();
+      c.globalAlpha = e * 0.5; c.fillStyle = '#08060e'; c.fillRect(0, 0, W, H);
+      c.globalAlpha = e; c.translate(0, (1 - e) * 10);
+      roundRect(c, x0, y0, pw, ph, 14); c.fillStyle = 'rgba(20,16,36,.94)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.16)'; c.lineWidth = 1; c.stroke();
+      // the twelve wisps, circling
+      const WC = ['#fff6c8', '#8ff0d8', '#ffb8e8', '#9fd8ff', '#c8a8ff', '#ffd98a'];
+      for (let k = 0; k < 12; k++) { const a = t * 0.6 + (k / 12) * 6.2832, X = W / 2 + Math.cos(a) * 26, Y = y0 + 38 + Math.sin(a) * 12; c.fillStyle = WC[k % 6]; c.globalAlpha = e * (0.7 + 0.3 * Math.sin(t * 3 + k)); c.beginPath(); c.arc(X, Y, 2.6, 0, 7); c.fill(); }
+      c.globalAlpha = e; seedIcon(c, W / 2, y0 + 38, '#f6f0e2');
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.font = F_TITLE; c.fillStyle = '#f6f0e2'; c.fillText('Twelve treasures found', W / 2, y0 + 72);
+      c.font = F_MAIN; c.fillStyle = 'rgba(246,240,226,.78)'; c.fillText('Grow the garden again from a new seed?', W / 2, y0 + 94); c.fillText('Your seeds and gems come with you.', W / 2, y0 + 108);
+      for (const [b, txt, main] of [[B.nw, 'New world', 1], [B.st, 'Stay', 0]]) {
+        roundRect(c, b[0], b[1], b[2] - b[0], b[3] - b[1], 9);
+        c.fillStyle = main ? (U.press?.prompt === 'new' ? '#e0a040' : '#c8862e') : U.press?.prompt === 'stay' ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.08)'; c.fill();
+        c.strokeStyle = main ? 'rgba(255,230,180,.6)' : 'rgba(255,255,255,.2)'; c.stroke();
+        c.font = F_MENU; c.fillStyle = main ? '#1a1208' : '#f6f0e2'; c.fillText(txt, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2 + 0.5);
+      }
+      c.restore();
     },
     drawMap(c) {
       const V = this.ui.map, Rm = V.Rm, M = V.M, z = V.z, x0 = V.cx - W / 2 / z, y0 = V.cy - H / 2 / z, h = this.hero, here = V.realm === Wd.G.realm;
@@ -348,8 +407,9 @@ export function install(Garden) {
         else if (f.k === 'way') tri(c, f.sx, f.sy, gs * 0.9, f.up, f.fill);
         else if (f.k === 'ruin') diamond(c, f.sx, f.sy, ms, '#e8e0d0');
         else if (f.k === 'place') sparkle(c, f.sx, f.sy, ms + 1, f.fill);
+        else if (f.k === 'station') trainGlyph(c, f.sx, f.sy, gs * 0.9, f.fill);
       }
-      for (const f of shown) if (f.show) label(c, f.pri >= 3 ? F_MINOR : F_MAIN, f.label, f.k === 'city' ? f.sx : f.lx, f.k === 'city' ? f.sy : f.ly, f.k === 'city' ? '#ff9aec' : f.pri >= 3 ? '#efe8da' : '#ffffff');
+      for (const f of shown) if (f.show) label(c, f.pri >= 3 ? F_MINOR : F_MAIN, f.label, f.k === 'city' ? f.sx : f.k === 'district' ? f.sx : f.lx, f.k === 'city' ? f.sy : f.k === 'district' ? f.sy : f.ly, f.k === 'city' ? '#ff9aec' : f.k === 'district' ? '#bfe8ff' : f.pri >= 3 ? '#efe8da' : '#ffffff');
       // you: a pulsing mark that points the way you face; off the card, an arrow at its edge
       if (here) {
         const fl = Math.hypot(h.fx, h.fy) || 1, fa = Math.atan2(h.fy / fl, h.fx / fl);

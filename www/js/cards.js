@@ -296,7 +296,9 @@ function game(p, ctx) {
   const stage = el(`div.stage${garden ? '.garden' : ''}`, canvas, hud, autobtn, tapplay);
   const media = el('div.media', stage);
   const hint = el('span.muted', garden ? '' : GAME_HINT[p.sub] || '');
-  const card = post('game', p, ctx, { media, caption: garden ? null : capt('arcade', `${p.title} · `, hint), mediaInteractive: true });
+  // the old road racer became Rail Raider: packages built before it still carry its old name
+  const title = p.sub === 'racer' ? String(p.title || '').replace(/Road Racer/, 'Rail Raider') : p.title;
+  const card = post('game', p, ctx, { media, caption: garden ? null : capt('arcade', `${title} · `, hint), mediaInteractive: true });
   let g = null, idle;
   const Cls = GAMES[p.sub] || GAMES.plinko;
   const ensure = () => {

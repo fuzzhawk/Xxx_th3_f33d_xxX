@@ -8,18 +8,22 @@
 import { Actor } from '../crystal/sprites.js';
 import * as Wd from './garden-world.js';
 import * as Art from './garden-art.js';
+import * as MA from './garden-metro-art.js';
 import { glowSprite, hash2, mk, tone } from './garden-kit.js';
 
 const { T, PLANTS, ANIMALS, ix, inside, GRASS, FOREST, FLOWERS, WATER, PATH, SAND, STREET, ROCK, VOID } = Wd;
 const WISP = ['#fff6c8', '#9fd8ff', '#ffb8e8', '#bff7ea', '#c8a8ff', '#ffd98a'];
-const RARE = ['moonflower', 'crystallily', 'lanterntree', 'spirittree', 'wisteria', 'jacaranda', 'ginkgo', 'crystaltree', 'skyorchid', 'cherry', 'maple', 'redwood'];
+const RARE = ['moonflower', 'crystallily', 'lanterntree', 'spirittree', 'wisteria', 'jacaranda', 'ginkgo', 'crystaltree', 'skyorchid', 'cherry', 'maple', 'redwood', 'bamboo', 'orchid', 'firelily', 'kapok', 'coral'];
 // what blows through each kind of country: [kind, colours, how many]
 const MOTES = [
   ['petal', ['#ffffff', '#ffd6e4', '#fff3a8'], 16], ['leaf', ['#8cc46a', '#5a9a4e', '#c8d870'], 16], ['petal', ['#ff9ac0', '#ffffff', '#ffd23f', '#c08aff'], 26], ['spore', ['#d8f0c0', '#f0f8d8'], 14], ['petal', ['#d880e8', '#f0b0f8'], 16],
-  ['leaf', ['#e07a2a', '#c0502a', '#e8b030', '#d8692e'], 30], ['dust', ['#e8cc98', '#d8b878'], 22], ['spore', ['#bff7ea', '#d8fff0'], 18], ['spore', ['#ffffff', '#cfe8ff'], 12], ['spore', ['#8ff0d8', '#c8a8ff', '#ffb8e8'], 26]
+  ['leaf', ['#e07a2a', '#c0502a', '#e8b030', '#d8692e'], 30], ['dust', ['#e8cc98', '#d8b878'], 22], ['spore', ['#bff7ea', '#d8fff0'], 18], ['spore', ['#ffffff', '#cfe8ff'], 12], ['spore', ['#8ff0d8', '#c8a8ff', '#ffb8e8'], 26],
+  // jungle pollen, bamboo leaves, salt glitter, ash-field embers, lagoon spray
+  ['spore', ['#e8ff9a', '#ffe08a'], 18], ['leaf', ['#a8c860', '#c8d880'], 14], ['dust', ['#ffffff', '#f4e8ee'], 18], ['ember', ['#ff6a2a', '#ffb23a', '#ffd24a'], 24], ['petal', ['#ffffff', '#bff4f8'], 10]
 ];
 const REALM_MOTES = { canyon: ['dust', ['#e0a070', '#c98050'], 20], mountain: ['spore', ['#ffffff'], 8], gorge: ['spore', ['#8af8e8', '#c8a8ff'], 24], cave: ['spore', ['#b8b0c8'], 8], deep: ['spore', ['#9ff0f0', '#e0a8ff'], 12], abyss: ['ember', ['#ff8a3a', '#ffd24a', '#ff5a2a'], 30],
-  under: ['spore', ['#5af0ff', '#ff5ad8'], 16], sky: ['petal', ['#ffffff', '#e8dcff'], 12], high: ['petal', ['#ffd6e4', '#ffffff', '#fff3a8'], 20], stars: ['star', ['#fff6c8', '#9fd8ff', '#ffffff'], 30], canopy: ['leaf', ['#7fb86a', '#cfe8a0'], 22], roofs: ['spore', ['#5af0ff', '#ff5ad8', '#ffd24a'], 10] };
+  under: ['spore', ['#5af0ff', '#ff5ad8'], 16], sky: ['petal', ['#ffffff', '#e8dcff'], 12], high: ['petal', ['#ffd6e4', '#ffffff', '#fff3a8'], 20], stars: ['star', ['#fff6c8', '#9fd8ff', '#ffffff'], 30], canopy: ['leaf', ['#7fb86a', '#cfe8a0'], 22], roofs: ['spore', ['#5af0ff', '#ff5ad8', '#ffd24a'], 10],
+  steam: ['dust', ['#c8b8a0', '#9a8a78'], 16], gears: ['spore', ['#ffd88a', '#fff0c0'], 12], furnace: ['ember', ['#ff6a1a', '#ffd24a', '#ff8a3a'], 28] };
 let bubble = null;
 const bubbleSprite = () => bubble || (bubble = (() => { const [cv, c] = mk(15, 17); c.fillStyle = 'rgba(24,20,34,.9)'; c.fillRect(1, 0, 13, 14); c.fillRect(0, 1, 15, 12); c.fillRect(6, 14, 3, 2); c.fillRect(7, 16, 1, 1); c.fillStyle = '#fbf6ea'; c.fillRect(2, 1, 11, 12); c.fillRect(1, 2, 13, 10); c.fillRect(7, 13, 1, 2); return cv; })());
 const auroraSprite = (() => { let cv = null; return () => cv || (cv = (() => { const [a, c] = mk(48, 160), g = c.createLinearGradient(0, 0, 0, 160); g.addColorStop(0, 'rgba(120,255,190,0)'); g.addColorStop(0.35, 'rgba(120,255,190,.5)'); g.addColorStop(0.7, 'rgba(160,140,255,.35)'); g.addColorStop(1, 'rgba(160,140,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 48, 160); const h = c.createLinearGradient(0, 0, 48, 0); h.addColorStop(0, 'rgba(0,0,0,1)'); h.addColorStop(0.5, 'rgba(0,0,0,0)'); h.addColorStop(1, 'rgba(0,0,0,1)'); c.globalCompositeOperation = 'destination-out'; c.fillStyle = h; c.fillRect(0, 0, 48, 160); return a; })()); })();
@@ -55,8 +59,8 @@ export function install(Garden, K) {
       const Rm = this.Rm, set = (x, y) => { if (inside(Rm, x, y)) { b[ix(Rm, x, y)] = 1; occ.add(ix(Rm, x, y)); } };
       for (const d of Rm.decor) {
         if (d.t === 'house') { for (let y = d.y - 1; y <= d.y; y++) for (let x = d.x - 1; x <= d.x + 1; x++) set(x, y); occ.add(ix(Rm, d.x, d.y + 1)); }
-        else if (d.t === 'tower') { for (let y = d.y - d.d + 1; y <= d.y; y++) for (let x = d.x; x < d.x + d.w; x++) set(x, y); }
-        else if (d.t === 'prop' || d.t === 'chest' || d.t === 'lamp' || d.t === 'neon') set(d.x, d.y);
+        else if (d.t === 'tower' || d.t === 'bldg') { for (let y = d.y - d.d + 1; y <= d.y; y++) for (let x = d.x; x < d.x + d.w; x++) set(x, y); }
+        else if (d.t === 'prop' || d.t === 'chest' || d.t === 'lamp' || d.t === 'neon' || (d.t === 'works' && d.k !== 'vent')) { set(d.x, d.y); if (d.t === 'works' && d.k === 'twin') set(d.x + 1, d.y); }
       }
     },
     // the sprite a piece of decor is drawn with, and where its foot stands (world pixels)
@@ -64,6 +68,10 @@ export function install(Garden, K) {
       const t = this.t, lit = this.isLit(d) ? 1 : 0;
       if (d.t === 'house') return Art.houseSprite(d.s, d.v, lit);
       if (d.t === 'tower') return Art.towerSprite(d.v, d.w, d.h);
+      if (d.t === 'bldg') return MA.bldgSprite(d.k, d.v, d.w, d.d, d.h, lit);
+      if (d.t === 'works') return MA.worksSprite(d.k, d.k === 'gear' || d.k === 'twin' ? Math.floor(t * 6 + d.x) % 8 : d.k === 'piston' ? Math.floor(t * 5 + d.y) % 4 : d.k === 'furnace' ? (hash2(d.x, Math.floor(t * 8), d.y) < 0.5 ? 1 : 0) : d.k === 'clockface' ? Math.floor(t * 0.4) % 96 : d.k === 'valve' ? (this.lit.get(d) > t ? Math.floor(t * 8) % 8 : 0) : 0, d.v || 0, lit);
+      if (d.t === 'lamp' && d.k === 'gaslamp') return MA.worksSprite('gaslamp', 0, 0, lit);
+      if (d.t === 'chest' && d.k === 'safe') return MA.worksSprite('safe', d.o ? 1 : 0);
       if (d.t === 'prop') return Art.propSprite(d.k, d.k === 'windmill' ? Math.floor(t * (this.lit.get(d) > t ? 9 : 2.2 * (0.4 + this.weather.wind))) % 4 : d.v || 0, lit);
       if (d.t === 'lamp') return Art.propSprite(d.k, d.v || 0, lit);
       if (d.t === 'gate') return Art.propSprite('gate');
@@ -83,14 +91,14 @@ export function install(Garden, K) {
       let best = null, bd = 1e9;
       for (const d of Wd.decorIn(Rm, tx - 4, ty - 1, tx + 4, ty + 10)) {
         const s = this.decorArt(d); if (!s && d.t !== 'crystal' && d.t !== 'holo' && d.t !== 'ring') continue;
-        const w = d.t === 'tower' ? d.w * T : s ? s.w : 16, hgt = s ? s.h : 18, fx = d.t === 'tower' ? d.x * T + w / 2 : d.x * T + 8, fy = (d.y + 1) * T + (d.t === 'holo' ? -30 : 0);
+        const w = (d.t === 'tower' || d.t === 'bldg') ? d.w * T : s ? s.w : 16, hgt = s ? s.h : 18, fx = (d.t === 'tower' || d.t === 'bldg') ? d.x * T + w / 2 : d.x * T + 8, fy = (d.y + 1) * T + (d.t === 'holo' ? -30 : 0);
         if (Math.abs(wx - fx) > w / 2 + 3 || wy > fy + 4 || wy < fy - hgt - 3) continue;
-        const dist = Math.hypot(wx - fx, wy - (fy - hgt / 2)) - (d.t === 'tower' || d.t === 'house' ? 0 : 30);
+        const dist = Math.hypot(wx - fx, wy - (fy - hgt / 2)) - (d.t === 'tower' || d.t === 'bldg' || d.t === 'house' ? 0 : 30);
         if (dist < bd) { bd = dist; best = d; }
       }
       if (!best) return false;
-      const far = best.t === 'tower' || best.t === 'house' || best.t === 'holo' ? 5 : 3, bx = best.t === 'tower' ? best.x + (best.w >> 1) : best.x;
-      this.reach(bx, best.y + (best.t === 'tower' || best.t === 'house' ? 1 : 0), { kind: 'decor', d: best }, far);
+      const big = best.t === 'tower' || best.t === 'bldg', far = big || best.t === 'house' || best.t === 'holo' ? 5 : 3, bx = big ? best.x + (best.w >> 1) : best.x;
+      this.reach(bx, best.y + (big || best.t === 'house' ? 1 : 0), { kind: 'decor', d: best }, far);
       return true;
     },
     sparkle(x, y, col, n = 10) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, s = 14 + Math.random() * 34; this.fx.push({ kind: 'spark', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.7 - 16, t: -Math.random() * 0.15, life: 0.7 + Math.random() * 0.5, c: col }); } },
@@ -126,7 +134,14 @@ export function install(Garden, K) {
       else if (d.t === 'prop') { for (let i = 0; i < 16; i++) this.addMote('petal', x + (R() - 0.5) * 30, y, ['#ffd6e4', '#ffffff', '#ff9ac0'], 22 + R() * 20); this.icon(x, y - 46, 'heart'); this.chime(x, y - 20, '#ffd6e4', 2); a.emote('love', 0.9); h.busy = 0.6; }
       else if (d.t === 'gate') { this.chime(x, y - 20, '#ffb08a', 2); for (let i = 0; i < 10; i++) this.addMote('petal', x + (R() - 0.5) * 36, y, ['#ffd6e4', '#ffffff'], 30 + R() * 14); a.emote('nod', 0.8); h.busy = 0.5; }
       else if (d.t === 'neon') { d.v = ((d.v || 0) + 1 + ((R() * 3) | 0)) % 8; this.sparkle(x, y - 18, Art.NEON[d.v % 6], 8); this.lit.set(d, t + 2); a.emote('nod', 0.5); h.busy = 0.3; }
-      else if (d.t === 'tower') { this.lit.set(d, t + 3); this.chime((d.x + d.w / 2) * T, y - 20, Art.NEON[d.v % 6], 3); this.icon((d.x + d.w / 2) * T, y - d.h - 6, ['note', 'heart', 'fish', 'moon'][d.v % 4]); a.emote('surprise', 0.6); h.busy = 0.4; }
+      else if (d.t === 'works') {
+        // machinery answers with steam, a shower of sparks, a turn of its wheel
+        this.lit.set(d, t + 4);
+        for (let i = 0; i < 8; i++) this.fx.push({ kind: 'smoke', x: x + (R() - 0.5) * 10, y: y - 16, vx: (R() - 0.5) * 12, vy: -14 - R() * 10, t: -i * 0.05, life: 1.4 });
+        if (d.k === 'furnace' || d.k === 'boiler') this.sparkle(x, y - 12, '#ffb24a', 12); else this.sparkle(x, y - 10, '#ffd88a', 6);
+        this.chime(x, y - 14, '#ffd88a', 1); a.emote('surprise', 0.6); h.busy = 0.4;
+      }
+      else if (d.t === 'tower' || d.t === 'bldg') { this.lit.set(d, t + 3); this.chime((d.x + d.w / 2) * T, y - 20, Art.NEON[d.v % 6], 3); this.icon((d.x + d.w / 2) * T, y - d.h - 6, ['note', 'heart', 'fish', 'moon'][d.v % 4]); a.emote('surprise', 0.6); h.busy = 0.4; }
       else if (d.t === 'crystal') { this.chime(x, y - 4, d.c, 2); this.sparkle(x, y - 6, d.c, 7); if (R() < 0.15) this.icon(x, y - 14, 'gem'); a.emote('think', 0.5); h.busy = 0.3; }
       else if (d.t === 'holo') { d.v = ((d.v || 0) + 1) % 4; this.sparkle(x, y - 40, '#5af0ff', 18); this.chime(x, y - 40, '#5af0ff', 3); a.emote('surprise', 0.8); h.busy = 0.5; }
       else if (d.t === 'ring') {
@@ -235,14 +250,18 @@ export function install(Garden, K) {
     // ------------------------------------------------ people: who lives where you are
     npcContext() {
       const Rm = this.Rm, hx = this.hero.x / T, hy = this.hero.y / T, c = Rm.city;
-      if (Rm.name === 'under' || Rm.name === 'roofs' || (c && hx > c.x0 - 4 && hx < c.x1 + 4 && hy > c.y0 - 4 && hy < c.y1 + 4)) return 'city';
+      if (Rm.name === 'under' || Rm.name === 'roofs') return 'city';
+      if (Rm.name === 'steam' || Rm.name === 'gears' || Rm.name === 'furnace') return 'works';
+      if (c && hx > c.x0 - 4 && hx < c.x1 + 4 && hy > c.y0 - 4 && hy < c.y1 + 4) { if (!Rm.metro) return 'city'; const d = Wd.districtAt(Rm, Math.floor(hx), Math.floor(hy)); return d === Wd.D_CORE || d === Wd.D_NEON ? 'city' : 'town'; }
       const vi = (Rm.villages || []).findIndex((v) => Math.hypot(v.x - hx, v.y - hy) < 44);
       return vi >= 0 ? `v${vi}` : 'wild';
     },
     spawnDreamNPCs() {
       const Rm = this.Rm, key = (this.npcKey = this.npcContext()), R = Math.random, mk2 = (k, era, x, y, o) => ({ k, actor: new Actor(this.skin.crystal(k, era), GAIT), x, y, path: [], wait: 0.5 + R() * 3, busy: 0, vx: 0, vy: 0, sowT: 12 + R() * 25, greetT: 0, task: null, follow: 0, ...o });
       this.npcs = [];
-      if (key === 'city') { for (let k = 0; k < 6; k++) { const at = this.npcSpot(3, 13); if (at) this.npcs.push(mk2(30 + k, 'Sci-fi', at[0] * T + 8, at[1] * T + 12, { citizen: 1 })); } return; }
+      // city folk: the centre's and the neon quarter's from the future, the old town's, the suburbs' and
+      // the works' from now
+      if (key === 'city' || key === 'town' || key === 'works') { for (let k = 0; k < (key === 'works' ? 4 : 6); k++) { const at = this.npcSpot(3, 13); if (at) this.npcs.push(mk2(30 + k + (key === 'town' ? 10 : key === 'works' ? 20 : 0), key === 'city' ? 'Sci-fi' : 'Present day', at[0] * T + 8, at[1] * T + 12, { citizen: 1 })); } return; }
       if (key[0] === 'v') {
         const v = Rm.villages[+key.slice(1)];
         v.houses.slice(0, 7).forEach((hs, k) => { const d = Rm.decor.find((o) => o.t === 'house' && o.x === hs.x && o.y === hs.y); if (d && this.walkable(hs.x, hs.y + 1)) this.npcs.push(mk2(1 + ((v.x + k * 3) % 18), 'Fantasy', hs.x * T + 8, (hs.y + 1) * T + 12, { home: d, vil: v, inside: this.mode === 'evening' && R() < 0.6 })); });
@@ -266,7 +285,7 @@ export function install(Garden, K) {
       // the wisps follow where you have been
       if ((this.trailT = (this.trailT || 0) + dt) > 0.07) { this.trailT = 0; this.trail.push([h.x, h.y]); if (this.trail.length > 90) this.trail.shift(); }
       // motes: kept topped up round the view, born upwind, carried by the wind
-      const wind = Rm.kind === 'cave' ? 0.15 : this.weather.wind, sp = Rm.name === 'surface' ? (this.cityK > 0.5 ? ['spore', ['#5af0ff', '#ff5ad8'], 10] : MOTES[Wd.biomeAt(Rm, Math.floor(h.x / T), Math.floor(h.y / T))]) : REALM_MOTES[Rm.name] || MOTES[0];
+      const wind = Rm.kind === 'cave' ? 0.15 : this.weather.wind, sp = Rm.name === 'surface' ? (this.cityK > 0.5 ? ['spore', ['#5af0ff', '#ff5ad8'], 10] : MOTES[Wd.biomeAt(Rm, Math.floor(h.x / T), Math.floor(h.y / T))] || MOTES[0]) : REALM_MOTES[Rm.name] || MOTES[0];
       const want = Math.round(sp[2] * (this.q >= 1 ? 1 : 0.5) * (this.weather.kind === 'gust' ? 1.5 : 1));
       if (this.motes.length < want && (this.moteT -= dt) <= 0) {
         this.moteT = 0.06;
@@ -310,7 +329,7 @@ export function install(Garden, K) {
         return;
       }
       const s = this.decorArt(o); if (!s) return;
-      const tall = o.t === 'tower' || o.t === 'house' || (o.t === 'prop' && o.k === 'windmill'), fx = o.t === 'tower' ? o.x * T + (o.w * T) / 2 : o.x * T + 8, fy = (o.y + 1) * T + (o.t === 'house' ? 2 : o.t === 'glint' ? -4 : 1), X = Math.round(fx - cx - s.w / 2), Y = Math.round(fy - cy - s.h);
+      const big = o.t === 'tower' || o.t === 'bldg', tall = big || o.t === 'house' || (o.t === 'prop' && o.k === 'windmill') || (o.t === 'works' && o.k !== 'vent' && o.k !== 'coal'), fx = big ? o.x * T + (o.w * T) / 2 : o.x * T + 8, fy = (o.y + 1) * T + (o.t === 'house' ? 2 : o.t === 'glint' ? -4 : 1), X = Math.round(fx - cx - s.w / 2), Y = Math.round(fy - cy - s.h);
       if (o.t === 'house' || (o.t === 'prop' && o.k !== 'well')) b.drawImage(Art.shadowSprite(s.w - 8, 8), X + 4, Y + s.h - 6);
       if (tall) {
         // thin to a veil when you walk behind it
@@ -318,7 +337,7 @@ export function install(Garden, K) {
       }
       b.drawImage(s.cv, X, Y); b.globalAlpha = 1;
       // a tower whose windows you set dancing
-      if (o.t === 'tower' && this.lit.get(o) > t) { b.globalCompositeOperation = 'lighter'; b.fillStyle = Art.NEON[(o.v + Math.floor(t * 8)) % 6]; b.globalAlpha = 0.5; for (let q = 0; q < 10; q++) b.fillRect(X + 3 + ((q * 7 + Math.floor(t * 10)) % Math.max(4, s.w - 8)), Y + 24 + ((q * 13) % Math.max(6, o.h - 16)), 3, 3); b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1; }
+      if (big && this.lit.get(o) > t) { b.globalCompositeOperation = 'lighter'; b.fillStyle = Art.NEON[(o.v + Math.floor(t * 8)) % 6]; b.globalAlpha = 0.5; for (let q = 0; q < 10; q++) b.fillRect(X + 3 + ((q * 7 + Math.floor(t * 10)) % Math.max(4, s.w - 8)), Y + 24 + ((q * 13) % Math.max(6, o.h - 16)), 3, 3); b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1; }
     },
     // over the things: whales above the islands, motes, bubbles with their signs, and your wisps
     drawOver(b, cx, cy) {
@@ -365,8 +384,10 @@ export function install(Garden, K) {
       b.globalCompositeOperation = 'lighter';
       for (const d of Wd.decorIn(Rm, x0, y0, x1, y1 + 4)) {
         const x = d.x * T + 8, y = (d.y + 1) * T, fl = 0.85 + Math.sin(t * 5 + d.x * 3 + d.y) * 0.1;
-        if (d.t === 'lamp') { if (this.isLit(d)) { const col = d.k === 'neonlamp' ? Art.NEON[(d.v || 0) % 3] : d.k === 'shroomlamp' ? '#8ff0d8' : '#ffd98a', ly = y - (d.k === 'neonlamp' ? 28 : d.k === 'lamp' ? 15 : 9); L(x, ly, 44, col, 0.55 * fl); L(x, ly, 16, col, 0.9 * fl); L(x, y - 2, 28, col, 0.35); } }
+        if (d.t === 'lamp') { if (this.isLit(d)) { const col = d.k === 'neonlamp' ? Art.NEON[(d.v || 0) % 3] : d.k === 'shroomlamp' ? '#8ff0d8' : '#ffd98a', ly = y - (d.k === 'neonlamp' ? 28 : d.k === 'gaslamp' ? 27 : d.k === 'lamp' ? 15 : 9); L(x, ly, 44, col, 0.55 * fl); L(x, ly, 16, col, 0.9 * fl); L(x, y - 2, 28, col, 0.35); } }
         else if (d.t === 'house') { if (this.isLit(d)) { L(x, y - 12, 44, '#ffc070', 0.5 * fl); L(x, y + 4, 28, '#ffd98a', 0.4); } }
+        else if (d.t === 'bldg') { if (dark || d.k === 'factory') { const k2 = d.k, col = k2 === 'glass' || k2 === 'spire' ? '#bfe8ff' : k2 === 'factory' ? '#ffb24a' : '#ffd98a'; L((d.x + d.w / 2) * T, y - Math.min(40, d.h * 0.4), 18 + d.w * 6, col, dark ? 0.35 : 0.15); } }
+        else if (d.t === 'works') { if (d.k === 'furnace') L(x, y - 8, 46, '#ff8a2a', 0.7 * fl); else if (d.k === 'boiler') L(x, y - 4, 22, '#ffb24a', 0.5 * fl); else if (d.k === 'clockface') L(x, y - 26, 30, '#ffe8b0', 0.3); }
         else if (d.t === 'tower') { if (dark) L((d.x + d.w / 2) * T, y - 4, 32, Art.NEON[d.v % 6], 0.3); }
         else if (d.t === 'neon') L(x, y - 20, 22, Art.NEON[d.v % 6], dark ? 0.6 : 0.25);
         else if (d.t === 'chest') { if (!d.o) L(x, y - 6, 12, d.k === 'capsule' ? '#ff5ad8' : '#ffe9a8', 0.3 + Math.sin(t * 3 + d.x) * 0.2); }
