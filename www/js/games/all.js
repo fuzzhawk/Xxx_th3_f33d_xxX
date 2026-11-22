@@ -35,7 +35,7 @@ export const GAMES = { garden: Garden, plinko: Plinko, breakout: Breakout, merge
   wordle: Wordle, bee: Bee, wordsearch: WordSearch, wheel: Wheel, hangman: Hangman, vocab: Vocab, ladder: Ladder, t2048: Twenty48, arrows: Arrows, jrpg: Jrpg, hack: Hack, outland: Outland };
 // display names (the package's own names win when it has them)
 export const GAME_NAMES = {
-  garden: 'Garden',
+  garden: 'Garden', vitriol: 'Vitriol', cavecrawler: 'Cave Crawler',
   plinko: 'Plinko', breakout: 'Breakout', merge: 'Merge', dash: 'Dash', flappy: 'Flap', tetris: 'Tetris', pong: 'Pong', peggle: 'Peg Shot', juggle: 'Juggle',
   platformer: 'Platformer', racer: 'Rail Raider', raycast: 'Hell Maze', rocks: 'Rocks', sling: 'Slingshot', outland: 'Outland',
   chess: 'Chess', dice: 'Yacht Dice', cards: 'Joker Hands', monsters: 'Monster Battle', fighter: 'Street Brawl',

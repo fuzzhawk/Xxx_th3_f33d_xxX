@@ -1,7 +1,7 @@
 import { lsGet, lsSet } from './store.js';
 
 export const CATS = ['game', 'wiki', 'video', 'meme', 'product', 'psych', 'selfcare', 'web', 'oracle', 'power', 'read', 'studio', 'news'];
-export const CAT_LABEL = { game: 'Games', wiki: 'Wikipedia', video: 'Videos', meme: 'Memes', product: 'Products', psych: 'Psychedelic', selfcare: 'Self-care', web: 'From the web', oracle: 'Oracle', power: 'Power scale', read: 'Long reads', studio: 'Studio', news: 'News', pit: 'Author pit', blade: 'Bladeview' };
+export const CAT_LABEL = { game: 'Games', wiki: 'Wikipedia', video: 'Videos', meme: 'Memes', product: 'Products', psych: 'Psychedelic', selfcare: 'Self-care', web: 'From the web', oracle: 'Oracle', power: 'Power scale', read: 'Long reads', studio: 'Studio', news: 'News', pit: 'The Author Pit', blade: 'Bladeview' };
 export const CAT_GLYPH = { game: '◐', wiki: '❦', video: '▶', meme: '☺', product: '✦', psych: '✺', selfcare: '☘', web: '⌘', oracle: '☯', power: '⚔', read: '❧', studio: '✎', news: '◉' };
 export const DEFAULT_PCT = { game: 20, wiki: 23, video: 18, meme: 10, product: 4, psych: 4, selfcare: 5, web: 5, oracle: 3, power: 2, read: 4, studio: 2, news: 0 };
 
@@ -40,6 +40,9 @@ export const DEFAULTS = {
   blueLight: 0.35,         // evening blue-light filter strength (0–0.75)
   blueLightOn: true,
   gardenInFeed: true,      // garden cards in the day feed too
+  bladeview: true,         // the Bladeview city card, early on and every 19 posts
+  authorPit: false,        // the Author Pit (shelved, so off unless turned on)
+  extGames: true,          // Vitriol and Cave Crawler, taking turns every 17 posts
   gardenPlantAlpha: 0.88   // how solid the garden's ground plants look (0.80–0.95)
 };
 

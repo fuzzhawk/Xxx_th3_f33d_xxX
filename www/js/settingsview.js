@@ -54,6 +54,10 @@ export async function render() {
     await packageGroup(man),
     balanceGroup(man),
     modesGroup(),
+    group('Extra cards', 'Cards the feed deals itself, between the package’s posts, in every mode.',
+      toggle('bladeview', 'Bladeview', 'A slow, rain-soaked view of the stacked city, early on and then every 19 posts. Tap it to move the camera.', () => app.softReload()),
+      toggle('extGames', 'Vitriol and Cave Crawler', 'The two whole games, taking turns every 17 posts', () => app.softReload()),
+      toggle('authorPit', 'The Author Pit', 'Fourteen writers make one book together. Shelved, so off unless you turn it on.', () => app.softReload())),
     group('Display', null,
       window.Capacitor?.isNativePlatform?.() ? toggle('immersive', 'Full screen', 'Hide the Android navigation buttons. Swipe up from the bottom edge to show them.', () => app.applyImmersive()) : null,
       toggle('showNsfw', 'Adult comics', 'Include NSFW webcomics such as Oglaf', () => app.softReload()),
@@ -88,8 +92,8 @@ export async function render() {
 // the feed showing only that; games the package has run out of are dealt fresh.
 function jumpGroup(pkg) {
   const man = pkg?.manifest, chip = (label, cat, sub, n) => el('button.jump', { onclick: () => app.jump(cat, sub) }, label, n !== undefined ? el('small', n ? String(n) : '+') : null);
-  const names = { ...GAME_NAMES, ...(man?.topics?.game || {}) };
-  const games = Object.keys(GAMES).sort((a, b) => (names[a] || a).localeCompare(names[b] || b));
+  const names = { ...(man?.topics?.game || {}), ...GAME_NAMES };   // the app's names win: a package can carry an old one
+  const games = [...Object.keys(GAMES), 'vitriol', 'cavecrawler'].sort((a, b) => (names[a] || a).localeCompare(names[b] || b));
   const label = (cat, sub) => man?.topics?.[cat]?.[sub] || String(sub).replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
   const rows = CATS.filter((c) => c !== 'game' && pkg?.posts?.[c]?.length).map((c) => {
     const subs = [...new Set(pkg.posts[c].map((p) => p.sub).filter(Boolean))];
@@ -98,6 +102,8 @@ function jumpGroup(pkg) {
   });
   return group('Jump to', 'Show only one game or one kind of post. The feed goes back to its normal mix when you tap “Show everything”.',
     el('div.jump-cat', el('div.jump-head', chip('All games', 'game', null, app.remaining('game'))), el('div.jumps', games.map((g) => chip(names[g] || g, 'game', g, app.remaining('game', g))))),
+    el('div.jump-cat', el('div.jump-head', chip(CAT_LABEL.blade, 'blade'))),
+    el('div.jump-cat', el('div.jump-head', chip(CAT_LABEL.pit, 'pit'))),
     ...rows);
 }
 
@@ -193,7 +199,7 @@ function balanceGroup(man) {
       el('button.btn.small', { onclick: () => { settings.pct = { ...DEFAULT_PCT }; saveSettings(); app.softReload(); render(); } }, 'Original 20/30/20/10/5/5/5/5')),
     subGroup('wiki', 'Wikipedia topics', man?.topics?.wiki),
     subGroup('video', 'Video topics', man?.topics?.video),
-    subGroup('game', 'Game types', man?.topics?.game),
+    subGroup('game', 'Game types', man?.topics?.game && Object.fromEntries(Object.entries(man.topics.game).map(([k, v]) => [k, GAME_NAMES[k] || v]))),
     subGroup('web', 'Web sources', man?.topics?.web),
     subGroup('news', 'News sources', man?.topics?.news),
     toggle('avoidRepeat', 'Avoid the same kind twice in a row'),

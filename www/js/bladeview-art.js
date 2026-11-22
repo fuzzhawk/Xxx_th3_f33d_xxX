@@ -11,7 +11,7 @@ import { grimePixels } from './grime.js';
 const GEN = new URL('../ext/vitriol/src/gen/', import.meta.url).href;
 let loading = null;
 const script = (src) => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error(`could not load ${src}`)); document.head.append(s); });
-export const loadGen = () => (loading ||= Promise.all([window.GREEBLEWORKS || script(`${GEN}greebleworks.js`), window.MERCFORGE || script(`${GEN}mercforge.js`)]).then(() => ({ GW: window.GREEBLEWORKS, MF: window.MERCFORGE })));
+export const loadGen = () => (loading ||= Promise.all([window.GREEBLEWORKS || script(`${GEN}greebleworks.js`), window.MERCFORGE || script(`${GEN}mercforge.js`), window.CRAWLERFORGE || script(`${GEN}crawlerforge.js`)]).then(() => ({ GW: window.GREEBLEWORKS, MF: window.MERCFORGE, CF: window.CRAWLERFORGE })));
 
 const mk = (w, h) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv; };
 const BASE = { mode: 'level', palette: 'sodium', dither: 0.45, greeble: 0.75, pipes: 0.7, windows: 0.6, neon: 0.3, grime: 0.8, wear: 0.65, relief: 1, lightdir: 315, platKind: 'auto',
@@ -87,16 +87,55 @@ export function sky(GW, mood, palette, seed) {
 // the gun shrunk to nothing, a walk instead of a run. Cops (full helmet, a lit visor) now and then.
 export function citizen(MF, seed) {
   const job = want(`c|${seed}`, () => {
-    const R = mulberry32(seed), h = R() * 360, cop = R() < 0.1;
+    const R = mulberry32(seed), pick = (a) => a[(R() * a.length) | 0], hsl = MF.hsl;
+    // what they wear: the outfit sets the coat's length, the head, the bag; the colours are the
+    // city's: wet browns, greys, olive, navy, oxblood, black, the odd faded colour
+    const OUT = [
+      { w: 4, coat: [0.5, 0.72], hat: ['brim', 'none', 'none'], belt: 1 },       // a trench coat
+      { w: 3, coat: [0.7, 0.9], hat: ['none', 'hood', 'brim'] },                 // a long dark coat
+      { w: 3, coat: [0.12, 0.22], hat: ['none', 'cap', 'beanie'] },              // a short jacket
+      { w: 3, coat: [0.1, 0.18], hat: ['hood'] },                                // a hoodie
+      { w: 2, coat: [0, 0], skirt: 1, hat: ['none', 'none', 'beanie'] },         // a skirt and a top
+      { w: 2, coat: [0.3, 0.45], hat: ['cap'], work: 1 },                        // a worker's coat
+      { w: 1, coat: [0.45, 0.55], hat: ['cap'], cop: 1 }                         // the police
+    ];
+    let t = R() * OUT.reduce((s, o) => s + o.w, 0), o = OUT[0];
+    for (const q of OUT) if ((t -= q.w) < 0) { o = q; break; }
+    const coatH = o.cop ? 220 : o.work ? pick([28, 40, 75]) : pick([25, 30, 35, 210, 220, 0, 350, 80, 40]);
+    const coatS = o.cop ? 26 : o.work ? 34 : pick([6, 10, 14, 20, 28]), coatL = o.cop ? 20 : pick([12, 16, 20, 24, 30]);
+    const skin = pick([[28, 46, 70], [26, 42, 58], [22, 38, 44], [20, 34, 32], [24, 30, 24], [30, 28, 62]]);
+    const hair = R() < 0.08 ? hsl(pick([180, 320, 10]), 40, 34) : hsl(pick([25, 30, 20, 0]), pick([10, 20, 30]), pick([8, 12, 18, 30, 55]));
     const p = Object.assign({}, MF.P_DEFAULTS, MF.randomParams(seed), {
-      gun: 'pistol', gunSize: 0.04, twoHanded: false, aimRows: 1, antenna: false, corrupt: 0, growths: 0, rotVeins: 0, pads: cop ? 0.4 : 0.05, plates: cop, armour: cop ? 0.5 : 0.05,
-      helmet: cop ? 'full' : R() < 0.25 ? 'crest' : 'none', backpack: R() < 0.3 ? 'pack' : 'none', height: 24 + ((R() * 9) | 0), stride: 0.18 + R() * 0.08, lift: 0.06, bounce: 0.012, runLean: 1, lean: 1,
-      colSuit: MF.hsl(cop ? 215 : h, cop ? 22 : 8 + R() * 18, 18 + R() * 16), colSuit2: MF.hsl(h, 8 + R() * 12, 9 + R() * 8), colAccent: MF.hsl((h + 160) % 360, 30 + R() * 30, 30 + R() * 16),
-      colVisor: cop ? '#7ad8ff' : MF.hsl(30, 20, 50), colGun: '#2a2622', grit: 0.9
+      civ: true, coat: o.coat[0] + R() * (o.coat[1] - o.coat[0]), skirt: !!o.skirt, hat: pick(o.hat), scarf: !o.work && !o.cop && R() < 0.3,
+      bag: o.cop || o.work ? 'none' : pick(['none', 'none', 'shoulder', 'shoulder', 'case']), armSwing: 0.6 + R() * 0.6,
+      gun: 'pistol', gunSize: 0.04, twoHanded: false, aimRows: 1, antenna: false, corrupt: 0, growths: 0, rotVeins: 0, pads: 0, plates: false, armour: 0, helmet: 'none',
+      backpack: R() < 0.12 ? 'pack' : 'none', gloveSize: 0, bootSize: 0.2 + R() * 0.3, height: 23 + ((R() * 8) | 0), headSize: 0.78 + R() * 0.16,
+      limbThick: 0.04 + R() * 0.012, shoulderW: 0.26 + R() * 0.08, stride: 0.13 + R() * 0.06, lift: 0.045, bounce: 0.01, runLean: 2, lean: R() < 0.2 ? 5 : 1,
+      colSuit: hsl(coatH, coatS, coatL), colSuit2: hsl(pick([220, 30, 0, 200]), pick([4, 8, 12]), 7 + R() * 9), colAccent: hsl(pick([0, 20, 45, 200, 160, 300]), 20 + R() * 25, 22 + R() * 18),
+      colSkin: hsl(...skin), colVisor: hair, colGun: hsl(pick([25, 30, 220, 0]), pick([8, 14, 20]), 10 + R() * 10), grit: 0.9
     });
     return MF.forge(p);
   });
   job.finish ||= (sh) => { const cv = mk(sh.canvas.width, sh.canvas.height); cv.getContext('2d').drawImage(sh.canvas, 0, 0); grit(cv, seed, { streak: 0, sat: 0.6, levels: 16 }); return { cv, CW: sh.CW, CH: sh.CH, run: sh.colOf('run', 0), runN: sh.framesOf('run'), idle: sh.colOf('idle', 0), idleN: sh.framesOf('idle') }; };
+  return job;
+}
+
+// one of Vitriol's abominations, grown big and idle: a Crawlerforge body (its idle frames) and its
+// tentacle strips, both put through the grit; the scene hangs it in the sky and lets it drift
+export function abomination(CF, seed) {
+  const job = want(`ab|${seed}`, () => {
+    const R = mulberry32(seed ^ 0xab0), pick = (a) => a[(R() * a.length) | 0], size = 44 + ((R() * 14) | 0);
+    return CF.forge(Object.assign({}, CF.P_DEFAULTS, CF.randomParams(seed), {
+      size, lobes: 5 + ((R() * 5) | 0), chaos: 0.5 + R() * 0.5, tentacles: 7 + ((R() * 5) | 0), tentVariants: 3,
+      tentLen: Math.round(size * (1.9 + R() * 0.7)), tentThick: Math.max(8, Math.round(size * 0.24)), tentTaper: 0.5 + R() * 0.25,
+      eyes: 3 + ((R() * 5) | 0), palette: pick(['raw', 'necrotic', 'deepsea', 'void', 'rust', 'ember', 'bile', 'chrome']), SS: 2, pullFrames: 1, hurtFrames: 1
+    }));
+  });
+  job.finish ||= (sh) => {
+    const body = mk(sh.canvas.width, sh.CH); body.getContext('2d').drawImage(sh.canvas, 0, 0); grit(body, seed, { streak: 0, sat: 0.7, levels: 16 });
+    const tc = mk(sh.tentacles.canvas.width, sh.tentacles.canvas.height); tc.getContext('2d').drawImage(sh.tentacles.canvas, 0, 0); grit(tc, seed + 1, { streak: 0, sat: 0.7, levels: 16 });
+    return { body, CW: sh.CW, CH: sh.CH, idle: sh.colOf('idle', 0), idleN: sh.framesOf('idle'), tent: { ...sh.tentacles, canvas: tc }, sockets: sh.physics.sockets, eyes: sh.physics.eyes, centre: sh.physics.centre, anchor: sh.anchor };
+  };
   return job;
 }
 
@@ -105,15 +144,6 @@ const cache = new Map();
 const memo = (key, fn) => { let v = cache.get(key); if (!v) cache.set(key, (v = fn())); return v; };
 // a glow: a soft dithered disc
 export const glow = (col) => memo(`g|${col}`, () => { const cv = mk(32, 32), c = cv.getContext('2d'), g = c.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, col); g.addColorStop(0.35, col.replace(/[\d.]+\)$/, '0.35)')); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, 32, 32); return cv; });
-// an umbrella from above-and-front: a dark dome, its rim lit by a glowing shaft
-export const umbrella = (col) => memo(`u|${col}`, () => {
-  // a clear canopy lit from the glowing shaft: the light fills it, brightest at the rim and the ribs
-  const cv = mk(20, 22), c = cv.getContext('2d');
-  c.globalAlpha = 0.55; c.fillStyle = col; c.beginPath(); c.ellipse(10, 8, 9.5, 6.5, 0, Math.PI, 0); c.fill(); c.fillRect(0.5, 7, 19, 2);
-  c.globalAlpha = 0.9; c.fillRect(0.5, 8, 19, 1); for (let q = 0; q < 5; q++) { const x = 2 + q * 4; c.beginPath(); c.moveTo(10, 2); c.lineTo(x, 8.5); c.lineWidth = 0.8; c.strokeStyle = col; c.stroke(); }
-  c.globalAlpha = 1; c.fillStyle = col; c.fillRect(9.5, 2, 1, 19); c.fillStyle = '#ffffff'; c.fillRect(9.5, 1, 1, 2);
-  return cv;
-});
 // the rooftop gardens' plants: a shrub, a small tree, tall grasses, a vine on a frame; leaves dark and dithered
 export const plant = (k) => memo(`pl|${k}`, () => {
   const cv = mk(24, 32), c = cv.getContext('2d'), R = mulberry32(k * 31 + 7), leaf = ['#2a4a2e', '#355a34', '#3e6a3a', '#24402a'], kind = k % 4;

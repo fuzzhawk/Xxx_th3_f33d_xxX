@@ -5,7 +5,7 @@
 // The city round the camera is built for each view: a canyon of brutalist blocks faced with
 // greebleworks facades (bladeview-art.js), shacks and cages and air conditioners bolted on, neon
 // signs, walkways and bridges at every height, wires slung between the blocks. Spinners and cars move
-// in their lanes, small people walk the walkways (some under lit umbrellas), steam rises, searchlights
+// in their lanes, small people walk the walkways in their coats and hoods, steam rises, searchlights
 // sweep, refinery flares burn on the far towers. Rain, fog, smog, ash and the hour (night, a sunset,
 // a grey dawn) set the mood. The billboards run slow simulations (Life, Langton's ant, rule 110,
 // Brian's brain); the ad panels crawl with Markov-chain poetry, all kept dim.
@@ -109,18 +109,21 @@ export class BladeView {
     const pal = L.pal === 'chrome' && hour === 'dusk' ? 'sodium' : L.pal;
     const styles = [...L.styles].sort(() => R() - 0.5).slice(0, 3);
     const cam = L.kind === 'tunnel' ? 'dolly' : L.kind === 'roof' ? (R() < 0.5 ? 'pan' : 'drift') : ['dolly', 'dolly', 'crane', 'pan', 'drift'][Math.floor(R() * 5)];
-    return { seed, R, lv, L, hour, wk, W: WEATHER[wk], mood, pal, styles, cam, clock: `${String(hour === 'night' ? [23, 0, 1, 2, 3, 4][Math.floor(R() * 6)] : hour === 'dusk' ? 19 + Math.floor(R() * 2) : 5 + Math.floor(R() * 2)).padStart(2, '0')}:${String(Math.floor(R() * 60)).padStart(2, '0')}` };
+    return { seed, R, lv, L, hour, wk, W: WEATHER[wk], mood, pal, styles, cam, clock: `${String(hour === 'night' ? [23, 0, 1, 2, 3, 4][Math.floor(R() * 6)] : hour === 'dusk' ? 19 + Math.floor(R() * 2) : 5 + Math.floor(R() * 2)).padStart(2, '0')}:${String(Math.floor(R() * 60)).padStart(2, '0')}`,
+      // one or two of Vitriol's abominations idling in the sky, in about half the open views
+      abom: L.under ? 0 : R() < ({ roof: 0.6, ledge: 0.6, lane: 0.6, gantry: 0.5 }[L.kind] ?? 0.4) ? (R() < 0.3 ? 2 : 1) : 0 };
   }
   go(seed) {
-    const v = this.plan(seed), { GW, MF } = this.G;
+    const v = this.plan(seed), { GW, MF, CF } = this.G;
     // everything this place needs, baked a slice at a time while the last one fades
     v.walls = v.styles.flatMap((s, k) => [A.facade(GW, s, v.pal, (seed + k * 7919) >>> 0), A.facade(GW, s, v.pal, (seed + k * 7919 + 31) >>> 0)]);
     v.plat = A.platform(GW, v.styles[0], v.pal, (seed ^ 0x51) >>> 0);
     v.skyJob = v.L.under ? null : A.sky(GW, v.mood, v.pal, (seed ^ 0x77) >>> 0);
-    v.people = Array.from({ length: 6 }, (_, k) => A.citizen(MF, ((seed % 997) * 13 + k * 101) % 4000 + 1));
+    v.people = Array.from({ length: 8 }, (_, k) => A.citizen(MF, ((seed % 997) * 13 + k * 101) % 4000 + 1));
+    v.aboms = Array.from({ length: v.abom }, (_, k) => A.abomination(CF, ((seed % 389) * 7 + k * 313) % 600 + 1));
     this.pending = v; this.state = this.view ? 'out' : 'load';
   }
-  ready(v) { return [...v.walls, v.plat, v.skyJob, ...v.people].every((j) => !j || j.done); }
+  ready(v) { return [...v.walls, v.plat, v.skyJob, ...v.people, ...v.aboms].every((j) => !j || j.done); }
 
   // ------------------------------------------------ building the place
   free() {
@@ -206,8 +209,8 @@ export class BladeView {
       // a sea of cloud below the roofs
       gl.cloudSea = 1;
       box(pb, -14, 14, -0.3, 0, -20, 50, () => 0.42, [1, 1, 1], ['py']);
-      for (let q = 0; q < 26; q++) { const x = rr(-12, 11), z = rr(-16, 46); box(db, x, x + rr(1.2, 3), 0, rr(0.4, 0.8), z, z + rr(0.8, 1.6), () => 0.3, [0.55, 0.4, 0.3]); gl.glows.push(['plant', x + 1, 0.8, z + 0.6]); }
-      for (let q = 0; q < 6; q++) { const x = rr(-12, 9), z = rr(-14, 44), hh = rr(2.2, 3.2); box(db, x, x + 3, 0, hh, z, z + 2.2, (y) => 0.35 + y * 0.05, [0.45, 0.5, 0.5]); gl.glows.push(['tank', x + 1.5, hh + 0.5, z + 1]); }
+      for (let q = 0; q < 26; q++) { const x = rr(-12, 11), z = rr(-16, 46); box(pb, x, x + rr(1.2, 3), 0, rr(0.4, 0.8), z, z + rr(0.8, 1.6), () => 0.3, [0.6, 0.45, 0.35]); gl.glows.push(['plant', x + 1, 0.8, z + 0.6]); }
+      for (let q = 0; q < 6; q++) { const x = rr(-12, 9), z = rr(-14, 44), hh = rr(2.2, 3.2); box(pb, x, x + 3, 0, hh, z, z + 2.2, (y) => 0.3 + y * 0.05, [0.5, 0.55, 0.55]); gl.glows.push(['tank', x + 1.5, hh + 0.5, z + 1]); }
     } else if (kind === 'walkway' || kind === 'gantry' || kind === 'ledge') {
       // the deck we stand on: a walkway down the canyon (a ledge hugs one face), with its railing
       const x0 = kind === 'ledge' ? half - 6 : -2.2, x1 = kind === 'ledge' ? half : 2.2;
@@ -218,16 +221,50 @@ export class BladeView {
       // the street far below, its own little lights
       if (kind !== 'ledge') { const fy = floors; box(db, -half - 1, half + 1, fy - 0.4, fy, -60, 300, () => 0.12, [0.5, 0.55, 0.65], ['py']); for (let q = 0; q < 40; q++) gl.glows.push([pick(['street', 'sign']), rr(-half, half), fy + 0.5, rr(-40, 280)]); }
     }
-    // ---- walkways and bridges across the canyon, above and below
-    if (kind !== 'tunnel' && kind !== 'roof' && kind !== 'hall') {
-      const n = kind === 'lane' ? 10 : 16;
+    // ---- walkways across the view, above and below: open decks with railings (some hung on rods),
+    // enclosed skybridges with a lit strip of windows; catwalks over the works and the sewer channel
+    const deck = kind === 'walkway' || kind === 'gantry' || kind === 'ledge';
+    if (kind !== 'roof') {
+      const n = { lane: 14, tunnel: 7, hall: 12 }[kind] ?? 26, X0 = kind === 'tunnel' ? -6 : -half, X1 = -X0;
       for (let q = 0; q < n; q++) {
-        const y = kind === 'street' ? rr(6, L.slab ? 12 : 60) : rr(-40, 70), z = rr(-20, 260), wd = rr(1.6, 3.2);
-        if (kind !== 'street' && Math.abs(y) < 3 && Math.abs(z) < 60) continue;
-        box(pb, -half, half, y - 0.35, y, z, z + wd, (yy) => shade(yy) * 1.1, tintOf(), ['py', 'ny', 'pz', 'nz']);
-        for (let x = -half; x < half; x += 2.4) box(db, x, x + 0.06, y, y + 1, z, z + 0.06, () => 0.2, [0.6, 0.6, 0.6], ['nz', 'pz']);
-        if (R() < 0.6) gl.glows.push(['bridge', rr(-half * 0.6, half * 0.6), y - 0.4, z + wd / 2]);
+        const y = kind === 'street' ? rr(5, L.slab ? 12 : 60) : kind === 'tunnel' ? rr(3.4, 4.6) : kind === 'hall' ? rr(8, 28) : rr(-40, 70), z = rr(-20, 260), wd = rr(1.6, 3.2), k = R();
+        if ((deck && Math.abs(y) < 3) || (kind === 'lane' && Math.abs(y - 6) < 16 && Math.abs(z - gl.camZ) < 50) || (kind === 'street' && y < 14 && Math.abs(z - gl.camZ) < 30)) continue;
+        if (k < 0.25 && kind !== 'tunnel' && kind !== 'hall') {
+          const hh = rr(2.6, 3.6);
+          box(batches[(R() * batches.length) | 0], X0, X1, y - 0.4, y + hh, z, z + wd + 1, shade, tintOf(), ['py', 'ny', 'pz', 'nz']);
+          for (let x = X0 + 2; x < X1 - 1; x += rr(2.5, 5)) if (R() < 0.6) gl.glows.push(['window', x, y + hh * 0.55, z - 0.1]);
+        } else {
+          box(pb, X0, X1, y - 0.35, y, z, z + wd, (yy) => shade(yy) * 1.1, tintOf(), ['py', 'ny', 'pz', 'nz']);
+          for (let x = X0; x < X1; x += 2.4) box(db, x, x + 0.06, y, y + 1, z, z + 0.06, () => 0.2, [0.6, 0.6, 0.6], ['nz', 'pz']);
+          box(db, X0, X1, y + 0.95, y + 1.03, z, z + 0.06, () => 0.22, [0.6, 0.6, 0.6], ['nz', 'pz', 'py']);
+          if (k > 0.72 && kind !== 'tunnel') for (let x = X0 + rr(2, 4); x < X1; x += rr(4, 8)) box(db, x, x + 0.05, y, y + rr(6, 14), z + wd / 2, z + wd / 2 + 0.05, () => 0.18, [0.5, 0.5, 0.55], ['nz', 'pz']);
+          if (R() < 0.6) gl.glows.push(['bridge', rr(X0 * 0.6, X1 * 0.6), y - 0.4, z + wd / 2]);
+        }
         gl.walks ||= []; gl.walks.push({ y, z: z + wd / 2, across: 1 });
+      }
+    }
+    // ---- pipes: fat runs across the view (some in bundles) with their flanges, runs along the
+    // faces and down the tunnel walls
+    if (kind !== 'roof') {
+      const ptint = () => pick([[0.8, 0.66, 0.52], [0.62, 0.64, 0.68], [0.58, 0.52, 0.44], [0.75, 0.48, 0.36]]);
+      const across = (x0, x1, y, z, r, tint) => {
+        box(pb, x0, x1, y - r, y + r, z - r, z + r, () => shade(y) * 0.85, tint, ['py', 'ny', 'pz', 'nz']);
+        for (let x = x0 + rr(1, 3); x < x1; x += rr(3, 6)) box(db, x, x + 0.14, y - r * 1.4, y + r * 1.4, z - r * 1.4, z + r * 1.4, () => shade(y) * 0.45, tint, ['nz', 'pz', 'py', 'ny', 'px', 'nx']);
+      };
+      const along = (x, y, z0, len, r, tint) => {
+        box(pb, x - r, x + r, y - r, y + r, z0, z0 + len, () => shade(y) * 0.8, tint, ['py', 'ny', 'px', 'nx']);
+        for (let z = z0 + rr(1, 3); z < z0 + len; z += rr(3, 6)) box(db, x - r * 1.4, x + r * 1.4, y - r * 1.4, y + r * 1.4, z, z + 0.14, () => shade(y) * 0.45, tint, ['nz', 'pz', 'py', 'ny', 'px', 'nx']);
+      };
+      if (kind === 'tunnel') for (const s2 of [-1, 1]) for (let k = 0; k < 3; k++) along(s2 * rr(5.2, 5.7), rr(1.6, 4.2), -40, 260, rr(0.12, 0.3), ptint());
+      else {
+        const n = kind === 'hall' ? 14 : kind === 'lane' ? 8 : 18;
+        for (let q = 0; q < n; q++) {
+          const y = kind === 'street' ? rr(4, L.slab ? 12 : 40) : kind === 'hall' ? rr(6, 30) : rr(-30, 60), z = rr(-10, 260), r = rr(0.15, 0.5), tint = ptint();
+          if ((deck && Math.abs(y) < 2.6) || (kind === 'lane' && Math.abs(y - 6) < 16 && Math.abs(z - gl.camZ) < 50)) continue;
+          const nb = R() < 0.35 ? ri(2, 4) : 1;
+          for (let b = 0; b < nb; b++) across(-half, half, y + b * r * 2.6, z, r, tint);
+        }
+        for (let q = 0; q < (kind === 'hall' ? 10 : 12); q++) { const s2 = R() < 0.5 ? -1 : 1, r = rr(0.12, 0.4); along(s2 * (half - r - 0.05), kind === 'hall' ? rr(2, 30) : rr(Math.max(floors + 2, -30), 60), rr(-30, 200), rr(15, 90), r, ptint()); }
       }
     }
     // ---- the clutter bolted on the faces: shacks, cages, air conditioners, pipes; signs and screens
@@ -237,8 +274,8 @@ export class BladeView {
       for (let q = 0; q < n; q++) {
         const z = rr(b.z0 + 0.5, b.z1 - 1.5), y = rr(floors + 1, Math.min(b.top - 2, 90)), r = R();
         if (r < 0.18) { const w = rr(2, 4.5), hh = rr(2, 3.4), dd = rr(1, 2.6); box(batches[(R() * batches.length) | 0], s < 0 ? face : face - dd, s < 0 ? face + dd : face, y, y + hh, z, z + w, shade, tintOf()); }
-        else if (r < 0.5) box(db, s < 0 ? face : face - 0.5, s < 0 ? face + 0.5 : face, y, y + 0.6, z, z + 0.9, () => shade(y) * 0.8, [0.55, 0.55, 0.58]);
-        else if (r < 0.62) box(db, s < 0 ? face : face - 1.1, s < 0 ? face + 1.1 : face, y, y + 1.6, z, z + rr(1.6, 3), () => shade(y) * 0.6, [0.45, 0.45, 0.5], [s < 0 ? 'px' : 'nx', 'py', 'nz', 'pz']);
+        else if (r < 0.5) box(pb, s < 0 ? face : face - 0.5, s < 0 ? face + 0.5 : face, y, y + 0.6, z, z + 0.9, () => shade(y) * 0.8, [0.55, 0.55, 0.58]);
+        else if (r < 0.62) box(pb, s < 0 ? face : face - 1.1, s < 0 ? face + 1.1 : face, y, y + 1.6, z, z + rr(1.6, 3), () => shade(y) * 0.6, [0.45, 0.45, 0.5], [s < 0 ? 'px' : 'nx', 'py', 'nz', 'pz']);
         else if (r < 0.72) box(db, s < 0 ? face : face - 0.18, s < 0 ? face + 0.18 : face, y - 4, y + 6, z, z + 0.18, () => shade(y) * 0.7, [0.6, 0.45, 0.35], [s < 0 ? 'px' : 'nx']);
         else if (r < 0.8 && y < 70 && gl.signs.length < 46) gl.signs.push({ x: s < 0 ? face + 0.25 : face - 0.25, y, z, s, seed: ri(1, 40), vert: R() < 0.6 });
         else if (r < 0.83 && y > floors + 4) gl.glows.push(['window', s < 0 ? face + 0.2 : face - 0.2, y, z]);
@@ -248,6 +285,41 @@ export class BladeView {
     if (kind === 'tunnel') for (let z = -30; z < 220; z += 9) gl.glows.push(['lamp', (z / 9) % 2 ? -5.4 : 5.4, 4.6, z]);
     if (kind === 'hall') for (let z = -30; z < 260; z += 12) for (const s2 of [-1, 1]) gl.glows.push(['lamp', s2 * (half - 0.6), rr(8, 20), z + rr(0, 6)]);
     if (L.slab) for (let z = -40; z < 300; z += 10) gl.glows.push(['lamp', rr(-half + 2, half - 2), 13.4, z]);
+    // the street itself: the kerb and gutter, worn markings, wet patches, lamps bent over the road;
+    // against the walls and on the pavements, rubbish piled up, kiosks, vending machines, bins and
+    // burning barrels, awnings over the shopfronts, bollards
+    if (kind === 'street') {
+      const ks = half - 3;
+      for (const s2 of [-1, 1]) box(db, s2 * ks - 0.15, s2 * ks + 0.15, 0, 0.02, -60, 300, () => 0.07, [0.6, 0.6, 0.7], ['py']);
+      for (let z = -60; z < 300; z += 7) if (R() < 0.7) box(db, -0.08, 0.08, 0, 0.012, z, z + 3, () => rr(0.22, 0.36), [0.9, 0.85, 0.6], ['py']);
+      for (let q = 0; q < 40; q++) { const x = rr(-ks + 0.5, ks - 3), z = rr(-20, 260); box(db, x, x + rr(0.8, 3), 0, 0.01, z, z + rr(0.8, 4), () => rr(0.28, 0.42), [0.55, 0.62, 0.78], ['py']); }
+      for (let z = rr(-20, 0); z < 260; z += rr(14, 22)) for (const s2 of [-1, 1]) {
+        const x = s2 * (ks + 0.4), x2 = x - s2 * 1.6;
+        box(db, x - 0.07, x + 0.07, 0.18, 6, z, z + 0.14, () => 0.2, [0.5, 0.5, 0.55]); box(db, Math.min(x, x2), Math.max(x, x2), 5.9, 6.04, z, z + 0.14, () => 0.2, [0.5, 0.5, 0.55]);
+        gl.glows.push(['street', x2, 5.75, z + 0.07]);
+      }
+      for (let q = 0; q < 38; q++) {
+        const s2 = R() < 0.5 ? -1 : 1, z = rr(-20, 250), r = R(), wx = s2 * half;
+        if (r < 0.32) {
+          for (let k = ri(4, 9); k > 0; k--) { const w = rr(0.35, 0.9), h = rr(0.3, 0.75), x = wx - s2 * rr(0.25, 1.4), zz = z + rr(-1, 1); box(R() < 0.5 ? db : pb, x - w / 2, x + w / 2, 0.18, 0.18 + h, zz, zz + w, () => rr(0.22, 0.42), pick([[0.4, 0.42, 0.45], [0.55, 0.45, 0.32], [0.3, 0.35, 0.3], [0.5, 0.5, 0.55]])); }
+        } else if (r < 0.46) {
+          const x = s2 * (ks + 1.5), w = rr(1.6, 2.4);
+          box(batches[(R() * batches.length) | 0], x - 0.9, x + 0.9, 0.18, 2.5, z, z + w, () => 0.45, tintOf());
+          box(db, x - 1.1, x + 1.1, 2.5, 2.62, z - 0.2, z + w + 0.2, () => 0.3, [0.6, 0.6, 0.65]);
+          gl.glows.push(['stall', x - s2 * 0.95, 1.4, z + w / 2]);
+          if (gl.signs.length < 54) gl.signs.push({ x: x - s2 * 0.92, y: 3.0, z: z + w / 2, s: s2, seed: ri(1, 40), vert: false, small: 1 });
+        } else if (r < 0.6) {
+          const x = wx - s2 * 0.4; box(db, x - 0.4, x + 0.4, 0.18, 2.0, z, z + 0.9, () => 0.24, [0.5, 0.52, 0.58]); gl.glows.push([pick(['sign', 'window', 'house']), x - s2 * 0.42, 1.3, z + 0.45]);
+        } else if (r < 0.72) {
+          const x = s2 * (ks + rr(0.3, 2)); box(pb, x - 0.32, x + 0.32, 0.18, 1.1, z, z + 0.64, () => 0.3, [0.6, 0.5, 0.4]);
+          if (L.slab || R() < 0.3) { gl.glows.push(['lamp', x, 1.4, z + 0.32]); gl.puffs.push({ x, y: 1.1, z: z + 0.32, t: R() * 5 }); }
+        } else if (r < 0.86) {
+          const x1 = wx - s2 * rr(1.6, 2.6), y = rr(2.6, 3.2), w = rr(3, 6);
+          box(pb, Math.min(wx, x1), Math.max(wx, x1), y, y + 0.1, z, z + w, () => 0.35, tintOf(), ['py', 'ny']);
+          gl.glows.push(['stall', (wx + x1) / 2, y - 0.5, z + w / 2]);
+        } else for (let k = 0; k < 4; k++) { const x = s2 * (ks + 0.25); box(db, x - 0.1, x + 0.1, 0.18, 0.9, z + k * 1.4, z + k * 1.4 + 0.2, () => 0.3, [0.7, 0.65, 0.4]); }
+      }
+    }
     // the ground floor of the street: stalls with their lamps, steam from the drains
     if (kind === 'street' || kind === 'hall' || kind === 'tunnel') {
       for (let q = 0; q < (kind === 'tunnel' ? 10 : 24); q++) { const z = rr(-20, 240), s = R() < 0.5 ? -1 : 1, x = kind === 'tunnel' ? s * 4.5 : s * (half - 1.5); gl.puffs.push({ x: kind === 'street' ? rr(-half + 4, half - 4) : x, y: 0, z, t: R() * 5 }); if (kind === 'street') gl.glows.push(['stall', s * (half - 2), 2.2, z]); }
@@ -260,7 +332,7 @@ export class BladeView {
     for (const sg of gl.signs) {
       const key = sg.seed % 10, ns = A.neonSign(key + 1, sg.vert);
       let t = signTex.get(`${key}|${sg.vert}`); if (!t) { t = this.tex(gl, ns.cv, false); signTex.set(`${key}|${sg.vert}`, t); }
-      const h = sg.vert ? 3 + (ns.cv.height / 16) : 1.2, w = (ns.cv.width / ns.cv.height) * h;
+      const h = sg.small ? 0.6 : sg.vert ? 3 + (ns.cv.height / 16) : 1.2, w = (ns.cv.width / ns.cv.height) * h;
       const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: t, fog: true, transparent: false }));
       m.position.set(sg.x, sg.y, sg.z); m.rotation.y = sg.s < 0 ? Math.PI / 2 : -Math.PI / 2; sc.add(m);
       sg.mesh = m; sg.col = ns.col; sg.ph = R() * 10;
@@ -282,20 +354,30 @@ export class BladeView {
       else { const sd = R() < 0.5 ? -1 : 1; m.position.set(sd * 5.6, rr(2.4, 3.6), rr(30, 160)); m.rotation.y = sd < 0 ? Math.PI / 2 : -Math.PI / 2; }
       sc.add(m); gl.crawls.push({ cr, t });
     }
-    // ---- wires slung between the blocks, heavy and sagging; some with lamps or washing
-    const wires = [];
-    if (kind !== 'roof' && kind !== 'lane' && kind !== 'ledge') for (let q = 0; q < (kind === 'tunnel' ? 18 : 60); q++) {
-      const z = rr(-20, 260), y = kind === 'tunnel' ? rr(3, 5.5) : rr(floors + 4, Math.min(tops, 70)), x0 = kind === 'tunnel' ? -5.5 : -half, x1 = kind === 'tunnel' ? 5.5 : half, z2 = z + rr(-6, 6), sag = rr(0.6, 3.5), NS = 10;
-      for (let k = 0; k < NS; k++) { const u0 = k / NS, u1 = (k + 1) / NS, P = (u) => [x0 + (x1 - x0) * u, y - Math.sin(u * Math.PI) * sag, z + (z2 - z) * u]; wires.push(...P(u0), ...P(u1)); }
+    // ---- wires slung between the blocks, heavy and sagging: single cables and bundles, loose ends
+    // hanging from them, washing pegged out along a few, a lamp on some
+    const wires = [], wash = new Batch();
+    if (kind !== 'roof' && kind !== 'ledge') for (let q = 0; q < ({ tunnel: 26, hall: 50, lane: 30 }[kind] ?? 110); q++) {
+      const z = rr(-20, 260), y = kind === 'tunnel' ? rr(3, 5.5) : rr(floors + 4, Math.min(tops, 70)), x0 = kind === 'tunnel' ? -5.5 : -half, x1 = -x0, z2 = z + rr(-6, 6), sag = rr(0.6, 3.5) * (kind === 'lane' ? 2.5 : 1), NS = 10;
+      const P = (u, oy = 0, oz = 0, sg = sag) => [x0 + (x1 - x0) * u, y - oy - Math.sin(u * Math.PI) * sg, z + oz + (z2 - z) * u];
+      const nb = R() < 0.35 ? ri(2, 5) : 1;
+      for (let b = 0; b < nb; b++) { const oy = b * rr(0.1, 0.3), oz = rr(-0.25, 0.25), sg = sag * rr(0.85, 1.2); for (let k = 0; k < NS; k++) wires.push(...P(k / NS, oy, oz, sg), ...P((k + 1) / NS, oy, oz, sg)); }
+      if (R() < 0.3) for (let d = ri(1, 3); d > 0; d--) {
+        const p = P(rr(0.15, 0.85)), len = rr(1.5, 7), dx = rr(-0.8, 0.8);
+        for (let k = 0; k < 5; k++) { const a0 = k / 5, a1 = (k + 1) / 5; wires.push(p[0] + dx * a0 * a0, p[1] - len * a0, p[2], p[0] + dx * a1 * a1, p[1] - len * a1, p[2]); }
+      }
+      if (kind !== 'tunnel' && kind !== 'lane' && R() < 0.18) for (let u = rr(0.08, 0.2); u < 0.9; u += rr(0.05, 0.12)) {
+        const p = P(u), w = rr(0.4, 0.9), h = rr(0.5, 1.2);
+        box(wash, p[0] - w / 2, p[0] + w / 2, p[1] - h, p[1], p[2] - 0.02, p[2] + 0.02, () => rr(0.16, 0.36), pick([[0.9, 0.5, 0.4], [0.5, 0.6, 0.8], [0.8, 0.8, 0.7], [0.6, 0.7, 0.5], [0.85, 0.7, 0.4]]), ['nz', 'pz']);
+      }
       if (R() < 0.25) gl.glows.push(['wire', 0, y - sag, (z + z2) / 2]);
     }
     if (wires.length) { const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(wires, 3)); sc.add(new T.LineSegments(g, new T.LineBasicMaterial({ color: 0x0a0a0c, fog: true }))); }
+    { const wm = wash.mesh(dark); if (wm) sc.add(wm); }
     // ---- glows (lamps, windows, neon, screens, stalls), drawn as additive sprites
     const GC = { mast: 'rgba(255,40,40,1)', house: 'rgba(160,255,170,1)', lamp: 'rgba(255,170,80,1)', neon: null, window: 'rgba(255,190,110,1)', bridge: 'rgba(255,210,150,1)', street: 'rgba(255,170,90,1)', sign: 'rgba(255,80,140,1)', stall: 'rgba(255,170,80,1)', wire: 'rgba(255,220,160,1)', screen: null, plant: 'rgba(120,220,120,1)', tank: 'rgba(255,80,60,1)' };
     const SZ = { mast: 1.4, house: 3.5, lamp: 7, neon: 4, window: 2.2, bridge: 3, street: 4, sign: 3, stall: 5, wire: 1.6, screen: 9, plant: 1.2, tank: 0.9 };
     const glowMats = new Map(), gmat = (col) => { let m = glowMats.get(col); if (!m) { const c = col.startsWith('#') ? `rgba(${parseInt(col.slice(1, 3), 16)},${parseInt(col.slice(3, 5), 16)},${parseInt(col.slice(5, 7), 16)},1)` : col; m = new T.SpriteMaterial({ map: this.tex(gl, A.glow(c), false), blending: T.AdditiveBlending, depthWrite: false, transparent: true, fog: true }); glowMats.set(col, m); } return m; };
-    gl.glowSpr = [];
-    for (const [k, x, y, z, col] of gl.glows) { if (k === 'plant') continue; const s = new T.Sprite(gmat(col || GC[k] || 'rgba(255,200,140,1)')); s.position.set(x, y, z); const sz = SZ[k] || 2; s.scale.set(sz, sz, 1); s.material.opacity = 0.6; sc.add(s); gl.glowSpr.push({ s, k, ph: R() * 10 }); }
     // ---- vehicles: spinners in their lanes (most levels), cars on the street
     const body = new T.BoxGeometry(2, 0.7, 4.4), cab = new T.BoxGeometry(1.3, 0.55, 1.8); cab.translate(0, 0.55, -0.3);
     const carMat = new T.MeshBasicMaterial({ color: 0x24262c, fog: true });
@@ -319,28 +401,31 @@ export class BladeView {
       cone.geometry.translate(0, -80, 0); cone.position.set(rr(-200, 200), rr(80, 150), rr(200, 320)); sc.add(cone); gl.cones.push({ cone, ph: R() * 6, sp: rr(0.1, 0.25) });
     }
     if (!L.under && kind !== 'street') for (let q = 0; q < 4; q++) { const s = new T.Sprite(gmat('rgba(255,140,40,1)')); s.position.set(rr(-260, 260), rr(30, 90), rr(260, 380)); s.scale.set(12, 16, 1); sc.add(s); gl.flares.push({ s, t: rr(0, 8), next: rr(2, 9) }); }
-    // ---- people: on the floor, the decks and the bridges, some under lit umbrellas
+    // ---- people: on the floor, the decks and the bridges, going about their business
     const sheets = v.people.filter((j) => j.out).map((j) => ({ j, t: this.tex(gl, j.out.cv, false) }));
-    const umb = ['rgba(120,220,255,1)', 'rgba(255,120,200,1)', 'rgba(255,200,120,1)'].map((c) => new T.SpriteMaterial({ map: this.tex(gl, A.umbrella(c.replace('rgba', 'rgb').replace(',1)', ')')), false), fog: true, transparent: true, alphaTest: 0.3 }));
     const where = [], camZ = gl.camZ;
     if (kind === 'street') for (let q = 0; q < 46; q++) where.push({ x: (R() < 0.5 ? -1 : 1) * rr(half - 2.6, half - 0.6), y: 0.18, z: rr(-10, 200), along: 1 });
     else if (kind === 'tunnel') for (let q = 0; q < 10; q++) where.push({ x: (R() < 0.5 ? -1 : 1) * rr(3.2, 5.6), y: 0, z: rr(0, 160), along: 1 });
     else if (kind === 'hall') for (let q = 0; q < 18; q++) where.push({ x: rr(-half + 3, half - 3), y: 0, z: rr(0, 180), along: R() < 0.5 });
     else if (kind === 'roof') for (let q = 0; q < 10; q++) where.push({ x: rr(-11, 11), y: 0, z: rr(-10, 44), along: R() < 0.5 });
     else if (kind === 'walkway' || kind === 'gantry' || kind === 'ledge') for (let q = 0; q < 26; q++) where.push({ x: kind === 'ledge' ? rr(half - 5, half - 1) : rr(-1.8, 1.8), y: 0, z: rr(-10, 220), along: 1 });
-    for (const wk of gl.walks || []) for (let q = 0; q < 2; q++) if (R() < 0.6) where.push({ x: rr(-half + 1, half - 1), y: wk.y, z: wk.z, along: 0, x0: -half + 0.5, x1: half - 0.5 });
+    for (const wk of gl.walks || []) if (Math.abs(wk.z - camZ) > 14) for (let q = 0; q < 2; q++) if (R() < 0.6) where.push({ x: rr(-half + 1, half - 1), y: wk.y, z: wk.z, along: 0, x0: -half + 0.5, x1: half - 0.5 });
     if (kind === 'walkway') for (let q = 0; q < 30; q++) where.push({ x: (R() < 0.5 ? -1 : 1) * rr(half - 2.4, half - 0.5), y: -26, z: rr(-10, 220), along: 1 });
     for (const p of where) {
       if (!sheets.length) break;
       if (p.along && Math.abs(p.z - camZ) < 12) p.z = camZ + 12 + R() * 30;
-      const S = sheets[(R() * sheets.length) | 0], tx = S.t.clone(); tx.needsUpdate = true; gl.tex.push(tx);
-      const sh = S.j.out, cw2 = sh.CW / sh.cv.width; tx.repeat.set(cw2, 1);
-      const spr = new T.Sprite(new T.SpriteMaterial({ map: tx, fog: true, transparent: true, alphaTest: 0.35 })); spr.center.set(0.5, 0);
-      const hgt = 1.75 * (sh.CH / 35); spr.scale.set(hgt * (sh.CW / sh.CH), hgt, 1); sc.add(spr);
-      const idle = R() < 0.25, wet = v.W.rain > 0.3 && !L.under && R() < 0.45;
-      let u = null; if (wet) { u = new T.Sprite(umb[(R() * umb.length) | 0]); u.center.set(0.5, 0); u.scale.set(1.1, 1.2, 1); sc.add(u); }
-      gl.people.push({ spr, tx, sh, u, ...p, dir: R() < 0.5 ? 1 : -1, sp: idle ? 0 : rr(0.7, 1.3), f: R() * 8, idle });
+      const si = (R() * sheets.length) | 0, sh = sheets[si].j.out, h = 1.75 * (sh.CH / 35), idle = R() < 0.25;
+      gl.people.push({ si, sh, w: h * (sh.CW / sh.CH), h, ...p, dir: R() < 0.5 ? 1 : -1, sp: idle ? 0 : rr(0.7, 1.3), f: R() * 8, idle });
     }
+    // one mesh per sheet: a quad per person, turned to the camera and given its frame every frame
+    gl.crowds = sheets.map((S, si) => {
+      const list = gl.people.filter((p) => p.si === si), n = list.length; if (!n) return null;
+      const pos = new Float32Array(n * 12), uv = new Float32Array(n * 8), idx = [];
+      for (let i = 0; i < n; i++) idx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3);
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setIndex(idx);
+      const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: S.t, alphaTest: 0.35, fog: true, side: T.DoubleSide })); m.frustumCulled = false; sc.add(m);
+      return { list, geo, pos, uv };
+    }).filter(Boolean);
     // ---- the rooftop gardens: their plants, masts with a red light, a greenhouse lit from inside; cloud below
     if (kind === 'roof') {
       const pm = [0, 1, 2, 3].map((k) => new T.SpriteMaterial({ map: this.tex(gl, A.plant(k + (v.seed % 7)), false), fog: true, transparent: true, alphaTest: 0.4 }));
@@ -361,6 +446,46 @@ export class BladeView {
     // ---- the camera's path
     const camH = { tunnel: 1.7, hall: rr(2, 9), street: rr(1.8, 7), walkway: rr(1.7, 4), lane: rr(-6, 20), gantry: rr(1.7, 3.5), ledge: rr(1.7, 6), roof: rr(1.8, 5) }[kind];
     gl.cam = { mode: v.cam, x: kind === 'ledge' ? half - 3 : kind === 'walkway' || kind === 'gantry' ? rr(-1, 1) : kind === 'street' ? rr(-half + 3, half - 3) : 0, y: camH, z: gl.camZ, yaw: kind === 'roof' ? rr(-0.6, 0.6) : rr(-0.12, 0.12), pitch: (kind === 'walkway' || kind === 'gantry') && R() < 0.4 ? -0.32 : kind === 'roof' ? rr(-0.12, 0.02) : kind === 'lane' ? rr(-0.15, 0.2) : rr(-0.02, 0.2), sp: rr(0.5, 1.1), dir: 1, t: 0 };
+    // ---- abominations: Vitriol's horrors grown huge, hanging idle in the far sky with their tentacles
+    // adrift, hazed by the distance; each is drawn into its own small canvas a few times a second
+    gl.aboms = [];
+    const open = kind === 'roof' || kind === 'ledge' || kind === 'lane';
+    for (const job of v.aboms || []) {
+      const a = job.out; if (!a) continue;
+      const Lt = a.tent.length, W = Math.ceil(a.CW + Lt * 1.15), H = Math.ceil(a.CH + Lt * 0.95), cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      const t = this.tex(gl, cv, false), dz = rr(90, 150), haze = Math.exp(-Math.pow(v.W.fog * 0.45 * dz, 2));
+      const m = new T.SpriteMaterial({ map: t, fog: false, transparent: true, depthWrite: false, opacity: clamp(0.62 + haze * 0.4, 0.62, 0.95) });
+      m.color.setScalar(0.85 + haze * 0.3).lerp(gl.fogCol.clone().multiplyScalar(4).addScalar(0.4), 0.2);
+      const sp = new T.Sprite(m), size = rr(50, 80) * (open ? 1.25 : 1); sp.scale.set(size * W / H, size, 1); sp.center.set(0.5, 1 - a.CH / H * 0.8); sc.add(sp);
+      gl.aboms.push({ a, cv, c: cv.getContext('2d'), t, sp, dz, x0: open ? rr(-32, 32) : rr(-0.4, 0.4) * half, y0: gl.cam.y + rr(open ? 14 : 22, open ? 44 : 40), ph: R() * 10, acc: 1,
+        sock: a.sockets.map((k, i) => ({ ...k, v: i % a.tent.count, len: rr(0.6, 1), ph: R() * 6 })) });
+    }
+    // ---- glows (lamps, windows, neon, screens, stalls, masts): additive points, one batch per size
+    // with the colour per point, so a few hundred lights are a handful of draw calls
+    const glowTex = this.tex(gl, A.glow('rgba(255,255,255,1)'), false), rgb = (c) => (c.startsWith('#') ? [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16) / 255) : c.match(/[\d.]+/g).slice(0, 3).map((n) => n / 255));
+    const BASE = { neon: 0.75, screen: 0.22, window: 0.45 }, groups = new Map();
+    for (const [k, x, y, z, col] of gl.glows) {
+      if (k === 'plant') continue;
+      const sz = SZ[k] || 2; let g = groups.get(sz); if (!g) groups.set(sz, (g = { p: [], c: [], base: [], ph: [], neon: [] }));
+      g.p.push(x, y, z); g.c.push(...rgb(col || GC[k] || 'rgba(255,200,140,1)')); g.base.push(BASE[k] ?? 0.55); g.ph.push(R() * 10); g.neon.push(k === 'neon');
+    }
+    gl.glowPts = [];
+    for (const [sz, g] of groups) {
+      const geo = new T.BufferGeometry(), attr = new T.Float32BufferAttribute(g.c, 3); geo.setAttribute('position', new T.Float32BufferAttribute(g.p, 3)); geo.setAttribute('color', attr);
+      const pts = new T.Points(geo, new T.PointsMaterial({ size: sz / Math.tan((FOV / 2) * Math.PI / 180), map: glowTex, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false, fog: true }));
+      pts.frustumCulled = false; sc.add(pts); gl.glowPts.push({ attr, c0: Float32Array.from(g.c), ...g });
+    }
+    // the wet street gives the low lights back: a long dim streak on the road under each, toward us
+    if (kind === 'street') {
+      const B = { p: [], uv: [], c: [], i: [] };
+      for (const [k, x, y, z, col] of gl.glows) {
+        if (y > 9 || !['street', 'stall', 'lamp', 'neon', 'sign', 'window', 'house'].includes(k)) continue;
+        const c = rgb(col || GC[k] || 'rgba(255,200,140,1)').map((v2) => v2 * 0.4), w = (SZ[k] || 2) * 0.35, len = (SZ[k] || 2) * (1.4 + y * 0.5), n = B.p.length / 3;
+        B.p.push(x - w, 0.03, z + len * 0.12, x + w, 0.03, z + len * 0.12, x + w, 0.03, z - len, x - w, 0.03, z - len); B.uv.push(0, 1, 1, 1, 1, 0, 0, 0); for (let q = 0; q < 4; q++) B.c.push(...c);
+        B.i.push(n, n + 1, n + 2, n, n + 2, n + 3);
+      }
+      if (B.i.length) { const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(B.p, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(B.uv, 2)); geo.setAttribute('color', new T.Float32BufferAttribute(B.c, 3)); geo.setIndex(B.i); sc.add(new T.Mesh(geo, new T.MeshBasicMaterial({ map: glowTex, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false, fog: true, side: T.DoubleSide }))); }
+    }
     gl.camera = new T.PerspectiveCamera(FOV, RW / RH, 0.2, 900);
     gl.kind = kind; gl.v = v; gl.lightning = 0;
     sc.add(gl.camera);
@@ -384,9 +509,22 @@ export class BladeView {
     if (this.acc < 1 / 30 && this.drawn) return;
     this.acc = 0; this.drawn = true;
     let r;
-    try { r = renderer(); } catch (e) { this.failed = String(e?.message || e); return; }
+    try { r = this.r = renderer(); } catch (e) { this.failed = String(e?.message || e); return; }
     r.setClearColor(this.gl.scene.background, 1); r.clear(); r.render(this.gl.scene, this.gl.camera);
     this.post(r.domElement);
+  }
+  // an abomination's frame: tentacles first, hanging and splayed and slowly swaying, then the body
+  drawAbom(ab, t) {
+    const { a, c, cv } = ab, Tn = a.tent, bx = cv.width / 2, by = a.CH * 0.95, CF = this.G.CF;
+    c.clearRect(0, 0, cv.width, cv.height);
+    for (const k of ab.sock) {
+      const x0 = bx + k.x, y0 = by + k.y, Lk = Tn.length * k.len;
+      const dx = k.nx * Lk * 0.42 + Math.sin(t * 0.33 + k.ph) * Lk * 0.16, dy = (0.62 + k.ny * 0.3 + Math.sin(t * 0.27 + k.ph * 1.3) * 0.08) * Lk;
+      CF.drawTentacle(c, Tn, k.v, x0, y0, x0 + dx, y0 + dy, Math.sin(t * 0.5 + k.ph * 1.7) * Lk * 0.22);
+    }
+    const f = Math.floor(t * 3 + ab.ph) % a.idleN;
+    c.drawImage(a.body, (a.idle + f) * a.CW, 0, a.CW, a.CH, bx - a.anchor.x, by - a.anchor.y, a.CW, a.CH);
+    ab.t.needsUpdate = true;
   }
   info() { const v = this.view; return { level: v.lv + 1, name: v.L.name, weather: WNAME[v.wk], hour: v.hour, clock: v.clock }; }
   step(dt) {
@@ -423,27 +561,41 @@ export class BladeView {
       car.beacon.material.opacity = car.fly ? (Math.sin(t * 6 + car.bob) > 0.3 ? 1 : 0.1) : 0.6;
     }
     // people walking (a step every so often), turning round at the end of their beat
-    for (const p of gl.people) {
-      if (!p.idle) {
-        if (p.along) { p.z += p.sp * p.dir * dt; if (p.z > 220 || p.z < -10) p.dir *= -1; }
-        else { p.x += p.sp * p.dir * dt; if (p.x > p.x1 || p.x < p.x0) p.dir *= -1; }
-        p.f += dt * p.sp * 7;
-      } else p.f += dt * 3;
-      const sh = p.sh, n = p.idle ? sh.idleN : sh.runN, col = (p.idle ? sh.idle : sh.run) + (Math.floor(p.f) % n), cw = sh.CW / sh.cv.width;
-      // facing: the sheet faces right; walking away or toward the camera reads either way at this size
-      const right = p.dir > 0;
-      p.tx.repeat.x = right ? cw : -cw; p.tx.offset.x = right ? col * cw : (col + 1) * cw;
-      p.spr.position.set(p.x, p.y, p.z);
-      if (p.u) p.u.position.set(p.x, p.y + p.spr.scale.y * 0.86, p.z);
+    // people: walk, then their quads, turned to the camera; each faces the way it moves on screen
+    cam.updateMatrixWorld(); const RX = cam.matrixWorld.elements[0], RZ = cam.matrixWorld.elements[2];
+    for (const cr of gl.crowds) {
+      const P = cr.pos, U = cr.uv;
+      cr.list.forEach((p, i) => {
+        if (!p.idle) {
+          if (p.along) { p.z += p.sp * p.dir * dt; if (p.z > 220 || p.z < -10) p.dir *= -1; }
+          else { p.x += p.sp * p.dir * dt; if (p.x > p.x1 || p.x < p.x0) p.dir *= -1; }
+          p.f += dt * p.sp * 7;
+        } else p.f += dt * 3;
+        const sh = p.sh, n = p.idle ? sh.idleN : sh.runN, col = (p.idle ? sh.idle : sh.run) + (Math.floor(p.f) % n), cw = sh.CW / sh.cv.width;
+        const onScreen = p.along ? p.dir : p.dir * Math.sign(RX || 1), u0 = onScreen > 0 ? col * cw : (col + 1) * cw, u1 = onScreen > 0 ? (col + 1) * cw : col * cw;
+        const hw = p.w / 2, ax = RX * hw, az = RZ * hw, o = i * 12;
+        P[o] = p.x - ax; P[o + 1] = p.y; P[o + 2] = p.z - az; P[o + 3] = p.x + ax; P[o + 4] = p.y; P[o + 5] = p.z + az;
+        P[o + 6] = p.x + ax; P[o + 7] = p.y + p.h; P[o + 8] = p.z + az; P[o + 9] = p.x - ax; P[o + 10] = p.y + p.h; P[o + 11] = p.z - az;
+        const q = i * 8; U[q] = u0; U[q + 1] = 0; U[q + 2] = u1; U[q + 3] = 0; U[q + 4] = u1; U[q + 5] = 1; U[q + 6] = u0; U[q + 7] = 1;
+      });
+      cr.geo.attributes.position.needsUpdate = true; cr.geo.attributes.uv.needsUpdate = true;
     }
     // the billboards and the ad crawls
     for (const s of gl.sims) { s.acc += dt; if (s.acc > s.every) { s.acc = 0; s.sim.step(); s.t.needsUpdate = true; } }
     if (Math.floor(t * 30) !== this.lastCrawl) { this.lastCrawl = Math.floor(t * 30); for (const cr of gl.crawls) { cr.cr.step(0.5); cr.t.needsUpdate = true; } }
     // neon flickers; windows and lamps breathe; flares burst on the skyline; searchlights sweep
-    for (const g of gl.glowSpr) { const base = g.k === 'neon' ? 0.75 : g.k === 'screen' ? 0.22 : g.k === 'window' ? 0.45 : 0.55; g.s.material.opacity = base * (g.k === 'neon' && Math.sin(t * 13 + g.ph * 7) > 0.97 ? 0.15 : 1) * (0.9 + Math.sin(t * 2 + g.ph) * 0.1); }
+    for (const g of gl.glowPts) {
+      const a = g.attr.array;
+      for (let i = 0; i < g.base.length; i++) { const k = g.base[i] * (g.neon[i] && Math.sin(t * 13 + g.ph[i] * 7) > 0.97 ? 0.15 : 1) * (0.9 + Math.sin(t * 2 + g.ph[i]) * 0.1); a[i * 3] = g.c0[i * 3] * k; a[i * 3 + 1] = g.c0[i * 3 + 1] * k; a[i * 3 + 2] = g.c0[i * 3 + 2] * k; }
+      g.attr.needsUpdate = true;
+    }
     for (const sg of gl.signs) { const on = !(Math.sin(t * 9 + sg.ph * 5) > 0.985); sg.mesh.visible = on; }
     for (const f of gl.flares) { f.t += dt; const u = f.t - f.next; f.s.material.opacity = u > 0 && u < 1.6 ? Math.sin((u / 1.6) * Math.PI) : 0; if (u > 1.6) { f.t = 0; f.next = 3 + Math.random() * 9; } f.s.scale.set(12, 14 + Math.max(0, Math.sin(u * 3)) * 12, 1); }
     for (const k of gl.cones) { k.cone.rotation.z = Math.sin(t * k.sp + k.ph) * 0.5; k.cone.rotation.x = Math.cos(t * k.sp * 0.7 + k.ph) * 0.3; }
+    for (const ab of gl.aboms) {
+      ab.sp.position.set(ab.x0 + Math.sin(t * 0.03 + ab.ph) * 9, ab.y0 + Math.sin(t * 0.21 + ab.ph) * 1.4, c.z + ab.dz);
+      if ((ab.acc += dt) > 0.12) { ab.acc = 0; this.drawAbom(ab, t); }
+    }
     if (gl.blimp) { const b = gl.blimp; b.bl.position.x = b.x0 + Math.sin(t * 0.01) * 40; b.scr.position.x = b.bl.position.x; }
     // steam from the drains and vents
     this.puffT = (this.puffT || 0) + dt;

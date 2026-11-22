@@ -6,7 +6,7 @@ import { settings, setMark, marks, CAT_LABEL } from './state.js';
 import * as favs from './favs.js';
 import { setImg } from './images.js';
 import { productSVG } from './productart.js';
-import { GAMES, GAME_HINT } from './games/all.js';
+import { GAMES, GAME_HINT, GAME_NAMES } from './games/all.js';
 import { MUTATORS } from './games/engine.js';
 import { Psych } from './psych.js';
 import { icon } from './icons.js';
@@ -39,7 +39,7 @@ const handleFor = (post, ctx) => {
   switch (post.cat) {
     case 'wiki': return [`wiki.${post.sub}`, `${ctx.topics?.wiki?.[post.sub] || post.sub} · Wikipedia`];
     case 'video': return [post.channel ? post.channel.toLowerCase().replace(/[^\w.]+/g, '').slice(0, 24) || 'tube' : `tube.${post.sub}`, `${ctx.topics?.video?.[post.sub] || 'Video'}${post.dur ? ` · ${post.dur}` : ''}${/^\d{4}/.test(post.date || '') ? ` · ${post.date.slice(0, 4)}` : ''}`];
-    case 'game': return post.sub === 'garden' ? ['your.garden', ''] : EXT_GAMES[post.sub] ? EXT_GAMES[post.sub].handle : ['arcade', `${ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
+    case 'game': return post.sub === 'garden' ? ['your.garden', ''] : EXT_GAMES[post.sub] ? EXT_GAMES[post.sub].handle : ['arcade', `${GAME_NAMES[post.sub] || ctx.topics?.game?.[post.sub] || post.sub} · tap to play`];
     case 'meme': return [post.sub === 'kym' ? 'knowyourmeme' : 'meme.lord', post.sub === 'kym' ? 'Know Your Meme' : 'remix'];
     case 'product': return ['infomercial.tv', 'Sponsored · not available in stores'];
     case 'psych': return ['the.trip', `${post.sub} · generative`];

@@ -14,6 +14,10 @@ const MODE_MIX = {
 };
 const PKG_KIND = (p) => (p.cat === 'read' ? 'poem' : p.cat);
 // one shared garden: every garden card opens the same saved garden
+// the cards the feed deals itself, outside the package: Bladeview, the Author Pit, and the two whole games
+const EXT_SUBS = ['vitriol', 'cavecrawler'];
+const specialPost = (cat, n) => ({ id: `${cat}-${Date.now().toString(36)}-${n}`, cat, title: CAT_LABEL[cat] });
+const extPost = (sub, n) => ({ id: `${sub}-${Date.now().toString(36)}-${n}`, cat: 'game', sub, seed: (Math.random() * 1e9) | 0, title: GAME_NAMES[sub], mods: [] });
 export const gardenPost = (mode, n = 0) => ({ id: `garden-${mode}-${Date.now().toString(36)}-${n}`, cat: 'game', sub: 'garden', seed: 7, title: 'Your garden', mode, mods: [] });
 
 // Activates heavy cards when they are mostly visible, tears them down when they
@@ -122,7 +126,7 @@ export class Feed {
       this.focus ? el('div.focusbar', el('span', 'Showing only ', el('b', this.focusSub ? this.subLabel(this.focus, this.focusSub) : CAT_LABEL[this.focus])), el('button.btn.small', { onclick: () => this.setFocus(null) }, 'Show everything')) : '');
   }
   subLabel(cat, sub) {
-    const t = this.pkg?.manifest.topics?.[cat]?.[sub] || (cat === 'game' && GAME_NAMES[sub]);
+    const t = (cat === 'game' && GAME_NAMES[sub]) || this.pkg?.manifest.topics?.[cat]?.[sub];
     return t || String(sub).replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
   }
   // Posts of one kind (and optionally one sub-type, e.g. a single game), as listed in Settings → Jump to.
@@ -188,17 +192,20 @@ export class Feed {
     // bladeview: a new place in the stacked city, early on and then every couple of dozen posts,
     // morning, day or evening. (The author pit is shelved: on only if settings.authorPit is set.)
     this.pitN = (this.pitN || 0) + 1;
-    if (!this.focus && settings.bladeview !== false && this.pitN - (this.lastBlade ?? -15) >= 19) { this.lastBlade = this.pitN; return { id: `blade-${now.toString(36)}-${this.pitN}`, cat: 'blade', title: 'Bladeview' }; }
-    if (!this.focus && settings.authorPit === true && this.pitN - (this.lastPit ?? -21) >= 29) { this.lastPit = this.pitN; return { id: `pit-${now.toString(36)}-${this.pitN}`, cat: 'pit', title: 'The Author Pit' }; }
+    if (!this.focus && settings.bladeview !== false && this.pitN - (this.lastBlade ?? -15) >= 19) { this.lastBlade = this.pitN; return specialPost('blade', this.pitN); }
+    if (!this.focus && settings.authorPit === true && this.pitN - (this.lastPit ?? -21) >= 29) { this.lastPit = this.pitN; return specialPost('pit', this.pitN); }
     if (this.mode && this.mode !== 'day' && !this.focus) return this.nextModePost();
     // the garden visits the day feed too, every couple of dozen posts
     if (!this.focus && settings.gardenInFeed !== false && this.total - (this.lastDayGarden ?? -10) >= 22) { this.lastDayGarden = this.total; this.total++; return gardenPost('day', this.total); }
     // and the two whole games (Vitriol's story, Cave Crawler), taking turns, every dozen and a half
-    if (!this.focus && this.total - (this.lastExt ?? -8) >= 17) {
+    if (!this.focus && settings.extGames !== false && this.total - (this.lastExt ?? -8) >= 17) {
       this.lastExt = this.total; this.total++;
       const sub = (this.extTurn = (this.extTurn || 0) + 1) % 2 ? 'cavecrawler' : 'vitriol';
-      return { id: `${sub}-${Date.now().toString(36)}-${this.total}`, cat: 'game', sub, seed: (Math.random() * 1e9) | 0, title: sub === 'vitriol' ? 'Vitriol' : 'Cave Crawler', mods: [] };
+      return extPost(sub, this.total);
     }
+    // Settings → Jump to: only Bladeview, only the pit, or only one of the two whole games
+    if (this.focus === 'blade' || this.focus === 'pit') { this.total++; return specialPost(this.focus, this.total); }
+    if (this.focus === 'game' && EXT_SUBS.includes(this.focusSub)) { this.total++; return extPost(this.focusSub, this.total); }
     if (this.focus && this.focusSub) {
       const l = this.pools[this.focus]?.get(this.focusSub);
       if (l?.length) { this.emitted[this.focus]++; this.total++; this.last = this.focus; return l.shift(); }

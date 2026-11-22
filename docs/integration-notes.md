@@ -492,7 +492,7 @@ World v6 (`garden-metro.js`, run by `loadGarden` on a v5 save and by `newGarden`
 
 ## Bladeview (a new card, 2026-11-22)
 `bladeview.js` (the scene, the camera, the post pass) and `bladeview-art.js` (the bakes, the sprites, the billboards); `cat: 'blade'` in `cards.js`, with its own header (`blade.view`) and face.
-- **In the feed:** the 4th post and then every 19, in every mode (`feed.js`). It is on unless `settings.bladeview === false`.
+- **In the feed:** the 4th post and then every 19, in every mode (`feed.js`). It is on unless `settings.bladeview === false` (Settings → Extra cards).
 - **What it is:** a slow 3D view of a rain-soaked noir city. Each card, and each tap, picks a new place, hour, weather and camera move. The new view comes in on a pixel-sort column wipe.
 - **The ten levels**, from the bottom up:
 
@@ -509,7 +509,10 @@ World v6 (`garden-metro.js`, run by `loadGarden` on a v5 save and by `newGarden`
   | 9 | The Spires | a ledge on a spire |
   | 10 | Rooftop Gardens | planters and tanks over a sea of cloud |
 
-  The blocks are brutalist and Kowloon-stacked. Hanging wires, walkways and bridges cross between them.
+  The blocks are brutalist and Kowloon-stacked. Between them, across the view:
+  - **Walkways:** open decks with railings, some hung on rods, and enclosed skybridges with a lit strip of windows. Catwalks cross the works and the sewer channel.
+  - **Pipes:** fat runs with flanges, some in bundles, plus runs along the faces and down the tunnel walls.
+  - **Wires:** single cables and bundles, loose ends hanging down, and washing pegged out on a few.
 - **Weather and light:**
   - Weather: acid rain, drizzle, storm (with lightning), fog, smog, clear, or ash.
   - The hour is night, dusk or dawn; the fog takes its colour from the sky.
@@ -518,9 +521,22 @@ World v6 (`garden-metro.js`, run by `loadGarden` on a v5 save and by `newGarden`
 - **Textures:**
   - Facades, platforms and skies come from Vitriol's Greebleworks, baked in small slices over several frames.
   - They go through the Hell Maze grime pass (`grimePixels` with its new options: gore 0, melt 0) and a pixel-sort streak pass.
+- **The street:**
+  - Kerb and gutter, worn lane markings and wet patches.
+  - Lamps bent over the road; their light, and the stalls' and the neon's, streaks back off the wet asphalt.
+  - Rubbish piled against the walls, kiosks with a lit hatch and a small sign, vending machines, bins and burning barrels, awnings over the shopfronts, bollards.
 - **People:**
-  - People are small Mercforge sprites in civilian kit, with a cop now and then. They carry lit umbrellas in the rain.
-  - They walk the decks and pavements, kept at least 12 m from the camera.
+  - Mercforge sprites drawn as civilians, through a new opt-in civilian mode in `mercforge.js`. It is off by default, so Vitriol is unchanged.
+  - That file is generated from Vitriol's own tool (its header says so), so the edit lives only in this copy. Re-syncing Vitriol would drop it: port the `civ` parameters (`civHead` and `civClothes`) to the tool, or re-apply them.
+  - Hands hang at their sides and swing with the walk. There is no weapon.
+  - Outfits: trench coats, long coats, short jackets, hoodies, skirts, work coats and the odd police officer.
+  - Heads wear hats, caps, beanies or hoods, or show their hair. Some have a scarf, a shoulder bag or a case.
+  - They keep the grit pass. Eight sheets are baked per view.
+  - They walk the decks, pavements and bridges, kept at least 12 m from the camera.
+  - They are drawn as one mesh per sheet, and each faces the way it moves on screen.
+- **Abominations:**
+  - In about half the open views, one or two of Vitriol's Crawlerforge horrors hang idle in the far sky. Each is grown big, with 7–11 tentacles that splay, hang and slowly sway, drawn into its own canvas a few times a second.
+  - Distance hazes them, they drift and bob a little, and buildings, wires and bridges pass in front of them.
 - **Vehicles:** spinners fly their lanes with lights and beacons, and cars run on the street. A blimp carries a rule-110 screen.
 - **Signs and screens:**
   - Neon signs are glyph shapes, not real brands, and they flicker.
@@ -528,6 +544,19 @@ World v6 (`garden-metro.js`, run by `loadGarden` on a v5 save and by `newGarden`
   - Ad strips scroll short poems from an order-1 Markov chain over an original corpus.
 - **Cost:**
   - At 4× CPU throttle in software GL, the post pass takes about 1.5 ms of JS per frame. The rest of each frame is the GPU readback.
+  - Lights are additive point batches, one per size, and the road reflections are one mesh. A view is about 80–140 draw calls, against about 400 when each was its own sprite.
   - A view takes about 1.5–1.8 s to bake and build. A tap transition takes about 2.5 s.
   - It renders at about 30 fps and stops when the card leaves the screen.
-- **Tested:** all ten levels go live with no errors. Eight taps in a row each build a new view, and the heap stays flat. The card shows, plays and changes on a tap in the feed.
+- **Tested:**
+  - All ten levels go live with no errors.
+  - Eight taps in a row each build a new view; the heap and the GPU's geometry and texture counts stay flat.
+  - The card shows, plays and changes on a tap in the feed.
+  - Vitriol's own mercs still forge as before.
+
+## Settings: the extra cards (2026-11-22)
+- **Extra cards** (a new group) has a toggle for each card the feed deals itself:
+  - Bladeview (`settings.bladeview`, on by default)
+  - Vitriol and Cave Crawler (`settings.extGames`, on)
+  - The Author Pit (`settings.authorPit`, off while shelved)
+- **Jump to:** lists Vitriol and Cave Crawler among the games, with Bladeview and The Author Pit after them. Jumping to one fills the feed with only that card (`feed.js` `specialPost` and `extPost`).
+- **Names:** the app's own game names now win over a package's topic names. The W46 package still called the racer "Road Racer"; it now shows as Rail Raider in Jump to, in Game types and on the card header.

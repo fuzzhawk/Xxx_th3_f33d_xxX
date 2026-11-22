@@ -43,7 +43,12 @@ const P={
   runFrames:8, stride:0.42, lift:0.20, bounce:0.030, lean:4, runLean:7,
   idleBob:0.014, tuck:0.42, recoil:0.35,
   // render
-  outline:true, shading:true, aimRows:9, previewFps:12
+  outline:true, shading:true, aimRows:9, previewFps:12,
+  /* civilian dress, for the feed's Bladeview city (off for Vitriol): no weapon, hands at the
+     sides swinging with the walk, and clothes instead of armour. colSuit is the coat or jacket,
+     colSuit2 the trousers and shoes, colAccent a scarf or a hat band, colVisor the hair, colGun
+     a hat, a hood lining or a bag. */
+  civ:false, coat:0, skirt:false, hat:'none', bag:'none', scarf:false, armSwing:1
 };
 
 /* The weapon roster's silhouettes. Above CONTROLS because the panel
@@ -285,13 +290,13 @@ function pose(state,f,nf,aim){
      the solver clamps and the foot stops going where it was asked.
      Standing at 0.86 leaves a visible knee at rest and headroom for a
      stride that actually reaches. */
-  const HIP=0.86;
+  const HIP=P.civ?0.93:0.86;           // a passer-by stands straighter
   let hipX=0,hipY=-leg*HIP,lean=P.lean*Math.PI/180;
   let fF={x:hipW*0.4,y:0},fB={x:-hipW*0.4,y:0};
 
   if(state==='idle'){
     hipY+=Math.sin(ph*TAU)*H*P.idleBob;
-    fF={x:hipW*0.55,y:0};fB={x:-hipW*0.6,y:0};
+    fF={x:hipW*(P.civ?0.2:0.55),y:0};fB={x:-hipW*(P.civ?0.25:0.6),y:0};
   }else if(state==='run'){
     const th=ph*TAU;
     /* Cap the stride so the far foot still sits inside the leg's
@@ -469,6 +474,73 @@ function drawChar(g,ps,C,opts){
 
   const dot=(p,r,col)=>{g.fillStyle=col;g.beginPath();g.arc(p.x,p.y,r,0,TAU);g.fill();};
 
+  /* Civilian head: a face, hair, and a hat, cap, beanie or hood (P.civ only). */
+  const civHead=(h,r)=>{
+    if(P.hat==='hood'){
+      // the hood, a cowl round the back of the head; the face shadowed inside it
+      g.fillStyle=P.colSuit;
+      g.beginPath();g.ellipse(h.x-r*0.22,h.y-r*0.12,r*1.22,r*1.26,0,0,TAU);g.fill();
+      g.fillStyle=shade(P.colSkin,-0.42);
+      g.beginPath();g.ellipse(h.x+r*0.42,h.y+r*0.12,r*0.58,r*0.74,0,0,TAU);g.fill();
+      g.fillStyle=shade(P.colSuit,-0.3);
+      g.fillRect(h.x+r*0.05,h.y-r*0.72,r*0.82,Math.max(1,r*0.22));
+      return;
+    }
+    dot(h,r,P.colSkin);
+    g.fillStyle=P.colVisor;                         // hair: round the back, a fringe, some longer
+    g.beginPath();g.arc(h.x-r*0.14,h.y-r*0.16,r*0.96,Math.PI*0.90,Math.PI*2.06);g.fill();
+    if(P.coat>0.3&&P.hat==='none')g.fillRect(h.x-r*1.0,h.y-r*0.2,r*0.7,r*1.3);
+    if(P.hat==='brim'){                             // a wide-brimmed hat, pulled low
+      g.fillStyle=P.colGun;
+      g.fillRect(h.x-r*1.55,h.y-r*0.62,r*3.2,Math.max(1,r*0.30));
+      g.fillRect(h.x-r*0.90,h.y-r*1.42,r*1.75,r*0.86);
+      g.fillStyle=P.colAccent;g.fillRect(h.x-r*0.90,h.y-r*0.78,r*1.75,Math.max(1,r*0.18));
+    }else if(P.hat==='cap'){                        // a peaked cap
+      g.fillStyle=P.colGun;
+      g.beginPath();g.arc(h.x-r*0.1,h.y-r*0.35,r*0.95,Math.PI,0);g.fill();
+      g.fillRect(h.x+r*0.4,h.y-r*0.45,r*1.15,Math.max(1,r*0.26));
+    }else if(P.hat==='beanie'){                     // a knitted cap, rolled at the brim
+      g.fillStyle=P.colAccent;
+      g.beginPath();g.arc(h.x-r*0.1,h.y-r*0.25,r*1.0,Math.PI,0);g.fill();
+      g.fillStyle=shade(P.colAccent,-0.25);g.fillRect(h.x-r*1.1,h.y-r*0.4,r*2.0,Math.max(1,r*0.3));
+    }
+  };
+
+  /* Civilian clothes over the legs and the torso: a coat (to the thigh, knee or shin) or a
+     skirt, a scarf, a shoulder bag. Drawn after both legs so a hem covers the thighs. */
+  const civClothes=()=>{
+    const T=ps.torso,sw=ps.shW*0.5,hw=ps.hipW*0.55;
+    g.save();g.translate(ps.hipX,ps.hipY);g.rotate(ps.lean*0.6);
+    if(P.coat>0||P.skirt){
+      const hem=ps.leg*Math.max(P.coat,P.skirt?0.42:0), flare=hw*1.12+ps.leg*0.07*Math.max(P.coat,0.4);
+      const top=P.coat>0?-T*1.0:-T*0.12;
+      g.fillStyle=P.coat>0?P.colSuit:P.colAccent;
+      g.beginPath();
+      g.moveTo(-sw*(P.coat>0?1.04:0.7),top);g.lineTo(sw*(P.coat>0?1.04:0.7),top);
+      g.lineTo(hw*1.1,0);g.lineTo(flare,hem);g.lineTo(-flare*1.05,hem);g.lineTo(-hw*1.15,0);
+      g.closePath();g.fill();
+      if(P.coat>0){
+        g.fillStyle=shade(P.colSuit,-0.32);           // the opening, the lapel, the belt
+        g.fillRect(sw*0.28,-T*0.86,Math.max(1,sw*0.14),hem+T*0.86);
+        g.beginPath();g.moveTo(-sw*0.2,-T*1.0);g.lineTo(sw*0.62,-T*1.0);g.lineTo(sw*0.3,-T*0.55);g.closePath();g.fill();
+        if(P.coat>0.35){g.fillStyle=shade(P.colSuit,-0.18);g.fillRect(-hw*1.2,-T*0.28,hw*2.5,Math.max(1,T*0.11));}
+        g.fillStyle=shade(P.colSuit,-0.22);           // a fold down the back of the skirt of the coat
+        g.fillRect(-flare*0.5,T*0.05,Math.max(1,sw*0.1),hem*0.9);
+      }
+    }
+    if(P.scarf){
+      g.fillStyle=P.colAccent;
+      g.fillRect(-sw*0.8,-T*1.08,sw*1.7,Math.max(1.2,T*0.18));
+      g.fillRect(-sw*0.95,-T*1.0,Math.max(1,sw*0.36),T*0.55);
+    }
+    if(P.bag==='shoulder'){
+      g.strokeStyle=shade(P.colGun,-0.2);g.lineWidth=Math.max(0.8,H*0.016);
+      g.beginPath();g.moveTo(-sw*0.7,-T*0.98);g.lineTo(sw*0.9,-T*0.05);g.stroke();
+      g.fillStyle=P.colGun;g.fillRect(sw*0.5,-T*0.12,H*0.11,H*0.09);
+    }
+    g.restore();
+  };
+
   const aim=ps.aim, dir={x:Math.cos(aim),y:Math.sin(aim)};
   const kick=(opts&&opts.kick||0)*P.recoil*H*0.06;
   const shF={x:ps.sh.x+H*0.02,y:ps.sh.y+H*0.01};
@@ -498,7 +570,7 @@ function drawChar(g,ps,C,opts){
   {
     const hip={x:ps.hipX-ps.hipW*0.30,y:ps.hipY};
     const knee=ik(hip.x,hip.y,ps.fB.x,ps.fB.y,ps.leg*0.5,ps.leg*0.5,-1);
-    bone(hip,knee,ps.fB,legR*0.94,back(P.colSuit),back(P.colSuit2));
+    bone(hip,knee,ps.fB,legR*0.94,back(P.civ?P.colSuit2:P.colSuit),back(P.colSuit2));
     if(P.bootSize>0)boot(ps.fB,legR*0.80,1,back(P.colSuit2),back(shade(P.colSuit2,-0.18)));
   }
 
@@ -558,7 +630,12 @@ function drawChar(g,ps,C,opts){
   const gripD=ps.arm*(P.twoHanded?0.58:0.90)-kick;
   const out=Math.abs(Math.sin(aim))*ps.arm*0.32;   // hold it clear of the body at steep angles
   let rear,front;
-  if(P.twoHanded){
+  if(P.civ){
+    // a passer-by: hands at the sides, swinging against the stride (still when standing)
+    const sw2=(opts&&opts.walk)?opts.swing:Math.PI/2, k=ps.arm*0.28*P.armSwing;
+    front={x:shF.x-Math.cos(sw2)*k-H*0.01,y:shF.y+ps.arm*0.92};
+    rear={x:shB.x+Math.cos(sw2)*k-H*0.01,y:shB.y+ps.arm*0.92};
+  }else if(P.twoHanded){
     rear={x:shB.x+dir.x*gripD+out*0.75,y:shB.y+dir.y*gripD};
     front={x:shF.x+dir.x*(ps.arm*0.94-kick)+out,y:shF.y+dir.y*(ps.arm*0.94-kick)};
   }else{
@@ -570,14 +647,17 @@ function drawChar(g,ps,C,opts){
   {
     const el=ik(shB.x,shB.y,rear.x,rear.y,ps.arm*0.5,ps.arm*0.5,1);
     bone(shB,el,rear,armR*0.92,back(P.colSuit),back(P.colSuit2));
-    if(P.gloveSize>0)glove(rear,armR*0.92,Math.atan2(rear.y-el.y,rear.x-el.x),
+    if(P.civ)dot(rear,armR*0.85,back(P.colSkin));
+    else if(P.gloveSize>0)glove(rear,armR*0.92,Math.atan2(rear.y-el.y,rear.x-el.x),
                            back(P.colSuit2),back(shade(P.colSuit2,-0.18)));
   }
 
   /* --- head --- */
   {
     const h=ps.hd,r=ps.headR,up=Math.sin(aim)*r*0.2;
-    if(P.helmet==='none'){
+    if(P.civ){
+      civHead(h,r);
+    }else if(P.helmet==='none'){
       dot(h,r,P.colSkin);
       g.fillStyle=P.colSuit2;
       g.beginPath();g.arc(h.x-r*0.14,h.y-r*0.16,r*0.94,Math.PI*0.92,Math.PI*2.16);g.fill();
@@ -636,7 +716,7 @@ function drawChar(g,ps,C,opts){
   {
     const hip={x:ps.hipX+ps.hipW*0.30,y:ps.hipY};
     const knee=ik(hip.x,hip.y,ps.fF.x,ps.fF.y,ps.leg*0.5,ps.leg*0.5,-1);
-    bone(hip,knee,ps.fF,legR,P.colSuit,P.colSuit2);
+    bone(hip,knee,ps.fF,legR,P.civ?P.colSuit2:P.colSuit,P.colSuit2);
     if(P.armour>0){                       // shin plate
       const a2=Math.atan2(ps.fF.y-knee.y,ps.fF.x-knee.x);
       g.save();g.translate((knee.x+ps.fF.x)/2,(knee.y+ps.fF.y)/2);g.rotate(a2);
@@ -653,7 +733,8 @@ function drawChar(g,ps,C,opts){
   /* --- weapon --- */
   const gripPt=P.twoHanded?rear:front;
   let muzzle={x:gripPt.x+dir.x*gs.len,y:gripPt.y+dir.y*gs.len};
-  {
+  if(P.civ){ civClothes(); muzzle={x:front.x,y:front.y}; }
+  else {
     g.save();g.translate(gripPt.x,gripPt.y);g.rotate(aim);
     const u=gs.u;
     const bh=Math.max(2,gs.h*0.55), rh=Math.max(3,gs.h);      // never let a part fall under a pixel
@@ -789,7 +870,8 @@ function drawChar(g,ps,C,opts){
   {
     const el=ik(shF.x,shF.y,front.x,front.y,ps.arm*0.5,ps.arm*0.5,1);
     bone(shF,el,front,armR,P.colSuit,P.colSuit2);
-    if(P.gloveSize>0)glove(front,armR,Math.atan2(front.y-el.y,front.x-el.x),
+    if(P.civ){ dot(front,armR*0.9,P.colSkin); if(P.bag==='case'){ g.fillStyle=P.colGun; g.fillRect(front.x-H*0.07,front.y+armR*0.6,H*0.14,H*0.10); g.fillStyle=shade(P.colGun,-0.3); g.fillRect(front.x-H*0.07,front.y+armR*0.6,H*0.14,Math.max(1,H*0.02)); } }
+    else if(P.gloveSize>0)glove(front,armR,Math.atan2(front.y-el.y,front.x-el.x),
                            P.colSuit2,shade(P.colSuit2,-0.20));
     if(P.pads>0)pauldron(shF.x,shF.y,H*0.038*P.pads,1,P.colAccent,shade(P.colAccent,-0.28));
   }
@@ -922,7 +1004,7 @@ function geoKey(){
     P.bootSize,P.gloveSize,P.helmet,P.antenna,P.pads,P.backpack,P.plates,P.gun,P.gunSize,
     P.taper,P.armour,P.corrupt,P.growths,
     P.twoHanded,P.muzzleBrake,P.runFrames,P.stride,P.lift,P.bounce,P.lean,P.runLean,
-    P.idleBob,P.tuck,P.aimRows,P.outline].join('|');
+    P.idleBob,P.tuck,P.aimRows,P.outline,P.civ,P.coat,P.skirt,P.hat,P.bag,P.scarf,P.armSwing].join('|');
 }
 let boxCache={key:'',box:null};
 
@@ -940,7 +1022,7 @@ function measureCell(cols,angles,pal){
       const col=cols[c];
       mctx.save();mctx.translate(ax0,ay0);
       const m=drawChar(mctx,pose(col.state,col.frame,col.frames,aim),pal,
-              {swing:col.state==='run'?(col.frame/col.frames)*TAU:0,kick:0});
+              {swing:col.state==='run'?(col.frame/col.frames)*TAU:0,walk:col.state==='run',kick:0});
       mctx.fillStyle='#fff';mctx.fillRect(m.x-1,m.y-1,2,2);   // keep the muzzle point in frame
       mctx.restore();
     }
@@ -978,7 +1060,7 @@ function buildSheet(){
       const col=cols[c];
       sctx.save();sctx.translate(c*CW+anchor.x,r*CH+anchor.y);
       const m=drawChar(sctx,pose(col.state,col.frame,col.frames,aim),pal,
-              {swing:col.state==='run'?(col.frame/col.frames)*TAU:0,kick:0});
+              {swing:col.state==='run'?(col.frame/col.frames)*TAU:0,walk:col.state==='run',kick:0});
       sctx.restore();
       muzzle[r][c]={x:+(anchor.x+m.x).toFixed(2),y:+(anchor.y+m.y).toFixed(2)};
     }
