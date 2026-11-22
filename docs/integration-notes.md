@@ -553,6 +553,32 @@ World v6 (`garden-metro.js`, run by `loadGarden` on a v5 save and by `newGarden`
   - The card shows, plays and changes on a tap in the feed.
   - Vitriol's own mercs still forge as before.
 
+- **Standalone page:** `node tools/build-bladeview.mjs` writes `standalone/bladeview/index.html`, one self-contained file of about 920 KB. It makes no outside requests.
+  - **Deploy:** drop the `standalone/bladeview` folder onto Netlify, or point a Netlify site at the repo with base directory `standalone/bladeview` and no build command.
+  - **Build:** it needs esbuild (`npm i --no-save esbuild@0.24.2`), as the Hell Maze page does. Rebuild after any change to the scene.
+  - **Inlined:**
+    - The scene and three.js, as one module.
+    - Greebleworks, Mercforge and Crawlerforge, minified into one classic script. `loadGen` finds them already loaded.
+  - **Screen** (`tools/bladeview/page.html`): the render takes the window's shape when the page opens.
+
+    | Screen | Render | Field of view |
+    |---|---|---|
+    | Wide | 224 high, up to 420 wide | 50° |
+    | Phone held upright | 168 wide, up to 364 high | 70° |
+    | Otherwise | 224 high | 58° |
+
+    The build swaps `bladeview.js`'s fixed sizes for `BV_RW`, `BV_RH` and `BV_FOV`, so the app is untouched. The canvas keeps that shape at any window size.
+  - **Controls** (`tools/bladeview/main.js`):
+    - A click, Space, → or Enter: a new view.
+    - 1–9 and 0: the next view on that level, from the sewers to the rooftops.
+    - A: the slow tour on or off (on by default; a new view every 45 s).
+    - F: full screen. H: hide the hints.
+    - On a touch screen, a tap moves on, and the hints show only that.
+    - The hints and the place line fade when the mouse is still.
+  - **Sharing:** the address carries the view (`#s=seed`, plus `&lv=` when a level was picked), so a link opens the same place, hour and weather.
+  - **Saving power:** it stops while the tab is hidden.
+  - **Tested** at 1280×720 and 390×844: it goes live with no errors and makes no outside requests. A level key, a click and a shared link all work.
+
 ## Settings: the extra cards (2026-11-22)
 - **Extra cards** (a new group) has a toggle for each card the feed deals itself:
   - Bladeview (`settings.bladeview`, on by default)

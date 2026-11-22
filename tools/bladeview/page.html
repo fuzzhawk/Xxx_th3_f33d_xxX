@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bladeview</title>
+<meta name="description" content="A slow camera in a rain-soaked vertical city, ten levels deep. Click to move on.">
+<meta name="theme-color" content="#07080a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2307080a'/%3E%3Crect x='2' y='4' width='3' height='12' fill='%23232a33'/%3E%3Crect x='11' y='2' width='3' height='14' fill='%23232a33'/%3E%3Crect x='6' y='7' width='4' height='9' fill='%231a2028'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%23ffb050'/%3E%3Crect x='12' y='5' width='1' height='2' fill='%23ff4f8b'/%3E%3Crect x='12' y='9' width='1' height='1' fill='%2354e0ff'/%3E%3C/svg%3E">
+<style>
+  :root { --bg: #07080a; --ink: #c8d4dc; --dim: #6d7a84; --amber: #ffb050; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  body { display: grid; place-items: center; }
+  #city { display: block; image-rendering: pixelated; cursor: pointer; background: var(--bg); }
+  body.still #city { cursor: none; }
+  .hud { position: fixed; left: 0; right: 0; pointer-events: none; padding: 10px 14px; text-shadow: 0 1px 0 #000; transition: opacity 0.8s; }
+  #hint { bottom: 0; color: var(--dim); display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: center; }
+  #hint b { color: var(--ink); font-weight: 500; }
+  #hint.off, body.still #hint { opacity: 0; }
+  #where { top: 0; text-align: right; color: var(--dim); opacity: 0.8; }
+  body.still #where { opacity: 0; }
+  #tour { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--amber); letter-spacing: 0.08em; background: rgba(0, 0, 0, 0.6); padding: 4px 10px; opacity: 0; transition: opacity 0.4s; pointer-events: none; }
+  #tour.show { opacity: 1; }
+  #tuning { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--dim); letter-spacing: 0.2em; text-transform: uppercase; animation: flick 2.4s steps(1) infinite; }
+  #tuning[hidden] { display: none; }
+  @keyframes flick { 0%, 100% { opacity: 0.8; } 47% { opacity: 0.35; } 50% { opacity: 0.8; } 83% { opacity: 0.5; } }
+  .touch { display: none; }
+  @media (pointer: coarse) { .keys { display: none; } .touch { display: inline; } #city { cursor: default; } }
+  @media (max-width: 640px) { #where { display: none; } }
+  noscript { position: fixed; inset: 0; display: grid; place-items: center; color: var(--dim); }
+</style>
+<script>
+  // the render takes the window's shape, within reason: 224 high and up to 420 wide on a wide screen
+  // (with a narrower field of view so the canyon walls do not bow out), 168 wide and up to 364 high
+  // on a phone held upright (with a taller one, so the street still fits)
+  (function () {
+    var a = innerWidth / Math.max(1, innerHeight), even = function (v) { return Math.round(v / 2) * 2; };
+    if (a < 0.75) { globalThis.BV_RW = 168; globalThis.BV_RH = Math.min(364, even(168 / a)); globalThis.BV_FOV = 70; }
+    else { globalThis.BV_RH = 224; globalThis.BV_RW = Math.min(420, even(224 * a)); globalThis.BV_FOV = a > 1.25 ? 50 : 58; }
+  })();
+</script>
+<script>/*BV_GEN*/</script>
+</head>
+<body>
+<canvas id="city" aria-label="A view of the city"></canvas>
+<div id="tuning">tuning in</div>
+<div id="where" class="hud"></div>
+<div id="hint" class="hud"><span class="keys"><b>click</b> move the camera</span><span class="keys"><b>1–9 · 0</b> a level, sewers to rooftops</span><span class="keys"><b>A</b> slow tour</span><span class="keys"><b>F</b> full screen</span><span class="keys"><b>H</b> hide this</span><span class="touch"><b>tap</b> move the camera · it moves on by itself every 45 s</span></div>
+<div id="tour"></div>
+<noscript>Bladeview needs JavaScript and WebGL.</noscript>
+<script type="module">/*BV_MAIN*/</script>
+</body>
+</html>
