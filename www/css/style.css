@@ -462,3 +462,6 @@ details.subw[open] summary::after { transform: rotate(90deg); }
 /* the author pit: a little world the same shape as a game card */
 .pit .stage { aspect-ratio: 6 / 7; }
 .pit .stage canvas { cursor: pointer; }
+/* bladeview: a window on the city, the same shape as a game card */
+.blade .stage { aspect-ratio: 6 / 7; background: #07080a; }
+.blade .stage canvas { cursor: pointer; }

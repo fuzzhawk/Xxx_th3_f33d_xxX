@@ -474,7 +474,7 @@ World v6 (`garden-metro.js`, run by `loadGarden` on a v5 save and by `newGarden`
 
 ## The Author Pit (a new card, 2026-11-21)
 `authorpit.js` (the scene) and `authorpit-script.js` (the cast and the script); `cat: 'pit'` in `cards.js`, with its own header and face.
-- **In the feed:** comes about the 8th post and then every 29, in every mode (`feed.js`, `settings.authorPit`).
+- **In the feed:** shelved since 2026-11-22: it shows only if `settings.authorPit === true`. When on, it comes about the 8th post and then every 29, in every mode (`feed.js`).
 - **The cast:** fourteen writers as Crystal Sprite characters, each dressed in colours that suggest them, with name tags: Wilson, Burroughs, Lovecraft, Colin Wilson, Le Guin, Butler, Sartre, Reich, Joyce, Tolkien, Nietzsche, Hesse, Dick and Atwood.
 - **The place:** a sunken garden. At its middle is a table with a blank book. Round it: a café, a crypt door, a cut-up table, an old oak, an orgone box, the river with a bench, a chalkboard, and a fire pit.
 - **The script:** 154 beats, about 13½ minutes of real time. Each beat is a line of dialogue with an emote, a walk, an act, a door or a stage note.
@@ -489,3 +489,45 @@ World v6 (`garden-metro.js`, run by `loadGarden` on a v5 save and by `newGarden`
   - **The lines** are written for the card in the spirit of each writer's ideas, with a few words of theirs at most.
 - **Playing:** it runs while the card is on screen and keeps its place (`localStorage` `pit.beat`). A tap moves it on, and it loops.
 - **Tested:** it plays through, all 14 characters bake, the camera follows each pair, and the card shows and plays in the feed. No errors.
+
+## Bladeview (a new card, 2026-11-22)
+`bladeview.js` (the scene, the camera, the post pass) and `bladeview-art.js` (the bakes, the sprites, the billboards); `cat: 'blade'` in `cards.js`, with its own header (`blade.view`) and face.
+- **In the feed:** the 4th post and then every 19, in every mode (`feed.js`). It is on unless `settings.bladeview === false`.
+- **What it is:** a slow 3D view of a rain-soaked noir city. Each card, and each tap, picks a new place, hour, weather and camera move. The new view comes in on a pixel-sort column wipe.
+- **The ten levels**, from the bottom up:
+
+  | # | Level | The view |
+  |---|---|---|
+  | 1 | The Sewers | a brick barrel vault over black water |
+  | 2 | The Works | a machine hall |
+  | 3 | Undercity | streets under a concrete slab |
+  | 4 | Street Level | wet asphalt, raised pavements |
+  | 5 | Lower Walkways | a walkway down the canyon |
+  | 6 | The Stacks | walkways higher up the canyon |
+  | 7 | Sky Lanes | open air between towers, with traffic |
+  | 8 | High Gantries | a gantry high over the street lights |
+  | 9 | The Spires | a ledge on a spire |
+  | 10 | Rooftop Gardens | planters and tanks over a sea of cloud |
+
+  The blocks are brutalist and Kowloon-stacked. Hanging wires, walkways and bridges cross between them.
+- **Weather and light:**
+  - Weather: acid rain, drizzle, storm (with lightning), fog, smog, clear, or ash.
+  - The hour is night, dusk or dawn; the fog takes its colour from the sky.
+  - Light comes from searchlights, refinery flares and steam.
+  - The picture is rendered at 192×224 and graded per hour. It is quantised to 18 levels with Bayer dither and grain, from one lookup table, then vignetted.
+- **Textures:**
+  - Facades, platforms and skies come from Vitriol's Greebleworks, baked in small slices over several frames.
+  - They go through the Hell Maze grime pass (`grimePixels` with its new options: gore 0, melt 0) and a pixel-sort streak pass.
+- **People:**
+  - People are small Mercforge sprites in civilian kit, with a cop now and then. They carry lit umbrellas in the rain.
+  - They walk the decks and pavements, kept at least 12 m from the camera.
+- **Vehicles:** spinners fly their lanes with lights and beacons, and cars run on the street. A blimp carries a rule-110 screen.
+- **Signs and screens:**
+  - Neon signs are glyph shapes, not real brands, and they flicker.
+  - Billboards run small simulations: Conway's Life, Brian's Brain, rule 110 and Langton's ant.
+  - Ad strips scroll short poems from an order-1 Markov chain over an original corpus.
+- **Cost:**
+  - At 4× CPU throttle in software GL, the post pass takes about 1.5 ms of JS per frame. The rest of each frame is the GPU readback.
+  - A view takes about 1.5–1.8 s to bake and build. A tap transition takes about 2.5 s.
+  - It renders at about 30 fps and stops when the card leaves the screen.
+- **Tested:** all ten levels go live with no errors. Eight taps in a row each build a new view, and the heap stays flat. The card shows, plays and changes on a tap in the feed.

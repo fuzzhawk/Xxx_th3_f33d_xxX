@@ -16,10 +16,13 @@ function gritField() {
   return (GRIT_F = { N, tex, dirt, gore });
 }
 // the grime and the meltdown over raw RGBA pixels, in place
-export function grimePixels(d, w, h) {
-  const F = gritField(), N = F.N;
+// o (all optional, Hell Maze's monsters use the defaults): gore (dried blood, 1), sat (how much colour
+// is kept, 0.62), levels (the colour steps, 14), shade (darker toward the foot, 1), melt (the share of
+// columns that slump, 0.34). Bladeview's walls use it with no gore and a thinner melt.
+export function grimePixels(d, w, h, o = {}) {
+  const F = gritField(), N = F.N, gk = o.gore ?? 1, sat = o.sat ?? 0.62, lv = o.levels ?? 14, sk = o.shade ?? 1;
   for (let y = 0; y < h; y++) {
-    const v = y / h, shade = 1.06 - 0.32 * v, gv = v * 0.18 - 0.7, row = (y % N) * N;
+    const v = y / h, shade = 1 + (0.06 - 0.32 * v) * sk, gv = v * 0.18 - 0.7, row = (y % N) * N;
     for (let x = 0; x < w; x++) {
       const j = (y * w + x) * 4;
       if (d[j + 3] < 8) continue;
@@ -27,26 +30,26 @@ export function grimePixels(d, w, h) {
       const mx = r > g ? (r > b ? r : b) : g > b ? g : b, mn = r < g ? (r < b ? r : b) : g < b ? g : b;
       if (mx > 215 && mx - mn > 90) continue;   // a glowing eye or ember: leave it lit
       const i = row + (x % N), lu = r * 0.3 + g * 0.59 + b * 0.11, k = F.tex[i] * shade;
-      r = (lu + (r - lu) * 0.62) * k; g = (lu + (g - lu) * 0.62) * k; b = (lu + (b - lu) * 0.62) * k;
+      r = (lu + (r - lu) * sat) * k; g = (lu + (g - lu) * sat) * k; b = (lu + (b - lu) * sat) * k;
       const dt2 = F.dirt[i];
       if (dt2 > 0) { r += (30 - r) * dt2; g += (24 - g) * dt2; b += (18 - b) * dt2; }
-      const gr = (F.gore[i] + gv) * 3;
+      const gr = (F.gore[i] + gv) * 3 * gk;
       if (gr > 0) { const q = gr > 0.7 ? 0.7 : gr; r += (74 - r) * q; g += (8 - g) * q; b += (10 - b) * q; }
       const bq = (BAYER[(y & 3) * 4 + (x & 3)] / 16 - 0.5) * 14;
-      d[j] = clamp(Math.round((r + bq) / 14) * 14, 0, 255); d[j + 1] = clamp(Math.round((g + bq) / 14) * 14, 0, 255); d[j + 2] = clamp(Math.round((b + bq) / 14) * 14, 0, 255);
+      d[j] = clamp(Math.round((r + bq) / lv) * lv, 0, 255); d[j + 1] = clamp(Math.round((g + bq) / lv) * lv, 0, 255); d[j + 2] = clamp(Math.round((b + bq) / lv) * lv, 0, 255);
     }
   }
-  melt(d, w, h);
+  melt(d, w, h, o.melt ?? 0.34);
 }
 // The meltdown: in about a third of the columns the lower part of each run of body slumps, its pixels
 // sorted by brightness so the light sinks to the bottom (pixel sorting, run downward), and now and
 // then it runs on past the body as a drip a few pixels long. Glowing pixels (eyes) are left where they are.
-function melt(d, w, h) {
+function melt(d, w, h, share = 0.34) {
   const hs = (a, b) => { let q = (a * 374761393 + b * 668265263 + 0x51ed) | 0; q = Math.imul(q ^ (q >>> 13), 1274126177); return ((q ^ (q >>> 16)) >>> 0) / 4294967296; };
   const lum = (j) => d[j] * 0.3 + d[j + 1] * 0.59 + d[j + 2] * 0.11, hot = (j) => { const mx = Math.max(d[j], d[j + 1], d[j + 2]), mn = Math.min(d[j], d[j + 1], d[j + 2]); return mx > 215 && mx - mn > 90; };
   const seg = [];
   for (let x = 0; x < w; x++) {
-    if (hs(x, w) > 0.34) continue;
+    if (hs(x, w) > share) continue;
     let y = 0, run = 0;
     while (y < h) {
       while (y < h && d[(y * w + x) * 4 + 3] < 8) y++;
