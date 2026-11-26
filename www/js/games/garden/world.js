@@ -149,7 +149,7 @@ export class World {
   villageAt(x, y, m = 0) { for (const v of this.villages) if (Math.hypot(v.x - x, v.y - y) <= v.rad + m) return v; return null; }
   // the biome under a tile: the city's rect, else the nearest site after a warp (cached)
   biomeAt(x, y) {
-    x = clamp(Math.floor(x), 0, WT - 1); y = clamp(Math.floor(y), 0, WT - 1); const q = y * WT + x, c = this.bc[q]; if (c !== 255) return c;
+    x = Number.isFinite(x) ? clamp(Math.floor(x), 0, WT - 1) : 0; y = Number.isFinite(y) ? clamp(Math.floor(y), 0, WT - 1) : 0; const q = y * WT + x, c = this.bc[q]; if (c !== 255) return c;
     let bi = 0;
     if (this.inCity(x, y)) bi = BIOMES.crown.i;
     else { const s = this.seed, wx = x + (fbm(x / 36, y / 36, s + 1, 3) - 0.5) * 72, wy = y + (fbm(x / 36, y / 36, s + 9, 3) - 0.5) * 72; let bd = 1e18; for (const p of this.sites) { const d = (wx - p.x) ** 2 + (wy - p.y) ** 2; if (d < bd) { bd = d; bi = p.b; } } }
@@ -375,6 +375,7 @@ export class World {
   // the ground under world px (x, y), on the ground or in place P: [top, kind, solid, floor under a bridge]
   cell(px, py, P, o = this._c || (this._c = { t: 0, k: 0, s: 0, lo: NOLO })) {
     const tx = Math.floor(px / TS), ty = Math.floor(py / TS);
+    if (!Number.isFinite(tx) || !Number.isFinite(ty)) { o.t = P ? P.h : 0; o.k = K_VOID; o.s = 1; o.lo = NOLO; return o; }
     if (P) { const M = this.place(P), i = tx - M.ox, j = ty - M.oy; if (i < 0 || j < 0 || i >= M.n || j >= M.n) { o.t = P.h; o.k = K_VOID; o.s = 1; o.lo = NOLO; return o; } const Q = j * M.n + i; o.t = M.e[Q] + M.h[Q]; o.k = M.kind[Q]; o.s = M.solid[Q]; o.lo = NOLO; return o; }
     if (tx < 0 || ty < 0 || tx >= WT || ty >= WT) { o.t = 0; o.k = K_CLIFF; o.s = 1; o.lo = NOLO; return o; }
     const C = this.chunk(Math.floor(tx / CS), Math.floor(ty / CS)), i = tx - C.cx * CS, j = ty - C.cy * CS, Q = (j + 1) * C.n + i + 1;

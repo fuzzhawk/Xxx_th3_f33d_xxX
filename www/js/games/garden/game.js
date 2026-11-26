@@ -194,13 +194,16 @@ export class Garden extends Game {
     }
     P.hv = this.ride ? P.h : P.hv + (P.h - P.hv) * Math.min(1, dt * 14);
     // the world round the walker
-    this.stepGiants(dt); this.stepBeasts(dt); this.stepNPCs(dt);
+    this.safe('giants', () => this.stepGiants(dt)); this.safe('beasts', () => this.stepBeasts(dt), () => { this.beasts = []; }); this.safe('npcs', () => this.stepNPCs(dt), () => { for (const n of this.npcs) this.actorTex?.give(n.slot); this.npcs = []; });
     for (const f of this.fx) { f.t += dt; f.x += (f.vx || 0) * dt; f.y += (f.vy || 0) * dt; f.h += (f.vh || 0) * dt; f.vh = (f.vh || 0) - (f.g ?? 30) * dt; } this.fx = this.fx.filter((f) => f.t < f.life);
-    if ((this.spawnT -= dt) <= 0) { this.spawnT = 0.5; this.spawn(); this.markExplored(); this.place(); }
-    if ((this.findT -= dt) <= 0) { this.findT = 0.2; this.lookForTreasure(); }
+    if ((this.spawnT -= dt) <= 0) { this.spawnT = 0.5; this.safe('spawn', () => this.spawn()); this.markExplored(); this.safe('place', () => this.place()); }
+    if ((this.findT -= dt) <= 0) { this.findT = 0.2; this.safe('treasure', () => this.lookForTreasure()); }
     for (const t of this.toasts) t.t += dt; this.toasts = this.toasts.filter((t) => t.t < 4.5);
     if ((this.saveT += dt) > 10) { this.saveT = 0; this.save(); }
   }
+  // run a part of the world; if it throws, note it once and carry on (optionally clearing what went wrong)
+  safe(what, fn, reset) { try { fn(); } catch (e) { this.oops(what, e); if (reset) reset(); } }
+  oops(what, e) { this.oopsSeen ||= new Set(); if (!this.oopsSeen.has(what)) { this.oopsSeen.add(what); console.warn(`garden: ${what}`, e); } }
   splash(x, y, h) { for (let k = 0; k < 10; k++) this.fx.push({ k: 'drop', x: x + (Math.random() - 0.5) * 10, y, h: h + 2, vx: (Math.random() - 0.5) * 40, vh: 30 + Math.random() * 40, g: 160, t: 0, life: 0.6 }); }
   // the autopilot: wander from place to place, sometimes up a lift, down a canyon or into a cave, and back
   autopilot(dt) {
@@ -300,7 +303,14 @@ export class Garden extends Game {
   }
   addBeast(kind, x, y, fam, extra) {
     const A = FAUNA[kind]; if (!A) return null; const P = this.P, r = Math.random, h = this.W.heightAt(x, y, P.place);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(h)) return null;
     const b = { k: kind, A, fam, x, y, h, base: h, alt: 0, place: P.place, dir: r() < 0.5 ? 1 : -1, f: r() * 4, wait: r() * 2, tx: x, ty: y, hx: x, hy: y, st: 'idle', t: 0, ph: r() * 6.283, flee: 0, ...extra };
+    // whatever list it came from (a rare jellyfish among the ground animals, say), it gets what its kind needs to move
+    const ai = A.ai, had = (k) => extra && extra[k] !== undefined;
+    if (ai === 'drift') { b.st = 'air'; if (!had('heading')) b.heading = r() * 6.283; if (!had('alt')) b.alt = P.place?.kind === 'isle' ? -60 - r() * 160 : 30 + r() * 80; if (!had('base')) b.base = P.place ? P.place.h : h; }
+    else if (ai === 'soar') { b.st = 'air'; if (!had('R')) b.R = 60 + r() * 90; if (!had('ang')) b.ang = r() * 6.283; if (!had('alt')) b.alt = 110 + r() * 60; }
+    else if (ai === 'flutter') { b.st = 'air'; if (!had('alt')) b.alt = 6 + r() * 16; }
+    else if (ai === 'bat') { b.st = 'air'; if (!had('alt')) b.alt = 24 + r() * 30; }
     this.beasts.push(b); return b;
   }
   spawn() {
@@ -380,6 +390,13 @@ export class Garden extends Game {
   stepBeasts(dt) {
     const P = this.P, Wd = this.W, r = Math.random;
     for (const b of this.beasts) {
+      try { this.stepBeast(b, dt, P, Wd, r); } catch (e) { b.gone = true; this.oops('beast', e); }
+      if (!Number.isFinite(b.x) || !Number.isFinite(b.y) || !Number.isFinite(b.alt) || !Number.isFinite(b.base)) b.gone = true;
+    }
+    this.beasts = this.beasts.filter((b) => !b.gone);
+  }
+  stepBeast(b, dt, P, Wd, r) {
+    {
       const A = b.A, ai = A.ai, dP = Math.hypot(P.x - b.x, P.y - b.y), sp = A.speed || 20; b.t += dt;
       const groundBase = () => (b.place ? b.place.h : Wd.heightAt(b.x, b.y, null));
       if (b.st === 'fly') {
@@ -387,7 +404,7 @@ export class Garden extends Game {
         b.alt += ((b.cruise || 90) - b.alt) * Math.min(1, dt * 0.9); b.x += b.vx * dt; b.y += b.vy * dt;
         const a = Math.atan2(b.vy, b.vx) + Math.sin(b.t * 1.3 + b.ph) * 0.25 * dt; const v = Math.hypot(b.vx, b.vy); b.vx = Math.cos(a) * v; b.vy = Math.sin(a) * v;
         b.dir = b.vx >= 0 ? 1 : -1; b.f += dt * (A.big ? 4 : 11); if (b.t > 45) b.gone = true;
-        continue;
+        return;
       }
       switch (ai) {
         case 'flock': {
@@ -510,7 +527,7 @@ export class Garden extends Game {
       BM.bb(sp, 0, 0, sp.width, sp.height, p.x, p.y, p.e - 1.5, K, 1, cover ? 0.3 : 1);
     }
     pt('static');
-    const lights = this.entities(BM, BS, BA, K, PJ, cam);
+    let lights = []; this.safe('entities', () => { lights = this.entities(BM, BS, BA, K, PJ, cam); });
     pt('entities');
     const nS = BS.upload(this.bat.bs), nM = BM.upload(this.bat.bm), nA = BA.upload(this.bat.ba);
     GL.glDraw(this.bat.bs, nS, GL.atlasTex(), true); GL.glDraw(this.bat.bm, nM, GL.atlasTex()); GL.glDraw(this.bat.ba, nA, this.actorTex.tex);

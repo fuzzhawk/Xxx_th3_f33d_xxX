@@ -731,3 +731,11 @@ The Makhana garden grew, got its old dream back, and gained heights and depths. 
   - `game.js`: heights, swimming, rides and caves, fauna behaviour, treasures, and the menu pages.
   - `atmos.js`: petal and glitter motes.
   - The engine's painter (`mk/tex.js`) takes a padding margin, and billboards (`mk/gl.js`) account for it.
+- **Freeze fix (same day):** the game could stop while the rest of the app carried on.
+  - **Cause:** a rare creature that flies, such as a jellyfish in Lantern Fungi or an ember bird in the jungle or the Pink Salt Lakes, could be spawned through the ground animals' path without what its kind needs to move. Its position became NaN, and the next world lookup threw. The engine catches a frame's error and logs it only once, so the same error repeated every frame and the game stood still.
+  - **Fixes:**
+    - Every creature now gets what its way of moving needs, whichever list it was spawned from.
+    - The world treats a NaN position as out of bounds.
+    - A creature that throws, or ends up somewhere that isn't a number, is dropped.
+    - The giants, animals, people, spawning, place names, treasure checks and the entity drawing each run guarded. One failure is logged once (`garden: <part>` in the console) and the rest carries on.
+  - **Tested** by forcing those creatures in, then running the autopilot at five times speed across three worlds and from an island, a cave, a canopy and a canyon floor. There were no errors and no frame over 400 ms.
