@@ -739,3 +739,70 @@ The Makhana garden grew, got its old dream back, and gained heights and depths. 
     - A creature that throws, or ends up somewhere that isn't a number, is dropped.
     - The giants, animals, people, spawning, place names, treasure checks and the entity drawing each run guarded. One failure is logged once (`garden: <part>` in the console) and the rest carries on.
   - **Tested** by forcing those creatures in, then running the autopilot at five times speed across three worlds and from an island, a cave, a canopy and a canyon floor. There were no errors and no frame over 400 ms.
+
+## The garden, third round (2026-11-26)
+**Fixes:**
+- **Sky creatures and the islands:** round an island (and from its bridges), jellyfish, koi, mantas, whales, lanterns and bubbles now fly a wide circle well outside its rim. They stay below its rock by their own height and more, so none clips through or spawns inside an island.
+- **Getting stuck:**
+  - Before, all four corners of the feet had to be within a step of where you stood, so on a slope a corner could leave you wedged in place.
+  - Now the middle of the feet decides where you stand. The feet ahead stop you only at a wall, a prop or ground more than a step above, so you can always walk away from an obstacle.
+  - Tested on 35 steep mountain spots: every one can be walked out of.
+  - Lakes now lie flat at ground level, with the ground easing down to them, so their banks can be climbed.
+- **The view behind things:** a cut-away in the shader. Anything nearer the camera than the walker and higher than their feet dithers away, either inside a circle round them on screen or when very near the camera. City blocks, mesas, canyon walls and terraces no longer hide you, and the canyon floors no longer show huge blurred walls up close.
+- **Lights through buildings:** glows (street lamps, windows, fires, beacons, lanterns, glowing creatures) are now drawn in the 3D pass, additively and depth-tested, so whatever stands in front hides them.
+  - The glow fades with the fog but carries through it more than the scenery does.
+  - It never writes depth, so the depth-of-field pass is unaffected.
+
+**Brought back from the old garden:**
+- **Fog that parts:** low banks of dithered mist lie about misty country (pale pastel in the dream, cloud round the islands).
+  - You, the people and the animals push the puffs aside as you pass, and they drift back.
+  - Banks between you and the camera thin away so they never smother the view.
+- **Trees that sway:** brushing past a tree or bush sways it, and trees shake a few leaves loose (petals from blossom).
+- **Ripples:** rings spread where you wade in, as you swim, where swimmers go, and now and then on any water nearby.
+- **Wisps:** one glowing wisp for each treasure found, trailing after you in a chain, circling and bobbing.
+- **Rooftop gardens:**
+  - Nine buildings in the ruined city have whole flat roofs with gardens: grass, vegetable beds, flower bushes, small trees, a water tank, washing and a glasshouse on the big ones, behind a low parapet.
+  - A gardener or two works up there.
+  - A lift on the street runs up each building's face, and you step across onto the roof.
+  - Plank bridges join each roof to its nearest neighbour.
+- **The undercity:** three lit stairwells in the city streets lead down to a maze of brick halls and brass works under the city. The rooms include:
+  - the night market, with stalls and lanterns;
+  - the boiler hall;
+  - oil pits with great cogwheels;
+  - the works.
+
+  Lamps line the halls. Brass rats, clockwork beetles, cog owls, cats and bats live there, and very rarely a steam golem. Its people wear hard hats, visors and brass-buckled waistcoats. Each stairwell has its own way back up.
+
+**New:**
+- **Sky bridges:** a spanning tree of plank walkways joins the eight islands.
+  - The bridges sag gently between the islands' heights, with lantern posts along both sides and rails.
+  - Rocks float beneath, and round landings with a lantern shrine and flowers break up the long spans.
+  - You walk straight off an island onto its bridge and off the far end onto the next island. The island, its bridges and the next island are one place to the animals too.
+- **People dressed for where they live:**
+  - Villagers, wanderers and city folk are dressed for their country: robes and tunics in bright colours in the dream; work clothes in the farmland; wraps and hoods in the desert; coats in the frost; hard hats in the rust belt; masks and gauntlets in the ash; long coats and fedoras in the city.
+  - Gardeners work on the roofs, hermits live on the islands, and a tree dweller lives in the canopies.
+  - Each context has twenty people, so each is baked once and then comes from the cache.
+- **Dreamier dream:**
+  - A soft bloom on the highlights and pastel-lifted shadows in the post pass, eased in as you cross into dream country.
+  - Pastel mist and tint, clearer skies, and glitter on pollen days.
+  - Floating paper lanterns and iridescent bubbles drift over the dream, and the islands have more sky creatures.
+  - Strange creatures come about three times as often there.
+  - The old garden's dream creatures are back:
+    - the glimmerkin, a small glowing forest spirit with a sprout on its head;
+    - the phoenix, which circles high;
+    - seals in the lagoon.
+  - The ash country has fire newts and ash moths.
+- **Files:**
+  - `live.js` (new): the fog field, the swaying, the ripples and the wisps.
+  - `world.js`: walkways and their landings, roof gardens and their lots, the undercity maze, linked places, and flat lakes.
+  - `scene.js`: walkway decks, roof and undercity visuals, and the glow, ring and mist sprites.
+  - `gl.js`: the cut-away, additive glows, the dream bloom, and billboard skew for swaying.
+  - `art.js`: the bridge posts, stairwells, market stalls, boilers and cogwheels, and the new creatures.
+  - `game.js`: the rest.
+- **Tested** with no errors:
+  - In a headless browser: the creatures circling outside an island, walking a bridge onto the next island, wisps, swimming and rings, a tree swaying and dropping leaves, fog pushed about 118 px aside, a roof lift up and down, and the undercity in and out.
+  - Error soaks at five times speed from a village, an island, a bridge and the undercity.
+- **Cost:**
+  - JS is about 4–5 ms a frame.
+  - In software GL the GPU part went from about 75 to 110 ms, from the glow pass, the cut-away test and the dream bloom. That is a few milliseconds on a phone GPU, and Battery Saver and the Resolution slider still apply.
+

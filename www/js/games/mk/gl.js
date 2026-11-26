@@ -16,17 +16,20 @@ export function renderer() {
   const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
   const prog = (vs, fs) => { const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); return p; };
   try {
-    R.P = prog(`attribute vec3 aPos;attribute vec2 aUV;attribute vec4 aRect;attribute vec2 aSA;uniform mat4 uMVP;varying vec2 vUV;varying vec4 vRect;varying vec2 vSA;varying float vD;
-      void main(){vec4 p=uMVP*vec4(aPos,1.);gl_Position=p;vUV=aUV;vRect=aRect;vSA=aSA;vD=p.w;}`,
-    `precision mediump float;uniform sampler2D uTex;uniform vec3 uFog;uniform vec2 uFogR;uniform float uFogA;uniform float uShadow;uniform float uPix;uniform float uDith;uniform vec2 uDR;uniform vec3 uTint;varying vec2 vUV;varying vec4 vRect;varying vec2 vSA;varying float vD;
+    R.P = prog(`attribute vec3 aPos;attribute vec2 aUV;attribute vec4 aRect;attribute vec2 aSA;uniform mat4 uMVP;varying vec2 vUV;varying vec4 vRect;varying vec2 vSA;varying float vD;varying float vY;
+      void main(){vec4 p=uMVP*vec4(aPos,1.);gl_Position=p;vUV=aUV;vRect=aRect;vSA=aSA;vD=p.w;vY=aPos.y;}`,
+    `precision mediump float;uniform sampler2D uTex;uniform vec3 uFog;uniform vec2 uFogR;uniform float uFogA;uniform float uShadow;uniform float uPix;uniform float uDith;uniform vec2 uDR;uniform vec3 uTint;uniform vec4 uCut;uniform vec3 uCutP;uniform float uAdd;varying vec2 vUV;varying vec4 vRect;varying vec2 vSA;varying float vD;varying float vY;
       float b2(vec2 a){a=floor(a);return fract(dot(a,vec2(.5,a.y*.75)));}
       float b4(vec2 a){return b2(.5*a)*.25+b2(a);}
       void main(){vec2 uv=vRect.z<0.?vRect.xy+vUV*abs(vRect.zw):vRect.xy+fract(vUV)*vRect.zw;vec4 c=texture2D(uTex,uv);
         if(uShadow>.5){if(c.a<.05)discard;gl_FragColor=vec4(0.,0.,0.,c.a*.75*vSA.y);return;}
-        if(c.a<.5)discard;if(vSA.y<.999){if(uDith>.5){if(vSA.y<b4(floor(gl_FragCoord.xy/uPix))+.03)discard;}else if(vSA.y<.5)discard;}
+        if(uAdd>.5){if(c.a<.5)discard;float fa=smoothstep(uFogR.x,uFogR.y,vD)*uFogA;gl_FragColor=vec4(c.rgb*vSA.x*vSA.y*(1.-fa*.55),0.);return;}
+        if(c.a<.5)discard;
+        if(uCut.w>.5&&vY>uCutP.y&&vD<uCutP.x){float k=max(1.-smoothstep(uCut.z*.55,uCut.z,distance(gl_FragCoord.xy,uCut.xy)),1.-smoothstep(uCutP.z*.6,uCutP.z,vD));if(k>.02&&k*.9>b4(floor(gl_FragCoord.xy/uPix)))discard;}
+        if(vSA.y<.999){if(uDith>.5){if(vSA.y<b4(floor(gl_FragCoord.xy/uPix))+.03)discard;}else if(vSA.y<.5)discard;}
         vec3 col=c.rgb*vSA.x*uTint;float f=smoothstep(uFogR.x,uFogR.y,vD)*uFogA;gl_FragColor=vec4(mix(col,uFog,f),clamp((vD-uDR.x)/uDR.y,0.,1.));}`);
     R.Q = prog(`attribute vec2 aP;void main(){gl_Position=vec4(aP,0.,1.);}`,
-    `precision mediump float;uniform sampler2D uS;uniform vec2 uRes;uniform float uFocus,uBand,uMax,uSat,uBri,uCon,uMode,uFocal,uRange,uSoft;uniform vec2 uDR;
+    `precision mediump float;uniform sampler2D uS;uniform vec2 uRes;uniform float uFocus,uBand,uMax,uSat,uBri,uCon,uMode,uFocal,uRange,uSoft,uDream,uPixB;uniform vec2 uDR;
       float coc(float a){return uMax*smoothstep(uRange,uRange+uSoft,abs(uDR.x+a*uDR.y-uFocal));}
       void main(){vec2 uv=gl_FragCoord.xy/uRes;vec4 c0=texture2D(uS,uv);vec3 c;
         if(uMode<.5){float d=abs(uv.y-uFocus);float r=uMax*smoothstep(uBand,uBand+.28,d);vec4 acc=c0;float n=1.;
@@ -34,13 +37,14 @@ export function renderer() {
         else{float cc=coc(c0.a);vec3 acc=c0.rgb;float ws=1.;
           if(uMax>.05){for(int i=0;i<34;i++){float a=float(i)*2.39996;float rr=sqrt((float(i)+.5)/34.)*uMax;vec4 s=texture2D(uS,uv+vec2(cos(a),sin(a))*rr/uRes);
             float sc=coc(s.a);float use=s.a>c0.a+.004?min(sc,cc):sc;float w=clamp(use-rr+1.,0.,1.);acc+=s.rgb*w;ws+=w;}}c=acc/ws;}
+        if(uDream>.01){vec3 bl=vec3(0.);for(int i=0;i<12;i++){float a=float(i)*2.39996+.5;float rr=(2.+float(i)*.9)*uPixB;bl+=max(texture2D(uS,uv+vec2(cos(a),sin(a))*rr/uRes).rgb-.76,0.);}c+=bl/12.*uDream*1.8;float l2=dot(c,vec3(.299,.587,.114));c=mix(c,c*.9+vec3(.07,.045,.11),uDream*.5*(1.-l2));}
         float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,uSat);c=(c-.5)*uCon+.5;c*=uBri;gl_FragColor=vec4(c,1.);}`);
   } catch (err) { console.warn('garden 3D disabled:', err); return null; }
   const P = R.P, Q = R.Q, u = (p, n) => gl.getUniformLocation(p, n);
   R.loc = { aPos: gl.getAttribLocation(P, 'aPos'), aUV: gl.getAttribLocation(P, 'aUV'), aRect: gl.getAttribLocation(P, 'aRect'), aSA: gl.getAttribLocation(P, 'aSA') };
-  for (const n of ['uMVP', 'uTex', 'uFog', 'uFogR', 'uFogA', 'uShadow', 'uDR', 'uPix', 'uDith', 'uTint']) R.loc[n] = u(P, n);
+  for (const n of ['uMVP', 'uTex', 'uFog', 'uFogR', 'uFogA', 'uShadow', 'uDR', 'uPix', 'uDith', 'uTint', 'uCut', 'uCutP', 'uAdd']) R.loc[n] = u(P, n);
   R.qloc = { aP: gl.getAttribLocation(Q, 'aP') };
-  for (const n of ['uS', 'uRes', 'uFocus', 'uBand', 'uMax', 'uSat', 'uBri', 'uCon', 'uMode', 'uFocal', 'uRange', 'uSoft', 'uDR']) R.qloc[n] = u(Q, n);
+  for (const n of ['uS', 'uRes', 'uFocus', 'uBand', 'uMax', 'uSat', 'uBri', 'uCon', 'uMode', 'uFocal', 'uRange', 'uSoft', 'uDR', 'uDream', 'uPixB']) R.qloc[n] = u(Q, n);
   R.quad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, R.quad); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
   R.dyn = gl.createBuffer(); R.dynS = gl.createBuffer();
   R.AS = 2048; R.atlas = texNew(R.AS, R.AS, null); R.pack = { x: 0, y: 0, rh: 0, gen: 1 };
@@ -80,11 +84,11 @@ export class Batch {
   reset() { this.n = 0; }
   v(x, y, z, u, v, r0, r1, r2, r3, s, al) { if ((this.n + 1) * 11 > this.a.length) { const b = new Float32Array(this.a.length * 2); b.set(this.a); this.a = b; } const a = this.a, o = this.n * 11; a[o] = x; a[o + 1] = y; a[o + 2] = z; a[o + 3] = u; a[o + 4] = v; a[o + 5] = r0; a[o + 6] = r1; a[o + 7] = r2; a[o + 8] = r3; a[o + 9] = s; a[o + 10] = al; this.n++; }
   // upright billboard: source rect (sx, sy, sw, sh) of canvas cv, foot at (x, z), base height h, k = stretch
-  bb(cv, sx, sy, sw, sh, x, z, h, k, shade, al, ax, zb, scale = 1) {
+  bb(cv, sx, sy, sw, sh, x, z, h, k, shade, al, ax, zb, scale = 1, skew = 0) {
     const r = atl(cv), S = R.AS, u0 = r[0] + sx / S, v0 = r[1] + sy / S, du = sw / S, dv = sh / S;
     const pd = sx === 0 && sy === 0 ? cv.pad || 0 : 0, X0 = x - (ax === undefined ? sw / 2 : ax) * scale, X1 = X0 + sw * scale, Y0 = h - pd * k * scale, Y1 = Y0 + sh * k * scale, Z = z + (zb || 0), s = shade === undefined ? 1 : shade, a = al === undefined ? 1 : al;
-    this.v(X0, Y1, Z, 0, 0, u0, v0, -du, dv, s, a); this.v(X1, Y1, Z, 1, 0, u0, v0, -du, dv, s, a); this.v(X1, Y0, Z, 1, 1, u0, v0, -du, dv, s, a);
-    this.v(X0, Y1, Z, 0, 0, u0, v0, -du, dv, s, a); this.v(X1, Y0, Z, 1, 1, u0, v0, -du, dv, s, a); this.v(X0, Y0, Z, 0, 1, u0, v0, -du, dv, s, a);
+    this.v(X0 + skew, Y1, Z, 0, 0, u0, v0, -du, dv, s, a); this.v(X1 + skew, Y1, Z, 1, 0, u0, v0, -du, dv, s, a); this.v(X1, Y0, Z, 1, 1, u0, v0, -du, dv, s, a);
+    this.v(X0 + skew, Y1, Z, 0, 0, u0, v0, -du, dv, s, a); this.v(X1, Y0, Z, 1, 1, u0, v0, -du, dv, s, a); this.v(X0, Y0, Z, 0, 1, u0, v0, -du, dv, s, a);
   }
   // the same, from a rect already in some texture (normalised [u, v, w, h])
   bbr(r, sw, sh, x, z, h, k, shade, al, scale = 1, flip = false) {
@@ -170,6 +174,7 @@ export function glScreen(tex, blur, G) {
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(L.uS, 0); gl.uniform2f(L.uRes, R.RW, R.RH);
   gl.uniform1f(L.uFocus, blur ? 1 - R.focusY / R.VH + (blur.focus || 0) : 0.5); gl.uniform1f(L.uBand, blur ? blur.band : 9); gl.uniform1f(L.uMax, blur ? blur.max * R.scale : 0);
   gl.uniform1f(L.uSat, blur ? blur.sat : 1); gl.uniform1f(L.uBri, blur ? G.bright : 1); gl.uniform1f(L.uCon, blur ? G.contrast : 1);
+  gl.uniform1f(L.uDream, blur?.dream || 0); gl.uniform1f(L.uPixB, R.scale);
   const D = R.D || 300, dof = !!blur && G.dof === 'DEPTH'; gl.uniform1f(L.uMode, dof ? 1 : 0); gl.uniform2f(L.uDR, D * 0.3, D * (blur?.depthSpan || 3));
   gl.uniform1f(L.uFocal, D * (1 + ((blur && blur.focus) || 0) * 1.6)); gl.uniform1f(L.uRange, (blur ? blur.band : 0) * D * 1.2); gl.uniform1f(L.uSoft, D * 0.35); gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
@@ -178,8 +183,13 @@ export function glMain(fog, fogA, G, fogR = [0.95, 1.9], tint = [1, 1, 1], depth
   const gl = R.gl, L = R.loc; gl.useProgram(R.P); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.uniformMatrix4fv(L.uMVP, false, R.mvp); gl.uniform1i(L.uTex, 0);
   gl.uniform3f(L.uFog, fog[0] / 255, fog[1] / 255, fog[2] / 255); const fk = Math.max(0, G.fog - 1);
   gl.uniform2f(L.uFogR, R.D * Math.max(fogR[0] * 0.47, fogR[0] - fk * 0.13), R.D * Math.max(fogR[1] * 0.58, fogR[1] - fk * 0.2)); gl.uniform1f(L.uFogA, clamp(fogA * G.fog, 0, 0.97));
-  gl.uniform1f(L.uShadow, 0); gl.uniform1f(L.uPix, R.scale); gl.uniform2f(L.uDR, R.D * 0.3, R.D * depthSpan); gl.uniform1f(L.uDith, G.dither ? 1 : 0); gl.uniform3f(L.uTint, tint[0], tint[1], tint[2]); gl.activeTexture(gl.TEXTURE0);
+  gl.uniform1f(L.uShadow, 0); gl.uniform1f(L.uAdd, 0); gl.uniform4f(L.uCut, 0, 0, 0, 0); gl.uniform3f(L.uCutP, 0, 0, 0); gl.uniform1f(L.uPix, R.scale); gl.uniform2f(L.uDR, R.D * 0.3, R.D * depthSpan); gl.uniform1f(L.uDith, G.dither ? 1 : 0); gl.uniform3f(L.uTint, tint[0], tint[1], tint[2]); gl.activeTexture(gl.TEXTURE0);
 }
+// the cut-away: anything nearer the camera than the walker and higher than their feet, inside a circle
+// round them on screen (or very near the camera), dithers away so they are never lost behind it
+export function glCut(on, sx, sy, r, depth, h, near) { const gl = R.gl, L = R.loc; gl.uniform4f(L.uCut, sx * R.scale, (R.VH - sy) * R.scale, r * R.scale, on ? 1 : 0); gl.uniform3f(L.uCutP, depth, h, near); }
+// additive glows (lamps, fires, wisps): depth-tested against the scene, never writing depth, fading in the fog
+export function glAdd(on) { const gl = R.gl, L = R.loc; gl.uniform1f(L.uAdd, on ? 1 : 0); if (on) { gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ZERO, gl.ONE); gl.depthMask(false); } else { gl.disable(gl.BLEND); gl.depthMask(true); } }
 export function glTint(t) { R.gl.uniform3f(R.loc.uTint, t[0], t[1], t[2]); }
 export function glDraw(buf, n, tex, shadow) {
   if (!n) return; const gl = R.gl, L = R.loc; gl.bindTexture(gl.TEXTURE_2D, tex); gl.bindBuffer(gl.ARRAY_BUFFER, buf);

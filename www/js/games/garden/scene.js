@@ -5,7 +5,7 @@
 // a queue with a time budget a frame, so walking into new country never stalls.
 import { mk, cx2d, bay, qIdx, clamp, fbm, hash2 } from '../mk/tex.js';
 import { renderer, texNew, texSet, texFree, Batch, newBuffer, freeBuffer, atlasGen } from '../mk/gl.js';
-import { BIOMES, BIOME_KEYS, FAMILY, ISLES, CAVES } from './lands.js';
+import { BIOMES, BIOME_KEYS, FAMILY, ISLES, CAVES, ROOFTOP, UNDER, WALKWAY } from './lands.js';
 import { groundTex, facadeTex, paintProp, paintDecal, animalFrames, giantFrames, paintCloud, PROPDEF } from './art.js';
 import { TS, CS, NOLO, K_GROUND, K_PATH, K_FLOOR, K_WATER, K_CLIFF, K_WALL, K_BRIDGE, K_TOXIC, K_BLDG, K_STREET, K_TRUNK, K_VOID } from './world.js';
 
@@ -15,11 +15,11 @@ export function want(key, make) { const j = done.get(key); if (j) return j.out; 
 export function pump(ms) { const t0 = performance.now(); while (jobs.length && performance.now() - t0 < ms) { const j = jobs.shift(); queued.delete(j.key); try { j.out = j.make(); } catch (e) { console.warn('garden paint', j.key, e); j.out = null; } done.set(j.key, j); } return jobs.length; }
 export const pending = () => jobs.length;
 
-const FAMS = ['green', 'rust', 'desert', 'ash', 'frost', 'dream', 'cave'], FTEX = ['cliffTop', 'cliffFace', 'wallTop', 'wallFace', 'water', 'bark', 'leaf'];
+const FAMS = ['green', 'rust', 'desert', 'ash', 'frost', 'dream', 'cave'], FTEX = ['cliffTop', 'cliffFace', 'wallTop', 'wallFace', 'water', 'bark', 'leaf', 'bridge'];
 const spec = (fam, k) => { const F = FAMILY[fam]; if (F.tex[k]) return F.tex[k]; if (k === 'bark') return ['cliffFace', [...F.col.bark, F.col.bark[0]].slice(0, 3)]; if (k === 'leaf') return ['moss', [...F.col.leaf, ...F.col.leaf].slice(0, 4)]; return F.tex.floor; };
 export const famTex = (fam, k) => want(`ft|${fam}|${k}`, () => { const [kind, cols] = spec(fam, k); return groundTex(kind, cols, FAMILY[fam].pal, 977 + fam.length * 31 + k.length * 13); });
 export const biomeTex = (bi, which) => want(`bt|${bi}|${which}`, () => { const B = BIOMES[BIOME_KEYS[bi]], [kind, cols] = B[which]; return groundTex(kind, cols, FAMILY[B.fam].pal, 4001 + bi * 101 + which.length * 7); });
-const placeDef = (P) => (P.kind === 'cave' ? CAVES[P.key] : ISLES[P.key]);
+export const placeDef = (P) => (P.kind === 'cave' ? CAVES[P.key] : P.kind === 'roof' ? ROOFTOP : P.kind === 'under' ? UNDER : P.kind === 'walk' ? WALKWAY[P.roof ? 'roof' : 'sky'] : ISLES[P.key]);
 export const placeTex = (P, which) => want(`pt|${P.kind}|${P.key}|${which}`, () => { const L = placeDef(P), [k, cols] = L[which]; return groundTex(k, cols, FAMILY[L.fam].pal, 7001 + P.key.length * 41 + which.length * 7); });
 const rockTex = () => want('mt|rock', () => groundTex('gravel', ['#555b5f', '#767c7c', '#9ca09a', '#3a3f44'], FAMILY.green.pal, 991));
 const snowTex = () => famTex('frost', 'cliffTop');
@@ -28,6 +28,24 @@ export const decalSprite = (type, fam, v) => want(`d|${type}|${fam}|${v}`, () =>
 export const animalSprites = (k, fam) => want(`a|${k}|${fam}`, () => animalFrames(k, fam, 300 + k.length * 37 + fam.length));
 export const giantSprites = (v) => want(`g|${v}`, () => giantFrames(1201 + v * 77));
 export const cloudSprite = (v) => want(`c|${v}`, () => paintCloud(5003 + v * 131));
+// a glow (for the additive pass): the colour falling off from the middle in four dithered steps
+const glows = new Map();
+export function glowSprite(c) {
+  const key = c.join(','); let cv = glows.get(key); if (cv) return cv;
+  cv = mk(48, 48); const x = cv.getContext('2d'), img = x.createImageData(48, 48), d = img.data;
+  for (let j = 0; j < 48; j++) for (let i = 0; i < 48; i++) { const q = 1 - Math.hypot(i - 23.5, j - 23.5) / 24; if (q <= 0) continue; const v = Math.min(1, Math.pow(q, 1.7) * 1.25), lv = Math.min(6, Math.floor(v * 6 + bay(i, j))) / 6; if (lv <= 0) continue; const o = (j * 48 + i) * 4; d[o] = c[0] * lv; d[o + 1] = c[1] * lv; d[o + 2] = c[2] * lv; d[o + 3] = 255; }
+  x.putImageData(img, 0, 0); glows.set(key, cv); return cv;
+}
+// a ripple's ring, and a puff of fog (dithered on and off, so it reads as pixel mist)
+let ring = null;
+export function ringSprite() { if (ring) return ring; ring = mk(32, 32); const x = ring.getContext('2d'), img = x.createImageData(32, 32), d = img.data; for (let j = 0; j < 32; j++) for (let i = 0; i < 32; i++) { const rr = Math.hypot(i - 15.5, j - 15.5); if (Math.abs(rr - 14) > 1.1) continue; const o = (j * 32 + i) * 4; d[o] = 224; d[o + 1] = 244; d[o + 2] = 246; d[o + 3] = 255; } x.putImageData(img, 0, 0); return ring; }
+const puffs = new Map();
+export function puffSprite(c, v) {
+  const key = `${c.join(',')}|${v}`; let cv = puffs.get(key); if (cv) return cv;
+  const w = 48, h = 30; cv = mk(w, h); const x = cv.getContext('2d'), img = x.createImageData(w, h), d = img.data, ph = v * 1.7;
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const ex = (i - w / 2) / (w / 2), ey = (j - h / 2) / (h / 2), q = 1 - Math.hypot(ex, ey) - (Math.sin(i * 0.4 + ph) * Math.cos(j * 0.5 + ph)) * 0.12; if (q <= 0) continue; if (Math.min(1, q * 1.7) * 0.9 <= bay(i, j)) continue; const o = (j * w + i) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255; }
+  x.putImageData(img, 0, 0); puffs.set(key, cv); return cv;
+}
 
 // ------------------------------------------------ the block atlas: 64 px cells; a row per family, then the city
 const ACELL = 64, AW = 512, AH = 1024;
@@ -190,49 +208,71 @@ export class ChunkVis {
   }
 }
 
-// ------------------------------------------------ a high or low place's visuals: an island's ground at its
-// height with a deep ragged rock cone under it (and waterfalls off its rim), floating rocks and clouds
-// round it; a canopy's leafy floor; a cave's floor and walls
+// ------------------------------------------------ a place's visuals: an island's ground at its height with a deep
+// ragged rock cone under it (waterfalls off its rim), floating rocks and clouds round it; a canopy's leafy floor; a cave's
+// or the undercity's floor and walls; a roof garden; a walkway's planks, posts and rails
 export class PlaceVis {
   constructor(W, P) { this.W = W; this.P = P; this.tex = null; this.ok = false; this.pGen = -1; this.missing = 1; }
-  free() { texFree(this.tex); freeBuffer(this.gBuf); freeBuffer(this.bBuf); freeBuffer(this.pBuf); freeBuffer(this.cBuf); this.tex = null; }
+  free() { texFree(this.tex); freeBuffer(this.gBuf); freeBuffer(this.bBuf); freeBuffer(this.pBuf); freeBuffer(this.cBuf); this.tex = null; this.gBuf = this.bBuf = this.pBuf = this.cBuf = null; }
   update() {
-    if (!this.ok) this.ok = this.bake();
+    if (!this.ok) this.ok = this.P.kind === 'walk' ? this.bakeWalk() : this.bake();
     if (this.ok && (this.pGen !== atlasGen() || this.missing)) this.buildProps();
   }
-  bake() {
-    const M = this.W.place(this.P), P = this.P, L = M.L, fam = L.fam, Pal = FAMILY[fam].pal, cave = P.kind === 'cave', canopy = P.kind === 'canopy';
-    const g = placeTex(P, 'g'), g2 = placeTex(P, 'g2'), p = placeTex(P, 'path'), wt = famTex(fam, 'water'), wallT = famTex(fam, 'cliffTop');
-    for (const k of ['cliffFace', 'cliffTop', 'water', canopy ? 'leaf' : 'bark']) famCell(fam, k);
-    if (!g || !g2 || !p || !wt || !wallT || !famTex(fam, 'cliffFace') || !famTex(fam, canopy ? 'leaf' : 'bark')) return false;
+  // a walkway needs no texture of its own: planks from the block atlas, a thin deck, rails along its edges
+  bakeWalk() {
+    const M = this.W.place(this.P), fam = M.L.fam, plank = famCell(fam, 'bridge'), side = famCell(fam, 'bark'), nw = M.nw, nh = M.nh, B = new Batch(4096);
+    if (!famTex(fam, 'bridge') || !famTex(fam, 'bark')) return false;
     blockTex();
-    const n = M.n, S = n * TS, cv = mk(S, S), x = cx2d(cv), img = x.createImageData(S, S), d = img.data, H = P.h;
-    for (let py = 0; py < S; py++) for (let px = 0; px < S; px++) {
-      const Q = Math.floor(py / TS) * n + Math.floor(px / TS), k = M.kind[Q]; if (k === K_VOID) continue;
-      const wx = M.ox * TS + px, wy = M.oy * TS + py, t = bay(px, py);
-      let c = k === K_WATER ? samp(wt, wx, wy) : k === K_WALL ? samp(wallT, wx, wy) : k === K_PATH ? samp(p, wx, wy) : samp(fbm(wx / 200, wy / 200, P.seed, 3) + t * 0.18 > 0.5 ? g2 : g, wx, wy);
-      const up = py >= TS ? M.kind[Q - n] : K_VOID; let m = 1;
-      if (!cave && up === K_VOID && (py & 15) < 2) m = 1.25;
-      if (cave && up === K_WALL && (py & 15) < 6) m = 0.5 + (py & 15) * 0.08;
+    const deck = (i, j) => i >= 0 && j >= 0 && i < nw && j < nh && M.kind[j * nw + i] !== K_VOID;
+    for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) {
+      if (!deck(i, j)) continue; const Q = j * nw + i, y = M.e[Q], X0 = (M.ox + i) * TS, X1 = X0 + TS, Z0 = (M.oy + j) * TS, Z1 = Z0 + TS;
+      top(B, X0, X1, Z0, Z1, y, plank, 1);
+      const hn = (ii, jj) => (deck(ii, jj) ? M.e[jj * nw + ii] : -1e9);
+      if (hn(i, j + 1) < y) { faceS(B, X0, X1, Z1, y, Math.max(hn(i, j + 1), y - 5), side, 0.7); if (!deck(i, j + 1)) faceS(B, X0, X1, Z1 - 1, y + 11, y + 9, side, 0.9); }
+      if (hn(i + 1, j) < y) { faceE(B, X1, Z0, Z1, y, Math.max(hn(i + 1, j), y - 5), side, 0.55); if (!deck(i + 1, j)) faceE(B, X1 - 1, Z0, Z1, y + 11, y + 9, side, 0.7); }
+      if (hn(i - 1, j) < y) { faceW(B, X0, Z0, Z1, y, Math.max(hn(i - 1, j), y - 5), side, 0.85); if (!deck(i - 1, j)) faceW(B, X0 + 1, Z0, Z1, y + 11, y + 9, side, 0.95); }
+      if (!deck(i, j - 1)) faceS(B, X0, X1, Z0 + 1, y + 11, y + 9, side, 0.8);
+      top(B, X0, X1, Z1, Z0, y - 5, side, 0.4);
+    }
+    this.bBuf = newBuffer(); this.bN = B.upload(this.bBuf, renderer().gl.STATIC_DRAW); this.gN = 0;
+    return true;
+  }
+  bake() {
+    const M = this.W.place(this.P), P = this.P, L = M.L, fam = L.fam, Pal = FAMILY[fam].pal, cave = P.kind === 'cave' || P.kind === 'under', canopy = P.kind === 'canopy', hangs = P.kind === 'isle' || canopy;
+    const g = placeTex(P, 'g'), g2 = placeTex(P, 'g2'), p = placeTex(P, 'path'), wt = famTex(fam, 'water'), wallT = famTex(fam, cave ? 'cliffTop' : 'wallTop'), tox = famTex(fam, 'toxic');
+    for (const k of ['cliffFace', 'cliffTop', 'water', 'wallTop', 'wallFace', canopy ? 'leaf' : 'bark']) famCell(fam, k);
+    if (!g || !g2 || !p || !wt || !wallT || !tox || !famTex(fam, 'cliffFace') || !famTex(fam, 'wallFace') || !famTex(fam, canopy ? 'leaf' : 'bark')) return false;
+    blockTex();
+    const nw = M.nw, nh = M.nh, ppt = nw * nh > 2600 ? 8 : 16, st = TS / ppt, SW = nw * ppt, SH = nh * ppt, cv = mk(SW, SH), x = cx2d(cv), img = x.createImageData(SW, SH), d = img.data, H = P.h;
+    for (let py = 0; py < SH; py++) for (let px = 0; px < SW; px++) {
+      const Q = Math.floor(py / ppt) * nw + Math.floor(px / ppt), k = M.kind[Q]; if (k === K_VOID) continue;
+      const wx = M.ox * TS + px * st, wy = M.oy * TS + py * st, t = bay(px, py), ly = (py * st) & 15;
+      let c = k === K_WATER ? samp(wt, wx, wy) : k === K_TOXIC ? samp(tox, wx, wy) : k === K_WALL ? samp(wallT, wx, wy) : k === K_PATH || k === K_FLOOR && P.kind === 'under' && fbm(wx / 90, wy / 90, P.seed, 2) > 0.55 ? samp(p, wx, wy) : samp(fbm(wx / 200, wy / 200, P.seed, 3) + t * 0.18 > 0.5 ? g2 : g, wx, wy);
+      const up = Q >= nw ? M.kind[Q - nw] : K_VOID; let m = 1;
+      if (hangs && up === K_VOID && ly < 2) m = 1.25;
+      if (k !== K_WALL && up === K_WALL && ly < 6) m = 0.5 + ly * 0.08;
       if (m !== 1) { const qi = qIdx(Pal, c[0] * m + t * 16, c[1] * m + t * 16, c[2] * m + t * 16); c = Pal.c[qi]; }
-      const o = (py * S + px) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+      const o = (py * SW + px) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
     }
     x.putImageData(img, 0, 0);
-    for (const D of M.decals) { const s = decalSprite(D.type, D.fam, Math.floor(hash2(D.x, D.y, 5) * 3)); if (s) x.drawImage(s, (D.x - M.ox) * TS + 3, (D.y - M.oy) * TS + 4); }
-    this.tex = texNew(S, S, cv);
-    const G = new Batch(1024); ground(G, n, M.ox, M.oy, () => H, (i, j) => M.kind[j * n + i] === K_VOID);
+    const k2 = ppt / TS; for (const D of M.decals) { const s2 = decalSprite(D.type, D.fam, Math.floor(hash2(D.x, D.y, 5) * 3)); if (s2) x.drawImage(s2, ((D.x - M.ox) * TS + 3) * k2, ((D.y - M.oy) * TS + 4) * k2, s2.width * k2, s2.height * k2); }
+    this.tex = texNew(SW, SH, cv);
+    const G = new Batch(1024), n2 = Math.max(nw, nh);
+    // the ground (its quads' texture coordinates run over the whole grid)
+    for (let j = 0; j < nh; j++) { let i0 = 0; while (i0 < nw) { if (M.kind[j * nw + i0] === K_VOID) { i0++; continue; } let i1 = i0 + 1; while (i1 < nw && M.kind[j * nw + i1] !== K_VOID) i1++; const X0 = (M.ox + i0) * TS, X1 = (M.ox + i1) * TS, Z0 = (M.oy + j) * TS, Z1 = Z0 + TS; G.quad([X0, H, Z0], [X1, H, Z0], [X1, H, Z1], [X0, H, Z1], [i0 / nw, j / nh], [i1 / nw, j / nh], [i1 / nw, (j + 1) / nh], [i0 / nw, (j + 1) / nh], [0, 0, -1, 1], 1); i0 = i1; } }
+    void n2;
     this.gBuf = newBuffer(); this.gN = G.upload(this.gBuf, renderer().gl.STATIC_DRAW);
-    const B = new Batch(4096), inn = (i, j) => i >= 0 && j >= 0 && i < n && j < n && M.kind[j * n + i] !== K_VOID;
-    const face = famCell(fam, 'cliffFace'), topC = famCell(fam, 'cliffTop'), wface = famCell(fam, 'water'), leaf = canopy ? famCell(fam, 'leaf') : null;
-    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-      if (!inn(i, j)) continue; const Q = j * n + i, X0 = (M.ox + i) * TS, X1 = X0 + TS, Z0 = (M.oy + j) * TS, Z1 = Z0 + TS;
-      // a cave's walls and pillars
-      if (M.h[Q]) { const tp = H + M.h[Q], nt = (ii, jj) => (inn(ii, jj) ? H + M.h[jj * n + ii] : H); top(B, X0, X1, Z0, Z1, tp, topC, 0.8); const hs = nt(i, j + 1), he = nt(i + 1, j), hw = nt(i - 1, j); if (hs < tp) faceS(B, X0, X1, Z1, tp, hs, face, 0.7); if (he < tp) faceE(B, X1, Z0, Z1, tp, he, face, 0.55); if (hw < tp) faceW(B, X0, Z0, Z1, tp, hw, face, 0.85); }
-      if (cave) continue;
+    const B = new Batch(4096), inn = (i, j) => i >= 0 && j >= 0 && i < nw && j < nh && M.kind[j * nw + i] !== K_VOID;
+    const face = famCell(fam, 'cliffFace'), topC = famCell(fam, 'cliffTop'), wface = famCell(fam, 'water'), leaf = canopy ? famCell(fam, 'leaf') : null, wallF = famCell(fam, cave ? 'cliffFace' : 'wallFace'), wallTop = famCell(fam, cave ? 'cliffTop' : 'wallTop');
+    for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) {
+      if (!inn(i, j)) continue; const Q = j * nw + i, X0 = (M.ox + i) * TS, X1 = X0 + TS, Z0 = (M.oy + j) * TS, Z1 = Z0 + TS;
+      // walls: a cave's, the undercity's halls, a roof's parapet
+      if (M.h[Q]) { const tp = H + M.h[Q], nt = (ii, jj) => (inn(ii, jj) ? H + M.h[jj * nw + ii] : P.kind === 'roof' ? H - 2000 : H); top(B, X0, X1, Z0, Z1, tp, wallTop, 0.85); const hs = nt(i, j + 1), he = nt(i + 1, j), hw = nt(i - 1, j); if (hs < tp) faceS(B, X0, X1, Z1, tp, Math.max(hs, H), wallF, 0.72); if (he < tp) faceE(B, X1, Z0, Z1, tp, Math.max(he, H), wallF, 0.56); if (hw < tp) faceW(B, X0, Z0, Z1, tp, Math.max(hw, H), wallF, 0.86); }
+      if (!hangs) continue;
       // the underside: every column hangs to its depth (water off the rim falls far into the haze)
-      const wet = M.kind[Q] === K_WATER, dep = wet && (!inn(i, j + 1) || !inn(i + 1, j) || !inn(i - 1, j)) ? 520 : M.depth[Q], lo = H - dep, Dp = (ii, jj) => (inn(ii, jj) ? M.depth[jj * n + ii] : 0), fc = wet ? wface : canopy ? leaf : face;
+      const wet = M.kind[Q] === K_WATER, dep = wet && (!inn(i, j + 1) || !inn(i + 1, j) || !inn(i - 1, j)) ? 520 : M.depth[Q], lo = H - dep, Dp = (ii, jj) => (inn(ii, jj) ? M.depth[jj * nw + ii] : 0), fc = wet ? wface : canopy ? leaf : face;
       const ds = Dp(i, j + 1); if (ds < dep) faceS(B, X0, X1, Z1, H - ds, lo, fc, wet ? 0.95 : 0.62);
-      const de = Dp(i + 1, j); if (de < dep) faceE(B, X1, Z1 - TS, Z1, H - de, lo, fc, wet ? 0.85 : 0.5);
+      const de = Dp(i + 1, j); if (de < dep) faceE(B, X1, Z0, Z1, H - de, lo, fc, wet ? 0.85 : 0.5);
       const dw = Dp(i - 1, j); if (dw < dep) faceW(B, X0, Z0, Z1, H - dw, lo, fc, wet ? 0.95 : 0.74);
       if (!wet) top(B, X0, X1, Z1, Z0, lo, canopy ? leaf : topC, 0.35);
     }
@@ -241,12 +281,12 @@ export class PlaceVis {
   }
   buildProps() {
     const M = this.W.place(this.P), B = new Batch(512), Cl = new Batch(128), K = renderer().K; let missing = 0;
-    for (const p of M.props) { if (p.chest && p.chest.found) continue; const s = propSprite(p.type, p.fam, p.v); if (!s) { missing++; continue; } B.bb(s, 0, 0, s.width, s.height, p.x, p.y, p.e - 1.5, K, 1, 1); }
-    for (const f of M.floaters) { const s = propSprite('floatrock', M.L.fam, f.v); if (!s) { missing++; continue; } B.bb(s, 0, 0, s.width, s.height, f.x, f.y, f.h, K, 0.92, 1); }
-    for (const c of M.clouds) { const s = cloudSprite(c.v); if (!s) { missing++; continue; } Cl.gd(s, c.x, c.y, s.width * 2.2 * c.s, s.height * 2.2 * c.s, c.h, 0.62); }
-    freeBuffer(this.pBuf); this.pBuf = newBuffer(); this.pN = B.upload(this.pBuf, renderer().gl.STATIC_DRAW);
+    for (const p of M.props) { if (p.chest && p.chest.found) continue; const s2 = propSprite(p.type, p.fam, p.v); if (!s2) { missing++; continue; } B.bb(s2, 0, 0, s2.width, s2.height, p.x, p.y, p.e - 1.5, K, 1, 1); }
+    for (const f of M.floaters) { const s2 = propSprite('floatrock', M.L.fam, f.v); if (!s2) { missing++; continue; } B.bb(s2, 0, 0, s2.width, s2.height, f.x, f.y, f.h, K, 0.92, 1); }
+    for (const c of M.clouds) { const s2 = cloudSprite(c.v); if (!s2) { missing++; continue; } Cl.gd(s2, c.x, c.y, s2.width * 2.2 * c.s, s2.height * 2.2 * c.s, c.h, 0.62); }
+    freeBuffer(this.pBuf); this.pBuf = null; this.pN = 0; if (B.n) { this.pBuf = newBuffer(); this.pN = B.upload(this.pBuf, renderer().gl.STATIC_DRAW); }
     freeBuffer(this.cBuf); this.cBuf = null; this.cN = 0; if (Cl.n) { this.cBuf = newBuffer(); this.cN = Cl.upload(this.cBuf, renderer().gl.STATIC_DRAW); }
-    this.pGen = atlasGen(); this.missing = missing;
+    this.props = M.props; this.pGen = atlasGen(); this.missing = missing;
   }
 }
 export { K_GROUND };
