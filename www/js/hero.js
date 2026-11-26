@@ -14,7 +14,10 @@ export function upgradeHero(h) {
   const persona = h.persona ? normPersona(h.persona, seed) : h.crystal ? normPersona(h.crystal, seed) : personaFor(seed, 'Fantasy');
   return { ...h, name: h.name || 'Nameless One', seed, persona, dnd: h.dnd || null, crystal: h.crystal || personaToCrystal(persona), marrow: h.marrow || personaToMarrow(persona) };
 }
-export function getHero() { try { return upgradeHero(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch { return null; } }
+// Fnordian: the default hero until another is saved (cerulean skin, a snow topknot, a leather robe with navy
+// trim, steel gloves and a hazard belt)
+export const DEFAULT_HERO = { name: 'Fnordian', seed: 4242, persona: { seed: 4242, era: 'Fantasy', build: 'average', skin: 'Cerulean', hair: 'topknot', hairColor: 'Snow', beard: 'none', head: 'none', headColor: 'Linen', top: 'robe', topColor: 'Leather', trimColor: 'Navy', bot: 'none', botColor: 'Neon', feet: 'none', feetColor: 'Leather', hands: 'gloves', handsColor: 'Steel', belt: 'on', beltColor: 'Hazard', cape: 'none', capeColor: 'Drab', weapon: 'none', weaponColor: 'Teal' } };
+export function getHero() { try { return upgradeHero(JSON.parse(localStorage.getItem(KEY) || 'null') || DEFAULT_HERO); } catch { return upgradeHero(DEFAULT_HERO); } }
 export function setHero(h) { try { if (h) localStorage.setItem(KEY, JSON.stringify(h)); else localStorage.removeItem(KEY); } catch { /* private mode */ } }
 // a hero from a persona (and optionally a D&D sheet): both styles are derived from it
 export function makeHero(name, persona, dnd = null) {

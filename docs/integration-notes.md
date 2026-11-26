@@ -653,3 +653,81 @@ The old garden (`games/garden*.js`: the 2D world, the dream layer, the metropoli
 - **Tested** with no errors:
   - The start village, the city, all five families, an island, a lift ride up, the menu, the map and the graphics sliders.
   - The autopilot wandering, stopping and restarting, and the card in the feed.
+
+## The garden, bigger and dreamier (2026-11-26, second round)
+The Makhana garden grew, got its old dream back, and gained heights and depths. What changed since the section above:
+- **The world** is 1024 × 1024 tiles (was 640). It still comes from a seed and is never stored.
+- **The dream is back:** 13 healthy biomes in the old garden's spirit, lush and a little uncanny, mixed in with the forgotten country rather than walled off from it. They have their own `dream` family (palette, cliffs, water), lighter fog, clearer skies, a touch more colour in the post pass, and fireflies at dusk.
+
+  | Dream biome | Its own |
+  |---|---|
+  | Sunlit Meadow, Heather Moor, Cherry Hills, Snowglass Vale | rolling hills; blossom, birch, flower bushes |
+  | Bluebell Wood, Ember Wood, Elder Glade, Lantern Fungi | birch, maple, spirit and lantern trees, glowing mushrooms |
+  | Emerald Jungle, Whispering Bamboo | palms and ferns, bamboo, lantern shrines |
+  | Turquoise Lagoon, Lily Marsh, Pink Salt Lakes | water, reeds, willows |
+
+  - About a quarter of the map is dream country. Villages take after the country they stand in: dream villages have bright roofs, lantern shrines and blossom, and names like Honeybrook and Willowmere.
+  - The walk starts in a dream village.
+- **Elevation:** every tile has a ground height.
+  - The ground rolls in low terraces, and the hills, downs and moors rise higher.
+  - **Mountains:** six terraced peaks, about 300 px high. Their shoulders go to bare rock and their heads to snow. You can climb them; from the top the country lies under a sea of haze.
+  - **Mesas** are sheer plateaus, and the craters have raised rims.
+  - **Steps:** a walker steps up or down 24 px at most, so terraces, rubble and low walls can all be walked over.
+  - **Invisible barriers fixed:** the old low cliff blocks are gone, and anything that blocks you is now a visible wall, cliff or deep drop.
+- **Canyons:** four long canyons cut 240 px down, with sheer walls and ramps at both ends.
+  - Rivers that cross a canyon fall into it as **waterfalls**, and roads cross on plank bridges. You can walk under a bridge on the canyon floor.
+  - Each canyon has two **lifts**: a headframe on the rim and a cage hanging over the floor. The ride steps out over the edge, then goes straight down (or up).
+- **Caves:** each canyon floor has a cave mouth in its wall. Walk in, the world goes dark for a moment, and you are inside one of four caves:
+  - The Crystal Heart, The Glow Grotto, The Sleeping Dragon and The Deep Vaults.
+  - They are dark, lit by crystals and glowing mushrooms, with pools, pillars, bats, salamanders, axolotls and snails.
+  - Walk into the lit way out to come back.
+- **Floating islands:** eight islands, now 560–760 px up. Most are dreamlike: the Wind Temple, the Star Harp, the Floating Bell, the Hanging Orchard and Cloud Meadow, plus Windward Isle, the Last Airship and the Pale Shelf.
+  - Each hangs over a deep ragged rock cone, with floating rocks round it and flat clouds drifting below.
+  - Some have a pond whose stream runs off the rim in a long waterfall into the haze.
+  - The sky up there is paler, with petals, glitter or fireflies.
+  - The sky creatures live round and below them: jellyfish, sky koi, mantas and whales.
+  - **Lifts go straight up and down:** each island's lift tower stands right under it, with a cable rising out of sight, and the island's pad is at the same spot.
+- **Giant trees and canopies:** four giant trunks stand in the forests. A basket lift on a rope rides up about 270 px to a canopy of their own: a leafy floor with a treehouse, ferns, songbirds, squirrels, parrots and tree frogs.
+- **Water:** you can **swim**. Wade in and the walker sinks to the waist and swims at about 60% speed, with a splash on the way in.
+  - Toxic water still keeps you out.
+  - The water's colour now shades gradually from one family's to the next over about six tiles, instead of changing at the border.
+- **Treasures:** twelve, each with a landmark and a chest. Walk up to a chest and it opens.
+
+  | Where | Treasures |
+  |---|---|
+  | In the dream | The Moss Fountain, The Singing Stones, The Root Arch, The Fox Statue |
+  | Out in the forgotten country | The Star Obelisk |
+  | On the highest summit | The Summit Cairn |
+  | Down a canyon | The Canyon Urn |
+  | In the caves | The Crystal Heart, The Sleeping Dragon |
+  | On the islands | The Wind Temple, The Star Harp |
+  | In a canopy | The Owl's Nest |
+
+  - The menu's **Treasures** page names the ones found and hints where the rest lie.
+  - Once all twelve are found, **Begin a new world** appears in the menu and starts again from a new seed.
+- **Animals:** 60 kinds. They are drawn with padding so nothing is clipped at the sprite's edge; trees, props and the giants are padded the same way.
+
+  | Group | Kinds |
+  |---|---|
+  | The forgotten country | deer, boar, hound, horse, cattle, goat, rat, lizard, beetle |
+  | The dream | fox, wolf, rabbit, hedgehog, squirrel, sheep, cow, cat, dog, raccoon, red panda, panda, jaguar, fennec, capybara, bear |
+  | Strange ones (rare) | kirin, spirit fox, moon hare, cloud sheep, stag, moth deer, mossling |
+  | Small ground and water creatures | gecko, salamander, axolotl, frog, tree frog, crab, snail, tortoise, turtle, dolphin |
+  | Birds | crow, pigeon, songbird, swallow, gull, parrot, owl, eagle, ember bird, duck, swan, heron, crane, flamingo, bat |
+  | Insects | butterfly, bee, dragonfly, moth, firefly |
+  | Sky creatures | jellyfish, sky koi, manta, whale |
+
+  - **How they move:** walkers and hoppers graze and shy away; swimmers keep to the water; waders keep to the shallows.
+  - Flocks peck on the ground until you come near, then all take off together.
+  - Passing flocks cross the sky, a hawk or owl circles high, bats come out at dusk (and live in the caves), and insects flutter about their patch.
+  - **The crow bug is fixed:** a bird that takes off now keeps flying, climbing to its height and on out of sight, and is let go once it is far away. It no longer hangs in one spot in the sky.
+- **The hero:** the character creator starts with **Fnordian** saved as the default hero (`DEFAULT_HERO` in `hero.js`). Removing your hero in the studio brings Fnordian back.
+- **Saving:** the save key is now `garden4` (`garden3` is left unused). It holds the seed, where you are (including inside an island, canopy or cave), the chunks you have walked, the treasures found as a bitmask, and how many worlds you have begun.
+- **Files:**
+  - `lands.js`: the dream and cave families, the dream biomes, the islands, the caves and the treasures.
+  - `art.js`: the new flora and landmark painters, the animal cast, clouds, and padding throughout.
+  - `world.js`: elevation, mountains, canyons, places (islands, canopies, caves), lifts and treasures.
+  - `scene.js`: terrain tops and faces, waterfalls, the water blend, snow and rock, and `PlaceVis`.
+  - `game.js`: heights, swimming, rides and caves, fauna behaviour, treasures, and the menu pages.
+  - `atmos.js`: petal and glitter motes.
+  - The engine's painter (`mk/tex.js`) takes a padding margin, and billboards (`mk/gl.js`) account for it.

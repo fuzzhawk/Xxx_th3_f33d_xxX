@@ -32,7 +32,7 @@ export class Atmos {
       case 'leaves': a.vx = -10 + r() * 8; a.vy = 10 + r() * 8; break; case 'dust': case 'sand': a.vx = (type === 'sand' ? -50 : -12) - r() * 20; a.vy = r() * 4 - 2; break;
       case 'ash': a.vx = -6 + r() * 4; a.vy = 8 + r() * 10; break; case 'embers': a.vx = r() * 10 - 5; a.vy = -14 - r() * 14; break;
       case 'spores': case 'fireflies': a.vx = r() * 8 - 4; a.vy = r() * 8 - 4; break; case 'pollen': a.vx = -6; a.vy = 2 + r() * 3; break;
-      case 'drips': a.vx = 0; a.vy = 120 + r() * 40; break; case 'haze': a.vx = -8 - r() * 6; a.vy = 0; break;
+      case 'drips': a.vx = 0; a.vy = 120 + r() * 40; break; case 'petals': a.vx = -14 - r() * 10; a.vy = 8 + r() * 8; break; case 'glitter': a.vx = r() * 6 - 3; a.vy = -2 - r() * 4; break; case 'haze': a.vx = -8 - r() * 6; a.vy = 0; break;
     }
     return a;
   }
@@ -66,6 +66,8 @@ export class Atmos {
         case 'fireflies': if (Math.sin(a.t * 2.3 + a.p) > 0.4) { c.fillStyle = '#fff090'; c.fillRect(x, y, 1, 1); c.fillStyle = 'rgba(255,240,120,.25)'; c.fillRect(x - 1, y, 3, 1); c.fillRect(x, y - 1, 1, 3); } break;
         case 'pollen': c.fillStyle = 'rgba(255,250,200,.55)'; c.fillRect(x, y, 1, 1); break;
         case 'drips': c.fillStyle = 'rgba(150,200,200,.45)'; c.fillRect(x, y, 1, 2); break;
+        case 'petals': c.fillStyle = a.p < 2 ? '#f5b5cc' : a.p < 4 ? '#f6f0e2' : '#f28aa8'; c.fillRect(x, y, Math.sin(a.t * 5 + a.p) > 0 ? 2 : 1, 1); break;
+        case 'glitter': if (Math.sin(a.t * 3.1 + a.p * 2) > 0.55) { c.fillStyle = a.p < 3 ? '#fff6c8' : '#c8f0f0'; c.fillRect(x, y, 1, 1); c.fillStyle = 'rgba(255,255,240,.3)'; c.fillRect(x - 1, y, 3, 1); c.fillRect(x, y - 1, 1, 3); } break;
         case 'haze': c.fillStyle = 'rgba(255,250,235,.07)'; c.fillRect(x, y, 24, 1); break;
       }
     }

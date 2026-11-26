@@ -127,7 +127,7 @@ export function creatorMedia() {
     el('button.btn', { onclick: stop(() => { seed = newSeed(); persona = personaFor(seed, ERAS[seed % 3]); changed(); }) }, 'Random look'),
     el('button.btn', { onclick: stop(() => { dseed = newSeed(); choice = {}; const r = mulberry32(dseed); const c0 = rollCharacter(r); persona = adventurerPersona(c0.race, c0.cls, mulberry32(dseed ^ 0x9e3779b9), seed); choice = { race: c0.race.n, cls: c0.cls.n }; name.value = ''; reroll(); name.value = ch.name; changed(); }) }, 'Roll adventurer'),
     el('button.btn.primary', { onclick: stop(save) }, 'Save hero'),
-    el('button.btn', { onclick: stop(() => { setHero(null); status.textContent = 'Removed. Games use their own heroes again.'; }) }, 'Remove'));
+    el('button.btn', { onclick: stop(() => { setHero(null); status.textContent = 'Removed. Fnordian is the hero again.'; }) }, 'Remove'));
   const media = el('div.media.creator', cv);
   const body = el('div.creator-body', tabs, name, desc, sec, rows, extra, busy, buttons, status);
   return { media, body, activate: () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); }, deactivate: () => cancelAnimationFrame(raf) };

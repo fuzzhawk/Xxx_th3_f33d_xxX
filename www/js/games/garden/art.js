@@ -69,10 +69,18 @@ export const PROPDEF = {
   shack: { w: 46, h: 40, foot: [40, 14], s: 3 }, cottage: { w: 48, h: 46, foot: [42, 14], s: 3 }, adobe: { w: 44, h: 34, foot: [38, 14], s: 3 }, loghut: { w: 46, h: 40, foot: [40, 14], s: 3 }, bunker: { w: 46, h: 30, foot: [42, 14], s: 3 },
   watertower: { w: 28, h: 64, foot: [22, 10], s: 3 }, windpump: { w: 26, h: 60, foot: [10, 8], s: 3 }, well: { w: 18, h: 22, foot: [14, 8] }, firebarrel: { w: 10, h: 14, foot: [8, 5] }, laundry: { w: 34, h: 20, foot: null }, cart: { w: 26, h: 18, foot: [22, 8] }, tent: { w: 30, h: 24, foot: [26, 8] },
   observatory: { w: 58, h: 72, foot: [50, 18], s: 3 }, greenhouse: { w: 62, h: 44, foot: [54, 16], s: 3 }, airship: { w: 124, h: 58, foot: [104, 20], s: 2 }, shrine: { w: 30, h: 48, foot: [24, 10] }, radiomast: { w: 32, h: 112, foot: [12, 10], s: 2 },
-  lifttower: { w: 36, h: 124, foot: null, s: 2 }, liftpad: { w: 34, h: 26, foot: null }, statue: { w: 42, h: 92, foot: [30, 14], s: 3 }
+  lifttower: { w: 36, h: 124, foot: null, s: 2 }, liftpad: { w: 34, h: 26, foot: null }, statue: { w: 42, h: 92, foot: [30, 14], s: 3 },
+  // the dream's flora
+  birch: { w: 30, h: 54, foot: [6, 5] }, maple: { w: 38, h: 50, foot: [10, 6] }, blossom: { w: 40, h: 48, foot: [10, 6] }, spirittree: { w: 74, h: 104, foot: [22, 10], s: 2 }, lanterntree: { w: 38, h: 52, foot: [10, 6] },
+  glowshroom: { w: 22, h: 20, foot: null }, bamboo: { w: 22, h: 60, foot: [8, 5] }, flowerbush: { w: 18, h: 14, foot: null }, mossrock: { w: 22, h: 16, foot: [18, 7] },
+  // landmarks, treasure and the ways up and down
+  fountain: { w: 40, h: 36, foot: [34, 12], s: 3 }, rootarch: { w: 50, h: 52, foot: null, s: 3 }, foxstatue: { w: 26, h: 34, foot: [18, 8] }, lanternshrine: { w: 22, h: 34, foot: [14, 8] }, obelisk: { w: 18, h: 60, foot: [14, 8], s: 3 },
+  cairn: { w: 22, h: 30, foot: [16, 8] }, urn: { w: 16, h: 22, foot: [12, 6] }, crystalheart: { w: 52, h: 60, foot: [40, 14], s: 3 }, dragonbones: { w: 96, h: 50, foot: null, s: 2 }, moonpool: { w: 46, h: 22, foot: null, s: 3 },
+  windtemple: { w: 64, h: 66, foot: [50, 14], s: 2 }, starharp: { w: 44, h: 70, foot: [30, 10], s: 3 }, floatbell: { w: 36, h: 64, foot: [24, 10], s: 3 }, nest: { w: 22, h: 12, foot: null }, treehouse: { w: 54, h: 52, foot: [44, 14], s: 3 },
+  chest: { w: 16, h: 14, foot: null }, chestopen: { w: 16, h: 14, foot: null }, cavemouth: { w: 40, h: 34, foot: null, s: 3 }, floatrock: { w: 26, h: 24, foot: null }, basket: { w: 22, h: 30, foot: null }, headframe: { w: 30, h: 46, foot: null, s: 3 }
 };
 export function paintProp(type, fam, seed) {
-  const F = FAMILY[fam], D = PROPDEF[type], t = new TB(D.w, D.h, D.s || 4, seed), r = t.r, K = F.col, pick = (a) => r.pick(a);
+  const F = FAMILY[fam], D = PROPDEF[type], t = new TB(D.w, D.h, D.s || 4, seed, D.pad ?? (D.w > 30 ? 6 : 3)), r = t.r, K = F.col, pick = (a) => r.pick(a);
   const leaf = K.leaf, bark = K.bark, stone = K.stone, metal = K.metal, rust = K.rust, W = D.w, H = D.h;
   const canopy = (cx, cy, n, rx, ry, rmin, rmax, cols) => { for (let k = 0; k < n; k++) { const x = cx + r.range(-rx, rx), y = cy + r.range(-ry, ry * 0.7), rr = r.range(rmin, rmax); t.ell(x, y, rr, rr * 0.85, pick(cols), rr * 1.1); } };
   switch (type) {
@@ -146,6 +154,38 @@ export function paintProp(type, fam, seed) {
     case 'liftpad': { const m = pick(metal); t.rect(3, 12, 28, 12, m, 1.2, 0.8); for (let x = 5; x < 30; x += 3) t.rect(x, 13, 1, 10, shadeHex(m, 0.7), 1.4); for (const x of [4, 29]) { t.line(x, 14, x, 2, 1, pick(rust), 1.6); t.rect(x - 1, 1, 2, 2, '#ffb040', 2); } t.line(4, 3, 29, 3, 0.6, pick(rust), 1.8); t.grain(0.35, 3, seed, 0.3); break; }
     case 'statue': { const s = K.stone; t.rect(6, 76, 30, 16, pick(s), 4, 1.4); t.poly([[14, 76], [16, 40], [26, 40], [28, 76]], pick(s)); t.hrect(14, 40, 14, 36, 5, 3); t.poly([[12, 44], [21, 26], [30, 44]], pick(s)); t.ell(21, 20, 6, 7, pick(s), 6); t.x.globalCompositeOperation = 'destination-out'; t.poly([[24, 12], [32, 22], [28, 30], [30, 14]], '#000'); t.x.globalCompositeOperation = 'source-over';
       t.line(12, 44, 4, 60, 3, pick(s), 4); t.line(30, 44, 36, 30, 3, pick(s), 4); t.grain(0.45, 4, seed, 0.6); t.speck(10, ['#1a1418'], 2, 4, 0.8, false, 'crack'); if (K.vine) t.speck(24, K.vine, 0.8, 2, 5, false); t.speck(10, ['#6a6e6a'], 0.4, 1, 0, false); break; }
+    // ---- the dream's flora
+    case 'birch': { const b = '#e8e4d4'; t.rect(W / 2 - 1.5, 18, 3, H - 18, b, 1.6, 0.6); for (let y = 20; y < H - 2; y += r.range(3, 6)) t.rect(W / 2 - 1.5, y, r.range(1.5, 3), 0.8, '#2a2520', 1.8); t.line(W / 2, 30, W / 2 - 6, 22, 0.8, b, 1.6); t.line(W / 2, 26, W / 2 + 6, 18, 0.8, b, 1.6); canopy(W / 2, 16, 26, 10, 12, 2.6, 5, leaf); t.speck(30, [leaf[leaf.length - 1], '#d8e4a0'], 0.3, 0.7, 0.3, false); break; }
+    case 'maple': { t.rect(W / 2 - 2, 26, 4, H - 26, pick(bark), 1.8, 0.8); t.line(W / 2, 34, W / 2 - 6, 26, 1.4, pick(bark), 1.2); t.line(W / 2, 32, W / 2 + 7, 24, 1.4, pick(bark), 1.2); canopy(W / 2, 17, 34, 14, 11, 3.5, 6.5, ['#e05a3a', '#ff8a5a', '#ffd23f', '#c0502a', '#a8522e'].filter((c) => c)); t.speck(30, ['#ffd23f', '#e05a3a'], 0.3, 0.7, 0.3, false); break; }
+    case 'blossom': { t.rect(W / 2 - 2, 26, 4, H - 26, pick(bark), 1.8, 0.8); t.line(W / 2, 32, W / 2 - 9, 22, 1.6, pick(bark), 1.2); t.line(W / 2, 30, W / 2 + 9, 20, 1.6, pick(bark), 1.2); canopy(W / 2, 17, 38, 15, 10, 3.5, 6.5, K.blossom || ['#f5b5cc', '#f28aa8']); t.speck(40, ['#f6f0e2', '#f28aa8'], 0.3, 0.7, 0.4, false); break; }
+    case 'spirittree': { const bx = W / 2; t.poly([[bx - 10, H], [bx - 5, 52], [bx + 5, 52], [bx + 11, H]], pick(bark)); t.hrect(bx - 10, 52, 20, H - 52, 4, 3); for (const [x, y] of [[bx - 14, H - 2], [bx + 15, H - 2]]) t.line(bx, H - 8, x, y, 2.6, pick(bark), 1.5);
+      canopy(bx, 32, 70, 30, 22, 5, 10, leaf); for (let k = 0; k < 26; k++) t.ell(bx + r.range(-30, 30), r.range(10, 50), 1.4, 1.4, pick(K.glow), 9); t.speck(40, [leaf[leaf.length - 1]], 0.4, 1, 0.3, false); for (let k = 0; k < 8; k++) { const x = bx + r.range(-24, 24); t.line(x, r.range(30, 44), x + r.range(-1, 1), r.range(54, 70), 0.6, pick(K.vine || leaf), 6); } break; }
+    case 'lanterntree': { t.rect(W / 2 - 2, 26, 4, H - 26, pick(bark), 1.8, 0.8); canopy(W / 2, 17, 30, 13, 10, 3.5, 6, leaf); for (let k = 0; k < 7; k++) { const x = W / 2 + r.range(-13, 13), y = r.range(22, 32); t.line(x, y - 4, x, y, 0.3, '#2a2520', 4); t.ell(x, y + 1.4, 1.5, 2, pick(['#ffd23f', '#ff8a5a', '#fff6c8']), 5); } break; }
+    case 'glowshroom': for (let k = 0; k < 5; k++) { const x = r.range(4, 18), h = r.range(5, 14), c = pick(K.glow.concat(K.fungCap)); t.rect(x - 0.6, 19 - h, 1.2, h, K.fungStem, 1.2); t.ell(x, 19 - h, r.range(2, 3.6), r.range(1.2, 2), c, 3); t.ell(x - 0.5, 18.6 - h, 0.8, 0.5, '#fff6c8', 3.4); } break;
+    case 'bamboo': for (let k = 0; k < 6; k++) { const x = r.range(4, 18), c = pick(['#88cb70', '#6aa65a', '#a8cf6a', '#4c8a4c']); t.line(x, H, x + r.range(-1.5, 1.5), r.range(2, 12), 1.6, c, 1.4); for (let y = H - 6; y > 8; y -= r.range(6, 9)) { t.rect(x - 1, y, 2, 0.7, shadeHex(c, 0.7), 1.6); if (r.chance(0.4)) t.line(x, y, x + r.sign() * r.range(3, 6), y - r.range(2, 4), 0.8, pick(leaf), 1.6); } } break;
+    case 'flowerbush': for (let k = 0; k < 8; k++) { const rr = r.range(2.2, 3.6); t.ell(9 + r.range(-4, 4), 8 + r.range(-2, 2), rr, rr * 0.8, pick(leaf), rr); } t.speck(14, K.flower, 0.6, 1, 2.6, false); break;
+    case 'mossrock': { t.ell(W / 2, H * 0.6, W * 0.45, H * 0.38, pick(stone), H * 0.5); t.ell(W * 0.45, H * 0.45, W * 0.3, H * 0.25, pick(stone), H * 0.6, 'base'); t.grain(0.35, 4, seed, 0.6); t.speck(24, K.moss || leaf, 0.8, 2, H * 0.7, false); break; }
+    // ---- landmarks
+    case 'fountain': { const s2 = K.stone; t.ell(20, 28, 18, 6, s2[0], 3); t.ell(20, 27, 15, 4.5, '#3a9ab8', 3.2); t.ell(16, 26, 4, 1, '#c8f0f0', 3.4); t.rect(17, 10, 6, 17, s2[1] || s2[0], 4, 1); t.ell(20, 10, 7, 2.4, s2[0], 5); for (let k = 0; k < 5; k++) t.line(20, 6, 20 + (k - 2) * 3, 12 + r.range(0, 4), 0.5, '#c8f0f0', 6); t.speck(20, K.moss || ['#4c8a4c'], 0.5, 1.2, 4, false); t.grain(0.35, 4, seed, 0.4); break; }
+    case 'rootarch': { const s2 = K.stone; t.rect(4, 14, 9, 38, s2[0], 5, 1.2); t.rect(37, 14, 9, 38, s2[0], 5, 1.2); t.rect(2, 8, 46, 9, s2[1] || s2[0], 6, 1.2); for (let k = 0; k < 9; k++) { let x = r.range(2, 48), y = 8; for (let q = 0; q < 6; q++) { const nx = x + r.range(-3, 3), ny = y + r.range(4, 8); t.line(x, y, nx, ny, r.range(1, 2.4), pick(bark), 7); x = nx; y = ny; } } t.speck(26, K.moss || leaf, 0.8, 2, 7, false); t.grain(0.35, 4, seed, 0.5); break; }
+    case 'foxstatue': { const s2 = K.stone; t.rect(3, 26, 20, 8, s2[0], 3, 1); t.ell(13, 20, 6, 5, s2[1] || s2[0], 5); t.ell(16, 12, 4, 4, s2[1] || s2[0], 6); t.poly([[13, 9], [14, 3], [16, 8]], s2[0]); t.poly([[17, 8], [19, 3], [20, 9]], s2[0]); t.line(8, 22, 3, 14, 3, s2[1] || s2[0], 5); t.grain(0.4, 4, seed, 0.5); t.speck(10, K.moss || leaf, 0.6, 1.4, 5, false); break; }
+    case 'lanternshrine': { const s2 = K.stone; t.rect(4, 28, 14, 6, s2[0], 2, 1); t.rect(8, 12, 6, 16, s2[1] || s2[0], 3, 1); t.poly([[2, 13], [11, 5], [20, 13]], pick(K.roof || s2)); t.rect(8.5, 14, 5, 6, '#ffd23f', 5); t.grain(0.35, 4, seed, 0.4); break; }
+    case 'obelisk': { const s2 = K.stone; t.poly([[4, 58], [6, 8], [9, 2], [12, 8], [14, 58]], pick(s2)); t.hrect(4, 2, 10, 56, 5, 3); for (let y = 14; y < 54; y += 5) for (let x = 6; x < 13; x += 3) if (r.chance(0.6)) t.rect(x, y, 1.4, 2, pick(K.glow), 6); t.grain(0.4, 4, seed, 0.5); break; }
+    case 'cairn': for (let k = 0; k < 9; k++) { const y = 28 - k * 2.8, w = 18 - k * 1.6; t.ell(11 + r.range(-1, 1), y, w / 2, 2.2, pick(K.stone), 3 + k); } t.line(11, 6, 11, 0, 0.6, pick(bark), 9); t.rect(11, 0, 5, 3, pick(K.cloth), 9); break;
+    case 'urn': { const c = pick(['#a35a3a', '#7e4a36', '#c8723e', '#956539']); t.ell(8, 13, 6.5, 7, c, 4); t.rect(5, 4, 6, 3, shadeHex(c, 0.8), 3); t.rect(3, 12, 10, 1, shadeHex(c, 0.6), 4); t.speck(8, ['#e5c689', '#3c2a2a'], 0.4, 0.9, 4, false); break; }
+    case 'crystalheart': for (const [x, h, w, ci] of [[26, 56, 10, 0], [14, 36, 6, 1], [38, 40, 7, 2], [20, 22, 4, 3], [33, 24, 4, 0], [8, 18, 3, 2]]) { const c = (K.crystal || ['#9ff0d8'])[ci % (K.crystal || ['#9ff0d8']).length]; t.poly([[x - w, 60], [x, 60 - h], [x + w, 60]], c); t.hrect(x - w, 60 - h, w * 2, h, 6, 4); t.line(x - w * 0.3, 60, x, 60 - h, 0.6, '#ffffff', 7); } break;
+    case 'dragonbones': { const b = K.bone || ['#e0d0ff', '#6e7c96']; let px = 8, py = 40; for (let k = 0; k < 20; k++) { const nx = px + 4.2, ny = 40 - Math.sin(k / 19 * 3.14) * 18; t.line(px, py, nx, ny, 2.2, b[0], 3); if (k > 3 && k < 16 && k % 2 === 0) { t.line(nx, ny, nx - 2, ny + 12, 1.2, b[0], 2.6); t.line(nx, ny, nx + 1, ny - 8, 1, b[1] || b[0], 3); } px = nx; py = ny; } t.ell(88, 40, 7, 5, b[0], 4); t.rect(86, 38, 2, 2, '#06070a', 4); t.line(92, 42, 96, 46, 1.4, b[0], 3); break; }
+    case 'moonpool': { const s2 = K.stone; t.ell(23, 12, 22, 9, s2[0], 2); t.ell(23, 12, 18, 7, '#0c0e14', 2); t.ell(23, 11, 4, 1.6, '#e0d0ff', 2.4); for (let k = 0; k < 14; k++) t.ell(23 + r.range(-15, 15), 12 + r.range(-5, 5), 0.4, 0.4, '#ffffff', 2.2); break; }
+    case 'windtemple': { const s2 = K.stone; t.rect(4, 56, 56, 9, s2[0], 2, 1); for (const x of [8, 20, 32, 44, 56]) { t.rect(x - 2.5, 18, 5, 38, s2[1] || s2[0], 5, 1); t.rect(x - 3.5, 16, 7, 3, s2[0], 6, 0.6); } t.poly([[2, 18], [32, 2], [62, 18]], pick(K.roof || s2)); t.hrect(2, 2, 60, 16, 7, 6); for (let k = 0; k < 6; k++) t.line(10 + k * 9, 20, 10 + k * 9 + r.range(-2, 2), r.range(28, 40), 0.6, pick(K.cloth), 7); t.speck(16, K.vine || leaf, 0.6, 1.4, 6, false); t.grain(0.3, 4, seed, 0.4); break; }
+    case 'starharp': { const s2 = K.stone; t.rect(6, 62, 32, 7, s2[0], 2, 1); t.line(10, 62, 12, 6, 3, s2[1] || s2[0], 5); t.line(12, 6, 36, 18, 3, s2[1] || s2[0], 5); t.line(36, 18, 34, 62, 2.4, s2[0], 5); for (let k = 0; k < 8; k++) { const x0 = 14 + k * 2.6, y0 = 7 + k * 1.3; t.line(x0, y0, x0 - 0.4, 61, 0.35, pick(K.glow), 6); } t.speck(10, K.glow, 0.5, 1, 7, false); break; }
+    case 'floatbell': { t.line(18, 0, 18, 10, 0.6, '#3a3f44', 4); t.poly([[8, 38], [10, 14], [18, 10], [26, 14], [28, 38]], '#a08060'); t.hrect(8, 10, 20, 28, 6, 6); t.rect(6, 36, 24, 3, '#7a5a40', 5); t.ell(18, 41, 3, 2.4, '#5a4232', 4); t.speck(10, ['#3aa08a', '#4c8a4c'], 0.6, 1.4, 6, false); t.rect(6, 56, 24, 7, pick(K.stone), 2, 1); break; }
+    case 'nest': { t.ell(11, 8, 10, 4, pick(bark), 2); t.ell(11, 7, 8, 2.6, '#2a2520', 1.5); for (let k = 0; k < 3; k++) t.ell(8 + k * 3, 6.6, 1.4, 1.1, pick(['#c8f0f0', '#f6f0e2', '#8fb2f0']), 2.4); t.speck(10, [pick(bark)], 0.4, 1, 3, false, 'blade'); break; }
+    case 'treehouse': { const pl = K.plank; t.rect(6, 22, 42, 26, pick(pl), 3, 1); for (let x = 7; x < 48; x += 3) t.rect(x, 22, 0.6, 26, shadeHex(pick(pl), 0.7), 3.2); t.poly([[2, 23], [27, 4], [52, 23]], pick(K.roof)); t._hRegion(2, 4, 52, 23, (x, y) => { const e = 1 - Math.abs(x - 27) / 25; return y > 4 + (1 - e) * 19 ? 4 + e * 6 : undefined; }); t.rect(23, 34, 8, 14, '#140e0a', 3); t.rect(12, 28, 6, 6, K.window || '#ffd23f', 4); t.rect(36, 28, 6, 6, K.window || '#ffd23f', 4); t.speck(20, leaf, 0.8, 2, 7, false); break; }
+    case 'chest': case 'chestopen': { const c = '#7a4a24', gold = '#e8c050'; t.rect(1.5, 6, 13, 7, c, 2, 0.6); t.rect(1.5, 9, 13, 0.9, gold, 2.5); t.rect(7, 8, 2, 2.5, gold, 3); if (type === 'chest') { t.rect(1.5, 2.5, 13, 4, shadeHex(c, 1.15), 3, 0.6); t.rect(1.5, 2.5, 13, 0.8, gold, 3.2); } else { t.rect(1.5, 1, 13, 2.4, shadeHex(c, 0.6), 2.5); t.rect(2.5, 6, 11, 2, '#ffd23f', 1); } t.grain(0.3, 3, seed, 0.2); break; }
+    case 'cavemouth': { const s2 = K.stone; t.ell(20, 22, 19, 16, pick(s2), 10); t.ell(20, 24, 12, 11, '#06070a', 2); t.rect(8, 24, 24, 10, '#06070a', 1); t.grain(0.45, 4, seed, 0.7); t.speck(12, K.moss || ['#285a52'], 0.6, 1.4, 9, false); t.speck(4, K.glow, 0.4, 0.7, 3, false); break; }
+    case 'floatrock': { t.poly([[2, 8], [24, 8], [18, 18], [13, 24], [8, 17]], pick(stone)); t.hrect(2, 8, 22, 16, 4, 4); t.ell(13, 7, 11, 3, pick(leaf), 5); t.speck(8, K.flower || leaf, 0.5, 1, 6, false); for (let k = 0; k < 3; k++) { const x = r.range(8, 18); t.line(x, 18, x, r.range(20, 24), 0.5, pick(K.vine || leaf), 3); } break; }
+    case 'basket': { t.line(11, 0, 11, 14, 0.5, '#3e352b', 2); t.line(4, 14, 11, 4, 0.4, '#3e352b', 2); t.line(18, 14, 11, 4, 0.4, '#3e352b', 2); t.rect(3, 14, 16, 14, pick(K.plank), 2, 0.8); for (let y = 16; y < 28; y += 2.4) t.line(3, y, 19, y, 0.6, shadeHex(pick(K.plank), 0.7), 2.4); t.rect(3, 13, 16, 1.4, pick(bark), 3); t.ell(11, 4, 2, 2, '#ffd23f', 4); break; }
+    case 'headframe': { const c = pick(metal.concat(K.plank)); t.line(4, 46, 10, 4, 1.4, c, 2); t.line(26, 46, 20, 4, 1.4, c, 2); t.line(8, 30, 22, 30, 1, c, 2); t.line(7, 18, 23, 18, 1, c, 2); t.ell(15, 4, 5, 5, '#2a2a2a', 3); t.ell(15, 4, 3, 3, pick(rust), 3.4); t.line(15, 6, 15, 46, 0.4, '#2a2520', 2.6); t.rect(9, 38, 12, 8, pick(K.plank), 2.4, 0.6); t.rect(14, 36, 2, 2, '#ffb040', 3); t.grain(0.35, 4, seed, 0.3); break; }
   }
   return t.finish(F.pal, { outline: true, dither: 0.5, amb: 0.42, dif: 0.78, hs: 0.8 });
 }
@@ -196,6 +236,13 @@ export function paintDecal(type, fam, seed) {
   return t.finish(F.pal, { dither: 0.45, amb: 0.5, dif: 0.6 });
 }
 
+// a cloud: soft heaped puffs, seen from above (laid flat under the islands, drifting)
+export function paintCloud(seed) {
+  const W = 112, H = 72, t = new TB(W, H, 2, seed, 2), r = RNG(seed), cols = ['#f6f0e2', '#ffffff', '#e8e4f0', '#f5e6ec'];
+  for (let k = 0; k < 18; k++) { const a = r.range(0, 6.283), d = r.range(0, 1) ** 0.7; t.ell(W / 2 + Math.cos(a) * d * W * 0.34, H / 2 + Math.sin(a) * d * H * 0.3, r.range(9, 22) * (1.1 - d * 0.4), r.range(7, 15) * (1.1 - d * 0.4), r.pick(cols), r.range(6, 14) * (1.2 - d)); }
+  return t.finish(FAMILY.dream.pal, { dither: 0.6, amb: 0.7, dif: 0.45, hs: 1.2 });
+}
+
 // a soft dithered shadow ellipse (drawn under things, as a decal)
 const SH = new Map();
 export function shadowTex(w, h) {
@@ -205,62 +252,166 @@ export function shadowTex(w, h) {
   SH.set(key, c); return c;
 }
 
-// ------------------------------------------------ animals: side-on (facing right), a short walk cycle
+// ------------------------------------------------ animals: side-on (facing right), four frames each
+// ai: walk (wander, flee), hop, swim (on water), flock (peck about, fly off when you come near), flutter (low,
+// erratic: insects), soar (circling high), wade (slow, by water), drift (the sky's creatures), bat
+const Q = (body, leg, neck, head, cols, o = {}) => ({ kind: 'quad', body, leg, neck, head, cols, ...o });
 export const FAUNA = {
-  deer: { w: 26, h: 26, body: [13, 13, 7, 4], leg: 9, neck: [5, -8], head: [3.2, 2.2], cols: ['#7a5a40', '#5e4430', '#a8936f'], antler: 1, tail: 1 },
-  boar: { w: 22, h: 16, body: [11, 8.5, 7, 4.6], leg: 4.5, neck: [5, 1], head: [3.6, 2.6], cols: ['#3e352b', '#2a2520', '#544638'], tusk: 1, bristle: 1 },
-  hound: { w: 22, h: 17, body: [10.5, 9.5, 6.5, 3], leg: 6.5, neck: [5, -3], head: [3, 2], cols: ['#544638', '#3e352b', '#6e5c47'], tail: 2, mange: 1, ears: 1 },
-  horse: { w: 32, h: 30, body: [15, 15, 9, 5], leg: 11, neck: [7, -9], head: [4.2, 2.4], cols: ['#3e352b', '#2a2520', '#6e5c47'], mane: 1, tail: 3, ribs: 1 },
-  cattle: { w: 32, h: 24, body: [15, 12, 10, 5.5], leg: 7, neck: [6, -1], head: [3.6, 2.8], cols: ['#8c765a', '#544638', '#d8d49c'], horns: 1, tail: 1, ribs: 1, patches: 1 },
-  goat: { w: 20, h: 19, body: [10, 10, 6, 3.6], leg: 6.5, neck: [4, -6], head: [2.8, 2], cols: ['#9ca09a', '#767c7c', '#544638'], curl: 1, tail: 1, beard: 1 },
-  rat: { w: 12, h: 7, body: [6, 4.4, 3.6, 2], leg: 1.6, neck: [3, 0.5], head: [1.8, 1.3], cols: ['#3e352b', '#2a2520', '#6e5c47'], tail: 4, small: 1 },
-  lizard: { w: 18, h: 7, body: [9, 4.6, 5, 1.6], leg: 1.8, neck: [4, 0], head: [2.2, 1.3], cols: ['#956539', '#7b512e', '#c49456'], tail: 5, low: 1 },
-  beetle: { w: 18, h: 11, insect: 1, cols: ['#1c2a2e', '#2c4a4e', '#3e7a70'] },
-  crow: { w: 14, h: 12, bird: 1, cols: ['#1a171e', '#24202a', '#3c3644'] },
-  heron: { w: 18, h: 26, wader: 1, cols: ['#9ca09a', '#767c7c', '#e0d6b8'] },
-  moth: { w: 18, h: 14, moth: 1, cols: ['#6e5c47', '#a8936f', '#e0d070'], glow: '#e0d070' }
+  // the forgotten world's
+  deer: Q([13, 13, 7, 4], 9, [5, -8], [3.2, 2.2], ['#7a5a40', '#5e4430', '#a8936f'], { w: 26, h: 26, antler: 1, tail: 1, ai: 'walk', speed: 28 }),
+  boar: Q([11, 8.5, 7, 4.6], 4.5, [5, 1], [3.6, 2.6], ['#3e352b', '#2a2520', '#544638'], { w: 22, h: 16, tusk: 1, bristle: 1, ai: 'walk', speed: 22 }),
+  hound: Q([10.5, 9.5, 6.5, 3], 6.5, [5, -3], [3, 2], ['#544638', '#3e352b', '#6e5c47'], { w: 22, h: 17, tail: 2, mange: 1, ears: 1, ai: 'walk', speed: 32 }),
+  horse: Q([15, 15, 9, 5], 11, [7, -9], [4.2, 2.4], ['#3e352b', '#2a2520', '#6e5c47'], { w: 32, h: 30, mane: 1, tail: 3, ribs: 1, ai: 'walk', speed: 26 }),
+  cattle: Q([15, 12, 10, 5.5], 7, [6, -1], [3.6, 2.8], ['#8c765a', '#544638', '#d8d49c'], { w: 32, h: 24, horns: 1, tail: 1, ribs: 1, patches: 1, ai: 'walk', speed: 12, calm: 1 }),
+  goat: Q([10, 10, 6, 3.6], 6.5, [4, -6], [2.8, 2], ['#9ca09a', '#767c7c', '#544638'], { w: 20, h: 19, curl: 1, tail: 1, beard: 1, ai: 'walk', speed: 22 }),
+  rat: Q([6, 4.4, 3.6, 2], 1.6, [3, 0.5], [1.8, 1.3], ['#3e352b', '#2a2520', '#6e5c47'], { w: 12, h: 7, tail: 4, small: 1, ai: 'walk', speed: 34 }),
+  // the dream's: gentle, and some of them strange
+  fox: Q([10, 9.5, 6, 3], 5.5, [5, -3], [3, 2], ['#e07a2a', '#a8522e', '#f6f0e2'], { w: 22, h: 16, tail: 6, ears: 1, ai: 'walk', speed: 30 }),
+  wolf: Q([11, 10, 7, 3.4], 7, [5, -3], [3.2, 2.2], ['#767c7c', '#555b5f', '#c4c0b8'], { w: 24, h: 18, tail: 6, ears: 1, ai: 'walk', speed: 30 }),
+  rabbit: Q([6, 6.4, 3.6, 2.6], 2, [2, -2.5], [2, 1.7], ['#a08060', '#7a5a40', '#f6f0e2'], { w: 12, h: 12, earsLong: 1, tail: 1, small: 1, ai: 'hop', speed: 30 }),
+  moonhare: Q([6, 6.4, 3.6, 2.6], 2, [2, -2.5], [2, 1.7], ['#f6f0e2', '#c8c0d8', '#fff6c8'], { w: 12, h: 12, earsLong: 1, tail: 1, small: 1, glow: '#fff6c8', ai: 'hop', speed: 34 }),
+  hedgehog: Q([6, 5.4, 4, 2.4], 1.4, [3, 0.8], [1.8, 1.3], ['#7a5a40', '#4a3628', '#c8a878'], { w: 12, h: 8, spikes: 1, small: 1, ai: 'walk', speed: 12 }),
+  squirrel: Q([6, 6, 3.4, 2.2], 2.2, [2.4, -1.6], [1.8, 1.5], ['#c0502a', '#7a5a40', '#e8d4a8'], { w: 12, h: 12, tail: 7, ears: 1, small: 1, ai: 'hop', speed: 36 }),
+  sheep: Q([12, 10, 7.5, 4.6], 5, [5, -2], [2.8, 2], ['#e8e4d4', '#a8a494', '#2a2520'], { w: 24, h: 18, wool: 1, tail: 1, ai: 'walk', speed: 14, calm: 1 }),
+  cloudsheep: Q([12, 10, 8, 5], 4, [5, -2], [2.6, 2], ['#f6f0e2', '#c8f0f0', '#5a4232'], { w: 26, h: 18, wool: 2, tail: 1, glow: '#c8f0f0', ai: 'walk', speed: 10, calm: 1 }),
+  cow: Q([15, 12, 10, 5.5], 7, [6, -1], [3.6, 2.8], ['#f6f0e2', '#2a2520', '#f5b5cc'], { w: 32, h: 24, horns: 1, tail: 1, patches: 2, ai: 'walk', speed: 12, calm: 1 }),
+  kirin: Q([14, 14, 8, 4.4], 10, [6, -9], [3.8, 2.2], ['#f6f0e2', '#c8a8ff', '#fff6c8'], { w: 30, h: 30, mane: 2, tail: 3, horn: 1, glow: '#c8a8ff', ai: 'walk', speed: 26 }),
+  stag: Q([14, 14, 8, 4.6], 10, [6, -9], [3.4, 2.4], ['#5a4232', '#3a2a1e', '#9ff0d8'], { w: 30, h: 32, antler: 2, tail: 1, glow: '#9ff0d8', ai: 'walk', speed: 24, big: 1 }),
+  spiritfox: Q([10, 9.5, 6, 3], 5.5, [5, -3], [3, 2], ['#c8f0f0', '#8fb2f0', '#fff6c8'], { w: 22, h: 16, tail: 6, ears: 1, glow: '#9fd8ff', ai: 'walk', speed: 34 }),
+  mothdeer: Q([13, 13, 7, 4], 9, [5, -8], [3.2, 2.2], ['#8a6aa8', '#5a4a7a', '#c8a8ff'], { w: 26, h: 26, antler: 1, wings: 1, tail: 1, glow: '#c8a8ff', ai: 'walk', speed: 20 }),
+  mossling: Q([6, 6, 4.4, 3.6], 1.4, [1.4, -1], [2.4, 2.2], ['#4c8a4c', '#2f5d36', '#a8cf6a'], { w: 12, h: 10, small: 1, moss: 1, ai: 'hop', speed: 12 }),
+  cat: Q([7, 6.6, 4.2, 2.2], 3.6, [3.4, -2.4], [2.2, 1.8], ['#544638', '#2a2520', '#e8d4a8'], { w: 14, h: 12, tail: 2, ears: 1, small: 1, ai: 'walk', speed: 28 }),
+  dog: Q([9, 8.4, 5.4, 3], 5, [4, -3], [2.8, 2], ['#a08060', '#7a5a40', '#e8d4a8'], { w: 18, h: 15, tail: 2, ears: 1, ai: 'walk', speed: 30 }),
+  raccoon: Q([8, 7, 5, 3], 3, [3.6, -0.6], [2.4, 1.8], ['#767c7c', '#3a3f44', '#e8e4d4'], { w: 16, h: 11, tail: 8, ears: 1, mask: 1, ai: 'walk', speed: 22 }),
+  redpanda: Q([8, 7, 5, 3], 3, [3.6, -1], [2.4, 1.8], ['#c0502a', '#4a3628', '#f6f0e2'], { w: 16, h: 11, tail: 8, ears: 1, mask: 1, ai: 'walk', speed: 18 }),
+  panda: Q([12, 10, 7.4, 5], 4.4, [4, -2], [3.4, 2.8], ['#f6f0e2', '#14201a', '#c8c0b8'], { w: 24, h: 18, panda: 1, tail: 1, ai: 'walk', speed: 8, calm: 1 }),
+  jaguar: Q([13, 10, 8, 3.6], 6.5, [6, -2], [3.2, 2.4], ['#c8a040', '#7a5a40', '#2a2520'], { w: 28, h: 18, spots: 1, tail: 4, ears: 1, ai: 'walk', speed: 30 }),
+  fennec: Q([8, 8, 4.6, 2.6], 4, [3.6, -2.4], [2.4, 1.8], ['#e5c689', '#c49456', '#fbf3dc'], { w: 16, h: 14, tail: 6, bigEars: 1, ai: 'walk', speed: 32 }),
+  capybara: Q([11, 9, 7.6, 4.4], 3.6, [4.4, -0.4], [3.6, 2.6], ['#7a5a40', '#5a4232', '#a08060'], { w: 22, h: 14, ears: 1, ai: 'walk', speed: 10, calm: 1 }),
+  bear: Q([15, 13, 10, 6.4], 6.4, [5, -1], [4, 3.4], ['#4a3628', '#2a2520', '#7a5a40'], { w: 32, h: 24, ears: 1, ai: 'walk', speed: 14, big: 1 }),
+  // the low things
+  lizard: { kind: 'low', w: 18, h: 7, cols: ['#956539', '#7b512e', '#c49456'], ai: 'walk', speed: 26 },
+  gecko: { kind: 'low', w: 14, h: 6, cols: ['#88cb70', '#4c8a4c', '#ffd23f'], ai: 'walk', speed: 28 },
+  salamander: { kind: 'low', w: 16, h: 6, cols: ['#e05a3a', '#7a2e22', '#ffd23f'], spots: 1, ai: 'walk', speed: 12 },
+  axolotl: { kind: 'low', w: 16, h: 7, cols: ['#f5b5cc', '#f28aa8', '#e05a3a'], frills: 1, ai: 'swim', speed: 12 },
+  frog: { kind: 'frog', w: 10, h: 8, cols: ['#4c8a4c', '#2f5d36', '#a8cf6a'], ai: 'hop', speed: 14 },
+  treefrog: { kind: 'frog', w: 10, h: 8, cols: ['#88cb70', '#3c7442', '#e05a3a'], ai: 'hop', speed: 14 },
+  crab: { kind: 'crab', w: 14, h: 9, cols: ['#e05a3a', '#a8522e', '#f6f0e2'], ai: 'walk', speed: 10 },
+  snail: { kind: 'shell', w: 12, h: 9, cols: ['#c8a878', '#a08060', '#e8d4a8'], snail: 1, ai: 'walk', speed: 3, calm: 1 },
+  tortoise: { kind: 'shell', w: 20, h: 12, cols: ['#5a4232', '#7a5a40', '#a8cf6a'], ai: 'walk', speed: 4, calm: 1 },
+  turtle: { kind: 'shell', w: 20, h: 10, cols: ['#3aa08a', '#2f5d36', '#88cb70'], ai: 'swim', speed: 10, calm: 1 },
+  beetle: { kind: 'bug', bug: 'beetle', w: 18, h: 11, cols: ['#1c2a2e', '#2c4a4e', '#3e7a70'], ai: 'walk', speed: 10, calm: 1 },
+  // the birds
+  crow: { kind: 'bird', w: 14, h: 12, cols: ['#1a171e', '#24202a', '#3c3644'], beak: '#3a3f44', ai: 'flock', speed: 60 },
+  pigeon: { kind: 'bird', w: 14, h: 12, cols: ['#8296a6', '#64788a', '#c8a8ff'], beak: '#f5b5cc', ai: 'flock', speed: 55 },
+  songbird: { kind: 'bird', w: 10, h: 9, cols: ['#e05a3a', '#7a5a40', '#ffd23f'], beak: '#ffd23f', small: 1, ai: 'flock', speed: 50 },
+  swallow: { kind: 'bird', w: 12, h: 9, cols: ['#2a3644', '#141a22', '#e05a3a'], beak: '#2a2520', small: 1, fork: 1, ai: 'flock', speed: 70 },
+  gull: { kind: 'bird', w: 16, h: 12, cols: ['#f6f0e2', '#b4b8ae', '#6a6e66'], beak: '#ffd23f', ai: 'flock', speed: 55 },
+  parrot: { kind: 'bird', w: 14, h: 13, cols: ['#e05a3a', '#3aa08a', '#ffd23f'], beak: '#f6f0e2', ai: 'flock', speed: 50 },
+  owl: { kind: 'bird', w: 14, h: 14, cols: ['#a08060', '#7a5a40', '#e8d4a8'], beak: '#e8c050', owl: 1, ai: 'soar', speed: 26 },
+  eagle: { kind: 'bird', w: 24, h: 14, cols: ['#5a4232', '#3a2a1e', '#f6f0e2'], beak: '#ffd23f', big: 1, ai: 'soar', speed: 30 },
+  emberbird: { kind: 'bird', w: 16, h: 13, cols: ['#ff8a5a', '#e05a3a', '#ffd23f'], beak: '#fff6c8', glow: '#ffb23a', ai: 'soar', speed: 40 },
+  duck: { kind: 'bird', w: 14, h: 11, cols: ['#7a5a40', '#3c7442', '#f6f0e2'], beak: '#ffd23f', swim: 1, ai: 'swim', speed: 14 },
+  swan: { kind: 'bird', w: 18, h: 16, cols: ['#f6f0e2', '#c8c0b8', '#2a2520'], beak: '#ff8a5a', swim: 1, swan: 1, ai: 'swim', speed: 10 },
+  heron: { kind: 'wader', w: 18, h: 26, cols: ['#9ca09a', '#767c7c', '#e0d6b8'], beak: '#c4a24a', ai: 'wade', speed: 8 },
+  crane: { kind: 'wader', w: 18, h: 28, cols: ['#f6f0e2', '#2a2520', '#e05a3a'], beak: '#6a6e66', ai: 'wade', speed: 8 },
+  flamingo: { kind: 'wader', w: 18, h: 28, cols: ['#f28aa8', '#e05a3a', '#f5b5cc'], beak: '#2a2520', ai: 'wade', speed: 8 },
+  bat: { kind: 'bat', w: 14, h: 8, cols: ['#24202a', '#1a171e', '#56405e'], ai: 'bat', speed: 40 },
+  // the small fliers
+  butterfly: { kind: 'bug', bug: 'butterfly', w: 12, h: 10, cols: ['#ffd23f', '#f28aa8', '#8fb2f0', '#b49be8', '#ff8a5a'], ai: 'flutter', speed: 16 },
+  bee: { kind: 'bug', bug: 'bee', w: 8, h: 7, cols: ['#ffd23f', '#2a2520', '#f6f0e2'], ai: 'flutter', speed: 22 },
+  dragonfly: { kind: 'bug', bug: 'dragonfly', w: 16, h: 9, cols: ['#3aa08a', '#8fb2f0', '#c8f0f0'], ai: 'flutter', speed: 30 },
+  moth: { kind: 'bug', bug: 'moth', w: 18, h: 14, cols: ['#6e5c47', '#a8936f', '#e0d070'], glow: '#e0d070', ai: 'flutter', speed: 16 },
+  firefly: { kind: 'bug', bug: 'firefly', w: 6, h: 6, cols: ['#2a2520', '#fff6c8', '#ffd23f'], glow: '#fff090', ai: 'flutter', speed: 10 },
+  // the sky's creatures, drifting round the islands and over the dream
+  jelly: { kind: 'sky', sky: 'jelly', w: 20, h: 30, cols: ['#c8f0f0', '#8fb2f0', '#f5b5cc'], glow: '#bfe6ff', ai: 'drift', speed: 6, scale: 1.6 },
+  koi: { kind: 'sky', sky: 'koi', w: 22, h: 12, cols: ['#ff8a5a', '#f6f0e2', '#e05a3a'], glow: '#ffb08a', ai: 'drift', speed: 16 },
+  manta: { kind: 'sky', sky: 'manta', w: 34, h: 18, cols: ['#2a6a8a', '#14201a', '#c8f0f0'], ai: 'drift', speed: 18, scale: 1.6 },
+  dolphin: { kind: 'sky', sky: 'dolphin', w: 26, h: 14, cols: ['#8296a6', '#64788a', '#e6eef0'], ai: 'swim', speed: 26 },
+  whale: { kind: 'sky', sky: 'whale', w: 96, h: 40, cols: ['#3a5a7a', '#24384c', '#c8d8e0'], ai: 'drift', speed: 14, scale: 2.6, big: 1 }
 };
-// four walking frames (for birds: two flying and two on the ground), right-facing, plus mirrors
 export function animalFrames(k, fam, seed) {
   const A = FAUNA[k], P = FAMILY[fam].pal, out = [];
   for (let f = 0; f < 4; f++) {
-    const t = new TB(A.w, A.h, 4, seed), r = t.r, C = A.cols.map((c) => shadeHex(c, 1 + (r.f() - 0.5) * 0.1)), W = A.w, H = A.h;
-    if (A.bird) {
-      const fly = f < 2, up = f === 0;
-      if (fly) { t.ell(7, 6, 4, 2, C[0], 2); t.ell(11, 5, 2, 1.6, C[1], 2); t.line(12.6, 5, 14, 5.4, 0.7, '#3a3f44', 2); t.poly(up ? [[4, 5], [8, 0], [10, 5]] : [[4, 6], [8, 11], [10, 6]], C[1]); t.line(3, 6, 1, 7, 1, C[0], 1.5); }
-      else { const hop = f === 3 ? 1 : 0; t.ell(7, 7 - hop, 4, 2.6, C[0], 2); t.ell(10.5, 5 - hop, 2, 1.8, C[1], 2.4); t.line(12, 5 - hop, 13.6, 5.6 - hop, 0.7, '#3a3f44', 2); t.line(3, 7 - hop, 0.6, 9 - hop, 1.2, C[0], 1.5); t.line(6.5, 9.5 - hop, 6, 12, 0.4, '#3a3f44', 1); t.line(8, 9.5 - hop, 8.5, 12, 0.4, '#3a3f44', 1); }
-    } else if (A.wader) {
-      const st = [0, 1, 0, -1][f]; t.line(8 + st, 25, 9, 15, 0.5, '#3a3f44', 1); t.line(10 - st, 25, 10, 15, 0.5, '#3a3f44', 1); t.ell(9.5, 13, 5, 3, C[0], 2.4); t.ell(8, 12.4, 3.5, 1.6, C[1], 2.6);
-      t.line(12.5, 12, 14, 7, 1, C[0], 2); t.line(14, 7, 12.6, 3.4, 1, C[0], 2); t.ell(13.2, 3, 1.4, 1.1, C[2], 2.4); t.line(14.2, 3, 17.6, 3.8, 0.6, '#c4a24a', 2); t.line(5, 13, 2.4, 15, 0.8, C[1], 2);
-    } else if (A.moth) {
-      const up = f % 2 === 0; t.ell(9, 7, 1.4, 4, C[0], 2.4); t.poly(up ? [[9, 6], [1, 1], [3, 9]] : [[9, 6], [2, 7], [5, 12]], C[1]); t.poly(up ? [[9, 6], [17, 1], [15, 9]] : [[9, 6], [16, 7], [13, 12]], C[1]); t.ell(up ? 4.5 : 5, up ? 4 : 8.5, 1.3, 1.3, C[2], 1); t.ell(up ? 13.5 : 13, up ? 4 : 8.5, 1.3, 1.3, C[2], 1); t.line(9, 3, 7, 0.5, 0.3, C[0], 1); t.line(9, 3, 11, 0.5, 0.3, C[0], 1);
-    } else if (A.insect) {
-      const st = f % 2 ? 1 : -1; for (let k2 = 0; k2 < 3; k2++) { const x = 5 + k2 * 4; t.line(x, 7, x - 2 + st * (k2 % 2 ? 1 : -1), 10.5, 0.5, '#0b0d0a', 1); } t.ell(9, 6, 7, 3.6, C[1], 3.4); t.line(9, 2.6, 9, 9.4, 0.4, C[0], 3.6); t.ell(16, 6, 2, 1.7, C[0], 2.4); t.line(17.4, 5, 18, 2, 0.3, C[0], 2); t.ell(7, 4.6, 2.5, 1, C[2], 4);
+    const t = new TB(A.w, A.h, A.kind === 'sky' && A.sky === 'whale' ? 2 : 4, seed, A.big ? 6 : 4), r = t.r, C = A.cols, W = A.w, H = A.h, ph = (f / 4) * 6.283;
+    if (A.kind === 'bird') {
+      const fly = f < 2, up = f === 0, sm = A.small ? 0.7 : 1, bc = A.beak || '#3a3f44';
+      if (fly) { t.ell(W * 0.5, H * 0.5, W * 0.28, H * 0.17, C[0], 2); t.ell(W * 0.78, H * 0.42, W * 0.14, H * 0.14, C[A.owl ? 0 : 1], 2); t.line(W * 0.88, H * 0.42, W * 0.98, H * 0.46, 0.7, bc, 2); t.poly(up ? [[W * 0.3, H * 0.45], [W * 0.55, 0], [W * 0.7, H * 0.45]] : [[W * 0.3, H * 0.55], [W * 0.55, H], [W * 0.7, H * 0.55]], C[1]); t.line(W * 0.24, H * 0.5, W * 0.04, H * (A.fork ? 0.4 : 0.58), 1.2 * sm, C[0], 1.5); if (A.fork) t.line(W * 0.24, H * 0.5, W * 0.04, H * 0.66, 0.8, C[0], 1.5); if (A.cols[2]) t.ell(W * 0.55, H * 0.56, W * 0.12, H * 0.08, C[2], 2.2); }
+      else if (A.swim) { const bob = f === 3 ? 0.4 : 0; t.ell(W * 0.45, H * 0.72 + bob, W * 0.36, H * 0.2, C[0], 2); if (A.swan) { t.line(W * 0.72, H * 0.66, W * 0.82, H * 0.2, 1.6, C[0], 2.4); t.line(W * 0.82, H * 0.2, W * 0.95, H * 0.28, 1.2, A.beak, 2.4); t.ell(W * 0.8, H * 0.2, 1.4, 1.2, C[0], 2.6); } else { t.ell(W * 0.76, H * 0.5 + bob, W * 0.15, H * 0.17, C[1], 2.4); t.line(W * 0.88, H * 0.5 + bob, W * 0.99, H * 0.56 + bob, 1, bc, 2.4); } t.ell(W * 0.4, H * 0.66 + bob, W * 0.2, H * 0.08, C[2], 2.2); t.line(W * 0.1, H * 0.84, W * 0.9, H * 0.84, 0.5, '#c8f0f0', 1); }
+      else { const hop = f === 3 ? 1 : 0; t.ell(W * 0.48, H * 0.58 - hop, W * 0.28, H * 0.22, C[0], 2); t.ell(W * 0.74, H * 0.42 - hop, W * 0.15, H * 0.16, C[A.owl ? 0 : 1], 2.4); t.line(W * 0.86, H * 0.42 - hop, W * 0.97, H * 0.48 - hop, 0.7, bc, 2); t.line(W * 0.22, H * 0.58 - hop, W * 0.03, H * 0.72 - hop, 1.2 * sm, C[0], 1.5); t.line(W * 0.44, H * 0.78 - hop, W * 0.42, H, 0.4, '#3a3f44', 1); t.line(W * 0.56, H * 0.78 - hop, W * 0.6, H, 0.4, '#3a3f44', 1); if (C[2]) t.ell(W * 0.52, H * 0.66 - hop, W * 0.14, H * 0.1, C[2], 2.2); if (A.owl) { t.rect(W * 0.7, H * 0.36 - hop, 1, 1, '#14201a', 3); t.rect(W * 0.8, H * 0.36 - hop, 1, 1, '#14201a', 3); } }
+      t.rect(W * 0.8, H * 0.38, 0.6, 0.6, '#0b0d0a', 3);
+    } else if (A.kind === 'wader') {
+      const st = [0, 1, 0, -1][f]; t.line(8 + st, H - 1, 9, 15, 0.5, '#3a3f44', 1); t.line(10 - st, H - 1, 10, 15, 0.5, '#3a3f44', 1); t.ell(9.5, 13, 5, 3, C[0], 2.4); t.ell(8, 12.4, 3.5, 1.6, C[1], 2.6);
+      t.line(12.5, 12, 14, 7, 1, C[0], 2); t.line(14, 7, 12.6, 3.4, 1, C[0], 2); t.ell(13.2, 3, 1.4, 1.1, C[2], 2.4); t.line(14.2, 3, 17.6, 3.8, 0.6, A.beak, 2); t.line(5, 13, 2.4, 15, 0.8, C[1], 2); t.rect(13.6, 2.6, 0.6, 0.6, '#0b0d0a', 3);
+    } else if (A.kind === 'bat') {
+      const up = f % 2 === 0; t.ell(W / 2, H / 2, 2, 2.4, C[0], 2); t.poly(up ? [[W / 2, H / 2], [0, 0], [2, H / 2], [4, H * 0.3]] : [[W / 2, H / 2], [0, H], [2, H / 2], [4, H * 0.8]], C[1]); t.poly(up ? [[W / 2, H / 2], [W, 0], [W - 2, H / 2], [W - 4, H * 0.3]] : [[W / 2, H / 2], [W, H], [W - 2, H / 2], [W - 4, H * 0.8]], C[1]); t.rect(W / 2 - 1, H / 2 - 1, 0.6, 0.6, '#ffd23f', 3);
+    } else if (A.kind === 'bug') {
+      const up = f % 2 === 0;
+      if (A.bug === 'butterfly') { const c1 = C[(seed % 5)], c2 = C[(seed + 2) % 5]; t.ell(6, 5, 0.7, 3, '#2a2520', 2); t.poly(up ? [[6, 5], [0.5, 0.5], [2, 6]] : [[6, 5], [1, 5], [3, 9.5]], c1); t.poly(up ? [[6, 5], [11.5, 0.5], [10, 6]] : [[6, 5], [11, 5], [9, 9.5]], c1); t.ell(up ? 3 : 3, up ? 3 : 6.5, 1, 1, c2, 1); t.ell(up ? 9 : 9, up ? 3 : 6.5, 1, 1, c2, 1); }
+      else if (A.bug === 'bee') { t.ell(4, 4.4, 2.8, 1.8, C[0], 2); t.rect(3, 3, 0.7, 3, C[1], 2.2); t.rect(4.6, 3, 0.7, 3, C[1], 2.2); t.ell(up ? 4 : 4.4, up ? 1.6 : 2.4, 1.8, 1, C[2], 1); t.ell(6.8, 4, 0.9, 0.9, C[1], 2); }
+      else if (A.bug === 'dragonfly') { t.line(1, 5, 12, 4.6, 1, C[0], 2); t.ell(13, 4.4, 1.4, 1.2, C[0], 2.4); t.line(5, 4, up ? 3 : 4, up ? 0.5 : 2, 0.6, C[2], 1); t.line(6, 4, up ? 9 : 8, up ? 0.5 : 2, 0.6, C[2], 1); t.line(5, 5, up ? 3 : 4, up ? 8.5 : 7.4, 0.6, C[1], 1); t.line(6, 5, up ? 9 : 8, up ? 8.5 : 7.4, 0.6, C[1], 1); }
+      else if (A.bug === 'firefly') { t.ell(3, 3, 1.2, 1.2, C[up ? 1 : 2], 1); t.rect(2.4, 1.6, 1.2, 0.6, C[0], 1.2); }
+      else if (A.bug === 'moth') { t.ell(9, 7, 1.4, 4, C[0], 2.4); t.poly(up ? [[9, 6], [1, 1], [3, 9]] : [[9, 6], [2, 7], [5, 12]], C[1]); t.poly(up ? [[9, 6], [17, 1], [15, 9]] : [[9, 6], [16, 7], [13, 12]], C[1]); t.ell(up ? 4.5 : 5, up ? 4 : 8.5, 1.3, 1.3, C[2], 1); t.ell(up ? 13.5 : 13, up ? 4 : 8.5, 1.3, 1.3, C[2], 1); }
+      else { const st = f % 2 ? 1 : -1; for (let k2 = 0; k2 < 3; k2++) { const x = 5 + k2 * 4; t.line(x, 7, x - 2 + st * (k2 % 2 ? 1 : -1), 10.5, 0.5, '#0b0d0a', 1); } t.ell(9, 6, 7, 3.6, C[1], 3.4); t.line(9, 2.6, 9, 9.4, 0.4, C[0], 3.6); t.ell(16, 6, 2, 1.7, C[0], 2.4); t.ell(7, 4.6, 2.5, 1, C[2], 4); }
+    } else if (A.kind === 'sky') {
+      if (A.sky === 'jelly') { const pul = Math.sin(ph) * 1.2; t.ell(10, 9, 8 + pul * 0.4, 7 - pul * 0.4, C[0], 6); t.ell(10, 11, 6, 2.4, C[1], 4); for (let k2 = 0; k2 < 6; k2++) { let px = 4 + k2 * 2.4, py = 14; for (let q = 0; q < 5; q++) { const nx = px + Math.sin(ph + q + k2) * 0.9, ny = py + 3; t.line(px, py, nx, ny, 0.5, q % 2 ? C[2] : C[0], 2); px = nx; py = ny; } } t.speck(6, ['#ffffff'], 0.4, 0.8, 7, false); }
+      else if (A.sky === 'koi') { const sw = Math.sin(ph) * 1.4; t.ell(11, 6, 8, 3.4, C[1], 3); t.speck(5, [C[0], C[2]], 1, 2, 4, false); t.poly([[3, 6], [-0.5, 2 + sw], [-0.5, 10 + sw]], C[0]); t.poly([[10, 3.6], [13, 0.5], [15, 4]], C[0]); t.rect(17, 5, 0.8, 0.8, '#0b0d0a', 4); }
+      else if (A.sky === 'manta') { const fl = Math.sin(ph) * 4; t.poly([[2, 9 + fl], [12, 6], [22, 6], [32, 9 + fl], [22, 12], [12, 12]], C[0]); t.hrect(2, 4, 30, 10, 3, 4); t.line(17, 11, 17 + Math.sin(ph) * 3, 18, 0.5, C[1], 2); t.ell(17, 8, 4, 2, C[2], 3.4); }
+      else if (A.sky === 'dolphin') { const arc = Math.sin(ph) * 1.5; t.ell(13, 7 + arc * 0.3, 10, 3.6, C[0], 3); t.ell(14, 8.4 + arc * 0.3, 8, 1.8, C[2], 2.4); t.poly([[12, 4], [9, 0.5], [15, 3.6]], C[1]); t.poly([[4, 7], [0, 4 + arc], [0.5, 10 + arc]], C[1]); t.line(22, 7.6, 25.6, 8, 1, C[0], 2.4); t.rect(20, 6, 0.8, 0.8, '#0b0d0a', 4); }
+      else { const tl = Math.sin(ph) * 5; t.ell(46, 20, 38, 13, C[0], 12); t.ell(50, 26, 32, 7, C[2], 8); t.poly([[10, 18], [-2, 10 + tl], [-2, 28 + tl]], C[1]); t.poly([[52, 28], [44, 38], [60, 32]], C[1]); for (let k2 = 0; k2 < 10; k2++) t.line(40 + k2 * 4, 28, 40 + k2 * 4, 32, 0.6, C[1], 9); t.rect(76, 17, 1.6, 1.6, '#0b0d0a', 13); t.speck(18, ['#e8e4d4', '#8a8e84'], 0.6, 1.4, 14, false); }
+    } else if (A.kind === 'low') {
+      const st = f % 2 ? 1 : -1; for (const x of [W * 0.3, W * 0.62]) { t.line(x, H * 0.6, x - 1.5 * st, H - 0.4, 0.6, C[1], 1); t.line(x + 1, H * 0.6, x + 1 + 1.5 * st, H - 0.4, 0.6, C[1], 1); }
+      t.ell(W * 0.48, H * 0.55, W * 0.28, H * 0.26, C[0], 1.6); t.ell(W * 0.82, H * 0.48, W * 0.12, H * 0.22, C[0], 1.8); let px = W * 0.22, py = H * 0.55; for (let q = 0; q < 4; q++) { const nx = px - W * 0.06, ny = py + Math.sin(ph + q) * 0.4; t.line(px, py, nx, ny, 1.6 - q * 0.3, C[0], 1.2); px = nx; py = ny; }
+      if (A.spots) t.speck(5, [C[2]], 0.4, 0.8, 2, false); if (A.frills) for (let q = 0; q < 3; q++) t.line(W * 0.78, H * 0.36, W * 0.72 + q, H * 0.08, 0.5, C[2], 2.2); t.rect(W * 0.88, H * 0.4, 0.6, 0.6, '#0b0d0a', 2.4);
+    } else if (A.kind === 'frog') {
+      const jump = f === 1 || f === 2, lift = jump ? 2 : 0; t.ell(5, 5 - lift, 4, 2.6, C[0], 2); t.ell(7.4, 3.6 - lift, 1.4, 1.2, C[0], 2.4); t.rect(7.6, 3 - lift, 0.8, 0.8, '#0b0d0a', 3); t.line(2, 6 - lift, jump ? 0 : 1, jump ? 7.8 : 7.6, 1, C[1], 1.4); t.line(6, 6 - lift, jump ? 8 : 7, 7.8, 0.8, C[1], 1.4); t.speck(3, [C[2]], 0.3, 0.6, 2.4, false);
+    } else if (A.kind === 'crab') {
+      const st = f % 2 ? 1 : -1; for (let q = 0; q < 3; q++) { t.line(4 + q * 2, 6, 2 + q * 2 + st, 8.6, 0.5, C[1], 1); t.line(8 + q * 2, 6, 10 + q * 2 - st, 8.6, 0.5, C[1], 1); } t.ell(7, 5, 5, 2.6, C[0], 2); t.ell(1.6, 3 + st * 0.3, 1.4, 1.2, C[0], 2); t.ell(12.4, 3 - st * 0.3, 1.4, 1.2, C[0], 2); t.rect(5.4, 2, 0.6, 1, '#0b0d0a', 2.4); t.rect(8, 2, 0.6, 1, '#0b0d0a', 2.4);
+    } else if (A.kind === 'shell') {
+      const st = f % 2 ? 0.6 : -0.6;
+      if (A.snail) { t.ell(6, 7.6, 5.4, 1.4, C[2], 1); t.ell(7 + st * 0.3, 4.4, 3.6, 3.6, C[0], 3); for (let q = 0; q < 3; q++) t.ell(7 + st * 0.3, 4.4, 2.6 - q * 0.8, 2.6 - q * 0.8, q % 2 ? C[1] : C[0], 3.2); t.line(10.6, 7, 11.8, 4, 0.4, C[2], 2); }
+      else { for (const x of [W * 0.25, W * 0.7]) t.line(x, H * 0.7, x + st, H - 0.4, 1.2, C[2], 1.2); t.ell(W * 0.5, H * 0.5, W * 0.38, H * 0.36, C[0], 4); for (let q = 0; q < 4; q++) t.ell(W * 0.3 + q * W * 0.13, H * 0.42, W * 0.06, H * 0.1, C[1], 4.4); t.ell(W * 0.92, H * 0.6, W * 0.08, H * 0.14, C[2], 2); t.rect(W * 0.95, H * 0.55, 0.6, 0.6, '#0b0d0a', 3); }
     } else {
       // a four-legged beast: legs swing out of phase, the body bobs, the head rides on a neck
-      const [bx, by, rx, ry] = A.body, L = A.leg, ph = (f / 4) * 6.283, bob = Math.abs(Math.sin(ph)) * 0.6, footY = H - 0.6, hipY = by + ry * 0.4 - bob;
-      const leg = (x, p, c) => { const s = Math.sin(ph + p) * (L * 0.32 + 0.5), kx = x + s * 0.5; t.line(x, hipY, kx + s * 0.25, hipY + L * 0.55, A.small ? 0.7 : 1.3, c, 1.4); t.line(kx + s * 0.25, hipY + L * 0.55, x + s, footY, A.small ? 0.6 : 1.1, c, 1.2); };
+      const [bx, by, rx, ry] = A.body, L = A.leg, bob = Math.abs(Math.sin(ph)) * 0.6, footY = H - 0.6, hipY = by + ry * 0.4 - bob;
+      const leg = (x, p, c) => { const sw = Math.sin(ph + p) * (L * 0.32 + 0.5), kx = x + sw * 0.5; t.line(x, hipY, kx + sw * 0.25, hipY + L * 0.55, A.small ? 0.8 : 1.3, c, 1.4); t.line(kx + sw * 0.25, hipY + L * 0.55, x + sw, footY, A.small ? 0.7 : 1.1, c, 1.2); };
       leg(bx - rx * 0.6, 0, shadeHex(C[1], 0.8)); leg(bx + rx * 0.55, Math.PI, shadeHex(C[1], 0.8));
-      if (A.tail) { const n = A.tail; if (n >= 4) { let px = bx - rx, py = by; for (let s = 0; s < 5; s++) { const nx = px - 1.4, ny = py + (n === 5 ? 0.2 : 0.5) + Math.sin(ph + s) * 0.3; t.line(px, py, nx, ny, n === 5 ? 1.6 - s * 0.25 : 0.4, C[1], 1); px = nx; py = ny; } } else t.line(bx - rx, by - ry * 0.4 - bob, bx - rx - 2 - n, by + (n === 2 ? -3 : 2) - bob + Math.sin(ph) * 0.6, n === 3 ? 1.6 : 0.9, C[1], 1.4); }
-      t.ell(bx, by - bob, rx, ry, C[0], ry * 1.1); t.ell(bx - rx * 0.2, by + ry * 0.45 - bob, rx * 0.8, ry * 0.4, C[1], ry * 0.5);
-      if (A.patches) t.speck(4, [C[2], C[1]], 1, 2.2, ry, false);
-      if (A.ribs) for (let k2 = 0; k2 < 4; k2++) t.line(bx - 2 + k2 * 1.6, by - ry * 0.4 - bob, bx - 2.6 + k2 * 1.6, by + ry * 0.4 - bob, 0.3, shadeHex(C[0], 0.7), ry * 1.3);
+      const tl = A.tail;
+      if (tl === 6 || tl === 7 || tl === 8) { const up = tl === 7 ? -1 : 0.2; t.ell(bx - rx - 2.4, by - (tl === 7 ? ry * 1.6 : 0) - bob, tl === 7 ? 2.4 : 3.2, tl === 7 ? 3.6 : 1.8, C[0], ry); if (tl === 6) t.ell(bx - rx - 4.6, by + up - bob, 1.2, 1, C[2], ry); if (tl === 8) for (let q = 0; q < 3; q++) t.rect(bx - rx - 4.4 + q * 1.6, by - 1.6 - bob, 0.7, 3, C[1], ry + 1); }
+      else if (tl >= 4) { let px = bx - rx, py = by; for (let q = 0; q < 5; q++) { const nx = px - 1.4, ny = py + 0.5 + Math.sin(ph + q) * 0.3; t.line(px, py, nx, ny, 0.5, C[1], 1); px = nx; py = ny; } }
+      else if (tl) t.line(bx - rx, by - ry * 0.4 - bob, bx - rx - 2 - tl, by + (tl === 2 ? -3 : 2) - bob + Math.sin(ph) * 0.6, tl === 3 ? 1.6 : 0.9, C[1], 1.4);
+      if (A.wings) { t.poly([[bx, by - ry - bob], [bx - 8, by - ry - 7 + Math.sin(ph) * 2], [bx - 2, by - ry]], C[2]); t.poly([[bx + 2, by - ry - bob], [bx + 9, by - ry - 7 - Math.sin(ph) * 2], [bx + 4, by - ry]], C[2]); }
+      t.ell(bx, by - bob, rx, ry, C[0], ry * 1.1);
+      if (A.wool) { t.speck(A.wool === 2 ? 26 : 18, [C[0], shadeHex(C[0], 0.9), '#ffffff'], 1, 2.2, ry * 1.4, false); }
+      else t.ell(bx - rx * 0.2, by + ry * 0.45 - bob, rx * 0.8, ry * 0.4, C[1], ry * 0.5);
+      if (A.patches) t.speck(A.patches === 2 ? 6 : 4, A.patches === 2 ? [C[1]] : [C[2], C[1]], 1, 2.4, ry, false);
+      if (A.panda) { t.ell(bx - rx * 0.5, by + ry * 0.2 - bob, rx * 0.35, ry * 0.8, C[1], ry * 1.1); t.ell(bx + rx * 0.5, by + ry * 0.2 - bob, rx * 0.3, ry * 0.8, C[1], ry * 1.1); }
+      if (A.spots) t.speck(9, [C[2]], 0.5, 1, ry * 1.2, false);
+      if (A.spikes) for (let q = 0; q < 9; q++) t.line(bx - rx * 0.8 + q * rx * 0.2, by - ry * 0.4 - bob, bx - rx * 0.9 + q * rx * 0.2 - 1, by - ry - 1.6 - bob, 0.5, C[1], ry * 1.2);
+      if (A.ribs) for (let q = 0; q < 4; q++) t.line(bx - 2 + q * 1.6, by - ry * 0.4 - bob, bx - 2.6 + q * 1.6, by + ry * 0.4 - bob, 0.3, shadeHex(C[0], 0.7), ry * 1.3);
       if (A.mange) t.speck(5, [C[2], shadeHex(C[0], 0.6)], 0.6, 1.2, ry, false);
-      if (A.bristle) for (let k2 = 0; k2 < 6; k2++) t.line(bx - rx * 0.6 + k2 * 1.8, by - ry - bob + 0.6, bx - rx * 0.6 + k2 * 1.8 + 0.6, by - ry - 1.2 - bob, 0.5, C[1], ry * 1.2);
+      if (A.moss) t.speck(8, ['#88cb70', '#2f5d36'], 0.5, 1.2, ry * 1.2, false);
+      if (A.bristle) for (let q = 0; q < 6; q++) t.line(bx - rx * 0.6 + q * 1.8, by - ry - bob + 0.6, bx - rx * 0.6 + q * 1.8 + 0.6, by - ry - 1.2 - bob, 0.5, C[1], ry * 1.2);
       leg(bx - rx * 0.4, Math.PI, C[1]); leg(bx + rx * 0.75, 0, C[1]);
-      const nx = bx + rx * 0.75 + A.neck[0], ny = by - ry * 0.3 + A.neck[1] - bob + (A.low ? 0 : Math.sin(ph * 0.5) * 0.3);
-      t.line(bx + rx * 0.6, by - ry * 0.4 - bob, nx, ny, A.small ? 1.4 : 2.6, C[0], ry);
+      const nx = bx + rx * 0.75 + A.neck[0], ny = by - ry * 0.3 + A.neck[1] - bob;
+      t.line(bx + rx * 0.6, by - ry * 0.4 - bob, nx, ny, A.small ? 1.4 : 2.6, C[A.panda ? 0 : 0], ry);
       t.ell(nx + A.head[0] * 0.4, ny, A.head[0], A.head[1], C[0], ry);
-      t.rect(nx + A.head[0] * 0.5, ny - A.head[1] * 0.4, 0.8, 0.8, '#0b0d0a', ry + 1);
-      if (A.ears) { t.line(nx - 0.6, ny - A.head[1] * 0.6, nx - 1, ny - A.head[1] - 1.6, 0.8, C[1], ry + 1); }
-      if (A.mane) for (let k2 = 0; k2 < 5; k2++) t.line(bx + rx * 0.6 + k2 * 1.2, by - ry * 0.6 - bob - k2 * 1.6, bx + rx * 0.6 + k2 * 1.2 - 1.2, by - ry * 0.6 - bob - k2 * 1.6 + 1.4, 0.8, C[1], ry + 1);
-      if (A.antler) for (const s of [-1, 1]) { const ax = nx - 0.4 + s * 0.6, ay = ny - A.head[1]; t.line(ax, ay, ax - 2 + s, ay - 5, 0.5, C[2], ry + 2); t.line(ax - 1.3 + s, ay - 3, ax + 0.8 + s, ay - 6, 0.4, C[2], ry + 2); t.line(ax - 1.6 + s, ay - 4, ax - 4 + s, ay - 5.4, 0.4, C[2], ry + 2); }
+      if (A.mask) t.rect(nx + A.head[0] * 0.2, ny - A.head[1] * 0.3, A.head[0] * 1.1, A.head[1] * 0.6, C[1], ry + 0.5);
+      if (A.panda) { t.ell(nx + A.head[0] * 0.6, ny - 0.2, 1, 0.9, C[1], ry + 0.6); t.ell(nx - 0.6, ny - A.head[1] * 0.9, 1, 1, C[1], ry + 1); }
+      t.rect(nx + A.head[0] * 0.5, ny - A.head[1] * 0.4, 0.8, 0.8, A.glow ? A.glow : '#0b0d0a', ry + 1);
+      if (A.ears) t.line(nx - 0.6, ny - A.head[1] * 0.6, nx - 1, ny - A.head[1] - 1.6, 0.8, C[1], ry + 1);
+      if (A.bigEars) { t.poly([[nx - 1.4, ny - A.head[1] * 0.5], [nx - 2.6, ny - A.head[1] - 4], [nx + 0.2, ny - A.head[1] * 0.6]], C[0]); }
+      if (A.earsLong) { t.line(nx - 0.2, ny - A.head[1] * 0.6, nx - 1.6, ny - A.head[1] - 4, 0.9, C[0], ry + 1); t.line(nx + 0.6, ny - A.head[1] * 0.6, nx - 0.2, ny - A.head[1] - 4.2, 0.9, C[0], ry + 1); }
+      if (A.mane) for (let q = 0; q < 5; q++) t.line(bx + rx * 0.6 + q * 1.2, by - ry * 0.6 - bob - q * 1.6, bx + rx * 0.6 + q * 1.2 - 1.2, by - ry * 0.6 - bob - q * 1.6 + 1.4, 0.8, A.mane === 2 ? C[1] : C[1], ry + 1);
+      if (A.antler) { const big = A.antler === 2 ? 1.6 : 1; for (const sgn of [-1, 1]) { const ax = nx - 0.4 + sgn * 0.6, ay = ny - A.head[1]; t.line(ax, ay, ax - 2 * big + sgn, ay - 5 * big, 0.5, C[2], ry + 2); t.line(ax - 1.3 * big + sgn, ay - 3 * big, ax + 0.8 * big + sgn, ay - 6 * big, 0.4, C[2], ry + 2); t.line(ax - 1.6 * big + sgn, ay - 4 * big, ax - 4 * big + sgn, ay - 5.4 * big, 0.4, C[2], ry + 2); } }
+      if (A.horn) t.line(nx + A.head[0] * 0.3, ny - A.head[1], nx + A.head[0] * 0.3 + 1, ny - A.head[1] - 4.4, 0.6, C[2], ry + 3);
       if (A.horns) { t.line(nx - 0.5, ny - A.head[1] + 0.4, nx - 3, ny - A.head[1] - 2.4, 0.7, C[2], ry + 2); t.line(nx + 0.6, ny - A.head[1] + 0.4, nx + 2.4, ny - A.head[1] - 2.6, 0.7, C[2], ry + 2); }
-      if (A.curl) { t.ell(nx - 1, ny - A.head[1], 1.4, 1.4, C[2], ry + 2); }
+      if (A.curl) t.ell(nx - 1, ny - A.head[1], 1.4, 1.4, C[2], ry + 2);
       if (A.tusk) t.line(nx + A.head[0] * 1.2, ny + 0.6, nx + A.head[0] * 1.2 + 0.8, ny - 0.8, 0.5, '#e0d6b8', ry + 2);
       if (A.beard) t.line(nx + A.head[0] * 0.6, ny + A.head[1], nx + A.head[0] * 0.5, ny + A.head[1] + 1.6, 0.6, C[2], ry);
+      if (A.glow) t.speck(5, [A.glow], 0.3, 0.6, ry * 1.6, false);
     }
-    const right = t.finish(P, { outline: true, dither: 0.45, amb: 0.45, dif: 0.75, hs: 0.8 });
+    const right = t.finish(P, { outline: true, dither: 0.45, amb: A.glow ? 0.6 : 0.45, dif: 0.75, hs: 0.8 });
     out.push({ r: right, l: flipH(right) });
   }
   return out;
@@ -271,7 +422,7 @@ export function animalFrames(k, fam, seed) {
 export function giantFrames(seed) {
   const out = [], P = PALS.green;
   for (let f = 0; f < 4; f++) {
-    const W = 64, H = 126, t = new TB(W, H, 3, seed), r = t.r, bark = ['#3e352b', '#2a2520', '#544638', '#6e5c47'], moss = ['#384a28', '#4a5f30', '#2b3820', '#5f763a'], stone = ['#555b5f', '#767c7c', '#3a3f44'];
+    const W = 64, H = 126, t = new TB(W, H, 3, seed, 8), r = t.r, bark = ['#3e352b', '#2a2520', '#544638', '#6e5c47'], moss = ['#384a28', '#4a5f30', '#2b3820', '#5f763a'], stone = ['#555b5f', '#767c7c', '#3a3f44'];
     const ph = (f / 4) * 6.283, sw = Math.sin(ph), cx = W / 2, hipY = 70 - Math.abs(Math.cos(ph)) * 1.5;
     const leg = (dx, s, c) => { const kneeX = cx + dx + s * 6, footX = cx + dx + s * 11; t.line(cx + dx, hipY, kneeX, hipY + 26, 7, c, 4); t.line(kneeX, hipY + 26, footX, H - 4, 6, c, 3.5); t.ell(footX + 1, H - 3, 6, 2.6, shadeHex(c, 0.8), 2); for (let k = 0; k < 3; k++) t.line(footX - 3 + k * 3, H - 2, footX - 5 + k * 4, H, 1, bark[1], 1); };
     leg(-6, -sw, bark[1]);

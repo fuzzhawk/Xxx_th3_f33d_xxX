@@ -43,13 +43,14 @@ export function qIdx(P, r, g, b) {
 }
 
 export class TB {
-  constructor(w, h, s, seed) { this.w = w | 0; this.h = h | 0; this.s = s || 4; this.W = this.w * this.s; this.H = this.h * this.s; this.c = mk(this.W, this.H); this.x = cx2d(this.c); this.hb = new Float32Array(this.W * this.H); this.r = RNG(seed || 1); this.x.lineCap = 'round'; this.x.lineJoin = 'round'; }
+  // pad: an empty margin round the drawing (in output px), so nothing painted near the edge is cut off
+  constructor(w, h, s, seed, pad = 0) { this.w = w | 0; this.h = h | 0; this.s = s || 4; this.p = pad | 0; this.W = (this.w + 2 * this.p) * this.s; this.H = (this.h + 2 * this.p) * this.s; this.c = mk(this.W, this.H); this.x = cx2d(this.c); this.hb = new Float32Array(this.W * this.H); this.r = RNG(seed || 1); this.x.lineCap = 'round'; this.x.lineJoin = 'round'; this.x.translate(this.p * this.s, this.p * this.s); }
   _hRegion(x0, y0, x1, y1, fn) {
-    const s = this.s, W = this.W, H = this.H;
-    const X0 = Math.max(0, Math.floor(x0 * s)), Y0 = Math.max(0, Math.floor(y0 * s)), X1 = Math.min(W, Math.ceil(x1 * s)), Y1 = Math.min(H, Math.ceil(y1 * s));
-    for (let Y = Y0; Y < Y1; Y++) for (let X = X0; X < X1; X++) { const i = Y * W + X, v = fn((X + 0.5) / s, (Y + 0.5) / s, this.hb[i]); if (v !== undefined) this.hb[i] = v; }
+    const s = this.s, W = this.W, H = this.H, p = this.p;
+    const X0 = Math.max(0, Math.floor((x0 + p) * s)), Y0 = Math.max(0, Math.floor((y0 + p) * s)), X1 = Math.min(W, Math.ceil((x1 + p) * s)), Y1 = Math.min(H, Math.ceil((y1 + p) * s));
+    for (let Y = Y0; Y < Y1; Y++) for (let X = X0; X < X1; X++) { const i = Y * W + X, v = fn((X + 0.5) / s - p, (Y + 0.5) / s - p, this.hb[i]); if (v !== undefined) this.hb[i] = v; }
   }
-  fill(col, ht) { this.x.fillStyle = col; this.x.fillRect(0, 0, this.W, this.H); if (ht !== undefined) this.hb.fill(ht); return this; }
+  fill(col, ht) { this.x.save(); this.x.setTransform(1, 0, 0, 1, 0, 0); this.x.fillStyle = col; this.x.fillRect(0, 0, this.W, this.H); this.x.restore(); if (ht !== undefined) this.hb.fill(ht); return this; }
   rect(x, y, w, h, col, ht, bev) {
     const s = this.s; if (col) { this.x.fillStyle = col; this.x.fillRect(x * s, y * s, w * s, h * s); }
     if (ht !== undefined && ht !== null) { bev = bev || 0; this._hRegion(x, y, x + w, y + h, (px, py) => { if (!bev) return ht; const e = Math.min(px - x, x + w - px, py - y, y + h - py); return ht * clamp(e / bev, 0, 1); }); }
@@ -76,7 +77,7 @@ export class TB {
     const W = this.W, H = this.H, img = this.x.getImageData(0, 0, W, H), d = img.data, s = this.s;
     for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) {
       const i = Y * W + X; if (d[i * 4 + 3] < 8) continue;
-      if (mask && !mask(X / s, Y / s)) continue;
+      if (mask && !mask(X / s - this.p, Y / s - this.p)) continue;
       const u = X / s / sc, v = Y / s / sc, n = fbm(u, v, seed || 7, 3, period ? period / sc : 0) - 0.5, h = hash2(X, Y, seed || 7) - 0.5;
       const m = 1 + n * amt + h * amt * 0.35; d[i * 4] = clamp(d[i * 4] * m, 0, 255); d[i * 4 + 1] = clamp(d[i * 4 + 1] * m, 0, 255); d[i * 4 + 2] = clamp(d[i * 4 + 2] * m, 0, 255);
       if (hamt) this.hb[i] += n * hamt + h * hamt * 0.4;
@@ -100,7 +101,7 @@ export class TB {
   }
   // light + crush. P = palette, o = { dither, light, amb, dif, outline, hs, alphaCut, keepAlpha, hlift }
   finish(P, o) {
-    o = o || {}; const s = this.s, W = this.W, H = this.H, w = this.w, h = this.h;
+    o = o || {}; const s = this.s, W = this.W, H = this.H, w = this.w + 2 * this.p, h = this.h + 2 * this.p;
     const src = this.x.getImageData(0, 0, W, H).data, hb = this.hb, lit = new Float32Array(W * H * 4);
     const L = [-0.48, -0.57, 0.66], k = s * 0.5 * (o.hs === undefined ? 1 : o.hs), amb = o.amb === undefined ? 0.5 : o.amb, dif = o.dif === undefined ? 0.62 : o.dif, doLight = o.light !== false;
     for (let Y = 0; Y < H; Y++) {
@@ -128,7 +129,7 @@ export class TB {
         if (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1)) { d[q] = oc[0]; d[q + 1] = oc[1]; d[q + 2] = oc[2]; d[q + 3] = 255; }
       }
     }
-    ox.putImageData(img, 0, 0); out.data = d; return out;
+    ox.putImageData(img, 0, 0); out.data = d; out.pad = this.p; return out;
   }
 }
 // crush an already-drawn canvas into a palette with dither

@@ -82,7 +82,7 @@ export class Batch {
   // upright billboard: source rect (sx, sy, sw, sh) of canvas cv, foot at (x, z), base height h, k = stretch
   bb(cv, sx, sy, sw, sh, x, z, h, k, shade, al, ax, zb, scale = 1) {
     const r = atl(cv), S = R.AS, u0 = r[0] + sx / S, v0 = r[1] + sy / S, du = sw / S, dv = sh / S;
-    const X0 = x - (ax === undefined ? sw / 2 : ax) * scale, X1 = X0 + sw * scale, Y0 = h, Y1 = h + sh * k * scale, Z = z + (zb || 0), s = shade === undefined ? 1 : shade, a = al === undefined ? 1 : al;
+    const pd = sx === 0 && sy === 0 ? cv.pad || 0 : 0, X0 = x - (ax === undefined ? sw / 2 : ax) * scale, X1 = X0 + sw * scale, Y0 = h - pd * k * scale, Y1 = Y0 + sh * k * scale, Z = z + (zb || 0), s = shade === undefined ? 1 : shade, a = al === undefined ? 1 : al;
     this.v(X0, Y1, Z, 0, 0, u0, v0, -du, dv, s, a); this.v(X1, Y1, Z, 1, 0, u0, v0, -du, dv, s, a); this.v(X1, Y0, Z, 1, 1, u0, v0, -du, dv, s, a);
     this.v(X0, Y1, Z, 0, 0, u0, v0, -du, dv, s, a); this.v(X1, Y0, Z, 1, 1, u0, v0, -du, dv, s, a); this.v(X0, Y0, Z, 0, 1, u0, v0, -du, dv, s, a);
   }
