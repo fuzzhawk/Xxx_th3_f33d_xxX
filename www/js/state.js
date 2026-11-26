@@ -42,8 +42,7 @@ export const DEFAULTS = {
   gardenInFeed: true,      // garden cards in the day feed too
   bladeview: true,         // the Bladeview city card, early on and every 19 posts
   authorPit: false,        // the Author Pit (shelved, so off unless turned on)
-  extGames: true,          // Vitriol and Cave Crawler, taking turns every 17 posts
-  gardenPlantAlpha: 0.88   // how solid the garden's ground plants look (0.80–0.95)
+  extGames: true           // Vitriol and Cave Crawler, taking turns every 17 posts
 };
 
 export const settings = Object.assign(structuredClone(DEFAULTS), lsGet('settings', {}));

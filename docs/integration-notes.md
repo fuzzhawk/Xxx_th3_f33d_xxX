@@ -586,3 +586,70 @@ World v6 (`garden-metro.js`, run by `loadGarden` on a v5 save and by `newGarden`
   - The Author Pit (`settings.authorPit`, off while shelved)
 - **Jump to:** lists Vitriol and Cave Crawler among the games, with Bladeview and The Author Pit after them. Jumping to one fills the feed with only that card (`feed.js` `specialPost` and `extPost`).
 - **Names:** the app's own game names now win over a package's topic names. The W46 package still called the racer "Road Racer"; it now shows as Rail Raider in Jump to, in Game types and on the card header.
+
+## The garden, rebuilt on the Makhana engine (2026-11-26)
+The old garden (`games/garden*.js`: the 2D world, the dream layer, the metropolis, the railway, farming and the rest) is gone. In its place:
+- `games/mk/`: the MAKHANA prototype's engine, ported as modules.
+  - `tex.js`: the texture painter. It paints at 3–4× into a height buffer, lights the paint from the heights, box-downsamples, then Bayer-dithers into a palette.
+  - `gl.js`: the tilt-shift WebGL1 renderer. Billboards are stretched by 1/cos(pitch), cliffs and walls are extruded blocks, fog is by depth, and the post pass does depth of field or a tilt-shift strip, saturation, contrast and brightness. It adds an atlas, a sub-texture upload and unprojection to the ground.
+- `games/garden/`: the new garden. The GAMES key is still `garden`, so feed cards are unchanged.
+
+| File | What it holds |
+|---|---|
+| `lands.js` | Palettes, five families (green, rust, desert, ash, frost) with their cliffs, walls and water, 23 biomes, and the island kinds |
+| `art.js` | The painters: 64 px ground tiles, about 50 props, village houses, landmarks, city facades and roofs, 12 animals with walk cycles, the giants and the sky |
+| `world.js` | The world plan and the tiles, generated per chunk |
+| `scene.js` | Paint jobs in a time budget, chunk visuals in three levels of detail, the block atlas, island visuals |
+| `atmos.js` | Fog wisps, weather, lights and vignette |
+| `gfx.js` | The graphics options |
+| `game.js` | The game |
+
+- **The world:** 640 × 640 tiles of 16 px, made from a seed and never stored.
+  - **Biomes** sit in regions by family: the old country gone feral in the west, frost along the north, the rust belt in the middle, the glass desert in the south, and the ash country in the east.
+  - The 23 biomes:
+
+    | Family | Biomes |
+    |---|---|
+    | Green | Old Pasture, Tanglewood, Bleak Downs, Lotus Fen, The Old Growth, Drowned Avenues, The Greenwreck |
+    | Desert | The Sea of Glass, Redwall Mesas, Bleach Pans, Sweetwater, The Ossuary Flats |
+    | Rust | Withered Acres, Carcass Yards, Foundry Nine, Sour Mire, The Pylon Steppe |
+    | Ash | Cinder Wastes, The Wound, Mycel Gardens, Crown Boulevard (the city) |
+    | Frost | Frostbite Moor, Black Taiga |
+
+  - **Rivers and roads:** three meandering rivers. Roads form a spanning tree over the villages and the city gates, with bridges over the water.
+  - **Villages:** 15 villages of weathered houses in the style of their family: cottages and shacks, adobe huts, log huts, bunkers. Each has a well, a water tower or windpump, fire barrels, washing lines, a cart, fences, crops, and villagers.
+  - **The ruined city:** a street grid of extruded tower blocks with concrete, brick, rusted-cladding, dead-glass and tile facades, broken tops, fallen lots and overgrown parks.
+  - **Islands:** seven floating islands, 170–300 px up (moor, orchard, the last airship, a quiet spire, a pale shelf). Each has a landmark and a rock skirt hanging below.
+- **The people:**
+  - The walker and the villagers, road wanderers and city scavengers are Crystal Sprite people.
+  - Each frame is graded darker and less saturated as it is copied into a slot texture, so many people cost one draw call.
+- **The giant gardeners:** three mossy colossi with branch antlers and a lantern. They stride across the green and the rust, about seven times a person's height.
+  - They are drawn with a thinner fog and nearer the focal plane, so they loom out of the haze from far off.
+- **Animals:** deer, boars, feral hounds, gaunt horses, scrawny cattle, goats, rats, lizards, beetles, crows (which take off), herons and moths (which glow at dusk).
+  - They are painted per family palette and spawned by biome.
+  - They wander, and most flee when you come close.
+- **Playing:** exploration only.
+  - Drag anywhere for a stick, or tap a spot to walk there; tap a person to be greeted.
+  - Walk into a lift tower's cage and it lifts you up to its island, with the country falling away below. The pad on the island takes you down again.
+  - The autopilot wanders between villages and lifts until you touch the card.
+- **The view:**
+  - It runs in Makhana's DRIFTER look: camera 22°, lens 60°, depth of field.
+  - Props standing between you and the camera dither see-through.
+  - From an island, the camera draws farther and the fog thins, so the country below shows far off in the haze.
+  - The light follows the feed's mode: a pale dawn, an overcast day, a dusk that lights the windows, fires and lanterns.
+- **The menu** (☰, top right) holds:
+  - **Map:** the world's biomes, with the country you haven't walked dimmed, plus villages, islands, giants and you.
+  - **Graphics:** presets (Drifter, Diorama, Miniature, Low Angle, Classic, Crisp HD, Battery Saver, No Blur) and every knob: focus mode, resolution, view size, camera, lens, blur, focus range and distance, saturation, contrast, brightness, depth fog, fog wisps, weather, vignette, fades and frame rate.
+  - **Back to** your home village, and **Close**.
+- **Saving:**
+  - `localStorage` key `garden3`: the seed, where you are, and the chunks you have walked.
+  - Graphics are saved in `garden.gfx`.
+  - The old garden's IndexedDB save is left untouched and unused.
+- **Settings:** the garden plant opacity slider went with the old garden.
+- **Cost:**
+  - JS is about 1.5 ms a frame. The rest is the GPU, mostly the depth-of-field pass, which is about 34 taps a pixel at 2× resolution.
+  - In software GL here that is about 80 ms; a phone GPU does it in a few. Battery Saver and the Resolution slider are there if a phone struggles.
+  - Chunk textures and buffers are freed when the card leaves the screen.
+- **Tested** with no errors:
+  - The start village, the city, all five families, an island, a lift ride up, the menu, the map and the graphics sliders.
+  - The autopilot wandering, stopping and restarting, and the card in the feed.
