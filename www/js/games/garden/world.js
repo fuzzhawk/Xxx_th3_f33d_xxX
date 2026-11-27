@@ -9,6 +9,8 @@
 import { RNG, fbm, hash2, clamp, lerp } from '../mk/tex.js';
 import { BIOMES, BIOME_KEYS, REGION, ISLES, CAVES, TREASURES, ROOFTOP, UNDER, WALKWAY } from './lands.js';
 import { PROPDEF } from './art.js';
+import { SkyLayer, DeepLayer, SKY_H, DEEP_H } from './layers.js';
+export { SKY_H, DEEP_H };
 
 export const TS = 16, CS = 16, WT = 1024, NC = WT / CS, STEP = 24, NOLO = -32768;
 export const K_GROUND = 0, K_PATH = 1, K_FLOOR = 2, K_WATER = 3, K_CLIFF = 4, K_WALL = 5, K_BRIDGE = 6, K_TOXIC = 7, K_BLDG = 8, K_STREET = 9, K_TRUNK = 10, K_VOID = 255;
@@ -43,12 +45,13 @@ export class World {
     this.seed = seed >>> 0; const r = RNG(this.seed ^ 0x9a7d), W = WT;
     this.bc = new Uint8Array(W * W).fill(255); this.ag = new Float32Array((W / 8 + 2) * (W / 8 + 2)).fill(-1);
     this.mountains = []; this.canyons = []; this.places = []; this.canopies = []; this.treasures = [];
-    // the city: a ruined grid at the rust belt's edge
-    this.city = { x0: Math.round(W * 0.58), y0: Math.round(W * 0.34), x1: Math.round(W * 0.58) + 120, y1: Math.round(W * 0.34) + 100, grid: 12 };
+    // the city: a living heart of lit towers (the tallest of them up into the sky realm) in a ring of ruins
+    this.city = { x0: Math.round(W * 0.5), y0: Math.round(W * 0.27), x1: Math.round(W * 0.5) + 204, y1: Math.round(W * 0.27) + 168, grid: 12 };
     this.cityE = Math.round(this.baseAt((this.city.y0 + this.city.y1) / 2) / 8) * 8;   // the city stands level at the height of its country
+    this.planCity(r);
     // biome sites in their region
     this.sites = [];
-    BIOME_KEYS.forEach((k, bi) => { const B = BIOMES[k]; if (k === 'crown') return; const R = REGION[B.reg || B.fam], n = B.fam === 'green' ? 5 : 4; for (let i = 0; i < n; i++) this.sites.push({ x: lerp(R[0], R[2], r.f()) * W, y: lerp(R[1], R[3], r.f()) * W, b: bi }); });
+    BIOME_KEYS.forEach((k, bi) => { const B = BIOMES[k]; if (k === 'crown' || B.layer) return; const R = REGION[B.reg || B.fam], n = B.fam === 'green' ? 5 : 4; for (let i = 0; i < n; i++) this.sites.push({ x: lerp(R[0], R[2], r.f()) * W, y: lerp(R[1], R[3], r.f()) * W, b: bi }); });
     // the rivers: from the north edge south, wandering
     this.water = new SegIndex(); this.rivers = [];
     for (let i = 0; i < 4; i++) { const x0 = r.range(0.1, 0.9) * W, x1 = clamp(x0 + r.range(-220, 220), 30, W - 30), pts = meander(r, [[x0, -4], [x1, W + 4]], 7, 0.26); this.rivers.push(pts); const w = r.range(1.3, 2.4); for (let k = 1; k < pts.length; k++) this.water.add(pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1], w, 'river'); }
@@ -92,14 +95,6 @@ export class World {
         Cn.L = s; this.canyons.push(Cn); break;
       }
     }
-    // the floating islands, high up, each over the lift tower that rides straight up to it
-    const isleKeys = Object.keys(ISLES).filter((k) => !ISLES[k].canopy), spots = [[0.24, 0.44], [0.36, 0.74], [0.14, 0.86], [0.62, 0.2], [0.86, 0.46], [0.72, 0.84], [0.44, 0.12], [0.5, 0.58]];
-    spots.forEach(([fx, fy], i) => {
-      const x = Math.round(fx * W + r.range(-40, 40)), y = Math.round(fy * W + r.range(-40, 40)), rad = r.int(14, 21), key = isleKeys[i % isleKeys.length];
-      // high over whatever lies under it (the northern heights and their peaks included), by a good way
-      let gmax = 0; for (let j = -rad - 4; j <= rad + 4; j += 4) for (let i = -rad - 4; i <= rad + 4; i += 4) gmax = Math.max(gmax, this.rise(x + i, y + j, BIOMES.pasture));
-      this.places.push({ i: this.places.length, kind: 'isle', key, x, y, rad, h: Math.max(r.int(560, 760), gmax + r.int(360, 460)), seed: r.int(1, 1e9), lift: null, pad: null, lm: { x: x + r.int(-2, 2), y: y - Math.round(rad * 0.32) } });
-    });
     // the giant trees in the forests, their canopies a world of their own up a basket lift
     for (let t = 0; t < 1500 && this.canopies.length < 4; t++) {
       const fam = r.chance(0.7) ? 'dream' : 'green', R = REGION[fam], x = Math.round(lerp(R[0], R[2], r.f()) * W), y = Math.round(lerp(R[1], R[3], r.f()) * W);
@@ -115,11 +110,8 @@ export class World {
       cave.lm = { x: cave.x, y: cave.y - Math.round(cave.rad * 0.35) }; cave.exit = { x: cave.x, y: cave.y + cave.rad - 3 };
       cave.mouth = this.canyonMouth(Cn); if (cave.mouth) { this.places.push(cave); Cn.cave = cave; }
     }
-    // island lift towers: on open ground right under each island
-    for (const I of this.places) if (I.kind === 'isle') {
-      for (let t = 0; t < 200 && !I.lift; t++) { const lx = I.x + r.int(-8, 8), ly = I.y + Math.round(I.rad * 0.25) + r.int(-5, 5), ti = this.tileInfo(lx, ly); if (ti.k === K_GROUND && this.flat(lx, ly, 1) && this.canyonAt(lx, ly).d > 3 && !this.villageAt(lx, ly, 3)) I.lift = { x: lx, y: ly }; }
-      I.lift ||= { x: I.x, y: I.y + Math.round(I.rad * 0.25) }; I.pad = { ...I.lift };
-    }
+    // the sky realm and the deep: worlds of their own above and below, with the ways between
+    this.sky = new SkyLayer(this, r); this.deep = new DeepLayer(this, r); this.ways = [...this.sky.ways, ...this.deep.ways];
     // the twelve treasures
     const tr = RNG(this.seed ^ 0x7eaf);
     TREASURES.forEach(([name, where, land, tag], i) => {
@@ -135,7 +127,7 @@ export class World {
       } else if (where === 'mountain') { const M = this.mountains.reduce((a, b) => (b.peak > a.peak ? b : a), this.mountains[0]); if (M) { T.lx = M.top.x; T.ly = M.top.y; M.cairn = T; } else { T.lx = this.villages[0].x + 12; T.ly = this.villages[0].y; } }
       else if (where === 'canyon') { const Cn = this.canyons[0]; if (Cn) { const [px, py] = this.canyonPoint(Cn, Cn.L * 0.62); T.lx = Math.round(px); T.ly = Math.round(py); } else { T.lx = this.villages[1].x + 12; T.ly = this.villages[1].y; } }
       else if (where === 'cave') { const P = this.places.find((p) => p.kind === 'cave' && p.key === tag) || this.places.find((p) => p.kind === 'cave' && !p.treasure); if (P) { T.place = P; T.lx = P.lm.x; T.ly = P.lm.y; P.treasure = T; } }
-      else if (where === 'isle') { const P = this.places.find((p) => p.kind === 'isle' && p.key === tag); if (P) { T.place = P; T.lx = P.lm.x; T.ly = P.lm.y; P.treasure = T; } }
+      else if (where === 'isle') { const I = this.sky.islands.find((p) => p.key === tag && !p.treasure) || this.sky.islands.find((p) => !p.treasure); if (I) { T.place = this.sky; T.lx = I.lm.x + 3; T.ly = I.lm.y + 2; I.treasure = T; } }
       else if (where === 'canopy') { const P = this.canopies[0]; if (P) { T.place = P; T.lx = P.nest.x; T.ly = P.nest.y; P.treasure = T; } }
       if (!T.lx && !T.place) { T.lx = this.villages[0].x + 10; T.ly = this.villages[0].y + 6; }
       T.cx = T.lx + 2; T.cy = T.ly + 1;   // the chest, beside its landmark
@@ -146,43 +138,44 @@ export class World {
     this.home = home; this.start = { x: home.x * TS + 8, y: (home.y + home.rad + 2) * TS };
     // the giants' country: the greens and the dream, and the rust
     this.giantHome = [[0.05, 0.2, 0.55, 0.95], [0.42, 0.14, 0.78, 0.6]];
-    // the sky bridges: a spanning tree over the islands, each bridge a narrow deck sagging between them
-    const isles = this.places.filter((p) => p.kind === 'isle'), linked = [isles[0]], walks = [];
-    while (linked.length < isles.length) { let best = null, bd = 1e9; for (const A of linked) for (const B of isles) { if (linked.includes(B)) continue; const d = Math.hypot(A.x - B.x, A.y - B.y); if (d < bd) { bd = d; best = [A, B]; } } linked.push(best[1]); walks.push(best); }
-    for (const [A, B] of walks) this.makeWalk(A, B, r, { w: 1.5, sag: 30, ea: A.rad * 0.5, eb: B.rad * 0.5, group: 'sky' });
-    for (const I of isles) I.group = 'sky';
-    // the city's roof gardens, each up a lift on the street, joined to its neighbours by plank bridges
-    const C2 = this.city, nx = Math.floor((C2.x1 - C2.x0) / C2.grid), ny = Math.floor((C2.y1 - C2.y0) / C2.grid), lots = [];
-    for (let lj = 0; lj < ny - 1; lj++) for (let li = 0; li < nx; li++) { const lot = li * 97 + lj, lr = hash2(lot, 7, this.seed); if (lr >= 0.12 && lr <= 0.82) lots.push({ li, lj, lot, k: hash2(lot, 29, this.seed) }); }
-    lots.sort((a, b) => a.k - b.k);
-    this.roofLots = new Map(); const roofs = [];
-    for (const L of lots) {
-      if (roofs.length >= 9) break; if (roofs.some((o) => Math.abs(o.li - L.li) + Math.abs(o.lj - L.lj) < 2)) continue;
-      const inset = 1 + Math.floor(hash2(L.lot, 3, this.seed) * 2), lx0 = C2.x0 + L.li * C2.grid, ly0 = C2.y0 + L.lj * C2.grid, x0 = lx0 + 3 + inset, x1 = lx0 + C2.grid - 1 - (inset > 1 ? 1 : 0), y0 = ly0 + 3 + inset, y1 = ly0 + C2.grid - 1;
-      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, tall = 1 - Math.hypot((cx - (C2.x0 + C2.x1) / 2) / (C2.x1 - C2.x0), (cy - (C2.y0 + C2.y1) / 2) / (C2.y1 - C2.y0)) * 1.6, hb = Math.round(48 + clamp(tall, 0, 1) * 110 * (0.5 + hash2(L.lot, 11, this.seed) * 0.8));
-      const mx = Math.round(cx), Pr = { i: this.places.length, kind: 'roof', key: 'roof', group: 'roofs', x: mx, y: Math.round(cy), rad: Math.max(x1 - x0, y1 - y0) / 2, x0, y0, x1, y1, hb, h: hb + 1 + this.cityE, seed: r.int(1, 1e9), li: L.li, lj: L.lj, lift: { x: mx, y: y1 + 1 }, pad: { x: mx, y: y1 } };
-      Pr.lm = { x: mx, y: Math.round(cy) }; this.places.push(Pr); roofs.push(Pr); this.roofLots.set(L.lot, Pr);
-    }
-    for (const A of roofs) { const B = roofs.filter((o) => o !== A && !(o.links || []).some((w) => w.a === A || w.b === A)).sort((a, b) => Math.hypot(a.x - A.x, a.y - A.y) - Math.hypot(b.x - A.x, b.y - A.y))[0]; if (B && Math.hypot(B.x - A.x, B.y - A.y) < 34) this.makeWalk(A, B, r, { w: 1.1, sag: 6, ea: A.rad * 0.6, eb: B.rad * 0.6, group: 'roofs', roof: true, straight: true }); }
-    // the undercity: brick halls and brass works under the streets, down stairwells at three crossings
-    const U = { i: this.places.length, kind: 'under', key: 'under', group: 'under', x: W + 400, y: 40, rad: 36, h: 0, seed: r.int(1, 1e9), gates: [] };
-    const gl = [[1, 1], [Math.max(2, nx - 3), 2], [Math.floor(nx / 2), Math.max(3, ny - 2)]];
-    gl.forEach(([li, lj], k) => { U.gates.push({ x: C2.x0 + li * C2.grid + 2, y: C2.y0 + lj * C2.grid + 1, cell: [[1, 1], [6, 2], [3, 6]][k] }); });
-    this.places.push(U); this.under = U;
     this.chunks = new Map(); this.placeCache = new Map();
   }
-  // a walkway between two places (islands or roofs): a polyline sagging between their heights; a place of its own
-  makeWalk(A, B, r, o) {
-    const dx = B.x - A.x, dy = B.y - A.y, L0 = Math.hypot(dx, dy) || 1, ux = dx / L0, uy = dy / L0, p0 = [A.x + 0.5 + ux * o.ea, A.y + 0.5 + uy * o.ea], p1 = [B.x + 0.5 - ux * o.eb, B.y + 0.5 - uy * o.eb];
-    const pts = o.straight ? [p0, p1] : meander(r, [p0, p1], 2, 0.05); let L = 0; const cum = [0]; for (let k = 1; k < pts.length; k++) { L += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); cum.push(L); }
-    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]), m = Math.ceil(o.w) + 3, ox = Math.floor(Math.min(...xs)) - m, oy = Math.floor(Math.min(...ys)) - m;
-    const Wk = { i: this.places.length, kind: 'walk', key: o.roof ? 'roofwalk' : 'walk', group: o.group, roof: !!o.roof, a: A, b: B, pts, cum, L, w: o.w, sag: o.sag, ox, oy, nw: Math.ceil(Math.max(...xs)) + m - ox, nh: Math.ceil(Math.max(...ys)) + m - oy, x: Math.round((p0[0] + p1[0]) / 2), y: Math.round((p0[1] + p1[1]) / 2), rad: L / 2, seed: r.int(1, 1e9) };
-    Wk.h = Math.round((A.h + B.h) / 2); Wk.hAt = (s2) => { const t = clamp(s2 / L, 0, 1); return Math.round(lerp(A.h, B.h, t) - o.sag * Math.sin(Math.PI * t)); };
-    this.places.push(Wk); (A.links ||= []).push(Wk); (B.links ||= []).push(Wk); Wk.links = [A, B];
-    return Wk;
+  // the city's lots: in its heart, lit towers on every lot but a few plazas (and the tallest up to the sky realm);
+  // outside it, the ruins as they were. Skybridges at several heights between neighbouring towers, neon down their faces.
+  planCity(r) {
+    const C = this.city, g = C.grid, nx = Math.floor((C.x1 - C.x0) / g), ny = Math.floor((C.y1 - C.y0) / g), ccx = (C.x0 + C.x1) / 2, ccy = (C.y0 + C.y1) / 2, s = this.seed;
+    this.lots = new Map(); this.skyTowers = []; this.slabs = []; this.signs = []; this.greatLifts = [];
+    const towers = [];
+    for (let lj = 0; lj < ny; lj++) for (let li = 0; li < nx; li++) {
+      const lot = li * 97 + lj, lx0 = C.x0 + li * g, ly0 = C.y0 + lj * g, d = Math.hypot((lx0 + g / 2 - ccx) / ((C.x1 - C.x0) / 2), (ly0 + g / 2 - ccy) / ((C.y1 - C.y0) / 2));
+      const core = d < 0.58 || (d < 0.76 && hash2(lot, 41, s) < 0.45); if (!core) continue;
+      const inset = 1 + Math.floor(hash2(lot, 3, s) * 2), L = { li, lj, lot, core: true, d, x0: lx0 + 3 + inset, x1: lx0 + g - 1 - (inset > 1 ? 1 : 0), y0: ly0 + 3 + inset, y1: ly0 + g - 1 };
+      L.plaza = hash2(lot, 43, s) < 0.07;
+      if (!L.plaza) { L.h = Math.round(150 + Math.pow(clamp(1 - d / 0.8, 0, 1), 1.3) * 780 * (0.55 + hash2(lot, 11, s) * 0.7)); L.f = 6 + Math.floor(hash2(lot, 17, s) * 3); L.mx = Math.round((L.x0 + L.x1) / 2); towers.push(L); }
+      this.lots.set(lot, L);
+    }
+    // the tallest: up through the clouds to the sky realm, their tops made into gardens
+    towers.sort((a, b) => a.d - b.d);
+    for (const L of towers) { if (this.skyTowers.length >= 9) break; if (this.skyTowers.some((T) => Math.abs(T.li - L.li) + Math.abs(T.lj - L.lj) < 2)) continue; L.h = SKY_H - this.cityE - 1; L.sky = true; this.skyTowers.push(L); }
+    // skybridges between neighbouring towers, at a few heights each
+    for (const A of towers) for (const [di, dj] of [[1, 0], [0, 1]]) {
+      const B = this.lots.get((A.li + di) * 97 + A.lj + dj); if (!B || B.plaza || !B.h) continue;
+      for (let k = 0; k < 3; k++) {
+        const H = 90 + k * 170 + Math.round(hash2(A.lot + k, B.lot, s) * 50); if (H + 50 > Math.min(A.h, B.h) || hash2(A.lot, k * 7 + di, s) < 0.35) continue;
+        const y0 = this.cityE + H, sl = di ? { X0: (A.x1 + 1) * TS, X1: B.x0 * TS, Z0: (Math.max(A.y0, B.y0) + 2) * TS, Z1: (Math.max(A.y0, B.y0) + 4) * TS, y0, y1: y0 + 12 } : { X0: (Math.max(A.x0, B.x0) + 2) * TS, X1: (Math.max(A.x0, B.x0) + 4) * TS, Z0: (A.y1 + 1) * TS, Z1: B.y0 * TS, y0, y1: y0 + 12 };
+        if (sl.X1 > sl.X0 && sl.Z1 > sl.Z0) this.slabs.push(sl);
+      }
+    }
+    // neon down the towers' street faces, and the big lit boards high on the tallest
+    for (const L of towers) { const n = 1 + Math.floor(hash2(L.lot, 51, s) * 3); for (let k = 0; k < n; k++) { const x = L.x0 + Math.floor(hash2(L.lot, 52 + k, s) * (L.x1 - L.x0 + 1)), H = 30 + hash2(L.lot, 60 + k, s) * Math.min(L.h - 50, 380); this.signs.push({ type: 'neonsign', x, y: L.y1 + 1, h: H, v: Math.floor(hash2(L.lot, 70 + k, s) * 3) }); } if (L.h > 420) this.signs.push({ type: 'holo', x: L.mx, y: L.y1 + 1, h: 200 + hash2(L.lot, 80, s) * Math.min(L.h - 300, 500), v: Math.floor(hash2(L.lot, 81, s) * 3) }); }
+    // the great lifts down to the deep: at three crossings near the heart
+    const ci = Math.floor((ccx - C.x0) / g), cj = Math.floor((ccy - C.y0) / g);
+    for (const [di, dj] of [[-2, 0], [2, -1], [0, 2]]) this.greatLifts.push([C.x0 + (ci + di) * g + 1, C.y0 + (cj + dj) * g + 1]);
   }
-  // nearest point of a walk's line to (x, y): [distance, arclength, side]
-  walkNear(Wk, x, y) { let bd = 1e9, bs = 0, side = 0; const P = Wk.pts; for (let k = 1; k < P.length; k++) { const [ax, ay] = P[k - 1], [bx, by] = P[k], dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1, t = clamp(((x - ax) * dx + (y - ay) * dy) / l2, 0, 1), px = ax + dx * t, py = ay + dy * t, d = Math.hypot(x - px, y - py); if (d < bd) { bd = d; bs = Wk.cum[k - 1] + Math.sqrt(l2) * t; side = Math.sign(dx * (y - ay) - dy * (x - ax)); } } return [bd, bs, side]; }
+  towerAt(x, y) { for (const T of this.skyTowers) if (x >= T.x0 && x <= T.x1 && y >= T.y0 && y <= T.y1) return T; return null; }
+  // the living heart's lot under a tile (null in the ruins and outside the city)
+  coreAt(x, y) { const C = this.city; if (!this.inCity(x, y)) return null; return this.lots.get(Math.floor((x - C.x0) / C.grid) * 97 + Math.floor((y - C.y0) / C.grid)) || null; }
+  towersNear(x, y, m) { return this.skyTowers.some((T) => x >= T.x0 - m && x <= T.x1 + m && y >= T.y0 - m && y <= T.y1 + m); }
   inCity(x, y, m = 0) { const C = this.city; return x >= C.x0 - m && x <= C.x1 + m && y >= C.y0 - m && y <= C.y1 + m; }
   villageAt(x, y, m = 0) { for (const v of this.villages) if (Math.hypot(v.x - x, v.y - y) <= v.rad + m) return v; return null; }
   // the biome under a tile: the city's rect, else the nearest site after a warp (cached)
@@ -255,12 +248,13 @@ export class World {
       out.e = this.cityE;
       const C = this.city, gx = (x - C.x0) % C.grid, gy = (y - C.y0) % C.grid, lot = Math.floor((x - C.x0) / C.grid) * 97 + Math.floor((y - C.y0) / C.grid);
       if (gx < 3 || gy < 3) { out.k = K_STREET; return out; }
+      const L = this.lots.get(lot);
+      if (L) { if (L.plaza || x < L.x0 || x > L.x1 || y < L.y0 || y > L.y1) { out.k = K_FLOOR; return out; } out.k = K_BLDG; out.h = L.h; out.f = L.f; return out; }
       const lr = hash2(lot, 7, s), park = lr < 0.12, ruin = lr > 0.82;
       if (park) return out;
       const inset = 1 + Math.floor(hash2(lot, 3, s) * 2);
       if (gx < 3 + inset || gy < 3 + inset || gx > C.grid - 1 - (inset > 1 ? 1 : 0) || gy > C.grid - 1) { out.k = K_FLOOR; return out; }
       if (ruin) { if (hash2(x, y, s + 4) < 0.45) { out.k = K_WALL; out.h = 8 + Math.round(hash2(x, y, s + 5) * 3) * 8; out.f = 2; } else out.k = K_FLOOR; return out; }
-      const roof = this.roofLots?.get(lot); if (roof) { out.k = K_BLDG; out.h = roof.hb; out.f = 1 + (Math.floor(hash2(lot, 17, s) * 5)); return out; }
       const tall = 1 - Math.hypot((x - (C.x0 + C.x1) / 2) / (C.x1 - C.x0), (y - (C.y0 + C.y1) / 2) / (C.y1 - C.y0)) * 1.6;
       out.k = K_BLDG; out.h = Math.round(40 + clamp(tall, 0, 1) * 150 * (0.5 + hash2(lot, 11, s) * 0.8) + hash2(lot, 13, s) * 30); out.f = 1 + (Math.floor(hash2(lot, 17, s) * 5));
       if (hash2(lot, 19, s) < 0.3) out.h -= Math.round(hash2(x, y, s + 23) * out.h * 0.4);   // broken tops
@@ -302,7 +296,7 @@ export class World {
     const key = cy * 1000 + cx; let C = this.chunks.get(key); if (C) return C;
     const n = CS + 2, N = n * n, b = new Uint8Array(N), k = new Uint8Array(N), e = new Int16Array(N), h = new Float32Array(N), f = new Uint8Array(N), lo = new Int16Array(N), x0 = cx * CS - 1, y0 = cy * CS - 1;
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const t = this.tileInfo(x0 + i, y0 + j), q = j * n + i; b[q] = t.b; k[q] = t.k; e[q] = t.e; h[q] = t.h; f[q] = t.f; lo[q] = t.lo; }
-    C = { cx, cy, b, k, e, h, f, lo, n, solid: new Uint8Array(CS * CS), props: [], decals: [], lights: [], shafts: [] };
+    C = { cx, cy, b, k, e, h, f, lo, n, solid: new Uint8Array(CS * CS), props: [], decals: [], lights: [], shafts: [], slabs: [], clouds: [] };
     const at = (i, j) => (j + 1) * n + i + 1;
     for (let j = 0; j < CS; j++) for (let i = 0; i < CS; i++) { const kk = k[at(i, j)]; if (kk === K_TOXIC || kk === K_BLDG || kk === K_CLIFF || kk === K_TRUNK) C.solid[j * CS + i] = 1; }
     let flat = true; for (let q = 1; q < N; q++) if (e[q] !== e[0]) { flat = false; break; } C.flat = flat;
@@ -323,7 +317,7 @@ export class World {
     for (const P of this.places) { hold(P.lift, 2); hold(P.mouth, 2); }
     for (const Cn of this.canyons) for (const L of Cn.lifts) { hold(L.top, 1); hold(L.bot, 1); }
     for (const T of this.treasures) if (!T.place) { hold({ x: T.lx, y: T.ly }, 2); hold({ x: T.cx, y: T.cy }, 1); }
-    for (const g of this.under?.gates || []) hold(g, 1);
+    for (const w of this.ways) hold({ x: w.gx, y: w.gy }, 2);
     const ground = (i, j) => k[at(i, j)] === K_GROUND, free = (i, j) => i >= 0 && j >= 0 && i < CS && j < CS && ground(i, j) && !C.solid[j * CS + i] && !edge(i, j) && !keep.has(j * CS + i);
     // villages whose houses fall in this chunk
     for (const v of this.villages) {
@@ -339,15 +333,25 @@ export class World {
     // lifts: towers under the islands (a cable running up out of sight), baskets at the giant trees, cages on the canyon rims
     for (const P of this.places) {
       const L = P.lift; if (!L || !inChunk(L.x, L.y)) continue; const le = eAt(L.x, L.y);
-      if (P.kind === 'isle') { place('lifttower', L.x * TS + 8, L.y * TS + 12, ISLES[P.key].fam, 0, { lift: P }); C.lights.push({ x: L.x * TS + 8, y: L.y * TS + 12, h: le + 116, r: 30, c: [255, 190, 110], beacon: 1 }); C.shafts.push({ x: L.x * TS + 8, y: L.y * TS + 10, y0: le + 118, y1: P.h - 40 }); }
-      else if (P.kind === 'roof') { place('liftpad', L.x * TS + 8, L.y * TS + 12, 'rust', 0, { lift: P }); C.lights.push({ x: L.x * TS + 8, y: L.y * TS + 12, h: le + 20, r: 22, c: [255, 190, 110], beacon: 1 }); C.shafts.push({ x: L.x * TS + 8, y: L.y * TS + 6, y0: le + 6, y1: P.h + 24 }); }
+      if (P.kind === 'roof') { place('liftpad', L.x * TS + 8, L.y * TS + 12, 'rust', 0, { lift: P }); C.lights.push({ x: L.x * TS + 8, y: L.y * TS + 12, h: le + 20, r: 22, c: [255, 190, 110], beacon: 1 }); C.shafts.push({ x: L.x * TS + 8, y: L.y * TS + 6, y0: le + 6, y1: P.h + 24 }); }
       else if (P.kind === 'canopy') { place('basket', L.x * TS + 8, L.y * TS + 12, 'dream', 0, { lift: P }); C.lights.push({ x: L.x * TS + 8, y: L.y * TS + 12, h: le + 20, r: 22, c: [255, 210, 120] }); C.shafts.push({ x: L.x * TS + 8, y: L.y * TS + 10, y0: le + 28, y1: P.h, rope: 1 }); }
     }
     for (const Cn of this.canyons) for (const L of Cn.lifts) {
       if (inChunk(L.top.x, L.top.y)) { place('headframe', L.top.x * TS + 8, L.top.y * TS + 12, Cn.fam, 0, { clift: L }); C.lights.push({ x: L.top.x * TS + 8, y: L.top.y * TS + 12, h: eAt(L.top.x, L.top.y) + 40, r: 26, c: [255, 190, 110], beacon: 1 }); }
       if (inChunk(L.bot.x, L.bot.y)) { const be = eAt(L.bot.x, L.bot.y); place('basket', L.bot.x * TS + 8, L.bot.y * TS + 12, Cn.fam, 1, { clift: L }); C.shafts.push({ x: L.bot.x * TS + 8, y: L.bot.y * TS + 10, y0: be + 28, y1: be + Cn.depth + 30, rope: 1 }); C.lights.push({ x: L.bot.x * TS + 8, y: L.bot.y * TS + 12, h: be + 18, r: 22, c: [255, 200, 120] }); }
     }
-    for (const g of this.under?.gates || []) if (inChunk(g.x, g.y)) { place('stairs', g.x * TS + 8, g.y * TS + 12, 'rust', 0, { gate: g }); C.lights.push({ x: g.x * TS + 8, y: g.y * TS + 12, h: this.cityE + 20, r: 30, c: [255, 220, 160] }); }
+    // the ways up and down: lift towers under the islands, elevators up the sky towers' faces, great lifts in the city
+    // and the canyons' floors down to the deep
+    for (const w of this.ways) {
+      if (!inChunk(w.gx, w.gy)) continue; const x = w.gx * TS + 8, y = w.gy * TS + 12, le = eAt(w.gx, w.gy);
+      if (w.kind === 'isle') { place('lifttower', x, y, 'dream', 0, { way: w }); C.lights.push({ x, y, h: le + 116, r: 30, c: [255, 190, 110], beacon: 1 }); C.shafts.push({ x, y: y - 2, y0: le + 118, y1: SKY_H - 60 }); }
+      else if (w.kind === 'tower') { place('liftpad', x, y, 'rust', 0, { way: w }); C.lights.push({ x, y, h: le + 20, r: 24, c: [140, 230, 255], beacon: 1 }); C.shafts.push({ x, y: y - 6, y0: le + 6, y1: SKY_H }); }
+      else { place('chasm', x, y + 4, 'rust', 0, { way: w }); place('headframe', x, y - 2, 'rust', 0); C.lights.push({ x, y, h: le + 30, r: 34, c: [255, 200, 130], beacon: 1 }); }
+    }
+    if (this.inCity(X0 + CS / 2, Y0 + CS / 2, CS)) {
+      for (const sg of this.signs) if (inChunk(sg.x, sg.y)) { C.props.push({ type: sg.type, x: sg.x * TS + 8, y: sg.y * TS + 2, fam: 'neon', v: sg.v, e: this.cityE + sg.h, sign: 1 }); C.lights.push({ x: sg.x * TS + 8, y: sg.y * TS + 2, h: this.cityE + sg.h + 14, r: sg.type === 'holo' ? 60 : 30, c: [[255, 90, 176], [68, 208, 224], [255, 211, 110]][sg.v % 3] }); }
+      for (const sl of this.slabs) if (inChunk(Math.floor(sl.X0 / TS), Math.floor(sl.Z0 / TS))) { C.slabs.push(sl); C.lights.push({ x: (sl.X0 + sl.X1) / 2, y: sl.Z1, h: sl.y0 - 2, r: 22, c: [180, 220, 255] }); }
+    }
     for (const P of this.places) if (P.kind === 'cave' && P.mouth && inChunk(P.mouth.x, P.mouth.y)) { const m = P.mouth; place('cavemouth', m.x * TS + 8, m.y * TS + 6, 'cave', 0, { mouth: P }); C.lights.push({ x: m.x * TS + 8, y: m.y * TS + 6, h: eAt(m.x, m.y) + 14, r: 30, c: [140, 230, 210] }); }
     // the treasures on the ground: a landmark, and a chest beside it
     for (const T of this.treasures) if (!T.place) {
@@ -359,6 +363,13 @@ export class World {
     for (let j = 0; j < CS; j++) for (let i = 0; i < CS; i++) {
       const x = X0 + i, y = Y0 + j, kk = k[at(i, j)], B = BIOMES[BIOME_KEYS[C.b[at(i, j)]]], fam = B.fam, rr = (q) => hash2(x * 7 + q, y * 13 + q * 3, s + 101);
       if (keep.has(j * CS + i) && (kk === K_STREET || kk === K_FLOOR)) continue;
+      const lotL = kk === K_FLOOR || kk === K_STREET ? this.lots.get(Math.floor((x - this.city.x0) / this.city.grid) * 97 + Math.floor((y - this.city.y0) / this.city.grid)) : null;
+      if (lotL && this.inCity(x, y)) {
+        // the living heart: lamps in pink and blue and amber, stalls and their lanterns, wet streets
+        if (kk === K_STREET) { if ((x + y * 3) % 7 === 0 && rr(1) < 0.6) { place('lamp', x * TS + 4, y * TS + 8, 'neon'); C.lights.push({ x: x * TS + 6, y: y * TS + 8, h: this.cityE + 30, r: 26, c: [[255, 90, 176], [68, 208, 224], [255, 211, 110]][Math.floor(rr(2) * 3)] }); } if (rr(3) < 0.08) C.decals.push({ type: 'puddle', x, y, fam: 'neon' }); }
+        else if (rr(4) < 0.05 && free(i, j)) { place('stall', x * TS + 8, y * TS + 12, 'neon'); C.lights.push({ x: x * TS + 8, y: y * TS + 10, h: this.cityE + 18, r: 26, c: [[255, 140, 200], [140, 220, 255], [255, 190, 110]][Math.floor(rr(5) * 3)] }); }
+        continue;
+      }
       if (kk === K_STREET) { if (rr(1) < 0.012) place(B.props.find((p) => p[0] === 'wreck') ? 'wreck' : 'scrap', x * TS + 8, y * TS + 12, fam); else if (rr(2) < 0.006) place('bus', x * TS + 8, y * TS + 12, fam); if (rr(3) < 0.05) C.decals.push({ type: rr(4) < 0.5 ? 'crack' : 'rubble', x, y, fam }); const C2 = this.city; if (((x - C2.x0) % C2.grid === 1) && (y % 6 === 0)) { place('lamp', x * TS + 4, y * TS + 8, fam); if (rr(5) < 0.25) C.lights.push({ x: x * TS + 6, y: y * TS + 8, h: this.cityE + 30, r: 20, c: [255, 200, 130] }); } continue; }
       if (kk === K_FLOOR && inCity) { if (rr(6) < 0.04) place(rr(7) < 0.5 ? 'scrap' : 'burnt', x * TS + 8, y * TS + 12, fam); if (rr(8) < 0.12) C.decals.push({ type: 'rubble', x, y, fam }); continue; }
       if (kk === K_GROUND && inCity && this.inCity(x, y)) { if (rr(9) < 0.08 && free(i, j)) place(rr(10) < 0.6 ? 'tree' : 'burnt', x * TS + 8, y * TS + 14, 'green'); if (rr(11) < 0.15) C.decals.push({ type: 'tuft', x, y, fam: 'green' }); continue; }
@@ -379,7 +390,6 @@ export class World {
   // a high or low place: its own tiles, props, the landmark, the lift pad or the way out
   place(P) {
     let M = this.placeCache.get(P.i); if (M) return M;
-    if (P.kind === 'walk' || P.kind === 'roof' || P.kind === 'under') { M = P.kind === 'walk' ? this.walkGrid(P) : P.kind === 'roof' ? this.roofGrid(P) : this.underGrid(P); this.placeCache.set(P.i, M); return M; }
     const isle = P.kind === 'isle', cave = P.kind === 'cave', canopy = P.kind === 'canopy', L = cave ? CAVES[P.key] : ISLES[P.key], r = RNG(P.seed), n = P.rad * 2 + 8, ox = P.x - P.rad - 4, oy = P.y - P.rad - 4, N = n * n;
     const kind = new Uint8Array(N).fill(K_VOID), e = new Int16Array(N).fill(P.h), h = new Float32Array(N), solid = new Uint8Array(N).fill(1), props = [], decals = [], lights = [], depth = new Float32Array(N), q = (x, y) => (y - oy) * n + (x - ox);
     const inside = (x, y) => x >= ox && y >= oy && x < ox + n && y < oy + n;
@@ -421,77 +431,6 @@ export class World {
     this.placeCache.set(P.i, M);
     return M;
   }
-  // a walkway's tiles: the deck, posts with lanterns along both sides, rocks floating under the long ones
-  walkGrid(P) {
-    const nw = P.nw, nh = P.nh, N = nw * nh, r = RNG(P.seed), kind = new Uint8Array(N).fill(K_VOID), e = new Int16Array(N), h = new Float32Array(N), solid = new Uint8Array(N).fill(1), props = [], lights = [], floaters = [], L = WALKWAY[P.roof ? 'roof' : 'sky'];
-    // on the long ones, a few round landings to rest on: a lantern shrine, flowers, a view
-    const lands = []; if (!P.roof) { const m = Math.floor(P.L / 85); for (let k = 1; k <= m; k++) { const s0 = (P.L * k) / (m + 1), q2 = P.pts.findIndex((_, q) => q > 0 && P.cum[q] >= s0), a = P.pts[q2 - 1], b = P.pts[q2], t = (s0 - P.cum[q2 - 1]) / (Math.hypot(b[0] - a[0], b[1] - a[1]) || 1); lands.push({ x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, s: s0 }); } }
-    for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) { const tx = P.ox + i + 0.5, ty = P.oy + j + 0.5, [d, s2] = this.walkNear(P, tx, ty), Q = j * nw + i, Ld = lands.find((l) => Math.hypot(l.x - tx, l.y - ty) < 3.4); if (d <= P.w || Ld) { kind[Q] = K_BRIDGE; solid[Q] = 0; e[Q] = Ld ? P.hAt(Ld.s) : P.hAt(s2); } }
-    for (const l of lands) { const hh = P.hAt(l.s); props.push({ type: 'lanternshrine', x: (l.x + 1.6) * TS, y: (l.y - 1.2) * TS, fam: 'dream', v: r.int(0, 2), e: hh }, { type: 'flowerbush', x: (l.x - 2) * TS, y: (l.y + 1.6) * TS, fam: 'dream', v: r.int(0, 2), e: hh }, { type: 'flowerbush', x: (l.x + 2.2) * TS, y: (l.y + 1.8) * TS, fam: 'dream', v: r.int(0, 2), e: hh }); lights.push({ x: (l.x + 1.6) * TS, y: (l.y - 1.2) * TS, h: hh + 24, r: 30, c: [255, 210, 140] }); }
-    const step = P.roof ? 4 : 5;
-    for (let s2 = step; s2 < P.L - 1; s2 += step) for (const sg of [-1, 1]) {
-      const k = P.pts.findIndex((_, q) => q > 0 && P.cum[q] >= s2), a = P.pts[k - 1], b = P.pts[k], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, t = (s2 - P.cum[k - 1]) / l, px = a[0] + (b[0] - a[0]) * t, py = a[1] + (b[1] - a[1]) * t, nx2 = -(b[1] - a[1]) / l, ny2 = (b[0] - a[0]) / l;
-      const x = (px + nx2 * sg * (P.w - 0.35)) * TS, y = (py + ny2 * sg * (P.w - 0.35)) * TS, hh = P.hAt(s2);
-      props.push({ type: 'skypost', x, y, fam: L.fam, v: r.int(0, 2), e: hh });
-      if ((Math.round(s2 / step) + (sg > 0 ? 1 : 0)) % 2 === 0) lights.push({ x, y, h: hh + 22, r: 20, c: [255, 214, 140] });
-      if (!P.roof && sg > 0 && Math.round(s2 / step) % 5 === 2) floaters.push({ x: px * TS + r.range(-30, 30), y: py * TS + r.range(-20, 20), h: hh - r.range(40, 120), v: r.int(0, 2), ph: r.range(0, 6.28) });
-    }
-    return { P, L, n: nw, nw, nh, ox: P.ox, oy: P.oy, kind, e, h, solid, props, decals: [], lights, depth: new Float32Array(N), floaters, clouds: [] };
-  }
-  // a roof garden: beds and planters, a water tank, washing, a glasshouse on the big ones, a low parapet round it
-  roofGrid(P) {
-    const nw = P.x1 - P.x0 + 1, nh = P.y1 - P.y0 + 1, N = nw * nh, r = RNG(P.seed), L = ROOFTOP, ox = P.x0, oy = P.y0, kind = new Uint8Array(N).fill(K_GROUND), e = new Int16Array(N).fill(P.h), h = new Float32Array(N), solid = new Uint8Array(N), props = [], decals = [], lights = [];
-    const pad = P.pad, edge = (i, j) => i === 0 || j === 0 || i === nw - 1 || j === nh - 1;
-    const walkEnds = (P.links || []).map((Wk) => { const [px, py] = Wk.a === P ? Wk.pts[0] : Wk.pts[Wk.pts.length - 1]; return [px, py]; });
-    for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) {
-      const x = ox + i, y = oy + j, Q = j * nw + i, gap = Math.abs(x - pad.x) <= 1 && y === pad.y || walkEnds.some(([wx, wy]) => Math.hypot(x + 0.5 - wx, y + 0.5 - wy) < 2.6);
-      if (edge(i, j) && !gap) { kind[Q] = K_WALL; h[Q] = 7; continue; }
-      if (Math.abs(x - pad.x) <= 1 && Math.abs(y - pad.y) <= 1) continue;
-      if ((i + j) % 3 === 0 && r.chance(0.5)) { kind[Q] = K_PATH; continue; }
-      const k = r.f();
-      if (k < 0.2) decals.push({ type: 'crops', x, y, fam: 'dream' });
-      else if (k < 0.3) props.push({ type: r.pick(['flowerbush', 'bush', 'fern', 'flowerbush']), x: x * TS + 8, y: y * TS + 14, fam: 'dream', v: r.int(0, 2), e: P.h });
-      else if (k < 0.34 && i > 1 && j > 1) { props.push({ type: r.pick(['blossom', 'tree', 'birch']), x: x * TS + 8, y: y * TS + 14, fam: 'dream', v: r.int(0, 2), e: P.h }); solid[Q] = 1; }
-      else if (k < 0.4) decals.push({ type: 'flowers', x, y, fam: 'dream' });
-    }
-    const big = nw * nh > 40, spot = (type, x, y) => { const Q = (y - oy) * nw + (x - ox); if (x <= ox || y <= oy || x >= ox + nw - 1 || y >= oy + nh - 1) return; props.push({ type, x: x * TS + 8, y: y * TS + 12, fam: type === 'watertower' ? 'rust' : 'dream', v: r.int(0, 2), e: P.h }); solid[Q] = 1; };
-    spot('watertower', ox + 1, oy + 1); if (big) spot('greenhouse', ox + Math.floor(nw / 2), oy + 2); spot('laundry', ox + nw - 3, oy + Math.floor(nh / 2));
-    props.push({ type: 'liftpad', x: pad.x * TS + 8, y: pad.y * TS + 12, fam: 'rust', v: 0, e: P.h, pad: P });
-    lights.push({ x: pad.x * TS + 8, y: pad.y * TS + 12, h: P.h + 20, r: 22, c: [255, 190, 110], beacon: 1 });
-    for (let k = 0; k < 3; k++) lights.push({ x: (ox + 1 + r.f() * (nw - 2)) * TS, y: (oy + 1 + r.f() * (nh - 2)) * TS, h: P.h + 18, r: 26, c: r.pick([[255, 214, 140], [255, 170, 200], [180, 220, 255]]) });
-    return { P, L, n: nw, nw, nh, ox, oy, kind, e, h, solid, props, decals, lights, depth: new Float32Array(N), floaters: [], clouds: [] };
-  }
-  // the undercity: halls three tiles wide joining an 8 × 8 grid of crossings (a maze with loops), some
-  // crossings opened into chambers (the night market, the boiler hall, the oil pits and their brass works)
-  underGrid(P) {
-    const G = 8, CW = 9, n = G * CW, N = n * n, ox = P.x - n / 2, oy = P.y - n / 2, r = RNG(P.seed), L = UNDER;
-    const kind = new Uint8Array(N).fill(K_WALL), e = new Int16Array(N), h = new Float32Array(N).fill(64), solid = new Uint8Array(N), props = [], decals = [], lights = [];
-    const open = (i, j, k = K_FLOOR) => { if (i < 1 || j < 1 || i >= n - 1 || j >= n - 1) return; const Q = j * n + i; kind[Q] = k; h[Q] = 0; };
-    const seen = new Set(), stack = [[0, 0]], links = []; seen.add('0,0');
-    while (stack.length) { const [ci, cj] = stack[stack.length - 1], nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b]) => [ci + a, cj + b]).filter(([a, b]) => a >= 0 && b >= 0 && a < G && b < G && !seen.has(`${a},${b}`)); if (!nb.length) { stack.pop(); continue; } const nx = nb[Math.floor(r.f() * nb.length)]; seen.add(`${nx[0]},${nx[1]}`); links.push([ci, cj, nx[0], nx[1]]); stack.push(nx); }
-    for (let k = 0; k < 14; k++) { const ci = r.int(0, G - 2), cj = r.int(0, G - 2); links.push(r.chance(0.5) ? [ci, cj, ci + 1, cj] : [ci, cj, ci, cj + 1]); }
-    const mid = (c) => c * CW + 4;
-    for (const [a, b, c, d] of links) { const x0 = Math.min(mid(a), mid(c)), x1 = Math.max(mid(a), mid(c)), y0 = Math.min(mid(b), mid(d)), y1 = Math.max(mid(b), mid(d)); for (let j = y0 - 1; j <= y1 + 1; j++) for (let i = x0 - 1; i <= x1 + 1; i++) open(i, j); }
-    const rooms = new Map();
-    for (let cj = 0; cj < G; cj++) for (let ci = 0; ci < G; ci++) { const g = P.gates.find((q) => q.cell[0] === ci && q.cell[1] === cj); if (!g && !r.chance(0.3)) continue; const kindR = g ? 'stair' : r.pick(['market', 'market', 'boiler', 'pit', 'works']); rooms.set(`${ci},${cj}`, kindR); for (let j = mid(cj) - 3; j <= mid(cj) + 3; j++) for (let i = mid(ci) - 3; i <= mid(ci) + 3; i++) open(i, j); }
-    const put = (type, x, y, fam = L.fam, extra) => { props.push({ type, x: (ox + x) * TS + 8, y: (oy + y) * TS + 12, fam, v: r.int(0, 2), e: P.h, ...extra }); const D = PROPDEF[type]; if (D?.foot) { const fw = Math.max(1, Math.ceil(D.foot[0] / TS)), t0 = x - Math.floor((fw - 1) / 2); for (let i = t0; i < t0 + fw; i++) if (i >= 0 && i < n) solid[y * n + i] = 1; } };
-    const light = (x, y, hh, rr, c) => lights.push({ x: (ox + x) * TS + 8, y: (oy + y) * TS + 10, h: P.h + hh, r: rr, c });
-    for (const [key, kindR] of rooms) {
-      const [ci, cj] = key.split(',').map(Number), cx = mid(ci), cy = mid(cj);
-      if (kindR === 'stair') { const g = P.gates.find((q) => q.cell[0] === ci && q.cell[1] === cj); g.ex = ox + cx; g.ey = oy + cy + 1; put('stairs', cx, cy, 'rust', { gate: g }); light(cx, cy, 20, 40, [255, 236, 200]); }
-      else if (kindR === 'market') { for (let k = 0; k < 5; k++) { const x = cx - 3 + r.int(0, 6), y = cy - 3 + r.int(0, 1) * 6; put('stall', x, y, 'rust'); light(x, y, 18, 26, r.pick([[255, 190, 110], [255, 140, 200], [140, 220, 255]])); } }
-      else if (kindR === 'boiler') { put('boiler', cx, cy - 1, 'rust'); light(cx, cy - 1, 16, 44, [255, 140, 60]); put('pipes', cx - 3, cy + 2); put('pipes', cx + 3, cy + 2); }
-      else if (kindR === 'pit') { for (let j = cy - 1; j <= cy + 1; j++) for (let i = cx - 2; i <= cx + 2; i++) open(i, j, K_TOXIC); put('gear', cx - 3, cy - 2, 'rust'); put('gear', cx + 3, cy - 2, 'rust'); light(cx, cy, 6, 34, [255, 170, 80]); }
-      else { put('gear', cx, cy - 2, 'rust'); put('tank', cx - 2, cy + 2); put('drum', cx + 2, cy + 2); light(cx, cy, 20, 30, [255, 200, 130]); }
-    }
-    // the halls: lamps on the walls, pipes, crates and drums along the way, rubbish and oil underfoot
-    for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
-      const Q = j * n + i; if (kind[Q] !== K_FLOOR || solid[Q]) continue; const nearRoom = [...rooms.keys()].some((k2) => { const [ci, cj] = k2.split(',').map(Number); return Math.abs(i - mid(ci)) <= 3 && Math.abs(j - mid(cj)) <= 3; }); if (nearRoom) { if (r.chance(0.06)) decals.push({ type: 'oil', x: ox + i, y: oy + j, fam: 'rust' }); continue; }
-      const wallN = kind[Q - n] === K_WALL; if (wallN && (i + j * 3) % 7 === 0) { put('lamp', i, j, 'rust'); light(i, j, 26, 26, [255, 196, 120]); continue; }
-      if (r.chance(0.025)) put(r.pick(['drum', 'scrap', 'pipes', 'drum']), i, j); if (r.chance(0.1)) decals.push({ type: r.pick(['crack', 'oil', 'rubble', 'stones']), x: ox + i, y: oy + j, fam: 'rust' });
-    }
-    return { P, L, n, nw: n, nh: n, ox, oy, kind, e, h, solid, props, decals, lights, depth: new Float32Array(N), floaters: [], clouds: [], rooms };
-  }
   // walking off one place's ground onto a linked one (an island onto its bridge, a bridge onto the far roof)
   standLinked(px, py, from, P, mode) {
     const h = this.stand(px, py, from, P, mode); if (!Number.isNaN(h) || !P?.links) return [h, P];
@@ -503,6 +442,7 @@ export class World {
   cell(px, py, P, o = this._c || (this._c = { t: 0, k: 0, s: 0, lo: NOLO })) {
     const tx = Math.floor(px / TS), ty = Math.floor(py / TS);
     if (!Number.isFinite(tx) || !Number.isFinite(ty)) { o.t = P ? P.h : 0; o.k = K_VOID; o.s = 1; o.lo = NOLO; return o; }
+    if (P?.layer) return P.cell(px, py, o);
     if (P) { const M = this.place(P), i = tx - M.ox, j = ty - M.oy; if (i < 0 || j < 0 || i >= M.nw || j >= M.nh) { o.t = P.h; o.k = K_VOID; o.s = 1; o.lo = NOLO; return o; } const Q = j * M.nw + i; o.t = M.e[Q] + M.h[Q]; o.k = M.kind[Q]; o.s = M.solid[Q]; o.lo = NOLO; return o; }
     if (tx < 0 || ty < 0 || tx >= WT || ty >= WT) { o.t = 0; o.k = K_CLIFF; o.s = 1; o.lo = NOLO; return o; }
     const C = this.chunk(Math.floor(tx / CS), Math.floor(ty / CS)), i = tx - C.cx * CS, j = ty - C.cy * CS, Q = (j + 1) * C.n + i + 1;

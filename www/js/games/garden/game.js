@@ -12,7 +12,7 @@ import { normPersona, personaToCrystal } from '../../persona.js';
 import { getMode } from '../../modes.js';
 import * as GL from '../mk/gl.js';
 import { mk, hex, mix, clamp, lerp, RNG } from '../mk/tex.js';
-import { World, TS, CS, WT, NC, STEP, NOLO, SWIM, WATERONLY, K_WATER, K_CLIFF, K_BLDG, K_TOXIC, K_VOID } from './world.js';
+import { World, SKY_H, DEEP_H, TS, CS, WT, NC, STEP, NOLO, SWIM, WATERONLY, K_WATER, K_CLIFF, K_BLDG, K_TOXIC, K_VOID } from './world.js';
 import { ChunkVis, PlaceVis, pump, pending, blockTex, animalSprites, giantSprites, propSprite, placeDef, glowSprite } from './scene.js';
 import { BIOMES, BIOME_KEYS, FAMILY, ISLES, CAVES } from './lands.js';
 import { paintSky, shadowTex, FAUNA, PROPDEF } from './art.js';
@@ -98,13 +98,13 @@ export class Garden extends Game {
     this.worlds = s?.worlds || 1;
     this.explored = s?.ex ? unb64(s.ex, NC * NC) : new Uint8Array(NC * NC);
     this.found = s?.found || 0; Wd.treasures.forEach((T, i) => { T.found = !!(this.found & (1 << i)); });
-    const place = s && s.place >= 0 ? Wd.places[s.place] || null : null;
+    const place = s?.place === 'sky' ? Wd.sky : s?.place === 'deep' ? Wd.deep : s && s.place >= 0 ? Wd.places[s.place] || null : null;
     this.P = { x: s?.x ?? Wd.start.x, y: s?.y ?? Wd.start.y, h: 0, hv: 0, place, actor: new Actor(this.skin.crystal(0, 'Present day'), { walkSpeed: 7.5, runSpeed: 55, walkStride: 5, runStride: 6.5 }), armed: false, goal: null, stuck: 0, swim: false };
     const P = this.P; P.h = Wd.heightAt(P.x, P.y, place, s?.h ?? 0);
     if (Number.isNaN(Wd.stand(P.x, P.y, P.h, place, SWIM))) Object.assign(P, { x: Wd.start.x, y: Wd.start.y, place: null, h: Wd.heightAt(Wd.start.x, Wd.start.y, null) });
     P.hv = P.h;
     this.cam = { x: P.x, y: P.y, h: P.h };
-    this.vis = new Map(); this.pvis = new Map(); this.npcs = []; this.beasts = []; this.fx = []; this.toasts = []; this.atmos = new Atmos();
+    this.vis = new Map(); this.visSky = new Map(); this.visDeep = new Map(); this.pvis = new Map(); this.npcs = []; this.beasts = []; this.fx = []; this.toasts = []; this.atmos = new Atmos();
     this.giants = this.makeGiants(); this.ui = null; this.uiS = 0; this.press = null; this.stick = null; this.ride = null; this.fade = null; this.t0 = 0; this.frameN = 0; this.saveT = 0; this.spawnT = 0; this.findT = 0;
     this.fogC = null; this.fogA = 0.2; this.lastPlace = ''; this.placeT = 0; this.mapCv = null; this.mapRow = 0; this.autoT = 0;
     this.autoOK = true;
@@ -118,7 +118,7 @@ export class Garden extends Game {
   stop() { this.save(); super.stop(); this.release(); }
   // off screen: give the GPU back its chunk textures, buffers and the people's frame texture (rebuilt on return)
   release() {
-    for (const v of this.vis.values()) v.free(); this.vis.clear();
+    for (const M of [this.vis, this.visSky, this.visDeep]) { for (const v of M.values()) v.free(); M.clear(); }
     for (const v of this.pvis.values()) v.free(); this.pvis.clear();
     if (this.actorTex) { GL.texFree(this.actorTex.tex); this.actorTex = null; this.heroSlot = undefined; for (const n of this.npcs) n.slot = -1; }
     if (this.skies) { for (const t of this.skies.values()) GL.texFree(t); this.skies = null; }
@@ -127,7 +127,7 @@ export class Garden extends Game {
   save() {
     if (Garden.active !== this) return;
     const P = this.P, at = this.ride ? this.ride.from : P, pl = this.ride ? this.ride.fromPlace : P.place;
-    try { localStorage.setItem(SAVE, JSON.stringify({ seed: this.W.seed, x: Math.round(at.x), y: Math.round(at.y), h: Math.round(at.h), place: pl ? pl.i : -1, ex: b64(this.explored), found: this.found, worlds: this.worlds })); } catch { /* full */ }
+    try { localStorage.setItem(SAVE, JSON.stringify({ seed: this.W.seed, x: Math.round(at.x), y: Math.round(at.y), h: Math.round(at.h), place: pl ? (pl.layer ? pl.key : pl.i) : -1, ex: b64(this.explored), found: this.found, worlds: this.worlds })); } catch { /* full */ }
   }
   // all twelve found: a new world from a new seed
   newWorld() {
@@ -254,21 +254,21 @@ export class Garden extends Game {
   }
   // the props round the walker (the chunk they stand in and its neighbours, or the place)
   nearProps() {
-    const P = this.P; if (P.place) return this.W.place(P.place).props;
-    const cx = Math.floor(P.x / (CS * TS)), cy = Math.floor(P.y / (CS * TS)), out = []; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const v = this.vis.get((cy + j) * 1000 + cx + i); if (v?.props) for (const p of v.props) if (Math.abs(p.x - P.x) < 60 && Math.abs(p.y - P.y) < 40) out.push(p); }
+    const P = this.P; if (P.place && !P.place.layer) return this.W.place(P.place).props;
+    const M = P.place?.key === 'sky' ? this.visSky : P.place?.key === 'deep' ? this.visDeep : this.vis, cx = Math.floor(P.x / (CS * TS)), cy = Math.floor(P.y / (CS * TS)), out = []; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const v = M.get((cy + j) * 1000 + cx + i); if (v?.props) for (const p of v.props) if (Math.abs(p.x - P.x) < 60 && Math.abs(p.y - P.y) < 40) out.push(p); }
     return out;
   }
   // the fog banks, the swaying, the rings on the water, the wisps
   stepLive(dt) {
-    const P = this.P, Wd = this.W, here = P.place, dark = here?.kind === 'cave' || here?.kind === 'under';
+    const P = this.P, Wd = this.W, here = P.place, dark = here?.kind === 'cave' || here?.key === 'deep';
     this.sway.update(dt); this.rip.anchor(P, Wd); this.rip.step(); this.wisps.update(dt, P, Wd.treasures.filter((T) => T.found).length);
     // ambient rings: a fish, a drop, now and then, on water near you
     if (this.rip.any && Math.random() < 0.2) this.rip.poke((this.rip.ox + Math.random() * this.rip.w) * 2, (this.rip.oy + Math.random() * this.rip.h) * 2, 1.6);
     for (const b of this.beasts) if (b.A.ai === 'swim' && Math.random() < dt * 2) this.rip.poke(b.x, b.y, 1.6);
     // the fog: thick where the country is misty (the dream's pale and pastel), clouds round the islands, none underground
     const B = here ? null : BIOMES[BIOME_KEYS[Wd.biomeAt(P.x / TS, P.y / TS)]];
-    const dens = dark ? 0 : here ? (here.kind === 'roof' ? 0.15 : 0.55) : clamp((B.fog[1] - 0.05) * 3.2 + (B.dream ? 0.25 : 0) + (this.mode === 'morning' ? 0.25 : 0), 0, 1);
-    const base = this.fogC || [200, 200, 200], col = here?.kind === 'isle' || here?.kind === 'walk' ? [246, 244, 250] : B?.dream || this.dreamK > 0.5 ? mix(base, [255, 236, 246], 0.55).map((v) => Math.round(v / 8) * 8) : mix(base, [236, 236, 230], 0.4).map((v) => Math.round(v / 8) * 8);
+    const dens = dark ? 0 : here ? (here.key === 'sky' ? 0.5 : 0.4) : clamp((B.fog[1] - 0.05) * 3.2 + (B.dream ? 0.25 : 0) + (this.mode === 'morning' ? 0.25 : 0), 0, 1);
+    const base = this.fogC || [200, 200, 200], col = here?.key === 'sky' || here?.kind === 'canopy' ? [246, 244, 250] : B?.dream || this.dreamK > 0.5 ? mix(base, [255, 236, 246], 0.55).map((v) => Math.round(v / 8) * 8) : mix(base, [236, 236, 230], 0.4).map((v) => Math.round(v / 8) * 8);
     const movers = [[P.x, P.y, P.vx || 0, P.vy || 0, 1]]; for (const n of this.npcs) if (Math.abs(n.x - P.x) < 300 && Math.abs(n.y - P.y) < 300) movers.push([n.x, n.y, 20, 0, 0.6]);
     for (const b of this.beasts) if (!b.alt && Math.abs(b.x - P.x) < 200 && Math.abs(b.y - P.y) < 200) movers.push([b.x, b.y, 10, 0, 0.4]);
     this.fogF.update(dt, this, dens, col, movers);
@@ -281,11 +281,17 @@ export class Garden extends Game {
     if (P.goal && this.autoT < 40) return;
     if (!P.goal && P.stuck < 9 && (this.idleT = (this.idleT || 0) + dt) < 1.5 + Math.random() * 3) return;   // a pause between walks
     this.autoT = 0; this.idleT = 0; P.stuck = 0; const r = Math.random, here = P.place;
-    if (here?.kind === 'walk') { const e2 = r() < 0.5 ? here.pts[0] : here.pts[here.pts.length - 1]; P.goal = { x: e2[0] * TS, y: e2[1] * TS }; return; }
-    if (here?.kind === 'under') { this.inT = (this.inT || 0) + 1; if (r() < 0.08 + this.inT * 0.04) { const g = here.gates.reduce((a, b) => (Math.hypot(b.ex * TS - P.x, b.ey * TS - P.y) < Math.hypot(a.ex * TS - P.x, a.ey * TS - P.y) ? b : a)); P.goal = { x: g.ex * TS + 8, y: g.ey * TS + 12 }; } else { const a = r() * 6.283, d = (4 + r() * 10) * TS; P.goal = { x: P.x + Math.cos(a) * d, y: P.y + Math.sin(a) * d }; } return; }
+    if (here?.layer) {
+      // in the sky or the deep: wander, follow a bridge to the next island now and then, and after a while go home
+      this.inT = (this.inT || 0) + 1;
+      const mine = Wd.ways.filter((w) => w.layer === here), w = mine.sort((a, b) => Math.hypot(a.lx * TS - P.x, a.ly * TS - P.y) - Math.hypot(b.lx * TS - P.x, b.ly * TS - P.y))[0];
+      if (w && r() < 0.04 + this.inT * 0.025 && Math.hypot(w.lx * TS - P.x, w.ly * TS - P.y) < 90 * TS) { P.goal = { x: w.lx * TS + 8, y: w.ly * TS + 12 }; P.armed = true; return; }
+      if (here.key === 'sky' && r() < 0.35) { const sp = here.spans.filter((q) => Math.hypot(q.pts[0][0] * TS - P.x, q.pts[0][1] * TS - P.y) < 60 * TS || Math.hypot(q.pts[q.pts.length - 1][0] * TS - P.x, q.pts[q.pts.length - 1][1] * TS - P.y) < 60 * TS); if (sp.length) { const q = pick(sp), e2 = pick(q.pts); P.goal = { x: e2[0] * TS, y: e2[1] * TS }; return; } }
+      for (let k = 0; k < 20; k++) { const a2 = r() * 6.283, d = (6 + r() * 16) * TS, x = P.x + Math.cos(a2) * d, y = P.y + Math.sin(a2) * d; if (!Number.isNaN(Wd.stand(x, y, Wd.heightAt(x, y, here), here, 0))) { P.goal = { x, y }; return; } }
+      return;
+    }
     if (here) {
       this.inT = (this.inT || 0) + 1;
-      if (here.links?.length && r() < 0.25) { const Wk = pick(here.links), e2 = Wk.a === here ? Wk.pts[1] || Wk.pts[0] : Wk.pts[Wk.pts.length - 2] || Wk.pts[0]; P.goal = { x: e2[0] * TS, y: e2[1] * TS }; return; }
       const door = here.kind === 'cave' ? here.exit : here.pad;
       if (r() < 0.12 + this.inT * 0.06) { P.goal = { x: door.x * TS + 8, y: door.y * TS + 12 }; return; }
       const a = r() * 6.283, d = r() * here.rad * 0.6 * TS; P.goal = { x: here.x * TS + Math.cos(a) * d, y: here.y * TS + Math.sin(a) * d }; return;
@@ -295,7 +301,7 @@ export class Garden extends Game {
     if (r() < 0.3) {
       const ways = [];
       for (const Pl of Wd.places) { if (Pl.lift) ways.push(Pl.lift); if (Pl.mouth) ways.push(Pl.mouth); }
-      for (const g of Wd.under.gates) ways.push(g);
+      for (const w of Wd.ways) ways.push({ x: w.gx, y: w.gy });
       for (const Cn of Wd.canyons) for (const L of Cn.lifts) ways.push(P.h < Wd.heightAt(L.top.x * TS + 8, L.top.y * TS + 12, null) - 100 ? L.bot : L.top);
       const w = ways.sort((a, b) => Math.hypot(a.x - tx, a.y - ty) - Math.hypot(b.x - tx, b.y - ty))[0];
       if (w && Math.hypot(w.x - tx, w.y - ty) < 70) { P.goal = { x: w.x * TS + 8, y: w.y * TS + 12 }; P.armed = true; return; }
@@ -307,8 +313,7 @@ export class Garden extends Game {
   // ------------------------------------------------ the ways up and down: lift towers, baskets, canyon cages, caves
   checkWays() {
     const P = this.P, Wd = this.W, here = P.place, dist = (t, oy = 12) => Math.hypot(P.x - (t.x * TS + 8), P.y - (t.y * TS + oy));
-    if (here?.kind === 'walk') { P.armed = true; return; }
-    if (here?.kind === 'under') { let anyU = false; for (const g of here.gates) { if (g.ex === undefined) continue; const d = dist({ x: g.ex, y: g.ey }); if (d < 30) anyU = true; if (d < 11 && P.armed) { this.leaveUnder(g); return; } } if (!anyU) P.armed = true; return; }
+    if (here?.layer) { let any = false; for (const w of Wd.ways) { if (w.layer !== here) continue; const d = dist({ x: w.lx, y: w.ly }); if (d < 30) any = true; if (d < 11 && P.armed) { this.rideWay(w, false); return; } } if (!any) P.armed = true; return; }
     if (here) {
       const door = here.kind === 'cave' ? here.exit : here.pad, d = dist(door);
       if (d > 30) P.armed = true; else if (d < 11 && P.armed) { if (here.kind === 'cave') this.leaveCave(here); else this.rideDown(here); }
@@ -319,7 +324,7 @@ export class Garden extends Game {
       if (Pl.lift) { const d = dist(Pl.lift); if (d < 30) any = true; if (d < 11 && P.armed) { this.rideUp(Pl); return; } }
       if (Pl.mouth) { const d = dist(Pl.mouth, 14); if (d < 30) any = true; if (d < 11 && P.armed) { this.enterCave(Pl); return; } }
     }
-    for (const g of Wd.under.gates) { const d = dist(g, 14); if (d < 30) any = true; if (d < 11 && P.armed) { this.enterUnder(g); return; } }
+    for (const w of Wd.ways) { const d = dist({ x: w.gx, y: w.gy }); if (d < 30) any = true; if (d < 11 && P.armed) { this.rideWay(w, true); return; } }
     for (const Cn of Wd.canyons) for (const L of Cn.lifts) {
       const dt = dist(L.top), db = dist(L.bot); if (dt < 30 || db < 30) any = true;
       if (!P.armed || (dt >= 11 && db >= 11)) continue; const th = Wd.heightAt(L.top.x * TS + 8, L.top.y * TS + 12, null);
@@ -328,18 +333,28 @@ export class Garden extends Game {
     }
     if (!any) P.armed = true;
   }
+  // up to the sky realm: straight up beside the tower or under the island, then a step across onto the pad. Down to
+  // the deep: down the shaft into the dark, then out of the cavern's roof far below and down to its floor (and back)
+  rideWay(w, going) {
+    const P = this.P, Wd = this.W, L = w.layer, g = { x: w.gx * TS + 8, y: w.gy * TS + 12 }, l = { x: w.lx * TS + 8, y: w.ly * TS + 12 };
+    g.h = Wd.heightAt(g.x, g.y, null); l.h = Wd.heightAt(l.x, l.y, L); const across = g.x !== l.x || g.y !== l.y;
+    if (L.key === 'sky') {
+      const top = { x: g.x, y: g.y, h: l.h }, dur = 2 + Math.abs(l.h - g.h) / 320;
+      if (going) this.startRide([{ a: { ...g, h: P.h }, b: top, dur }, ...(across ? [{ a: top, b: l, dur: 0.7, flat: 1 }] : [])], L, 'liftpad', w.name);
+      else this.startRide([...(across ? [{ a: { ...l, h: P.h }, b: top, dur: 0.7, flat: 1 }] : []), { a: across ? top : { ...g, h: P.h }, b: g, dur }], null, 'liftpad', '');
+    } else if (going) this.startRide([{ a: { ...g, h: P.h }, b: { ...g, h: g.h - 70 }, dur: 1.5, dark: 'in' }, { a: { ...l, h: l.h + 380 }, b: l, dur: 2.8, dark: 'out', place: L }], L, 'liftpad', w.name);
+    else this.startRide([{ a: { ...l, h: P.h }, b: { ...l, h: l.h + 380 }, dur: 2.8, dark: 'in' }, { a: { ...g, h: g.h - 70 }, b: g, dur: 1.5, dark: 'out', place: null }], null, 'liftpad', '', L);
+  }
   // a ride: straight segments eased one after the other; the platform rides with you
-  startRide(segs, toPlace, prop, name) {
+  startRide(segs, toPlace, prop, name, during = null) {
     const P = this.P; this.ride = { segs, i: 0, t: 0, toPlace, prop, name, from: { ...segs[0].a }, fromPlace: P.place };
-    P.goal = null; this.stick = null; P.place = null; P.actor.face('S'); P.swim = false;
+    P.goal = null; this.stick = null; P.place = during; P.actor.face('S'); P.swim = false;
   }
   rideUp(Pl) {
-    if (Pl.kind === 'roof') { const P = this.P, L = Pl.lift, pd = Pl.pad, a = { x: L.x * TS + 8, y: L.y * TS + 12, h: P.h }, b = { ...a, h: Pl.h }, c = { x: pd.x * TS + 8, y: pd.y * TS + 8, h: Pl.h }; this.startRide([{ a, b, dur: 1.6 + (Pl.h - P.h) / 160 }, { a: b, b: c, dur: 0.7, flat: 1 }], Pl, 'liftpad', 'A Roof Garden'); return; }
     this.rideUp2(Pl);
   }
   rideUp2(Pl) { const P = this.P, L = Pl.lift, a = { x: L.x * TS + 8, y: L.y * TS + 12, h: P.h }, b = { ...a, h: Pl.h }; this.startRide([{ a, b, dur: 2.2 + (Pl.h - P.h) / 200 }], Pl, Pl.kind === 'canopy' ? 'basket' : 'liftpad', Pl.kind === 'canopy' ? 'The Canopy' : ISLES[Pl.key].name); }
   rideDown(Pl) {
-    if (Pl.kind === 'roof') { const L = Pl.lift, pd = Pl.pad, c = { x: pd.x * TS + 8, y: pd.y * TS + 8, h: Pl.h }, b = { x: L.x * TS + 8, y: L.y * TS + 12, h: Pl.h }, a = { ...b, h: this.W.heightAt(b.x, b.y, null) }; this.startRide([{ a: c, b, dur: 0.7, flat: 1 }, { a: b, b: a, dur: 1.6 + (Pl.h - a.h) / 160 }], null, 'liftpad'); return; }
     this.rideDown2(Pl);
   }
   rideDown2(Pl) { const L = Pl.lift, a = { x: L.x * TS + 8, y: L.y * TS + 12, h: Pl.h }, b = { ...a, h: this.W.heightAt(a.x, a.y, null) }; this.startRide([{ a, b, dur: 2.2 + (a.h - b.h) / 200 }], null, Pl.kind === 'canopy' ? 'basket' : 'liftpad'); }
@@ -351,13 +366,13 @@ export class Garden extends Game {
   stepRide(dt) {
     const R = this.ride, P = this.P, S = R.segs[R.i]; R.t += dt; const u = clamp(R.t / S.dur, 0, 1), e = ss(u);
     P.x = lerp(S.a.x, S.b.x, e); P.y = lerp(S.a.y, S.b.y, e); P.h = lerp(S.a.h, S.b.h, e); P.actor.update(dt, { vx: S.flat ? 1 : 0, vy: 0 });
-    if (u >= 1) { if (R.i < R.segs.length - 1) { R.i++; R.t = 0; return; } P.place = R.toPlace; P.h = S.b.h; P.armed = false; this.ride = null; if (R.name) this.toast(R.name); }
+    // the dark of a shaft: fading in as you go down into it, out as you come out of it somewhere else
+    R.dark = S.dark === 'in' ? u : S.dark === 'out' ? 1 - u : 0;
+    if (u >= 1) { if (R.i < R.segs.length - 1) { R.i++; R.t = 0; const N = R.segs[R.i]; if (N.place !== undefined) { P.place = N.place; P.x = N.a.x; P.y = N.a.y; P.h = P.hv = N.a.h; this.cam = { x: P.x, y: P.y, h: P.h }; this.beasts = []; this.fogF.clear(); for (const n of this.npcs) this.actorTex?.give(n.slot); this.npcs = []; } return; } P.place = R.toPlace; P.h = S.b.h; P.armed = false; this.ride = null; if (R.name) this.toast(R.name); }
   }
   // the caves: walk into the mouth, the world goes dark a moment, and you are inside
   enterCave(C) { this.fade = { t: 0, dur: 1, go: () => { const P = this.P; P.place = C; P.x = C.exit.x * TS + 8; P.y = (C.exit.y - 1.6) * TS; P.h = C.h; P.armed = false; P.goal = null; this.cam = { x: P.x, y: P.y, h: P.h }; P.hv = P.h; this.toast(CAVES[C.key].name); } }; this.P.goal = null; this.stick = null; }
   leaveCave(C) { this.fade = { t: 0, dur: 1, go: () => { const P = this.P, m = C.mouth; P.place = null; P.x = m.x * TS + 8; P.y = (m.y + 1.8) * TS; P.h = this.W.heightAt(P.x, P.y, null, -999); P.hv = P.h; P.armed = false; P.goal = null; this.cam = { x: P.x, y: P.y, h: P.h }; this.lastPlace = ''; } }; this.P.goal = null; this.stick = null; }
-  enterUnder(g) { const U = this.W.under; this.W.place(U); this.fade = { t: 0, dur: 1, go: () => { const P = this.P; P.place = U; P.x = g.ex * TS + 8; P.y = (g.ey - 1.6) * TS; P.h = U.h; P.hv = P.h; P.armed = false; P.goal = null; this.cam = { x: P.x, y: P.y, h: P.h }; this.toast('The Undercity'); } }; this.P.goal = null; this.stick = null; }
-  leaveUnder(g) { this.fade = { t: 0, dur: 1, go: () => { const P = this.P; P.place = null; P.x = g.x * TS + 8; P.y = (g.y + 1.8) * TS; P.h = this.W.heightAt(P.x, P.y, null); P.hv = P.h; P.armed = false; P.goal = null; this.cam = { x: P.x, y: P.y, h: P.h }; this.lastPlace = ''; } }; this.P.goal = null; this.stick = null; }
   stepFade(dt) { const F = this.fade; F.t += dt; if (!F.swapped && F.t >= F.dur / 2) { F.swapped = true; F.go(); this.beasts = []; this.fogF.clear(); for (const n of this.npcs) this.actorTex?.give(n.slot); this.npcs = []; } if (F.t >= F.dur) this.fade = null; }
 
   // ------------------------------------------------ the treasures: walk up to a chest and it opens
@@ -370,7 +385,7 @@ export class Garden extends Game {
       this.toast(`Treasure ${n} of 12: ${T.name}`);
       for (let k = 0; k < 24; k++) this.fx.push({ k: 'spark', x: T.cx * TS + 8 + (Math.random() - 0.5) * 8, y: T.cy * TS + 12, h: P.h + 6, vx: (Math.random() - 0.5) * 50, vh: 30 + Math.random() * 50, g: 50, t: 0, life: 1.4 });
       if (n === 12) this.toast('All twelve found. A new world waits in the menu');
-      for (const v of this.vis.values()) v.missing = 1; for (const v of this.pvis.values()) v.missing = 1;
+      for (const M of [this.vis, this.visSky, this.visDeep, this.pvis]) for (const v of M.values()) v.missing = 1;
       this.save();
     }
   }
@@ -379,9 +394,18 @@ export class Garden extends Game {
   faunaHere() {
     const P = this.P, here = P.place, ev = this.mode === 'evening';
     if (here?.kind === 'cave') return { fam: 'cave', ground: ['salamander', 'snail', 'crab', 'mossling', 'axolotl', 'salamander'], bugs: ['firefly', 'moth', 'firefly'], air: [], soar: [], sky: here.key === 'grotto' || here.key === 'crystal' ? ['jelly'] : [], rare: ['spiritfox'], bats: 1, dream: true };
-    if (here?.kind === 'under') return { fam: 'rust', ground: ['brassrat', 'clockbeetle', 'rat', 'cat', 'brassrat', 'clockbeetle'], bugs: ['moth', 'ashmoth'], air: [], soar: ['cogowl'], sky: [], rare: ['golem'], bats: 1, dream: false };
-    if (here?.kind === 'roof' || (here?.kind === 'walk' && here.roof)) return { fam: 'dream', ground: ['pigeon', 'cat', 'songbird', 'pigeon'], bugs: ['butterfly', 'bee', ev ? 'firefly' : 'butterfly'], air: ['pigeon', 'crow', 'swallow'], soar: [], sky: [], rare: ['raccoon'], dream: false };
-    if (here?.kind === 'walk') return { fam: 'dream', ground: ['songbird', 'gull', 'songbird'], bugs: ['butterfly', ev ? 'firefly' : 'dragonfly'], air: ['swallow', 'gull', 'songbird'], soar: ['eagle', 'phoenix'], sky: ['jelly', 'koi', 'manta', 'whale', 'lantern', 'bubble', 'koi'], rare: [], dream: true };
+    if (here?.key === 'deep') {
+      const k = here.kindAt(P.x / TS, P.y / TS);
+      if (k === 'machine' || k === 'ruins') return { fam: 'rust', ground: ['brassrat', 'clockbeetle', 'rat', 'cat', 'brassrat', 'clockbeetle'], bugs: ['moth', 'ashmoth', 'firefly'], air: [], soar: ['cogowl'], sky: [], rare: ['golem', 'golem'], bats: 1, dream: false };
+      if (k === 'lake') return { fam: 'cave', ground: ['axolotl', 'axolotl', 'frog', 'snail', 'salamander', 'crab'], bugs: ['firefly', 'firefly', 'moth'], air: [], soar: [], sky: ['jelly', 'jelly', 'lantern'], rare: ['glimmerkin'], bats: 1, dream: true };
+      return { fam: 'cave', ground: k === 'crystal' ? ['crab', 'salamander', 'snail', 'firenewt'] : ['mossling', 'snail', 'salamander', 'glimmerkin', 'frog'], bugs: ['firefly', 'moth', 'firefly', 'ashmoth'], air: [], soar: [], sky: ['jelly', 'bubble', 'lantern'], rare: ['glimmerkin', 'mothdeer', 'spiritfox'], bats: 1, dream: true };
+    }
+    if (here?.key === 'sky') {
+      const a = here.isleAt(P.x / TS, P.y / TS), fam = a ? ISLES[a.I.key].fam : 'dream';
+      if (!a) return { fam: 'dream', ground: ['pigeon', 'songbird', 'cat'], bugs: ['butterfly', 'bee', ev ? 'firefly' : 'butterfly'], air: ['swallow', 'gull', 'songbird'], soar: ['eagle', 'phoenix'], sky: ['jelly', 'koi', 'manta', 'whale', 'lantern', 'bubble', 'koi'], rare: [], dream: true };
+      if (fam === 'dream') return { fam, ground: ['rabbit', 'moonhare', 'cloudsheep', 'sheep', 'songbird', 'fox', 'cloudsheep', 'glimmerkin', 'deer'], bugs: ['butterfly', 'bee', ev ? 'firefly' : 'butterfly', 'dragonfly'], air: ['swallow', 'songbird', 'gull'], soar: ['eagle', 'emberbird', 'phoenix'], sky: ['jelly', 'koi', 'manta', 'whale', 'koi', 'jelly', 'manta', 'lantern', 'bubble'], rare: ['kirin', 'spiritfox', 'stag', 'glimmerkin'], dream: true };
+      return { fam, ground: fam === 'rust' ? ['crow', 'rat', 'pigeon'] : fam === 'frost' ? ['goat', 'fox', 'rabbit'] : ['goat', 'crow', 'rabbit', 'sheep'], bugs: ['moth', 'butterfly'], air: AIR[fam] || ['crow'], soar: ['eagle'], sky: ['manta', 'whale', 'jelly'], rare: [], dream: false };
+    }
     if (here?.kind === 'canopy') return { fam: 'dream', ground: ['squirrel', 'songbird', 'parrot', 'treefrog', 'redpanda', 'snail', 'squirrel'], bugs: ['butterfly', 'moth', 'bee', ev ? 'firefly' : 'butterfly'], air: ['songbird', 'parrot', 'swallow'], soar: ['owl'], sky: ['koi'], rare: ['spiritfox', 'mossling'], dream: true };
     if (here) {
       const fam = ISLES[here.key].fam;
@@ -399,11 +423,11 @@ export class Garden extends Game {
     const ai = A.ai, had = (k) => extra && extra[k] !== undefined;
     if (ai === 'drift') {
       b.st = 'air'; if (!had('heading')) b.heading = r() * 6.283;
-      const here = P.place, sky = here && (here.kind === 'isle' || (here.kind === 'walk' && !here.roof));
-      if (sky) {
+      const here = P.place, I = here?.key === 'sky' ? here.islandNear(x / TS, y / TS) : null;
+      if (I) {
         // round an island in a wide circle, never inside its rock or over a bridge: below, by its own height and more
-        const I = here.kind === 'isle' ? here : [here.a, here.b].reduce((a2, b2) => (Math.hypot(b2.x * TS - x, b2.y * TS - y) < Math.hypot(a2.x * TS - x, a2.y * TS - y) ? b2 : a2)), sc = A.scale || 1, R2 = (I.rad + 8 + r() * 14 + (A.big ? 8 : 0)) * TS;
-        b.orbit = { cx: I.x * TS + 8, cy: I.y * TS + 8, R: R2, ang: r() * 6.283, dir: r() < 0.5 ? 1 : -1 }; b.base = I.h; b.alt = -(A.h * sc * 1.1 + 40 + r() * (A.big ? 200 : 260)); b.alt0 = b.alt;
+        const sc = A.scale || 1, R2 = (I.rad + 10 + r() * 16 + (A.big ? 10 : 0)) * TS;
+        b.orbit = { cx: I.x * TS + 8, cy: I.y * TS + 8, R: R2, ang: r() * 6.283, dir: r() < 0.5 ? 1 : -1 }; b.base = here.h; b.alt = -(A.h * sc * 1.1 + 40 + r() * (A.big ? 200 : 260)); b.alt0 = b.alt;
         b.x = b.orbit.cx + Math.cos(b.orbit.ang) * R2; b.y = b.orbit.cy + Math.sin(b.orbit.ang) * R2 * 0.8;
       } else { if (!had('alt')) b.alt = 30 + r() * 80; if (!had('base')) b.base = here ? here.h : h; }
     }
@@ -444,19 +468,30 @@ export class Garden extends Game {
     if (L.soar.length && count((b) => b.A.ai === 'soar') < 1 && r() < 0.06) { const kind = ev && L.soar.includes('owl') ? 'owl' : pick(L.soar), [x, y] = spot(4, 12); this.addBeast(kind, x, y, fam, { st: 'air', R: 60 + r() * 90, ang: r() * 6.283, alt: 110 + r() * 60 }); }
     if ((ev || L.bats) && count((b) => b.k === 'bat') < (L.bats ? 4 : 3) && r() < 0.2) { const [x, y] = spot(3, 10); for (let q = 0; q < 2; q++) this.addBeast('bat', x + (r() - 0.5) * 40, y, fam, { st: 'air', alt: 24 + r() * 30 }); }
     // the sky's own creatures: round the islands (and below them), now and then over the dream
-    const wantS = here?.kind === 'isle' || here?.kind === 'walk' ? 6 : L.sky.length ? (L.dream ? 4 : 1) : 0;
+    const wantS = here?.key === 'sky' ? 7 : L.sky.length ? (L.dream ? 4 : 1) : 0;
     if (L.sky.length && count((b) => b.A.ai === 'drift') < wantS && r() < (here ? 0.35 : L.dream ? 0.12 : 0.04)) {
-      const kind = pick(L.sky), [x, y] = spot(here ? 6 : 10, here ? 22 : 18), A = FAUNA[kind], hi = here?.kind === 'isle';
+      const kind = pick(L.sky), [x, y] = spot(here ? 6 : 10, here ? 22 : 18), A = FAUNA[kind], hi = here?.key === 'sky';
       void A; void hi; this.addBeast(kind, x, y, fam, here ? {} : { alt: 30 + r() * 80, base: Wd.heightAt(x, y, null) });
       if (kind === 'koi' || kind === 'lantern' || kind === 'bubble') for (let q = 0; q < 2; q++) this.addBeast(kind, x + (r() - 0.5) * 40, y + (r() - 0.5) * 30, fam, here ? {} : { alt: 40 + r() * 40, base: Wd.heightAt(x, y, null) });
     }
     // villagers in the villages near you, a few wanderers on the roads, scavengers in the city
     const AT = this.actorTex, ptx = P.x / TS, pty = P.y / TS;
     this.npcs = this.npcs.filter((n) => { const keep = (n.place === here || (n.place && here && n.place.group && n.place.group === here.group)) && Math.hypot(n.x - P.x, n.y - P.y) < 46 * TS; if (!keep && AT) AT.give(n.slot); return keep; });
-    if (here && here.kind !== 'cave' && here.kind !== 'walk') {
-      const want = here.kind === 'under' ? 7 : here.kind === 'roof' ? 2 : here.kind === 'canopy' ? 1 : 2, ctx = here.kind === 'under' ? 'under' : here.kind === 'roof' ? 'roof' : here.kind === 'canopy' ? 'dream' : 'sky';
-      for (let t = 0; t < 6 && this.npcs.filter((n) => n.place === here).length < want; t++) { const [x, y] = here.kind === 'under' ? spot(4, 16) : [(here.x + (r() - 0.5) * here.rad) * TS, (here.y + (r() - 0.5) * here.rad) * TS], h = Wd.heightAt(x, y, here); if (!this.blocked(x, y, here, h)) this.addNPC(x, y, h, here, (here.seed + t * 13 + this.npcs.length * 7) >>> 0, false, ctx, here); }
+    if (here && here.kind !== 'cave') {
+      let want = 2, ctx = 'sky';
+      if (here.key === 'deep') { const k = here.kindAt(P.x / TS, P.y / TS); want = k === 'machine' ? 8 : k === 'ruins' ? 2 : 1; ctx = k === 'machine' || k === 'ruins' ? 'under' : 'sky'; }
+      else if (here.key === 'sky') { const T = Wd.towerAt(P.x / TS, P.y / TS); want = T ? 3 : here.isleAt(P.x / TS, P.y / TS) ? 2 : 0; ctx = T ? 'roof' : 'sky'; }
+      else if (here.kind === 'canopy') { want = 1; ctx = 'dream'; }
+      for (let t = 0; t < 6 && this.npcs.filter((n) => n.place === here).length < want; t++) { const [x, y] = here.layer ? spot(3, 14) : [(here.x + (r() - 0.5) * here.rad) * TS, (here.y + (r() - 0.5) * here.rad) * TS], h = Wd.heightAt(x, y, here); if (!this.blocked(x, y, here, h)) this.addNPC(x, y, h, here.layer ? null : here, ((here.seed || 7) + t * 13 + this.npcs.length * 7 + Math.floor(x / 64)) >>> 0, false, ctx, here); }
     }
+    // the living city: flying cars along the lanes over the streets, high and low
+    const core = !here || here.key === 'sky' ? Wd.coreAt(ptx, pty) : null;
+    if (core && count((b) => b.A.ai === 'traffic') < 12 && r() < 0.5) {
+      const C = Wd.city, g = C.grid, alongX = r() < 0.5, lane = alongX ? C.y0 + (Math.floor((pty - C.y0) / g) + Math.floor((r() - 0.5) * 6)) * g + 1.5 : C.x0 + (Math.floor((ptx - C.x0) / g) + Math.floor((r() - 0.5) * 6)) * g + 1.5, dir = r() < 0.5 ? 1 : -1, sp = 110 + r() * 80;
+      const x = alongX ? P.x - dir * 30 * TS : lane * TS, y = alongX ? lane * TS : P.y - dir * 26 * TS;
+      const b = this.addBeast('skycar', x, y, 'neon', { st: 'air', vx: alongX ? dir * sp : 0, vy: alongX ? 0 : dir * sp }); if (b) { b.base = Wd.cityE; b.alt = here ? SKY_H - Wd.cityE - 90 - r() * 560 : 50 + r() * 620; }
+    }
+
     if (!here) {
       for (const v of Wd.villages) {
         if (Math.hypot(v.x - ptx, v.y - pty) > 34 || this.npcs.some((n) => n.home === v)) continue;
@@ -485,7 +520,7 @@ export class Garden extends Game {
       if (n.wait > 0) n.wait -= dt;
       else if (!n.goal) {
         if (n.road) { const a = r() * 6.283; for (let k = 0; k < 8; k++) { const x = n.x + Math.cos(a + k * 0.8) * 6 * TS, y = n.y + Math.sin(a + k * 0.8) * 6 * TS; if (Wd.roads.near(x / TS, y / TS)[0] < 0.5) { n.goal = { x, y }; break; } } }
-        else if (n.place?.kind === 'under') { const a = r() * 6.283; n.goal = { x: n.x + Math.cos(a) * 6 * TS, y: n.y + Math.sin(a) * 6 * TS }; }
+        else if (n.place?.layer) { const a = r() * 6.283; n.goal = { x: n.x + Math.cos(a) * 5 * TS, y: n.y + Math.sin(a) * 5 * TS }; }
         else if (n.home) { const h = n.home, cx = h.rad ? h.x : (h.x0 + h.x1) / 2, cy = h.rad ? h.y : (h.y0 + h.y1) / 2, rad = n.place ? h.rad * 0.6 : h.rad || 30; n.goal = { x: (cx + (r() - 0.5) * 2 * rad) * TS, y: (cy + (r() - 0.5) * 2 * rad) * TS }; }
         n.wait = 0;
         if (!n.goal) n.wait = 2;
@@ -549,6 +584,10 @@ export class Garden extends Game {
           b.heading += Math.sin(b.t * 0.21 + b.ph) * 0.12 * dt; b.x += Math.cos(b.heading) * sp * dt; b.y += Math.sin(b.heading) * sp * dt * 0.7; b.dir = Math.cos(b.heading) >= 0 ? 1 : -1;
           b.alt += Math.sin(b.t * 0.6 + b.ph) * 6 * dt; if (!b.place) b.base += (Math.max(0, Wd.heightAt(b.x, b.y, null)) - b.base) * Math.min(1, dt * 0.3); b.f += dt * 3; break;
         }
+        case 'traffic': {
+          // a flying car along its lane, out of sight and gone
+          b.x += b.vx * dt; b.y += b.vy * dt; b.dir = b.vx > 0 || (!b.vx && b.vy > 0) ? 1 : -1; b.f += dt * 4; if (b.t > 18) b.gone = true; break;
+        }
         case 'bat': {
           const dx = b.tx - b.x, dy = b.ty - b.y, d = Math.hypot(dx, dy);
           if (d < 5) { const a = r() * 6.283; b.tx = b.hx + Math.cos(a) * 3 * TS; b.ty = b.hy + Math.sin(a) * 2 * TS; }
@@ -573,11 +612,11 @@ export class Garden extends Game {
   }
 
   // ------------------------------------------------ where you are: explored chunks, names
-  markExplored() { const P = this.P, here = P.place, at = here ? (here.kind === 'cave' ? here.mouth : here.kind === 'under' ? here.gates[0] : here.kind === 'walk' ? { x: P.x / TS, y: P.y / TS } : here) : null; const ax = at ? at.x * TS : P.x, ay = at ? at.y * TS : P.y, cx = Math.floor(ax / (CS * TS)), cy = Math.floor(ay / (CS * TS)); for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) { const x = cx + i, y = cy + j; if (x >= 0 && y >= 0 && x < NC && y < NC) this.explored[y * NC + x] = 1; } }
+  markExplored() { const P = this.P, here = P.place, at = here ? (here.kind === 'cave' ? here.mouth : here.layer ? { x: P.x / TS, y: P.y / TS } : here) : null; const ax = at ? at.x * TS : P.x, ay = at ? at.y * TS : P.y, cx = Math.floor(ax / (CS * TS)), cy = Math.floor(ay / (CS * TS)); for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) { const x = cx + i, y = cy + j; if (x >= 0 && y >= 0 && x < NC && y < NC) this.explored[y * NC + x] = 1; } }
   place() {
     const P = this.P, Wd = this.W; if (this.ride || this.fade) return;
-    let name = P.place ? placeDef(P.place).name : ''; if (P.place?.kind === 'canopy') name = 'The Canopy';
-    if (!P.place) { const v = Wd.villageAt(P.x / TS, P.y / TS, 2); name = v ? v.name : Wd.inCity(P.x / TS, P.y / TS) ? 'The Ruined City' : P.h < Wd.baseAt(P.y / TS) - 100 ? 'The Canyon Floor' : P.h - Wd.baseAt(P.y / TS) >= 200 ? 'The Summit' : Wd.biomeName(P.x, P.y); }
+    let name = P.place ? (P.place.layer ? P.place.nameAt(P.x / TS, P.y / TS) : placeDef(P.place).name) : ''; if (P.place?.kind === 'canopy') name = 'The Canopy';
+    if (!P.place) { const v = Wd.villageAt(P.x / TS, P.y / TS, 2); name = v ? v.name : Wd.coreAt(P.x / TS, P.y / TS) ? 'The Neon Heart' : Wd.inCity(P.x / TS, P.y / TS) ? 'The Ruined City' : P.h < Wd.baseAt(P.y / TS) - 100 ? 'The Canyon Floor' : P.h - Wd.baseAt(P.y / TS) >= 200 ? 'The Summit' : Wd.biomeName(P.x, P.y); }
     if (name !== this.pend) { this.pend = name; this.pendT = 0; } else if ((this.pendT += 0.5) >= 1 && name !== this.lastPlace) { this.lastPlace = name; this.toast(name); }
   }
   toast(s) { this.toasts = this.toasts.filter((t) => t.s !== s); this.toasts.push({ s, t: 0 }); if (this.toasts.length > 3) this.toasts.shift(); }
@@ -590,51 +629,56 @@ export class Garden extends Game {
     if (!R || GL.glLost()) { c.fillStyle = '#0b0d0a'; c.fillRect(0, 0, W, H); c.fillStyle = '#9ca09a'; c.font = '13px ui-monospace, monospace'; c.fillText('the garden needs WebGL', 20, 40); return; }
     this.actorTex ||= new ActorTex(); for (const n of this.npcs) if (n.slot < 0) n.slot = this.actorTex.take();
     if (this.heroSlot === undefined) this.heroSlot = this.actorTex.take();
-    const P = this.P, Wd = this.W, hour = HOUR[this.mode] || HOUR.day, here = P.place, dark = here?.kind === 'cave' || here?.kind === 'under', cave = dark;
+    const P = this.P, Wd = this.W, hour = HOUR[this.mode] || HOUR.day, here = P.place, inDeep = here?.key === 'deep', inSky = here?.key === 'sky', inCave = here?.kind === 'cave', dark = inCave || inDeep, cave = dark;
     const K = GL.setLens(GFX.pitch, GFX.fov), VW = Math.round(GFX.zoom), VH = Math.round((VW * H) / W);
     // the camera follows, lifting with the ground and the rides
     const cam = this.cam; cam.x += (P.x - cam.x) * 0.12; cam.y += (P.y - cam.y) * 0.12; cam.h += (P.hv - cam.h) * (this.ride ? 0.35 : 0.2);
-    const gb = Wd.baseAt(cam.y / TS), hi = cave ? 0 : clamp((cam.h - gb - 60) / 420, 0, 1), far = lerp(6, 16, hi), fogR = cave ? [0.8, 2] : [lerp(0.95, 1.8, hi), lerp(1.9, 8.5, hi)];
+    const gb = Wd.baseAt(cam.y / TS), hi = cave ? 0 : clamp((cam.h - gb - 60) / 420, 0, 1), far = lerp(6, 16, hi), fogR = cave ? [0.9, 2.4] : [lerp(0.95, 1.8, hi), lerp(1.9, 8.5, hi)];
     const PJ = GL.camSetup(VW, VH, Math.round(cam.x), cam.h, Math.round(cam.y), VH * 0.56, far);
     const prev = this.view; this.view = { VW, VH, PJ };
-    // fog and sky follow the country you are in, the height and the hour
-    const B = here ? null : BIOMES[BIOME_KEYS[Wd.biomeAt(P.x / TS, P.y / TS)]], fam = here?.kind === 'cave' ? 'cave' : here ? placeDef(here).fam : B.fam, sky2 = here && (here.kind === 'isle' || here.kind === 'canopy' || (here.kind === 'walk' && !here.roof)), high = !cave && (hi > 0.3 || sky2);
+    // fog and sky follow the country you are in (or the sky, or the deep), the height and the hour
+    const B = here ? null : BIOMES[BIOME_KEYS[Wd.biomeAt(P.x / TS, P.y / TS)]], deepK = inDeep ? here.kindAt(P.x / TS, P.y / TS) : '', fam = inCave ? 'cave' : inDeep ? 'cave' : inSky ? 'dream' : here ? placeDef(here).fam : B.fam;
+    const sky2 = inSky || here?.kind === 'canopy' || (this.ride && cam.h - gb > 300), high = !cave && (hi > 0.3 || sky2), core = !here && Wd.coreAt(P.x / TS, P.y / TS);
     let fogT, fogAT;
-    if (here?.kind === 'under') { fogT = [34, 26, 20]; fogAT = 0.34; }
+    if (inDeep) { fogT = deepK === 'machine' || deepK === 'ruins' ? [40, 28, 20] : deepK === 'crystal' ? [16, 20, 40] : [10, 16, 26]; fogAT = 0.4; }
     else if (cave) { fogT = [10, 12, 20]; fogAT = 0.5; }
     else if (high) { fogT = mix(hex(hour.hiSky[2]), hour.fog, 0.3); fogAT = 0.2 + hi * 0.08; }
     else if (here) { fogT = mix([150, 150, 150], hour.fog, 0.5); fogAT = 0.16; }
+    else if (core) { fogT = mix([60, 52, 80], hour.fog, 0.35); fogAT = 0.26; }
     else { fogT = mix(hex(B.fog[0]), hour.fog, hour.fogK * (B.dream ? 0.5 : 1)); fogAT = B.dream ? B.fog[1] * 0.75 + 0.02 : B.fog[1] + 0.1; if (B.dream) fogT = mix(fogT, this.mode === 'evening' ? [150, 110, 190] : [240, 214, 236], 0.3); }
     this.fogC = this.fogC ? mix(this.fogC, fogT, this.fade ? 1 : 0.03) : fogT; this.fogA += (fogAT - this.fogA) * (this.fade ? 1 : 0.03);
-    // how dreamy it is here (the bloom, the pastel shadows), eased as you cross into or out of the dream
-    const dreamT = here ? (sky2 && fam === 'dream' ? 0.55 : 0) : B.dream ? 1 : 0; this.dreamK += (dreamT - this.dreamK) * (this.fade ? 1 : 0.02);
-    const sky = this.sky(fam, hour, cave ? 'cave' : high ? 'hi' : B?.dream ? 'dream' : '');
+    // how dreamy it is here (the bloom, the pastel shadows): the dream, the sky realm, the glowing deep, the neon heart
+    const dreamT = inDeep ? 0.6 : sky2 ? 0.6 : here ? 0 : B.dream ? 1 : core ? 0.5 : 0; this.dreamK += (dreamT - this.dreamK) * (this.fade ? 1 : 0.02);
+    const sky = this.sky(fam, hour, cave ? 'cave' : high ? 'hi' : B?.dream ? 'dream' : core ? 'neon' : '');
     const PF = globalThis.GPROF, pt = (k) => { if (PF) { const n = performance.now(); PF[k] = (PF[k] || 0) + n - (PF._t || n); PF._t = n; } }; pt('_start'); if (PF) PF._t = performance.now();
-    // build and stream what can be seen
+    // build and stream what can be seen: the ground (unless underground), the sky realm (when up there, or on the way),
+    // the deep (when down there)
     const budget = this.vis.size < 4 ? 16 : 7, t0 = performance.now();
-    const need = cave ? [] : this.visible(VW, VH, cam, gb);
+    const showSky = !dark && (inSky || cam.h - gb > 380), showGround = !dark;
+    const needG = showGround ? this.visible(VW, VH, cam, gb, this.W, this.vis) : [], needS = showSky ? this.visible(VW, VH, cam, SKY_H, Wd.sky, this.visSky, 7) : [], needD = inDeep ? this.visible(VW, VH, cam, DEEP_H, Wd.deep, this.visDeep, 5) : [];
+    const cur = inSky ? needS : inDeep ? needD : needG, need = [...cur, ...(cur === needG ? [] : needG), ...(cur === needS ? [] : needS)]; this.drawn = need;
     for (const v of need) { if (performance.now() - t0 > budget) break; v.update(v.wantLod); }
     pump(Math.max(2, budget - (performance.now() - t0)));
     pt('stream');
-    // the places near enough to be seen (or stood in): islands, bridges, canopies, roofs; underground, only where you are
-    const rideTo = this.ride?.toPlace || this.ride?.fromPlace, range = (Q) => (Q.kind === 'isle' ? 2400 : Q.kind === 'walk' ? 2400 + Q.rad * TS : Q.kind === 'roof' ? 1100 : 1500);
-    const places = cave ? [here] : Wd.places.filter((Q) => Q === here || Q === rideTo || (Q.kind !== 'cave' && Q.kind !== 'under' && Math.hypot(Q.x * TS - cam.x, Q.y * TS - cam.y) < range(Q)));
+    // the places near enough to be seen (or stood in): the giant trees' canopies; a cave only from inside it
+    const rideTo = this.ride?.toPlace || this.ride?.fromPlace;
+    const places = inCave ? [here] : inDeep ? [] : Wd.places.filter((Q) => Q === here || Q === rideTo || (Q.kind === 'canopy' && Math.hypot(Q.x * TS - cam.x, Q.y * TS - cam.y) < 1500));
     let bakes = 0; for (const Q of places) { let pv = this.pvis.get(Q.i); if (!pv) this.pvis.set(Q.i, (pv = new PlaceVis(Wd, Q))); if (!pv.ok && Q !== here && bakes++ > 0) continue; pv.update(); }
     for (const [i, pv] of this.pvis) if (!places.includes(pv.P) && this.frameN % 120 === 0) { pv.free(); this.pvis.delete(i); }
     // ---- the 3D pass
     GL.glBegin(VW, VH, GFX.scale, this.fogC); GL.glScreen(sky, null, GFX);
-    const tint = here?.kind === 'under' ? [1, 0.9, 0.78] : cave ? [0.72, 0.74, 0.86] : high ? [hour.shade[0] * 1.04, hour.shade[1] * 1.03, hour.shade[2] * 1.06] : B?.dream ? [hour.shade[0] * 1.05, hour.shade[1] * 1.04, hour.shade[2] * 1.04] : hour.shade;
+    const tint = inDeep ? (deepK === 'machine' ? [1.02, 0.92, 0.82] : [0.86, 0.94, 1.08]) : cave ? [0.72, 0.74, 0.86] : high ? [hour.shade[0] * 1.04, hour.shade[1] * 1.03, hour.shade[2] * 1.06] : core ? [hour.shade[0] * 0.92, hour.shade[1] * 0.9, hour.shade[2] * 1.04] : B?.dream ? [hour.shade[0] * 1.05, hour.shade[1] * 1.04, hour.shade[2] * 1.04] : hour.shade;
     GL.glMain(this.fogC, this.fogA * 2.2, GFX, fogR, tint, lerp(3, 7, hi));
-    // the cut-away: whatever stands between the camera and the walker (a building, a mesa, a canyon wall) thins to a dither round them
+    // the cut-away: whatever stands between the camera and the walker (a building, a mesa, a canyon wall) fades round them
     const [hx, hy, hw] = PJ(P.x, P.y, 0, P.hv + 14), D = GL.camD(), cut = [hx, hy, 72, hw - 10, P.hv + 12, D * 0.4]; GL.glCut(1, ...cut);
     pt('places+sky');
     const bt = blockTex(), atlas = GL.atlasTex();
-    for (const v of need) if (v.lod >= 0) GL.glDraw(v.gBuf, v.gN, v.tex);
+    for (const v of need) if (v.lod >= 0 && v.gN) GL.glDraw(v.gBuf, v.gN, v.tex);
     for (const v of need) if (v.bN) GL.glDraw(v.bBuf, v.bN, bt);
     // props near the walker are drawn each frame instead, so they can sway (and fade when they stand in the way)
-    const pcx = P.x / (CS * TS), pcy = P.y / (CS * TS), nearV = need.filter((v) => Math.abs(v.cx + 0.5 - pcx) < 1.6 && Math.abs(v.cy + 0.5 - pcy) < 1.6 && v.props);
+    const pcx = P.x / (CS * TS), pcy = P.y / (CS * TS), nearV = cur.filter((v) => Math.abs(v.cx + 0.5 - pcx) < 1.6 && Math.abs(v.cy + 0.5 - pcy) < 1.6 && v.props);
     for (const v of need) if (v.pN && !nearV.includes(v)) GL.glDraw(v.pBuf, v.pN, atlas);
-    const nearP = here && this.pvis.get(here.i);
+    const nearP = here && !here.layer && this.pvis.get(here.i);
     for (const Q of places) { const pv = this.pvis.get(Q.i); if (!pv?.ok) continue; if (pv.gN) GL.glDraw(pv.gBuf, pv.gN, pv.tex); GL.glDraw(pv.bBuf, pv.bN, bt); if (pv.pN && pv !== nearP) GL.glDraw(pv.pBuf, pv.pN, atlas); }
     this.bat ||= { m: new GL.Batch(2048), s: new GL.Batch(512), a: new GL.Batch(512), g: new GL.Batch(64), l: new GL.Batch(512), p: new GL.Batch(1024), q: new GL.Batch(256), r: new GL.Batch(6), bq: GL.newBuffer(), bm: GL.newBuffer(), bs: GL.newBuffer(), ba: GL.newBuffer(), bg: GL.newBuffer(), bl: GL.newBuffer(), bp: GL.newBuffer(), br: GL.newBuffer() };
     const BM = this.bat.m, BS = this.bat.s, BA = this.bat.a, BG = this.bat.g, BL = this.bat.l, BP = this.bat.p, BQ = this.bat.q; BM.reset(); BS.reset(); BA.reset(); BG.reset(); BL.reset(); BP.reset(); BQ.reset(); this.BG = BG;
@@ -649,7 +693,7 @@ export class Garden extends Game {
       (a < 1 ? BQ : BP).bb(sp, 0, 0, sp.width, sp.height, p.x, p.y, p.e - 1.5, K, 1, a, undefined, 0, 1, this.sway.skew(p, sp.height));
     } };
     for (const v of nearV) nearProps(v.props);
-    if (nearP?.props) { nearProps(nearP.props); for (const f of Wd.place(here).floaters) { const s2 = propSprite('floatrock', placeDef(here).fam, f.v); if (s2) BP.bb(s2, 0, 0, s2.width, s2.height, f.x, f.y, f.h + Math.sin(this.t0 * 0.6 + f.ph) * 3, K, 0.92, 1); } }
+    if (nearP?.props) { nearProps(nearP.props); for (const f of (nearP.P === here ? Wd.place(here).floaters : [])) { const s2 = propSprite('floatrock', placeDef(here).fam, f.v); if (s2) BP.bb(s2, 0, 0, s2.width, s2.height, f.x, f.y, f.h + Math.sin(this.t0 * 0.6 + f.ph) * 3, K, 0.92, 1); } }
     for (const [p, v] of pf) if (v.f !== this.frameN) pf.delete(p);
     GL.glCut(0, ...cut); const nP = BP.upload(this.bat.bp); GL.glDraw(this.bat.bp, nP, atlas);
     pt('static');
@@ -665,7 +709,7 @@ export class Garden extends Game {
       const RQ = this.bat.r, X0 = this.rip.ox * 2, Z0 = this.rip.oy * 2, X1 = X0 + this.rip.w * 2, Z1 = Z0 + this.rip.h * 2, y = this.rip.level + 0.6; RQ.reset(); RQ.quad([X0, y, Z0], [X1, y, Z0], [X1, y, Z1], [X0, y, Z1], [0, 0], [1, 0], [1, 1], [0, 1], [0, 0, -1, 1], 1);
       const nR = RQ.upload(this.bat.br); GL.glBlend(true, true); GL.glDraw(this.bat.br, nR, this.ripTex); GL.glBlend(false, false);
     });
-    GL.glBlend(true, true); for (const Q of places) { const pv = this.pvis.get(Q.i); if (pv?.cN) GL.glDraw(pv.cBuf, pv.cN, atlas); } GL.glBlend(false, false);
+    GL.glBlend(true, true); for (const Q of places) { const pv = this.pvis.get(Q.i); if (pv?.cN) GL.glDraw(pv.cBuf, pv.cN, atlas); } for (const v of need) if (v.cN) GL.glDraw(v.cBuf, v.cN, atlas); GL.glBlend(false, false);
     // the cut-away again, faded: whatever stood between the camera and the walker, drawn over them see-through
     GL.glCut(2, ...cut); GL.glBlend(true);
     for (const v of nearV) { if (v.lod >= 0) GL.glDraw(v.gBuf, v.gN, v.tex); if (v.bN) GL.glDraw(v.bBuf, v.bN, bt); }
@@ -686,30 +730,32 @@ export class Garden extends Game {
     // ---- the air, in view pixels
     c.scale(W / VW, H / VH);
     const dcx = prev ? (cam.x - (this.lastCam?.x ?? cam.x)) : 0, dcy = prev ? (cam.y - (this.lastCam?.y ?? cam.y)) : 0; this.lastCam = { x: cam.x, y: cam.y };
-    const ev = this.mode === 'evening', motes = here?.kind === 'under' ? 'drips' : here?.kind === 'cave' ? (here.key === 'grotto' || here.key === 'crystal' ? 'glitter' : 'drips') : here?.kind === 'roof' || here?.kind === 'walk' && here.roof ? (ev ? 'fireflies' : 'pollen') : here?.kind === 'walk' ? 'glitter' : here ? (here.kind === 'canopy' ? (ev ? 'fireflies' : 'leaves') : ev && placeDef(here).fam === 'dream' ? 'fireflies' : placeDef(here).motes) : ev && B.dream ? 'fireflies' : B.dream && this.frameN % 1200 < 600 && B.motes === 'pollen' ? 'glitter' : B.motes;
+    const ev = this.mode === 'evening', motes = inDeep ? ({ machine: 'embers', ruins: 'drips', crystal: 'glitter', lake: 'drips', fungus: 'spores' }[deepK] || 'drips') : inSky ? (ev ? 'fireflies' : 'glitter') : core ? (this.mode === 'morning' ? 'drips' : 'rain') : here?.kind === 'cave' ? (here.key === 'grotto' || here.key === 'crystal' ? 'glitter' : 'drips') : here?.kind === 'roof' || here?.kind === 'walk' && here.roof ? (ev ? 'fireflies' : 'pollen') : here?.kind === 'walk' ? 'glitter' : here ? (here.kind === 'canopy' ? (ev ? 'fireflies' : 'leaves') : ev && placeDef(here).fam === 'dream' ? 'fireflies' : placeDef(here).motes) : ev && B.dream ? 'fireflies' : B.dream && this.frameN % 1200 < 600 && B.motes === 'pollen' ? 'glitter' : B.motes;
     this.atmos.update(1 / 60, motes, VW, VH, dcx, dcy);
     c.imageSmoothingEnabled = true; this.fogF.draw2D(c, PJ, D, (here ? 0.34 : 0.28 + this.dreamK * 0.08) * Math.min(1.3, GFX.fogOv), P); c.imageSmoothingEnabled = false;
     for (const [x, y, a, k, col] of this.dustPts || []) { c.fillStyle = k === 'spark' ? `rgba(255,236,150,${a.toFixed(2)})` : k === 'drop' ? `rgba(200,230,240,${(a * 0.8).toFixed(2)})` : k === 'leaf' ? col : `rgba(200,190,170,${(a * 0.5).toFixed(2)})`; if (k === 'leaf') c.globalAlpha = Math.min(1, a * 2); c.fillRect(Math.round(x), Math.round(y), k === 'dust' || k === 'leaf' ? 2 : 1, 1); c.globalAlpha = 1; }
-    this.atmos.draw(c, VW, VH, cam.x, cam.y, this.fogC, this.fogA * (cave ? 0.4 : 1), motes, here?.kind === 'under' ? ['rgba(40,20,10,.16)', 'rgba(255,170,90,.06)'] : cave ? ['rgba(10,14,30,.18)', 'rgba(120,200,220,.05)'] : B?.dream ? [hour.tint[0], this.mode === 'evening' ? 'rgba(200,140,255,.12)' : 'rgba(255,220,240,.10)'] : hour.tint);
+    this.atmos.draw(c, VW, VH, cam.x, cam.y, this.fogC, this.fogA * (cave ? 0.4 : 1), motes, inDeep ? (deepK === 'machine' ? ['rgba(40,20,10,.16)', 'rgba(255,170,90,.06)'] : ['rgba(6,10,24,.16)', 'rgba(120,220,255,.05)']) : core ? ['rgba(20,10,40,.14)', 'rgba(255,90,176,.07)'] : cave ? ['rgba(10,14,30,.18)', 'rgba(120,200,220,.05)'] : B?.dream ? [hour.tint[0], this.mode === 'evening' ? 'rgba(200,140,255,.12)' : 'rgba(255,220,240,.10)'] : hour.tint);
     c.restore();
     pt('overlay');
     if (this.fade) { const u = this.fade.t / this.fade.dur, a = 1 - Math.abs(u * 2 - 1); c.fillStyle = `rgba(0,0,0,${clamp(a * 1.4, 0, 1).toFixed(3)})`; c.fillRect(0, 0, W, H); }
     this.drawUI(c);
   }
   // which chunks the view needs, and at what level of detail (the camera's footprint on the ground)
-  visible(VW, VH, cam, gb = 0) {
+  // which chunks of a layer (the ground, the sky realm, the deep) the view needs, and at what level of detail: the
+  // camera's footprint on the layer's plane (and, from high up, on the ground far below)
+  visible(VW, VH, cam, gb = 0, src = this.W, map = this.vis, reach = 0) {
     const up = cam.h - gb > 40, pts = [], low = Math.min(gb, cam.h); for (const pl of up ? [cam.h, low] : [low]) for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) { const g = GL.unproject((i / 4) * VW, (j / 4) * VH, pl); if (g) pts.push(g); }
-    const D = GL.camD(), maxd = D * (up ? 10 : 4.2);
+    const D = GL.camD(), maxd = D * (reach || (up ? 10 : 4.2));
     let x0 = cam.x - 200, x1 = cam.x + 200, y0 = cam.y - 200, y1 = cam.y + 140;
     for (const [x, y] of pts) { const dx = x - cam.x, dy = y - cam.y, d = Math.hypot(dx, dy), k = d > maxd ? maxd / d : 1; const X = cam.x + dx * k, Y = cam.y + dy * k; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y); }
     const S = CS * TS, cx0 = Math.max(0, Math.floor(x0 / S) - 1), cx1 = Math.min(NC - 1, Math.floor(x1 / S) + 1), cy0 = Math.max(0, Math.floor(y0 / S) - 1), cy1 = Math.min(NC - 1, Math.floor(y1 / S) + 1);
     const g0 = GL.unproject(VW / 2, VH * 0.56, low) || [cam.x, cam.y], fx = up ? g0[0] : cam.x, fy = up ? g0[1] : cam.y, out = [];
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
-      const key = cy * 1000 + cx; let v = this.vis.get(key); if (!v) this.vis.set(key, (v = new ChunkVis(this.W, cx, cy)));
-      const d = Math.min(Math.hypot((cx + 0.5) * S - fx, (cy + 0.5) * S - fy), Math.hypot((cx + 0.5) * S - cam.x, (cy + 0.5) * S - cam.y)) / S; v.wantLod = d < 1.6 ? 0 : d < 3.2 ? 1 : 2; v.d = d; v.used = this.frameN; out.push(v);
+      const key = cy * 1000 + cx; let v = map.get(key); if (!v) map.set(key, (v = new ChunkVis(src, cx, cy)));
+      const d = Math.min(Math.hypot((cx + 0.5) * S - fx, (cy + 0.5) * S - fy), Math.hypot((cx + 0.5) * S - cam.x, (cy + 0.5) * S - cam.y)) / S; v.wantLod = d < 1.6 ? 0 : d < 3.2 ? 1 : 2; v.d = d; v.used = this.frameN; if (v.lod !== 9) out.push(v);
     }
     out.sort((a, b) => a.d - b.d);
-    if (this.vis.size > 260) for (const [k, v] of [...this.vis].sort((a, b) => a[1].used - b[1].used)) { if (this.vis.size <= 200) break; if (v.used < this.frameN - 30) { v.free(); this.vis.delete(k); } }
+    if (map.size > 260) for (const [k, v] of [...map].sort((a, b) => a[1].used - b[1].used)) { if (map.size <= 200) break; if (v.used < this.frameN - 30) { v.free(); map.delete(k); } }
     return out;
   }
   // sky textures, per family, hour and height (the dream's skies clearer, the islands' higher and paler)
@@ -717,7 +763,7 @@ export class Garden extends Game {
     this.skies ||= new Map(); const key = `${fam}|${this.mode}|${kind}`; let s = this.skies.get(key);
     if (!s) {
       let cv; if (kind === 'cave') { cv = mk(16, 16); const x = cv.getContext('2d'); x.fillStyle = '#05060a'; x.fillRect(0, 0, 16, 16); }
-      else { const S = kind === 'hi' ? hour.hiSky : kind === 'dream' ? hour.sky.map((c2, i) => (i < 2 ? c2 : hour.hiSky[i])) : hour.sky; cv = paintSky(256, 160, S[0], S[1], S[2], S[3], this.W.seed % 97, kind === 'hi' ? 6 : 4); }
+      else { const S = kind === 'neon' ? ['#06040a', '#1c122e', '#601a3a', '#ff5ab0'] : kind === 'hi' ? hour.hiSky : kind === 'dream' ? hour.sky.map((c2, i) => (i < 2 ? c2 : hour.hiSky[i])) : hour.sky; cv = paintSky(256, 160, S[0], S[1], S[2], S[3], this.W.seed % 97, kind === 'hi' ? 6 : 4); }
       s = GL.texNew(cv.width, cv.height, cv, false, true); this.skies.set(key, s);
     }
     return s;
@@ -738,7 +784,7 @@ export class Garden extends Game {
       const base = A.ai === 'swim' ? b.h - (bird ? 2 : 4) : b.base;
       if (b.alt < 50 && A.ai !== 'drift' && A.ai !== 'swim') BS.gd(shadowTex(s.width < 16 ? 10 : 20, s.width < 16 ? 4 : 6), b.x, b.y, s.width * 0.8 * sc, 5, (A.ai === 'flutter' || A.ai === 'bat' || b.st === 'fly' ? b.base : b.h) + 0.4, 1 - b.alt / 60);
       BM.bb(s, 0, 0, s.width, s.height, b.x, b.y, base + b.alt, K, 1, 1, undefined, 0, sc);
-      if (A.glow && (ev || here?.kind === 'cave' || here?.kind === 'under' || A.ai === 'drift' || A.bug === 'firefly' || this.dreamK > 0.5)) lights.push({ x: b.x, y: b.y, h: base + b.alt + 4 * sc, r: A.bug === 'firefly' ? 7 : 14 * sc, c: hex(A.glow), a: A.bug === 'firefly' ? (Math.sin(b.t * 2.6 + b.ph) > 0 ? 0.9 : 0.2) : 0.6 });
+      if (A.glow && (ev || here?.kind === 'cave' || here?.key === 'deep' || A.ai === 'traffic' || A.ai === 'drift' || A.bug === 'firefly' || this.dreamK > 0.5)) lights.push({ x: b.x, y: b.y, h: base + b.alt + 4 * sc, r: A.bug === 'firefly' ? 7 : 14 * sc, c: hex(A.glow), a: A.bug === 'firefly' ? (Math.sin(b.t * 2.6 + b.ph) > 0 ? 0.9 : 0.2) : 0.6 });
     }
     // the chests already opened, and a glint on those still waiting
     for (const T of Wd.treasures) {
@@ -756,9 +802,9 @@ export class Garden extends Game {
     this.dustPts = this.fx.map((f) => { const [x, y] = PJ(f.x, f.y, 0, f.h); return [x, y, 1 - f.t / f.life, f.k, f.col]; });
     // lights from the chunks in view (fires, windows, lamps, lift beacons) and from the places
     const blink = 0.6 + 0.4 * (Math.sin(this.t0 * 3) > 0 ? 1 : 0);
-    if (here?.kind !== 'cave' && here?.kind !== 'under') for (const v of this.vis.values()) { if (v.used !== this.frameN || v.lod < 0) continue; const C = Wd.chunk(v.cx, v.cy); for (const L of C.lights) { if (!near(L.x, L.y, 760)) continue; lights.push({ x: L.x, y: L.y, h: L.h, r: L.r, c: L.c, a: L.fire ? 0.8 + Math.sin(this.t0 * 9 + L.x) * 0.15 : L.beacon ? blink : 1 }); } }
-    const darkHere = here?.kind === 'cave' || here?.kind === 'under';
-    for (const pv of this.pvis.values()) { if (!pv.ok) continue; const M = Wd.place(pv.P); if ((pv.P.kind === 'cave' || pv.P.kind === 'under') !== darkHere) continue; for (const L of M.lights) if (near(L.x, L.y, 900)) lights.push({ x: L.x, y: L.y, h: L.h, r: L.r, c: L.c, a: L.beacon ? blink : 1 }); }
+    if (here?.kind !== 'cave') for (const v of this.drawn || []) { if (v.used !== this.frameN || v.lod < 0 || v.lod === 9) continue; const C = v.W.chunk(v.cx, v.cy); for (const L of C.lights) { if (!near(L.x, L.y, 760)) continue; lights.push({ x: L.x, y: L.y, h: L.h, r: L.r, c: L.c, a: L.fire ? 0.8 + Math.sin(this.t0 * 9 + L.x) * 0.15 : L.beacon ? blink : 1 }); } }
+    const darkHere = here?.kind === 'cave';
+    for (const pv of this.pvis.values()) { if (!pv.ok) continue; const M = Wd.place(pv.P); if ((pv.P.kind === 'cave') !== darkHere) continue; for (const L of M.lights) if (near(L.x, L.y, 900)) lights.push({ x: L.x, y: L.y, h: L.h, r: L.r, c: L.c, a: L.beacon ? blink : 1 }); }
     return lights;
   }
 
@@ -855,16 +901,16 @@ export class Garden extends Game {
     c.font = '9px ui-monospace, Menlo, monospace'; c.textBaseline = 'middle';
     for (const v of Wd.villages) { const [x, y] = at(v.x, v.y), sn = seen(v.x, v.y); c.fillStyle = sn ? '#f0d08a' : 'rgba(240,208,138,.35)'; c.fillRect(x - 1.5, y - 1.5, 3, 3); if (sn) { c.fillStyle = '#e8dcc4'; c.fillText(v.name, x + 4, y); } }
     for (const Q of Wd.places) {
-      if (Q.kind === 'isle') { const [x, y] = at(Q.x, Q.y); c.strokeStyle = 'rgba(200,220,240,.6)'; c.beginPath(); c.arc(x, y, (Q.rad / WT) * S, 0, 6.3); c.stroke(); }
-      else if (Q.kind === 'canopy') { const [x, y] = at(Q.x, Q.y); c.fillStyle = 'rgba(120,200,110,.85)'; c.beginPath(); c.arc(x, y, 2.4, 0, 6.3); c.fill(); }
-      else if (Q.kind === 'walk' && !Q.roof) { c.strokeStyle = 'rgba(232,214,170,.45)'; c.setLineDash([2, 2]); c.beginPath(); Q.pts.forEach(([px, py], k) => { const [x, y] = at(px, py); if (k) c.lineTo(x, y); else c.moveTo(x, y); }); c.stroke(); c.setLineDash([]); }
-      else if (Q.kind === 'roof') { const [x, y] = at(Q.x, Q.y); c.fillStyle = 'rgba(140,220,120,.8)'; c.fillRect(x - 1, y - 1, 2, 2); }
-      else if (Q.kind === 'under') for (const g of Q.gates) { if (!seen(g.x, g.y)) continue; const [x, y] = at(g.x, g.y); c.fillStyle = '#ffb040'; c.fillRect(x - 1, y - 1, 2, 2); }
+      if (Q.kind === 'canopy') { const [x, y] = at(Q.x, Q.y); c.fillStyle = 'rgba(120,200,110,.85)'; c.beginPath(); c.arc(x, y, 2.4, 0, 6.3); c.fill(); }
       else if (Q.mouth && seen(Q.mouth.x, Q.mouth.y)) { const [x, y] = at(Q.mouth.x, Q.mouth.y); c.fillStyle = '#6ad0b0'; c.fillRect(x - 1, y - 1, 2, 2); }
     }
-    for (const T of Wd.treasures) { const ax = T.place ? (T.place.kind === 'cave' ? T.place.mouth.x : T.place.x) : T.lx, ay = T.place ? (T.place.kind === 'cave' ? T.place.mouth.y : T.place.y) : T.ly, [x, y] = at(ax, ay); if (T.found) { c.fillStyle = '#ffd860'; c.fillText('★', x - 3, y); } }
+    // the sky realm over the country: its islands, its bridges; the lifts up and the great lifts down
+    for (const I of Wd.sky.islands) { const [x, y] = at(I.x, I.y); c.strokeStyle = 'rgba(210,225,245,.6)'; c.beginPath(); c.ellipse(x, y, (I.rad / WT) * S, (I.rad * 0.8 / WT) * S, 0, 0, 6.3); c.stroke(); }
+    c.strokeStyle = 'rgba(232,214,170,.4)'; c.setLineDash([2, 2]); for (const sp of Wd.sky.spans) { c.beginPath(); sp.pts.forEach(([px, py], k) => { const [x, y] = at(px, py); if (k) c.lineTo(x, y); else c.moveTo(x, y); }); c.stroke(); } c.setLineDash([]);
+    for (const w of Wd.ways) { const [x, y] = at(w.gx, w.gy); c.fillStyle = w.layer.key === 'sky' ? '#bfe6ff' : '#ffb040'; c.fillRect(x - 1, y - 1, 2, 2); }
+    for (const T of Wd.treasures) { const ax = T.place && !T.place.layer ? (T.place.kind === 'cave' ? T.place.mouth.x : T.place.x) : T.lx, ay = T.place && !T.place.layer ? (T.place.kind === 'cave' ? T.place.mouth.y : T.place.y) : T.ly, [x, y] = at(ax, ay); if (T.found) { c.fillStyle = '#ffd860'; c.fillText('★', x - 3, y); } }
     for (const g of this.giants) { const [x, y] = at(g.x / TS, g.y / TS); c.fillStyle = 'rgba(160,200,120,.8)'; c.fillRect(x - 1, y - 2, 2, 4); }
-    const here = this.P.place, anchor = here ? (here.kind === 'cave' ? here.mouth : here.kind === 'under' ? here.gates[0] : here.kind === 'walk' ? null : here) : null, px0 = anchor ? anchor.x * TS : this.P.x, py0 = anchor ? anchor.y * TS : this.P.y, [px, py] = at(px0 / TS, py0 / TS);
+    const here = this.P.place, anchor = here ? (here.kind === 'cave' ? here.mouth : here.layer ? null : here) : null, px0 = anchor ? anchor.x * TS : this.P.x, py0 = anchor ? anchor.y * TS : this.P.y, [px, py] = at(px0 / TS, py0 / TS);
     c.fillStyle = '#ff7a3a'; c.beginPath(); c.arc(px, py, 3, 0, 6.3); c.fill(); c.strokeStyle = '#000'; c.stroke();
     c.fillStyle = 'rgba(232,220,196,.5)'; c.font = '10px ui-monospace, Menlo, monospace'; c.fillText('tap to go back', ox, oy + S + 16);
   }

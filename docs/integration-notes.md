@@ -838,3 +838,45 @@ The Makhana garden grew, got its old dream back, and gained heights and depths. 
   - **Props fade whole:** a tree, a pillar or a house standing between the camera and the walker now fades as a whole sprite, easing down to 30% and back up as you pass. Before, the per-pixel cut left a tree's trunk solid and its crown faded, so it looked cut in half. The judgement is per prop, in screen space: it is nearer than the walker and its sprite covers them. Terrain and buildings keep the per-pixel fade.
   - **The giant gardeners blur:** they are drawn with their true depth now. Their thinner fog stays so they still loom out of the haze, but the focus pass blurs them like everything else at their distance. Before, their depth was squeezed toward the focal plane, which kept them sharp.
 
+## The garden: the sky realm, the deep and the neon heart (2026-11-27)
+The small floating islands and their bridges, the roof gardens and the old undercity are gone. Two worlds as big as the country replace them, one above and one below. Both are streamed in chunks the same way as the ground (`layers.js`), and the same chunk renderer draws all three.
+
+- **The sky realm (1150 px up):**
+  - Ten large floating islands of the dream, 28–48 tiles across. They have terraced ground, ponds, waterfalls off their rims, deep rock cones beneath, and rocks floating round them.
+  - The nine tallest towers of the city rise all the way up, and their tops are sky gardens: beds, flower bushes, blossom and glasshouses, lantern shrines, gardeners, and a low parapet.
+  - A spanning tree of plank bridges (21 spans in the test world, with a few loops) joins every island and every tower top, with lantern posts along them. All of it can be walked end to end without a load.
+  - A cloud deck drifts far below, between the sky realm and the city.
+  - The Wind Temple and Star Harp treasures are on two of the islands.
+  - Hermits in robes live on the islands. Sky creatures circle each island well outside its rock and below it, and phoenixes and eagles soar.
+- **Getting up there:**
+  - An elevator runs up the street face of each sky tower: straight up past the lit floors and the skybridges, then a step across onto the garden.
+  - A lift tower stands on the ground under each island, with its cable rising out of sight. You come back down the same way.
+- **The deep (1000 px down, far below even the canyons):** a vast cavern network.
+  - **The Machine Deep** lies under the city's heart: boilers, great cogwheels, pistons, tanks, chimneys, dormant brass automatons, channels of molten slag, lamps, and the undercity's people with their brass creatures.
+  - **Under each canyon,** a chain of halls: the Glowing Wood (giant and glowing mushrooms, lantern trees), the Crystal Hollows (crystals and crystal hearts), the Black Lake (dark water and glowing shores) or the Sunken Works (pillars, obelisks, cogs and automatons).
+  - **More caverns** lie out between them, joined by wide winding tunnels.
+  - Rock walls rise 300–560 px round every cavern, and great pillars climb into the dark, so the ceiling is always out of sight overhead. The walls show no face to the rock behind them, so nothing hides a cavern from the camera.
+  - The deep is lit by its fungi, crystals, slag and furnaces, with its own fog, motes, tint and bloom.
+- **Getting down there:**
+  - A great lift stands over a shaft in each canyon's floor, and three more stand at crossings in the city's heart.
+  - The ride goes down the shaft into the dark, then out of the cavern's roof far below and down to its floor. Coming back reverses it.
+- **The city:** it is larger (204 × 168 tiles) and is now a living heart inside a ring of ruins.
+  - Its 85 lots of lit towers stand 150–930 px tall, faced with dark glass, neon-banded panels and window grids.
+  - The nine sky towers reach the sky realm.
+  - Glass skybridges cross the streets between neighbouring towers at several heights.
+  - Neon signs run down the towers' street faces, with big lit boards high on the tallest.
+  - Flying cars run along the lanes over the streets at every height, lights fore and aft.
+  - The streets are wet, with lamps in pink, blue and amber, market stalls and crowds in long coats. It rains, under a dark violet sky with a pink horizon.
+  - The ruined ring round it is as before.
+- **Under the hood:**
+  - `layers.js` (new) holds `SkyLayer` and `DeepLayer`. Each has the ground's interface (`chunk`, `cell`, `tileInfo`, `biomeAt`, `baseAt`, `seed`) and its own biomes in `lands.js`, marked `layer` and kept out of the country's map.
+  - Chunks in the layers may be wholly empty (open sky, solid rock) and are skipped. Islands hang their undersides from their rims, and bridges are a plank thick.
+  - The game keeps a chunk map per layer and draws the ground and the sky realm together when you are up there or riding up. Only the deep is drawn when you are down there.
+  - The save records `sky` or `deep` as the place.
+- **Tested** with no errors:
+  - The neon heart, a sky island, the Machine Deep and the Glowing Wood.
+  - Riding a tower elevator up to its sky garden and out onto the bridges, and riding a canyon's great lift down into the deep and back up.
+  - Finding the Wind Temple treasure on its island.
+  - Error soaks with the autopilot (which takes the lifts by itself) from the city, an island, the Machine Deep, a canyon and a village.
+- **Cost:** JS is about 4–5 ms a frame. In software GL, streaming the sky and the ground far below peaks at about 18 ms, and the GPU part is about 140 ms there; that is a few milliseconds on a phone.
+

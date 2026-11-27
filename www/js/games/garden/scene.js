@@ -56,7 +56,7 @@ function blockAtlas() {
   blocks.x = blocks.cv.getContext('2d'); blocks.tex = texNew(AW, AH, blocks.cv);
   return blocks;
 }
-const FACADES = ['conc', 'brick', 'metal', 'tower', 'tile'], ROOFS = ['roof', 'roofgreen'];
+const FACADES = ['conc', 'brick', 'metal', 'tower', 'tile', 'glass', 'neonA', 'neonB'], ROOFS = ['roof', 'roofgreen'];
 // a cell of a family's block texture, or of a city facade / roof; painted in when it is ready
 function cell(col, row, key, src) {
   const A = blockAtlas(); if (!A.have.has(key)) { const cv = src(); if (cv) { A.x.drawImage(cv, col * ACELL, row * ACELL); A.have.add(key); A.dirty = true; A.wanted.delete(key); } else A.wanted.set(key, [col, row, src]); }
@@ -88,10 +88,12 @@ const LODPX = [16, 8, 4];   // pixels per tile at each level of detail
 const WG = 6;               // the water's colour blends between families over this many tiles
 export class ChunkVis {
   constructor(W, cx, cy) { this.W = W; this.cx = cx; this.cy = cy; this.lod = -1; this.want = 2; this.tex = null; this.gBuf = null; this.bBuf = null; this.pBuf = null; this.pGen = -1; this.missing = 1; this.used = 0; }
-  free() { texFree(this.tex); freeBuffer(this.gBuf); freeBuffer(this.bBuf); freeBuffer(this.pBuf); this.tex = this.gBuf = this.bBuf = this.pBuf = null; }
+  free() { texFree(this.tex); freeBuffer(this.gBuf); freeBuffer(this.bBuf); freeBuffer(this.pBuf); freeBuffer(this.cBuf); this.tex = this.gBuf = this.bBuf = this.pBuf = this.cBuf = null; }
   // bake (or re-bake at a finer level) once every texture the chunk needs is painted
   update(lod) {
     this.want = lod;
+    if (this.lod === 9) return;   // nothing here: open sky, solid rock
+    if (this.lod === -1 && this.W.chunk(this.cx, this.cy).empty) { this.lod = 9; return; }
     if (this.lod === -1 || lod < this.lod) { if (this.bakeGround(lod)) { if (this.lod === -1) this.buildBlocks(); this.lod = lod; } }
     if (this.lod >= 0 && (this.pGen !== atlasGen() || this.missing)) this.buildProps();
   }
@@ -158,7 +160,7 @@ export class ChunkVis {
       const G = new Batch(C.flat ? 6 : 1536), ox = this.cx * CS, oy = this.cy * CS;
       if (C.flat) { const X1 = X0 + CS * TS, Y1 = Y0 + CS * TS, y = C.e[0]; G.quad([X0, y, Y0], [X1, y, Y0], [X1, y, Y1], [X0, y, Y1], [0, 0], [1, 0], [1, 1], [0, 1], [0, 0, -1, 1], 1); }
       else {
-        ground(G, CS, ox, oy, (i, j) => C.e[at(i, j)]);
+        ground(G, CS, ox, oy, (i, j) => C.e[at(i, j)], C.voids ? (i, j) => C.k[at(i, j)] === K_VOID : null);
         // under a bridge over a canyon, the floor far below
         for (let j = 0; j < CS; j++) for (let i = 0; i < CS; i++) { const q = at(i, j); if (C.lo[q] === NOLO) continue; const Xa = (ox + i) * TS, Za = (oy + j) * TS, y = C.lo[q]; G.quad([Xa, y, Za], [Xa + TS, y, Za], [Xa + TS, y, Za + TS], [Xa, y, Za + TS], [i / CS, j / CS], [(i + 1) / CS, j / CS], [(i + 1) / CS, (j + 1) / CS], [i / CS, (j + 1) / CS], [0, 0, -1, 1], 0.7); }
       }
@@ -172,25 +174,38 @@ export class ChunkVis {
     const fl = (q) => (C.lo[q] !== NOLO ? C.lo[q] : C.e[q]), fc = famCell;
     for (let j = 0; j < CS; j++) for (let i = 0; i < CS; i++) {
       const q = at(i, j), k = C.k[q], e = C.e[q], fam = BIOMES[BIOME_KEYS[C.b[q]]].fam, X0 = (this.cx * CS + i) * TS, X1 = X0 + TS, Z0 = (this.cy * CS + j) * TS, Z1 = Z0 + TS;
+      if (k === K_VOID) continue;
+      if (C.voids && C.dep[q]) {
+        // the sky's islands and bridges: from the rim, rock (or a waterfall, or the deck's planks) hangs to its depth
+        const wet = k === K_WATER, br = k === K_BRIDGE, vS = C.k[q + n] === K_VOID, vE = C.k[q + 1] === K_VOID, vW = C.k[q - 1] === K_VOID, dep = wet && (vS || vE || vW) ? 600 : C.dep[q], lo = e - dep, Dp = (dq) => (C.k[q + dq] === K_VOID ? 0 : C.dep[q + dq]), sk = wet ? fc(fam, 'water') : br ? fc(fam, 'bark') : fc(fam, 'cliffFace');
+        const dS = Dp(n), dE = Dp(1), dW = Dp(-1);
+        if (dS < dep || vS) faceS(B, X0, X1, Z1, vS ? e : e - dS, lo, sk, wet ? 0.95 : 0.62);
+        if (dE < dep || vE) faceE(B, X1, Z0, Z1, vE ? e : e - dE, lo, sk, wet ? 0.85 : 0.5);
+        if (dW < dep || vW) faceW(B, X0, Z0, Z1, vW ? e : e - dW, lo, sk, wet ? 0.95 : 0.74);
+        if (!wet) top(B, X0, X1, Z1, Z0, lo, br ? sk : fc(fam, 'cliffTop'), 0.35);
+      }
       // terrain faces: from this tile's ground down to the neighbour's (a bridge deck is only a plank thick)
       const er = e - W.baseAt(this.cy * CS + j), deck = C.lo[q] !== NOLO, wf = k === K_WATER, face = wf ? fc(fam, 'water') : deck ? fc(fam, 'bark') : er >= 180 ? fc('frost', 'cliffFace') : er >= 130 ? rockCell() : fc(fam, 'cliffFace');
-      const lowS = fl(q + n), lowE = fl(q + 1), lowW = fl(q - 1), dk = (b) => (deck ? Math.max(b, e - 6) : b);
+      const vd = (dq) => (C.k[q + dq] === K_VOID ? 1e9 : fl(q + dq)), lowS = vd(n), lowE = vd(1), lowW = vd(-1), dk = (b) => (deck ? Math.max(b, e - 6) : b);
       if (lowS < e) faceS(B, X0, X1, Z1, e, dk(lowS), face, wf ? 0.9 : 0.76);
       if (lowE < e) faceE(B, X1, Z0, Z1, e, dk(lowE), face, wf ? 0.8 : 0.62);
       if (lowW < e) faceW(B, X0, Z0, Z1, e, dk(lowW), face, wf ? 0.95 : 0.9);
       // blocks: walls, buildings, the border cliffs, the giant trees' trunks
       const hgt = C.h[q]; if (!hgt) continue; const tp = e + hgt;
       let tc, bf;
-      if (k === K_BLDG) { bf = facCell((C.f[q] - 1) % 5); tc = roofCell(hash2(this.cx * 16 + i, this.cy * 16 + j, 3) < 0.2 ? 1 : 0); }
+      if (k === K_BLDG) { bf = facCell((C.f[q] - 1) % 8); tc = roofCell(hash2(this.cx * 16 + i, this.cy * 16 + j, 3) < 0.2 ? 1 : 0); }
       else if (k === K_WALL && C.f[q] === 2) { bf = facCell(0); tc = fc('ash', 'wallTop'); }
       else if (k === K_TRUNK) { bf = fc('dream', 'bark'); tc = bf; }
       else { tc = fc(fam, k === K_WALL ? 'wallTop' : 'cliffTop'); bf = fc(fam, k === K_WALL ? 'wallFace' : 'cliffFace'); }
       top(B, X0, X1, Z0, Z1, tp, tc, k === K_BLDG ? 0.9 : 1.04);
-      const nt = (dq) => C.e[q + dq] + C.h[q + dq];
+      // (the deep's walls show no face to the rock behind them, so nothing hides the cavern from the camera)
+      const nt = (dq) => (C.voids && !C.dep[q] && C.k[q + dq] === K_VOID ? 1e9 : C.e[q + dq] + C.h[q + dq]);
       const hs = nt(n); if (hs < tp) faceS(B, X0, X1, Z1, tp, Math.max(hs, e), bf);
       const he = nt(1); if (he < tp) faceE(B, X1, Z0, Z1, tp, Math.max(he, e), bf);
       const hw = nt(-1); if (hw < tp) faceW(B, X0, Z0, Z1, tp, Math.max(hw, e), bf);
     }
+    // the skybridges between the towers: lit boxes of glass across the streets
+    for (const sl of C.slabs) { const f = facCell(5); top(B, sl.X0, sl.X1, sl.Z0, sl.Z1, sl.y1, roofCell(0), 0.9); top(B, sl.X0, sl.X1, sl.Z1, sl.Z0, sl.y0, f, 0.45); faceS(B, sl.X0, sl.X1, sl.Z1, sl.y1, sl.y0, f, 0.85); faceE(B, sl.X1, sl.Z0, sl.Z1, sl.y1, sl.y0, f, 0.65); faceW(B, sl.X0, sl.Z0, sl.Z1, sl.y1, sl.y0, f, 0.9); }
     // the lifts' cables and ropes
     for (const s of C.shafts) shaft(B, s.x, s.y, s.y0, s.y1, s.rope ? 0.7 : 1.6, s.rope ? fc('dream', 'bark') : fc('rust', 'wallFace'));
     freeBuffer(this.bBuf); this.bBuf = null; this.bN = 0; if (B.n) { this.bBuf = newBuffer(); this.bN = B.upload(this.bBuf, renderer().gl.STATIC_DRAW); }
@@ -206,6 +221,7 @@ export class ChunkVis {
     }
     this.props = C.props;
     freeBuffer(this.pBuf); this.pBuf = null; this.pN = 0; if (B.n) { this.pBuf = newBuffer(); this.pN = B.upload(this.pBuf, renderer().gl.STATIC_DRAW); }
+    if (C.clouds?.length) { const Cl = new Batch(32); for (const c of C.clouds) { const s = cloudSprite(c.v); if (!s) { missing++; continue; } Cl.gd(s, c.x, c.y, s.width * 2.4 * c.s, s.height * 2.4 * c.s, c.h, 0.6); } freeBuffer(this.cBuf); this.cBuf = null; this.cN = 0; if (Cl.n) { this.cBuf = newBuffer(); this.cN = Cl.upload(this.cBuf, renderer().gl.STATIC_DRAW); } }
     this.pGen = atlasGen(); this.missing = missing;
   }
 }
@@ -217,27 +233,8 @@ export class PlaceVis {
   constructor(W, P) { this.W = W; this.P = P; this.tex = null; this.ok = false; this.pGen = -1; this.missing = 1; }
   free() { texFree(this.tex); freeBuffer(this.gBuf); freeBuffer(this.bBuf); freeBuffer(this.pBuf); freeBuffer(this.cBuf); this.tex = null; this.gBuf = this.bBuf = this.pBuf = this.cBuf = null; }
   update() {
-    if (!this.ok) this.ok = this.P.kind === 'walk' ? this.bakeWalk() : this.bake();
+    if (!this.ok) this.ok = this.bake();
     if (this.ok && (this.pGen !== atlasGen() || this.missing)) this.buildProps();
-  }
-  // a walkway needs no texture of its own: planks from the block atlas, a thin deck, rails along its edges
-  bakeWalk() {
-    const M = this.W.place(this.P), fam = M.L.fam, plank = famCell(fam, 'bridge'), side = famCell(fam, 'bark'), nw = M.nw, nh = M.nh, B = new Batch(4096);
-    if (!famTex(fam, 'bridge') || !famTex(fam, 'bark')) return false;
-    blockTex();
-    const deck = (i, j) => i >= 0 && j >= 0 && i < nw && j < nh && M.kind[j * nw + i] !== K_VOID;
-    for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) {
-      if (!deck(i, j)) continue; const Q = j * nw + i, y = M.e[Q], X0 = (M.ox + i) * TS, X1 = X0 + TS, Z0 = (M.oy + j) * TS, Z1 = Z0 + TS;
-      top(B, X0, X1, Z0, Z1, y, plank, 1);
-      const hn = (ii, jj) => (deck(ii, jj) ? M.e[jj * nw + ii] : -1e9);
-      if (hn(i, j + 1) < y) { faceS(B, X0, X1, Z1, y, Math.max(hn(i, j + 1), y - 5), side, 0.7); if (!deck(i, j + 1)) faceS(B, X0, X1, Z1 - 1, y + 11, y + 9, side, 0.9); }
-      if (hn(i + 1, j) < y) { faceE(B, X1, Z0, Z1, y, Math.max(hn(i + 1, j), y - 5), side, 0.55); if (!deck(i + 1, j)) faceE(B, X1 - 1, Z0, Z1, y + 11, y + 9, side, 0.7); }
-      if (hn(i - 1, j) < y) { faceW(B, X0, Z0, Z1, y, Math.max(hn(i - 1, j), y - 5), side, 0.85); if (!deck(i - 1, j)) faceW(B, X0 + 1, Z0, Z1, y + 11, y + 9, side, 0.95); }
-      if (!deck(i, j - 1)) faceS(B, X0, X1, Z0 + 1, y + 11, y + 9, side, 0.8);
-      top(B, X0, X1, Z1, Z0, y - 5, side, 0.4);
-    }
-    this.bBuf = newBuffer(); this.bN = B.upload(this.bBuf, renderer().gl.STATIC_DRAW); this.gN = 0;
-    return true;
   }
   bake() {
     const M = this.W.place(this.P), P = this.P, L = M.L, fam = L.fam, Pal = FAMILY[fam].pal, cave = P.kind === 'cave' || P.kind === 'under', canopy = P.kind === 'canopy', hangs = P.kind === 'isle' || canopy;

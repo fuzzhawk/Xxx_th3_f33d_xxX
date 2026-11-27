@@ -58,6 +58,12 @@ FAMILY.cave = { pal: PALS.cave, col: { leaf: ['#1a3a3a', '#285a52', '#3a8a78'], 
     bone: ['#e0d0ff', '#6e7c96'], plank: ['#3a2a1a', '#5a442a'], roof: ['#323c52', '#424e66'], tarp: ['#5a3a8a', '#285a52'], cloth: ['#5a3a8a', '#285a52'], sign: ['#6ad0b0', '#c8a0ff'], window: '#ffd88a' },
   tex: { floor: ['moss', ['#1c2230', '#262e40', '#285a52', '#3a8a78']], cliffTop: ['cliffTop', ['#262e40', '#1c2230', '#323c52', '#285a52']], cliffFace: ['cliffFace', ['#1c2230', '#141822', '#262e40']],
     wallTop: ['wallTop', ['#323c52', '#424e66', '#262e40', '#285a52']], wallFace: ['wallFace', ['#262e40', '#323c52', '#1c2230', '#285a52']], water: ['water', ['#0c0e14', '#1a3a3a', '#6ad0b0']], toxic: ['water', ['#0c0e14', '#1a3a3a', '#6ad0b0']], bridge: ['bridge', ['#3a2a1a', '#5a442a', '#141822']] } };
+// the living city's heart: wet dark streets, glass, neon in pink, blue and amber
+FAMILY.neon = { pal: PALS.neon, col: { leaf: ['#0e3e52', '#14607a', '#1e92aa'], bark: ['#26183c', '#321f4c'], stone: ['#3a3a42', '#5a5a62', '#7a7a80'], metal: ['#3a3a42', '#5a5a62', '#968aa6'], rust: ['#3a1424', '#601a3a'], concrete: ['#3a3a42', '#5a5a62', '#26183c'],
+    glow: ['#ff5ab0', '#44d0e0', '#ffd36e', '#a8f4ff'], vine: null, moss: null, flower: ['#ff5ab0', '#44d0e0'], litter: ['#26183c', '#3a3a42'], puddle: '#1e92aa', cloth: ['#d0367c', '#14607a', '#ffd36e', '#e8e0f0'], sign: ['#ff5ab0', '#44d0e0', '#ffd36e', '#a8f4ff'],
+    plank: ['#3a3a42', '#5a5a62', '#26183c'], roof: ['#26183c', '#3a3a42'], tarp: ['#d0367c', '#1e92aa', '#ffd36e'], window: '#ffd36e', char: ['#06040a', '#0c0814'] },
+  tex: { floor: ['concrete', ['#3a3a42', '#5a5a62', '#26183c']], cliffTop: ['cliffTop', ['#3a3a42', '#26183c', '#5a5a62', '#14607a']], cliffFace: ['cliffFace', ['#26183c', '#1c122e', '#3a3a42']],
+    wallTop: ['wallTop', ['#5a5a62', '#7a7a80', '#3a3a42', '#26183c']], wallFace: ['metalWall', ['#26183c', '#3a3a42', '#140c20', '#d0367c']], water: ['water', ['#0a2430', '#14607a', '#a8f4ff']], toxic: ['toxic', ['#3a1424', '#d0367c', '#ff5ab0']], bridge: ['bridge', ['#3a3a42', '#5a5a62', '#140c20']] } };
 for (const F of Object.values(FAMILY)) { F.col = { ...BASE, ...F.col }; for (const k in F.col) if (F.col[k] === null) F.col[k] = k === 'vine' || k === 'moss' ? null : BASE[k]; }
 
 // the biomes. g / g2 = two ground textures mixed by noise, path = the trodden ground; props and decals
@@ -145,8 +151,7 @@ Object.assign(BIOMES, {
   pinksalt: { name: 'Pink Salt Lakes', fam: 'desert', reg: 'desert', dream: 1, g: ['salt', ['#f1dfb0', '#fbf3dc', '#e8e4d4']], g2: ['salt', ['#fbf3dc', '#f1dfb0', '#a9cbd0']], mix: 0.5, water: 'water', waterAmt: 0.32, path: ['gravel', ['#d6ad6c', '#c49456', '#e5c689']],
     props: [['crystal', 0.006], ['rock', 0.004], ['palm', 0.002]], decals: [['stones', 0.03]], fauna: ['flamingo', 'fennec', 'lizard', 'crane'], rare: ['emberbird'], fog: ['#fbe8e8', 0.08], motes: 'haze' }
 });
-export const BIOME_KEYS = Object.keys(BIOMES);
-BIOME_KEYS.forEach((k, i) => { BIOMES[k].key = k; BIOMES[k].i = i; });
+
 // where each family lives on the map: [x0, y0, x1, y1] as fractions, and how many sites per biome
 export const REGION = { green: [0.02, 0.14, 0.5, 0.98], dream: [0.12, 0.26, 0.6, 0.88], frost: [0.04, 0.02, 0.78, 0.18], rust: [0.46, 0.12, 0.8, 0.58], desert: [0.42, 0.62, 0.98, 0.98], ash: [0.74, 0.1, 0.98, 0.66] };
 // the floating islands' kinds: their ground, props and what has been left on them
@@ -180,3 +185,16 @@ export const TREASURES = [
 export const ROOFTOP = { name: 'A Roof Garden', fam: 'dream', g: ['grass', ['#6aa65a', '#88cb70', '#4c8a4c', '#a8cf6a']], g2: ['flowers', ['#6aa65a', '#88cb70', '#f28aa8', '#ffd23f', '#b49be8']], path: ['floor', ['#b4b8ae', '#8a8e84', '#d8d4c0', '#6a6e66']], props: [], land: 'greenhouse' };
 export const UNDER = { name: 'The Undercity', fam: 'rust', g: ['floor', ['#43413a', '#5c5a50', '#2e2d28', '#66442c']], g2: ['concrete', ['#43413a', '#5c5a50', '#2e2d28']], path: ['asphalt', ['#2e2d28', '#1d1d1a', '#43413a', '#17110c']], props: [], land: 'boiler' };
 export const WALKWAY = { sky: { name: 'The Sky Bridge', fam: 'dream' }, roof: { name: 'The Roof Bridges', fam: 'rust' } };
+// the upper and lower worlds' own grounds (kept out of the country's map: layer marks them)
+for (const [k, L] of Object.entries(ISLES)) if (!L.canopy) BIOMES['sky_' + k] = { name: L.name, layer: 'sky', fam: L.fam, dream: L.fam === 'dream' ? 1 : 0, g: L.g, g2: L.g2, mix: 0.5, path: L.path, props: L.props, decals: [['flowers', 0.08], ['tuft', 0.14]], fauna: [], fog: ['#ece6f4', 0.08], motes: L.motes };
+Object.assign(BIOMES, {
+  sky_garden: { name: 'A Sky Garden', layer: 'sky', fam: 'dream', dream: 1, g: ROOFTOP.g, g2: ROOFTOP.g2, mix: 0.5, path: ROOFTOP.path, props: [], decals: [], fauna: [], fog: ['#ece6f4', 0.08], motes: 'pollen' },
+  deep_machine: { name: 'The Machine Deep', layer: 'deep', fam: 'rust', g: ['oil', ['#2e2d28', '#1d1d1a', '#43413a', '#5c5a50']], g2: ['concrete', ['#43413a', '#5c5a50', '#2e2d28']], mix: 0.55, path: ['floor', ['#5c5a50', '#43413a', '#7a776a', '#66442c']], props: [], decals: [], fauna: [], fog: ['#3a2a1e', 0.3], motes: 'embers' },
+  deep_fungus: { name: 'The Glowing Wood', layer: 'deep', fam: 'cave', g: ['moss', ['#141822', '#1a3a3a', '#285a52', '#6ad0b0']], g2: ['litter', ['#141822', '#262e40', '#5a3a8a', '#285a52']], mix: 0.5, path: ['gravel', ['#262e40', '#1c2230', '#323c52']], props: [], decals: [], fauna: [], fog: ['#1a2a3a', 0.3], motes: 'spores' },
+  deep_crystal: { name: 'The Crystal Hollows', layer: 'deep', fam: 'cave', g: ['gravel', ['#262e40', '#323c52', '#141822', '#424e66']], g2: ['glass', ['#1c2230', '#3a8a78', '#8a5ac8', '#a8f4e0']], mix: 0.55, path: ['gravel', ['#323c52', '#262e40', '#424e66']], props: [], decals: [], fauna: [], fog: ['#1c2440', 0.28], motes: 'glitter' },
+  deep_lake: { name: 'The Black Lake', layer: 'deep', fam: 'cave', g: ['moss', ['#0c0e14', '#141822', '#1a3a3a', '#285a52']], g2: ['gravel', ['#141822', '#1c2230', '#262e40']], mix: 0.5, path: ['gravel', ['#1c2230', '#262e40', '#323c52']], props: [], decals: [], fauna: [], fog: ['#101a28', 0.32], motes: 'drips' },
+  deep_ruins: { name: 'The Sunken Works', layer: 'deep', fam: 'cave', g: ['floor', ['#262e40', '#323c52', '#1c2230', '#424e66']], g2: ['gravel', ['#262e40', '#323c52', '#141822']], mix: 0.6, path: ['floor', ['#323c52', '#424e66', '#262e40', '#56647e']], props: [], decals: [], fauna: [], fog: ['#1a2030', 0.3], motes: 'drips' },
+  deep_rock: { name: 'The Deep Ways', layer: 'deep', fam: 'cave', g: ['gravel', ['#1c2230', '#262e40', '#141822', '#323c52']], g2: ['moss', ['#141822', '#1c2230', '#1a3a3a', '#285a52']], mix: 0.6, path: ['gravel', ['#262e40', '#1c2230', '#323c52']], props: [], decals: [], fauna: [], fog: ['#121622', 0.34], motes: 'drips' }
+});
+export const BIOME_KEYS = Object.keys(BIOMES);
+BIOME_KEYS.forEach((k, i) => { BIOMES[k].key = k; BIOMES[k].i = i; });

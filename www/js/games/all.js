@@ -53,7 +53,7 @@ export function upgradeGamePost(p) {
   return p;
 }
 export const GAME_HINT = {
-  garden: 'drag to walk, or tap a spot to walk there · lifts go up to the islands, canopies and roof gardens, or down a canyon · bridges join the islands · stairwells lead to the undercity · find the twelve treasures · ☰ for the map',
+  garden: 'drag to walk, or tap a spot to walk there · lifts rise to the sky realm from the towers and under the islands, and great lifts go down to the deep from the canyons and the city · find the twelve treasures · ☰ for the map',
   plinko: 'tap to drop a ball', breakout: 'drag to move the paddle', merge: 'drag to aim, release to drop · two alike merge (on the planet, aim around the core)', dash: 'tap to jump (twice to double-jump)',
   flappy: 'tap to flap', tetris: 'tap beside the piece to move, tap the piece to turn, drag to slide, swipe down to drop, swipe up to hold · every full line is lifted out as a saying', pong: 'drag to move your paddle', peggle: 'aim, release to shoot', juggle: 'tap the balls to keep them up',
   platformer: 'tap to jump, twice to double-jump · ladders, pads and springs work by themselves · grab power-ups', racer: 'drag to aim, hold to fire · shoot down bolts and dynamite · crates hold steam and upgrades · tap an arrow at a junction to pick your line', raycast: 'drag sideways to turn, up/down to walk · tap to fire, hold to keep firing · tap the weapon bar to switch · find the key, reach the glowing exit',
