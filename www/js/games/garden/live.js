@@ -1,8 +1,9 @@
 // The garden's small living touches, as they were in the old garden: banks of low fog that part round
 // you and drift back, trees and bushes that sway when you brush past and shed a few leaves, rings
 // spreading on the water, and the wisps that follow you for each treasure found.
-import { puffSprite, ringSprite, glowSprite } from './scene.js';
-import { clamp } from '../mk/tex.js';
+import { glowSprite } from './scene.js';
+import { clamp, mk } from '../mk/tex.js';
+import { K_WATER } from './world.js';
 
 const WISP = [[255, 246, 200], [159, 216, 255], [255, 184, 232], [191, 247, 234], [200, 168, 255], [255, 217, 138]];
 
@@ -14,7 +15,7 @@ export class FogField {
   clear() { this.banks = []; }
   // density 0..1 (how foggy this country is), col the mist's colour, movers [[x, y, vx, vy, strength]]
   update(dt, g, density, col, movers) {
-    this.t += dt; const P = g.P, here = P.place, want = Math.round(clamp(density, 0, 1) * 16), wind = [Math.cos(this.t * 0.013) * 5, Math.sin(this.t * 0.011) * 2];
+    this.t += dt; const P = g.P, here = P.place, want = Math.round(clamp(density, 0, 1) * 9), wind = [Math.cos(this.t * 0.013) * 5, Math.sin(this.t * 0.011) * 2];
     const far = (b) => Math.hypot(b.x - P.x, b.y - P.y);
     for (let n = 0; this.banks.length < want && n < 2; n++) {
       // new banks come in round the edge of the view (all over it, the first time)
@@ -34,13 +35,24 @@ export class FogField {
     this.banks = this.banks.filter((b) => (b.life > 0 || b.a > 0.02) && far(b) < 520);
     if (this.banks.length > want + 4) this.banks.sort((a, b) => far(a) - far(b)).length = want + 4;
   }
-  // drawn beside and beyond the walker; those coming between you and the camera thin away, so the mist never smothers the view
-  draw(B, K, strength, P) {
+  // drawn over the picture as the old garden drew it (soft, see-through puffs), but anchored in the world: each puff
+  // is projected to the screen and sized by its distance. Those coming between you and the camera thin away.
+  draw2D(c, PJ, D, strength, P) {
     for (const b of this.banks) for (const p of b.puffs) {
-      const x = b.x + p.ox + p.dx, y = b.y + p.oy + p.dy, dz = y - P.y, near = clamp(1 - (dz + 6) / 60, 0, 1) * clamp(1 - (Math.abs(x - P.x) - 150) / 90, 0, 1), al = clamp(b.a * strength * near, 0, 0.9); if (al < 0.04) continue;
-      const s = puffSprite(b.col, p.v); B.bb(s, 0, 0, s.width, s.height, x, y, b.base + p.h, K * 0.7, 1, al, undefined, 0, p.s * 0.8);
+      const x = b.x + p.ox + p.dx, y = b.y + p.oy + p.dy, dz = y - P.y, near = clamp(1 - (dz + 4) / 70, 0, 1), al = clamp(b.a * strength * near, 0, 0.6); if (al < 0.02) continue;
+      const [sx, sy, w] = PJ(x, y, 0, b.base + p.h); if (w <= D * 0.35) continue; const k = D / w, r = 26 * p.s * k, s = softPuff(b.col);
+      c.globalAlpha = al * clamp((w - D * 0.35) / (D * 0.3), 0, 1); c.drawImage(s, sx - r, sy - r * 0.62, r * 2, r * 1.24);
     }
+    c.globalAlpha = 1;
   }
+}
+// one soft puff: an ellipse whose density falls away smoothly to its edge (drawn with smoothing on, so it is blurry)
+const softs = new Map();
+function softPuff(col) {
+  const key = col.join(','); let cv = softs.get(key); if (cv) return cv;
+  cv = mk(64, 64); const x = cv.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32), [r, gg, b] = col;
+  for (const [t, a] of [[0, 0.9], [0.35, 0.62], [0.65, 0.26], [0.85, 0.08], [1, 0]]) g.addColorStop(t, `rgba(${r},${gg},${b},${a})`);
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64); softs.set(key, cv); return cv;
 }
 
 // ------------------------------------------------ trees and bushes that sway
@@ -52,12 +64,47 @@ export class Sway {
   skew(p, h) { const s = this.m.get(p); return s ? Math.sin(s.t * 12) * s.a * Math.min(7, h * 0.1) : 0; }
 }
 
-// ------------------------------------------------ rings on the water
+// ------------------------------------------------ water that moves
+// as the old garden had it: a height field on 2-px cells over the water round the walker (waves spread, bounce
+// off the banks and die away), drawn as light and dark glints laid on the water's surface. Pokes come from you
+// wading and swimming, from swimmers, from drops and fish. The field slides along as you walk.
 export class Ripples {
-  constructor() { this.r = []; }
-  add(x, y, h, big = false) { if (this.r.length < 40) this.r.push({ x, y, h, t: 0, life: big ? 1.7 : 1.15, s: big ? 1.5 : 1 }); }
-  update(dt) { for (const q of this.r) q.t += dt; this.r = this.r.filter((q) => q.t < q.life); }
-  draw(B) { const cv = ringSprite(); for (const q of this.r) { const k = q.t / q.life, w = (5 + k * 30) * q.s; B.gd(cv, q.x, q.y, w, w * 0.62, q.h + 0.6, (1 - k) * 0.95); } }
+  constructor() { this.w = 200; this.h = 176; const N = this.w * this.h; this.a = new Float32Array(N); this.b = new Float32Array(N); this.m = new Uint8Array(N); this.ox = -1e9; this.oy = -1e9; this.place = undefined; this.any = false; this.cv = mk(this.w, this.h); this.img = this.cv.getContext('2d').createImageData(this.w, this.h); this.level = 0; this.t = 0; }
+  // where the field lies: round the walker, more of it ahead (north, where the camera looks)
+  anchor(P, Wd) {
+    const ox = Math.floor((P.x - this.w) / 2), oy = Math.floor((P.y - this.h * 1.45) / 2), dx = ox - this.ox, dy = oy - this.oy;
+    if (P.place !== this.place) { this.place = P.place; this.a.fill(0); this.b.fill(0); this.ox = ox; this.oy = oy; this.mask(P, Wd); return; }
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      // slide the water along, keeping its waves
+      for (const k of ['a', 'b']) { const o = this[k], n = new Float32Array(o.length); for (let j = 0; j < this.h; j++) { const sj = j + dy; if (sj < 0 || sj >= this.h) continue; for (let i = 0; i < this.w; i++) { const si = i + dx; if (si >= 0 && si < this.w) n[j * this.w + i] = o[sj * this.w + si]; } } this[k] = n; }
+      this.ox = ox; this.oy = oy; this.mask(P, Wd);
+    }
+  }
+  // which cells are water at the level of the water nearest you (asked a tile at a time)
+  mask(P, Wd) {
+    const w = this.w, h = this.h, m = this.m; m.fill(0); this.any = false; let level = null, bd = 1e9;
+    const tx0 = Math.floor((this.ox * 2) / 16), ty0 = Math.floor((this.oy * 2) / 16), tx1 = Math.floor(((this.ox + w) * 2) / 16), ty1 = Math.floor(((this.oy + h) * 2) / 16), tiles = [];
+    for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) { const c = Wd.cell(tx * 16 + 8, ty * 16 + 8, P.place); if (c.k !== K_WATER) continue; const t = c.t; tiles.push([tx, ty, t]); const d = Math.hypot(tx * 16 - P.x, ty * 16 - P.y) + Math.abs(t - P.h) * 4; if (d < bd) { bd = d; level = t; } }
+    if (level === null) return; this.level = level;
+    for (const [tx, ty, t] of tiles) { if (Math.abs(t - level) > 2) continue; const i0 = tx * 8 - this.ox, j0 = ty * 8 - this.oy; for (let j = Math.max(0, j0); j < Math.min(h, j0 + 8); j++) for (let i = Math.max(0, i0); i < Math.min(w, i0 + 8); i++) m[j * w + i] = 1; this.any = true; }
+  }
+  // a soft, round drop
+  poke(x, y, s) {
+    const i = Math.floor(x / 2) - this.ox, j = Math.floor(y / 2) - this.oy, w = this.w;
+    if (i < 3 || j < 3 || i >= w - 3 || j >= this.h - 3 || !this.m[j * w + i]) return;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const k = (j + dy) * w + i + dx; if (this.m[k]) this.a[k] += s * Math.exp(-(dx * dx + dy * dy) / 1.2); }
+  }
+  step() {
+    if (!this.any) return; const { w, h, a, b, m } = this;
+    for (let j = 1; j < h - 1; j++) for (let i = 1; i < w - 1; i++) { const k = j * w + i; b[k] = m[k] ? ((a[k - 1] + a[k + 1] + a[k - w] + a[k + w]) * 0.5 - b[k]) * 0.975 : 0; }
+    this.a = b; this.b = a;
+  }
+  // the glints: light where the surface tilts toward the sky, dark where it tilts away
+  paint(light, dark) {
+    if (!this.any) return null; const { w, h, a, m } = this, d = this.img.data; d.fill(0); let n = 0;
+    for (let j = 1; j < h - 1; j++) for (let i = 1; i < w - 1; i++) { const k = j * w + i; if (!m[k]) continue; const s = a[k - 1] - a[k + 1] + a[k - w] - a[k + w]; if (s > 0.3) { const o = k * 4; d[o] = light[0]; d[o + 1] = light[1]; d[o + 2] = light[2]; d[o + 3] = light[3]; n++; } else if (s < -0.3) { const o = k * 4; d[o] = dark[0]; d[o + 1] = dark[1]; d[o + 2] = dark[2]; d[o + 3] = dark[3]; n++; } }
+    if (!n) return null; this.cv.getContext('2d').putImageData(this.img, 0, 0); return this.cv;
+  }
 }
 
 // ------------------------------------------------ the wisps: one for each treasure found, trailing after you

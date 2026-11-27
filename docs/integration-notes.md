@@ -806,3 +806,32 @@ The Makhana garden grew, got its old dream back, and gained heights and depths. 
   - JS is about 4–5 ms a frame.
   - In software GL the GPU part went from about 75 to 110 ms, from the glow pass, the cut-away test and the dream bloom. That is a few milliseconds on a phone GPU, and Battery Saver and the Resolution slider still apply.
 
+## The garden, fourth round (2026-11-27)
+- **The see-through view fades instead of dithering.**
+  - Whatever stands between the camera and the walker (inside a circle round them on screen, or very near the camera, and higher than their feet) is left out of the opaque pass.
+  - After the walker, the creatures and everything behind are drawn, it is drawn again on its own, blended over the scene at an opacity that falls toward the middle of the circle.
+  - Blending keeps the depth the post pass reads in the alpha channel. The near band was narrowed so mesa tops at the screen's edge no longer fade.
+  - Props near the walker (trees and the like) go through the same two passes, and the old 30% dither for props in the way is gone.
+  - The clouds under the islands are now alpha-blended too, not dithered.
+- **The fog is the old garden's again:** soft, see-through puffs drawn over the picture with smoothing on, so they are blurry. Each puff falls away smoothly to its edge, with no dithering.
+  - They are anchored in the world (projected and sized by distance) and still pushed aside by you, the people and the animals.
+  - There are fewer banks and they are lighter, so the screen never clogs. Those coming between you and the camera thin away.
+- **The water is the old garden's fluid simulation again.**
+  - A height field on 2-px cells covers the water round the walker, more of it ahead. Waves spread, bounce off the banks and die away (damping 0.975 a tick).
+  - It is drawn as light and dark glints in a texture laid over the water's surface.
+  - Pokes come from wading in, swimming strokes, swimmers, and drops and fish at random.
+  - The field slides along with you and keeps its waves; it follows the level of the water nearest you.
+- **The lie of the land:** the country is high in the north and falls away to the south.
+  - A regional base height runs from about 170 px at the north edge to sea level at the south. Mean ground height by row: 172, 127, 92, 63, 36, 20, 10.
+  - Hills are rougher in the north and gentler in the south, and all seven mountains stand in the northern half, taller the further north they are.
+  - Rivers run north to south and step down as they go, in small waterfalls. Lakes lie at their country's level.
+  - The city stands level at the height of its country, its edge eased into the land round it.
+  - Canyons still cut 240 px below the land round them.
+  - Islands float at least 360 px above whatever lies beneath them, so the northern peaks never meet their rock.
+  - Rock, snow, canyon shading, the place names (Summit, Canyon Floor), the canyon lifts and the camera's sense of being high all read heights relative to the land round about.
+  - The map shades by altitude too.
+- **Tested** with no errors:
+  - The fade in the city and among the mesas, the fog in Lantern Fungi, and swimming with the waves spreading (222 cells moving).
+  - All seven summits and the canyon floors reachable on foot.
+  - Error soaks from a village, an island and the undercity.
+

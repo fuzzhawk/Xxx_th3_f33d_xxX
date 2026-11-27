@@ -145,7 +145,7 @@ export class Garden extends Game {
   }
   stepGiants(dt) {
     for (const g of this.giants) {
-      g.base += (Math.max(-20, this.W.heightAt(g.x, g.y, null)) - g.base) * Math.min(1, dt * 1.5);
+      g.base += (Math.max(this.W.baseAt(g.y / TS) - 20, this.W.heightAt(g.x, g.y, null)) - g.base) * Math.min(1, dt * 1.5);
       if (g.wait > 0) { g.wait -= dt; continue; }
       const dx = g.tx - g.x, dy = g.ty - g.y, d = Math.hypot(dx, dy);
       if (d < 20) { const R = this.W.giantHome[g.v % 2]; g.tx = lerp(R[0], R[2], Math.random()) * WT * TS; g.ty = lerp(R[1], R[3], Math.random()) * WT * TS; g.wait = 4 + Math.random() * 8; continue; }
@@ -222,8 +222,8 @@ export class Garden extends Game {
         // blocked: try round it
         if (m < Math.hypot(vx, vy) * dt * 0.3) { const a = Math.atan2(vy, vx), s2 = Math.hypot(vx, vy) * dt; for (const da of [0.6, -0.6, 1.2, -1.2]) { m = this.walk(P, Math.cos(a + da) * s2, Math.sin(a + da) * s2, SWIM); if (m > s2 * 0.4) break; } } else if (P.stuck < 9) P.stuck = 0;
       }
-      const sw = Wd.isWater(P.x, P.y, P.place); if (sw && !P.swim) { this.splash(P.x, P.y, P.h); this.rip.add(P.x, P.y, P.h, true); } P.swim = sw;
-      if (sw && (vx || vy) && (this.ripT -= dt) <= 0) { this.ripT = 0.28; this.rip.add(P.x, P.y + 1, P.h); }
+      const sw = Wd.isWater(P.x, P.y, P.place); if (sw && !P.swim) { this.splash(P.x, P.y, P.h); this.rip.anchor(P, Wd); this.rip.poke(P.x, P.y, 9); } P.swim = sw;
+      if (sw && (vx || vy) && Math.random() < dt * 10) this.rip.poke(P.x + (Math.random() - 0.5) * 8, P.y - 1, 3.2);
       P.actor.update(dt, { vx, vy, swim: P.swim }); P.vx = vx; P.vy = vy;
       if (vx || vy) this.safe('bump', () => this.brush(vx, vy));
       this.checkWays();
@@ -261,10 +261,10 @@ export class Garden extends Game {
   // the fog banks, the swaying, the rings on the water, the wisps
   stepLive(dt) {
     const P = this.P, Wd = this.W, here = P.place, dark = here?.kind === 'cave' || here?.kind === 'under';
-    this.sway.update(dt); this.rip.update(dt); this.wisps.update(dt, P, Wd.treasures.filter((T) => T.found).length);
+    this.sway.update(dt); this.rip.anchor(P, Wd); this.rip.step(); this.wisps.update(dt, P, Wd.treasures.filter((T) => T.found).length);
     // ambient rings: a fish, a drop, now and then, on water near you
-    if (Math.random() < dt * 3) { const a = Math.random() * 6.283, d = 20 + Math.random() * 170, x = P.x + Math.cos(a) * d, y = P.y + Math.sin(a) * d * 0.7; if (Wd.isWater(x, y, here)) this.rip.add(x, y, Wd.heightAt(x, y, here)); }
-    for (const b of this.beasts) if (b.A.ai === 'swim' && b.t % 1.3 < dt) this.rip.add(b.x, b.y, b.h);
+    if (this.rip.any && Math.random() < 0.2) this.rip.poke((this.rip.ox + Math.random() * this.rip.w) * 2, (this.rip.oy + Math.random() * this.rip.h) * 2, 1.6);
+    for (const b of this.beasts) if (b.A.ai === 'swim' && Math.random() < dt * 2) this.rip.poke(b.x, b.y, 1.6);
     // the fog: thick where the country is misty (the dream's pale and pastel), clouds round the islands, none underground
     const B = here ? null : BIOMES[BIOME_KEYS[Wd.biomeAt(P.x / TS, P.y / TS)]];
     const dens = dark ? 0 : here ? (here.kind === 'roof' ? 0.15 : 0.55) : clamp((B.fog[1] - 0.05) * 3.2 + (B.dream ? 0.25 : 0) + (this.mode === 'morning' ? 0.25 : 0), 0, 1);
@@ -296,7 +296,7 @@ export class Garden extends Game {
       const ways = [];
       for (const Pl of Wd.places) { if (Pl.lift) ways.push(Pl.lift); if (Pl.mouth) ways.push(Pl.mouth); }
       for (const g of Wd.under.gates) ways.push(g);
-      for (const Cn of Wd.canyons) for (const L of Cn.lifts) ways.push(P.h < -100 ? L.bot : L.top);
+      for (const Cn of Wd.canyons) for (const L of Cn.lifts) ways.push(P.h < Wd.heightAt(L.top.x * TS + 8, L.top.y * TS + 12, null) - 100 ? L.bot : L.top);
       const w = ways.sort((a, b) => Math.hypot(a.x - tx, a.y - ty) - Math.hypot(b.x - tx, b.y - ty))[0];
       if (w && Math.hypot(w.x - tx, w.y - ty) < 70) { P.goal = { x: w.x * TS + 8, y: w.y * TS + 12 }; P.armed = true; return; }
     }
@@ -322,8 +322,9 @@ export class Garden extends Game {
     for (const g of Wd.under.gates) { const d = dist(g, 14); if (d < 30) any = true; if (d < 11 && P.armed) { this.enterUnder(g); return; } }
     for (const Cn of Wd.canyons) for (const L of Cn.lifts) {
       const dt = dist(L.top), db = dist(L.bot); if (dt < 30 || db < 30) any = true;
-      if (P.armed && dt < 11 && P.h > -60) { this.rideCanyon(L, true); return; }
-      if (P.armed && db < 11 && P.h < -60) { this.rideCanyon(L, false); return; }
+      if (!P.armed || (dt >= 11 && db >= 11)) continue; const th = Wd.heightAt(L.top.x * TS + 8, L.top.y * TS + 12, null);
+      if (dt < 11 && P.h > th - 60) { this.rideCanyon(L, true); return; }
+      if (db < 11 && P.h < th - 60) { this.rideCanyon(L, false); return; }
     }
     if (!any) P.armed = true;
   }
@@ -576,7 +577,7 @@ export class Garden extends Game {
   place() {
     const P = this.P, Wd = this.W; if (this.ride || this.fade) return;
     let name = P.place ? placeDef(P.place).name : ''; if (P.place?.kind === 'canopy') name = 'The Canopy';
-    if (!P.place) { const v = Wd.villageAt(P.x / TS, P.y / TS, 2); name = v ? v.name : Wd.inCity(P.x / TS, P.y / TS) ? 'The Ruined City' : P.h < -100 ? 'The Canyon Floor' : P.h >= 220 ? 'The Summit' : Wd.biomeName(P.x, P.y); }
+    if (!P.place) { const v = Wd.villageAt(P.x / TS, P.y / TS, 2); name = v ? v.name : Wd.inCity(P.x / TS, P.y / TS) ? 'The Ruined City' : P.h < Wd.baseAt(P.y / TS) - 100 ? 'The Canyon Floor' : P.h - Wd.baseAt(P.y / TS) >= 200 ? 'The Summit' : Wd.biomeName(P.x, P.y); }
     if (name !== this.pend) { this.pend = name; this.pendT = 0; } else if ((this.pendT += 0.5) >= 1 && name !== this.lastPlace) { this.lastPlace = name; this.toast(name); }
   }
   toast(s) { this.toasts = this.toasts.filter((t) => t.s !== s); this.toasts.push({ s, t: 0 }); if (this.toasts.length > 3) this.toasts.shift(); }
@@ -593,7 +594,7 @@ export class Garden extends Game {
     const K = GL.setLens(GFX.pitch, GFX.fov), VW = Math.round(GFX.zoom), VH = Math.round((VW * H) / W);
     // the camera follows, lifting with the ground and the rides
     const cam = this.cam; cam.x += (P.x - cam.x) * 0.12; cam.y += (P.y - cam.y) * 0.12; cam.h += (P.hv - cam.h) * (this.ride ? 0.35 : 0.2);
-    const hi = cave ? 0 : clamp((cam.h - 60) / 420, 0, 1), far = lerp(6, 16, hi), fogR = cave ? [0.8, 2] : [lerp(0.95, 1.8, hi), lerp(1.9, 8.5, hi)];
+    const gb = Wd.baseAt(cam.y / TS), hi = cave ? 0 : clamp((cam.h - gb - 60) / 420, 0, 1), far = lerp(6, 16, hi), fogR = cave ? [0.8, 2] : [lerp(0.95, 1.8, hi), lerp(1.9, 8.5, hi)];
     const PJ = GL.camSetup(VW, VH, Math.round(cam.x), cam.h, Math.round(cam.y), VH * 0.56, far);
     const prev = this.view; this.view = { VW, VH, PJ };
     // fog and sky follow the country you are in, the height and the hour
@@ -611,7 +612,7 @@ export class Garden extends Game {
     const PF = globalThis.GPROF, pt = (k) => { if (PF) { const n = performance.now(); PF[k] = (PF[k] || 0) + n - (PF._t || n); PF._t = n; } }; pt('_start'); if (PF) PF._t = performance.now();
     // build and stream what can be seen
     const budget = this.vis.size < 4 ? 16 : 7, t0 = performance.now();
-    const need = cave ? [] : this.visible(VW, VH, cam);
+    const need = cave ? [] : this.visible(VW, VH, cam, gb);
     for (const v of need) { if (performance.now() - t0 > budget) break; v.update(v.wantLod); }
     pump(Math.max(2, budget - (performance.now() - t0)));
     pt('stream');
@@ -625,38 +626,43 @@ export class Garden extends Game {
     const tint = here?.kind === 'under' ? [1, 0.9, 0.78] : cave ? [0.72, 0.74, 0.86] : high ? [hour.shade[0] * 1.04, hour.shade[1] * 1.03, hour.shade[2] * 1.06] : B?.dream ? [hour.shade[0] * 1.05, hour.shade[1] * 1.04, hour.shade[2] * 1.04] : hour.shade;
     GL.glMain(this.fogC, this.fogA * 2.2, GFX, fogR, tint, lerp(3, 7, hi));
     // the cut-away: whatever stands between the camera and the walker (a building, a mesa, a canyon wall) thins to a dither round them
-    const [hx, hy, hw] = PJ(P.x, P.y, 0, P.hv + 14), D = GL.camD(); GL.glCut(true, hx, hy, 62, hw - 10, P.hv + 12, D * 0.55);
+    const [hx, hy, hw] = PJ(P.x, P.y, 0, P.hv + 14), D = GL.camD(), cut = [hx, hy, 72, hw - 10, P.hv + 12, D * 0.4]; GL.glCut(1, ...cut);
     pt('places+sky');
     const bt = blockTex(), atlas = GL.atlasTex();
     for (const v of need) if (v.lod >= 0) GL.glDraw(v.gBuf, v.gN, v.tex);
     for (const v of need) if (v.bN) GL.glDraw(v.bBuf, v.bN, bt);
-    // props near the walker are drawn each frame instead, so they can sway and the ones between you and the camera can thin out
+    // props near the walker are drawn each frame instead, so they can sway (and fade when they stand in the way)
     const pcx = P.x / (CS * TS), pcy = P.y / (CS * TS), nearV = need.filter((v) => Math.abs(v.cx + 0.5 - pcx) < 1.6 && Math.abs(v.cy + 0.5 - pcy) < 1.6 && v.props);
     for (const v of need) if (v.pN && !nearV.includes(v)) GL.glDraw(v.pBuf, v.pN, atlas);
     const nearP = here && this.pvis.get(here.i);
     for (const Q of places) { const pv = this.pvis.get(Q.i); if (!pv?.ok) continue; if (pv.gN) GL.glDraw(pv.gBuf, pv.gN, pv.tex); GL.glDraw(pv.bBuf, pv.bN, bt); if (pv.pN && pv !== nearP) GL.glDraw(pv.pBuf, pv.pN, atlas); }
-    GL.glCut(false, 0, 0, 0, 0, 0, 0);
-    // the living, as billboards (people from their own frame texture)
-    this.bat ||= { m: new GL.Batch(2048), s: new GL.Batch(512), a: new GL.Batch(512), g: new GL.Batch(64), l: new GL.Batch(512), f: new GL.Batch(256), bm: GL.newBuffer(), bs: GL.newBuffer(), ba: GL.newBuffer(), bg: GL.newBuffer(), bl: GL.newBuffer(), bf: GL.newBuffer() };
-    const BM = this.bat.m, BS = this.bat.s, BA = this.bat.a, BG = this.bat.g, BL = this.bat.l, BF = this.bat.f; BM.reset(); BS.reset(); BA.reset(); BG.reset(); BL.reset(); BF.reset(); this.BG = BG;
-    const sinP = Math.sin((GFX.pitch * Math.PI) / 180);
-    const nearProps = (list) => { for (const p of list) {
-      if (p.chest && p.chest.found) continue;
-      const sp = propSprite(p.type, p.fam, p.v); if (!sp) continue; const dz = p.y - P.y, dx = Math.abs(p.x - P.x);
-      const cover = dz > 2 && dz < (sp.height * 1.05) / Math.max(0.15, sinP) && dx < sp.width / 2 + 7 && p.e >= P.h - 30;
-      BM.bb(sp, 0, 0, sp.width, sp.height, p.x, p.y, p.e - 1.5, K, 1, cover ? 0.3 : 1, undefined, 0, 1, this.sway.skew(p, sp.height));
-    } };
+    this.bat ||= { m: new GL.Batch(2048), s: new GL.Batch(512), a: new GL.Batch(512), g: new GL.Batch(64), l: new GL.Batch(512), p: new GL.Batch(1024), r: new GL.Batch(6), bm: GL.newBuffer(), bs: GL.newBuffer(), ba: GL.newBuffer(), bg: GL.newBuffer(), bl: GL.newBuffer(), bp: GL.newBuffer(), br: GL.newBuffer() };
+    const BM = this.bat.m, BS = this.bat.s, BA = this.bat.a, BG = this.bat.g, BL = this.bat.l, BP = this.bat.p; BM.reset(); BS.reset(); BA.reset(); BG.reset(); BL.reset(); BP.reset(); this.BG = BG;
+    const nearProps = (list) => { for (const p of list) { if (p.chest && p.chest.found) continue; const sp = propSprite(p.type, p.fam, p.v); if (!sp) continue; BP.bb(sp, 0, 0, sp.width, sp.height, p.x, p.y, p.e - 1.5, K, 1, 1, undefined, 0, 1, this.sway.skew(p, sp.height)); } };
     for (const v of nearV) nearProps(v.props);
-    if (nearP?.props) { nearProps(nearP.props); for (const f of Wd.place(here).floaters) { const s2 = propSprite('floatrock', placeDef(here).fam, f.v); if (s2) BM.bb(s2, 0, 0, s2.width, s2.height, f.x, f.y, f.h + Math.sin(this.t0 * 0.6 + f.ph) * 3, K, 0.92, 1); } }
+    if (nearP?.props) { nearProps(nearP.props); for (const f of Wd.place(here).floaters) { const s2 = propSprite('floatrock', placeDef(here).fam, f.v); if (s2) BP.bb(s2, 0, 0, s2.width, s2.height, f.x, f.y, f.h + Math.sin(this.t0 * 0.6 + f.ph) * 3, K, 0.92, 1); } }
+    const nP = BP.upload(this.bat.bp); GL.glDraw(this.bat.bp, nP, atlas);
+    GL.glCut(0, ...cut);
     pt('static');
+    // the living, as billboards (people from their own frame texture)
     let lights = []; this.safe('entities', () => { lights = this.entities(BM, BS, BA, K, PJ, cam); });
-    this.rip.draw(BM);
     pt('entities');
     const nS = BS.upload(this.bat.bs), nM = BM.upload(this.bat.bm), nA = BA.upload(this.bat.ba);
     GL.glDraw(this.bat.bs, nS, GL.atlasTex(), true); GL.glDraw(this.bat.bm, nM, GL.atlasTex()); GL.glDraw(this.bat.ba, nA, this.actorTex.tex);
-    // clouds under the islands, laid flat and see-through; the low fog that parts round you
-    for (const Q of places) { const pv = this.pvis.get(Q.i); if (pv?.cN) GL.glDraw(pv.cBuf, pv.cN, atlas); }
-    this.fogF.draw(BF, K, (here ? 0.42 : 0.34 + this.dreamK * 0.1) * Math.min(1.3, GFX.fogOv), P); const nF = BF.upload(this.bat.bf); if (nF) GL.glDraw(this.bat.bf, nF, GL.atlasTex());
+    // the water's ripples, laid over its surface; clouds under the islands, laid flat and see-through
+    this.safe('ripples', () => {
+      const rc = this.rip.paint(dark ? [170, 215, 255, 120] : [255, 255, 255, 205], dark ? [0, 0, 10, 96] : [10, 40, 80, 70]); if (!rc) return;
+      if (!this.ripTex) this.ripTex = GL.texNew(rc.width, rc.height, rc); else GL.texSet(this.ripTex, rc);
+      const RQ = this.bat.r, X0 = this.rip.ox * 2, Z0 = this.rip.oy * 2, X1 = X0 + this.rip.w * 2, Z1 = Z0 + this.rip.h * 2, y = this.rip.level + 0.6; RQ.reset(); RQ.quad([X0, y, Z0], [X1, y, Z0], [X1, y, Z1], [X0, y, Z1], [0, 0], [1, 0], [1, 1], [0, 1], [0, 0, -1, 1], 1);
+      const nR = RQ.upload(this.bat.br); GL.glBlend(true, true); GL.glDraw(this.bat.br, nR, this.ripTex); GL.glBlend(false, false);
+    });
+    GL.glBlend(true, true); for (const Q of places) { const pv = this.pvis.get(Q.i); if (pv?.cN) GL.glDraw(pv.cBuf, pv.cN, atlas); } GL.glBlend(false, false);
+    // the cut-away again, faded: whatever stood between the camera and the walker, drawn over them see-through
+    GL.glCut(2, ...cut); GL.glBlend(true);
+    for (const v of nearV) { if (v.lod >= 0) GL.glDraw(v.gBuf, v.gN, v.tex); if (v.bN) GL.glDraw(v.bBuf, v.bN, bt); }
+    for (const Q of places) { const pv = this.pvis.get(Q.i); if (!pv?.ok || Math.hypot(Q.x * TS - P.x, Q.y * TS - P.y) > 900 && Q !== here) continue; if (pv.gN) GL.glDraw(pv.gBuf, pv.gN, pv.tex); GL.glDraw(pv.bBuf, pv.bN, bt); }
+    GL.glDraw(this.bat.bp, nP, atlas);
+    GL.glBlend(false); GL.glCut(0, ...cut);
     // the giants loom out of the haze: drawn with a thinner fog, so they are seen from far off
     const nG = BG.upload(this.bat.bg); if (nG) { GL.glMain(this.fogC, this.fogA * 0.8, GFX, [fogR[0] * 1.8, fogR[1] * 2.6], tint, lerp(3, 7, hi) * 2.4); GL.glDraw(this.bat.bg, nG, GL.atlasTex()); }
     // the glows: lamps, fires, windows, beacons, glowing creatures, your wisps, all hidden behind whatever stands in front
@@ -673,6 +679,7 @@ export class Garden extends Game {
     const dcx = prev ? (cam.x - (this.lastCam?.x ?? cam.x)) : 0, dcy = prev ? (cam.y - (this.lastCam?.y ?? cam.y)) : 0; this.lastCam = { x: cam.x, y: cam.y };
     const ev = this.mode === 'evening', motes = here?.kind === 'under' ? 'drips' : here?.kind === 'cave' ? (here.key === 'grotto' || here.key === 'crystal' ? 'glitter' : 'drips') : here?.kind === 'roof' || here?.kind === 'walk' && here.roof ? (ev ? 'fireflies' : 'pollen') : here?.kind === 'walk' ? 'glitter' : here ? (here.kind === 'canopy' ? (ev ? 'fireflies' : 'leaves') : ev && placeDef(here).fam === 'dream' ? 'fireflies' : placeDef(here).motes) : ev && B.dream ? 'fireflies' : B.dream && this.frameN % 1200 < 600 && B.motes === 'pollen' ? 'glitter' : B.motes;
     this.atmos.update(1 / 60, motes, VW, VH, dcx, dcy);
+    c.imageSmoothingEnabled = true; this.fogF.draw2D(c, PJ, D, (here ? 0.34 : 0.28 + this.dreamK * 0.08) * Math.min(1.3, GFX.fogOv), P); c.imageSmoothingEnabled = false;
     for (const [x, y, a, k, col] of this.dustPts || []) { c.fillStyle = k === 'spark' ? `rgba(255,236,150,${a.toFixed(2)})` : k === 'drop' ? `rgba(200,230,240,${(a * 0.8).toFixed(2)})` : k === 'leaf' ? col : `rgba(200,190,170,${(a * 0.5).toFixed(2)})`; if (k === 'leaf') c.globalAlpha = Math.min(1, a * 2); c.fillRect(Math.round(x), Math.round(y), k === 'dust' || k === 'leaf' ? 2 : 1, 1); c.globalAlpha = 1; }
     this.atmos.draw(c, VW, VH, cam.x, cam.y, this.fogC, this.fogA * (cave ? 0.4 : 1), motes, here?.kind === 'under' ? ['rgba(40,20,10,.16)', 'rgba(255,170,90,.06)'] : cave ? ['rgba(10,14,30,.18)', 'rgba(120,200,220,.05)'] : B?.dream ? [hour.tint[0], this.mode === 'evening' ? 'rgba(200,140,255,.12)' : 'rgba(255,220,240,.10)'] : hour.tint);
     c.restore();
@@ -681,13 +688,13 @@ export class Garden extends Game {
     this.drawUI(c);
   }
   // which chunks the view needs, and at what level of detail (the camera's footprint on the ground)
-  visible(VW, VH, cam) {
-    const pts = [], low = Math.min(0, cam.h); for (const pl of cam.h > 40 ? [cam.h, low] : [low]) for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) { const g = GL.unproject((i / 4) * VW, (j / 4) * VH, pl); if (g) pts.push(g); }
-    const D = GL.camD(), maxd = D * (cam.h > 40 ? 10 : 4.2);
+  visible(VW, VH, cam, gb = 0) {
+    const up = cam.h - gb > 40, pts = [], low = Math.min(gb, cam.h); for (const pl of up ? [cam.h, low] : [low]) for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) { const g = GL.unproject((i / 4) * VW, (j / 4) * VH, pl); if (g) pts.push(g); }
+    const D = GL.camD(), maxd = D * (up ? 10 : 4.2);
     let x0 = cam.x - 200, x1 = cam.x + 200, y0 = cam.y - 200, y1 = cam.y + 140;
     for (const [x, y] of pts) { const dx = x - cam.x, dy = y - cam.y, d = Math.hypot(dx, dy), k = d > maxd ? maxd / d : 1; const X = cam.x + dx * k, Y = cam.y + dy * k; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y); }
     const S = CS * TS, cx0 = Math.max(0, Math.floor(x0 / S) - 1), cx1 = Math.min(NC - 1, Math.floor(x1 / S) + 1), cy0 = Math.max(0, Math.floor(y0 / S) - 1), cy1 = Math.min(NC - 1, Math.floor(y1 / S) + 1);
-    const g0 = GL.unproject(VW / 2, VH * 0.56, low) || [cam.x, cam.y], fx = cam.h > 40 ? g0[0] : cam.x, fy = cam.h > 40 ? g0[1] : cam.y, out = [];
+    const g0 = GL.unproject(VW / 2, VH * 0.56, low) || [cam.x, cam.y], fx = up ? g0[0] : cam.x, fy = up ? g0[1] : cam.y, out = [];
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
       const key = cy * 1000 + cx; let v = this.vis.get(key); if (!v) this.vis.set(key, (v = new ChunkVis(this.W, cx, cy)));
       const d = Math.min(Math.hypot((cx + 0.5) * S - fx, (cy + 0.5) * S - fy), Math.hypot((cx + 0.5) * S - cam.x, (cy + 0.5) * S - cam.y)) / S; v.wantLod = d < 1.6 ? 0 : d < 3.2 ? 1 : 2; v.d = d; v.used = this.frameN; out.push(v);
@@ -828,7 +835,7 @@ export class Garden extends Game {
         let col = hex(B.g[1][0]);
         if (t.k === K_WATER || t.k === 7) col = B.fam === 'ash' ? [36, 32, 42] : B.dream ? [58, 154, 184] : [44, 74, 80];
         else if (t.k === K_CLIFF) col = [74, 66, 56]; else if (t.k === K_BLDG) col = [90, 90, 98]; else if (t.k === 9 || t.k === 1 || t.k === 6) col = [140, 118, 90];
-        if (t.e >= 200) col = [232, 238, 240]; else if (t.e > 0) col = col.map((v) => Math.min(255, v * (1 + t.e / 300))); else if (t.e < -40) col = col.map((v) => v * 0.45);
+        const rel = t.e - Wd.baseAt(ty); if (rel >= 200) col = [232, 238, 240]; else if (rel > 0) col = col.map((v) => Math.min(255, v * (1 + rel / 300))); else if (rel < -40) col = col.map((v) => v * 0.45); col = col.map((v) => Math.min(255, v * (0.9 + t.e / 900)));
         mx.fillStyle = `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`; mx.fillRect(x, y, 1, 1);
       }
     }

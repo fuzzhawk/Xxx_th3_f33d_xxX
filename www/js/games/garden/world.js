@@ -45,6 +45,7 @@ export class World {
     this.mountains = []; this.canyons = []; this.places = []; this.canopies = []; this.treasures = [];
     // the city: a ruined grid at the rust belt's edge
     this.city = { x0: Math.round(W * 0.58), y0: Math.round(W * 0.34), x1: Math.round(W * 0.58) + 120, y1: Math.round(W * 0.34) + 100, grid: 12 };
+    this.cityE = Math.round(this.baseAt((this.city.y0 + this.city.y1) / 2) / 8) * 8;   // the city stands level at the height of its country
     // biome sites in their region
     this.sites = [];
     BIOME_KEYS.forEach((k, bi) => { const B = BIOMES[k]; if (k === 'crown') return; const R = REGION[B.reg || B.fam], n = B.fam === 'green' ? 5 : 4; for (let i = 0; i < n; i++) this.sites.push({ x: lerp(R[0], R[2], r.f()) * W, y: lerp(R[1], R[3], r.f()) * W, b: bi }); });
@@ -69,11 +70,11 @@ export class World {
     for (let k = 0; k < 5; k++) { const i = r.int(0, nodes.length - 1), j = r.int(0, nodes.length - 1); if (i !== j) edges.push([i, j]); }
     for (const [i, j] of edges) { const pts = meander(r, [nodes[i], nodes[j]], 5, 0.12); for (let k = 1; k < pts.length; k++) this.roads.add(pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1], 1.1, 'road'); }
     const clearOf = (x, y, m) => !this.inCity(x, y, m + 6) && !this.villages.some((v) => Math.hypot(v.x - x, v.y - y) < v.rad + m + 4) && x > m + 8 && y > m + 8 && x < W - m - 8 && y < W - m - 8;
-    // mountains: terraced cones, snow on their heads
-    for (const [fam, n] of [['frost', 2], ['green', 1], ['dream', 1], ['desert', 1], ['rust', 1]]) for (let q = 0; q < n; q++) for (let t = 0; t < 200; t++) {
-      const R = REGION[fam], x = lerp(R[0], R[2], r.f()) * W, y = lerp(R[1], R[3], r.f()) * W, rad = r.int(24, 34);
+    // mountains: terraced cones, snow on their heads, all in the high north (the further north, the taller)
+    for (let q = 0; q < 7; q++) for (let t = 0; t < 300; t++) {
+      const y = lerp(0.05, 0.5, Math.pow(r.f(), 1.4)) * W, x = lerp(0.05, 0.95, r.f()) * W, rad = r.int(24, 34);
       if (!clearOf(x, y, rad) || this.mountains.some((M) => Math.hypot(M.x - x, M.y - y) < M.rad + rad + 24)) continue;
-      this.mountains.push({ x: Math.round(x), y: Math.round(y), rad, peak: r.int(270, 360), seed: r.int(1, 1e9), fam }); break;
+      this.mountains.push({ x: Math.round(x), y: Math.round(y), rad, peak: r.int(250, 320) + Math.round((1 - y / W) * 70), seed: r.int(1, 1e9), fam: BIOMES[BIOME_KEYS[this.biomeAt(x, y)]].fam }); break;
     }
     // each summit: the highest ground near the middle
     for (const M of this.mountains) { let best = -1; const R = Math.round(M.rad * 0.45); for (let j = -R; j <= R; j += 1) for (let i = -R; i <= R; i += 1) { const e = this.rise(M.x + i, M.y + j, BIOMES.pasture); if (e > best) { best = e; M.top = { x: M.x + i, y: M.y + j }; } } }
@@ -95,7 +96,9 @@ export class World {
     const isleKeys = Object.keys(ISLES).filter((k) => !ISLES[k].canopy), spots = [[0.24, 0.44], [0.36, 0.74], [0.14, 0.86], [0.62, 0.2], [0.86, 0.46], [0.72, 0.84], [0.44, 0.12], [0.5, 0.58]];
     spots.forEach(([fx, fy], i) => {
       const x = Math.round(fx * W + r.range(-40, 40)), y = Math.round(fy * W + r.range(-40, 40)), rad = r.int(14, 21), key = isleKeys[i % isleKeys.length];
-      this.places.push({ i: this.places.length, kind: 'isle', key, x, y, rad, h: r.int(560, 760), seed: r.int(1, 1e9), lift: null, pad: null, lm: { x: x + r.int(-2, 2), y: y - Math.round(rad * 0.32) } });
+      // high over whatever lies under it (the northern heights and their peaks included), by a good way
+      let gmax = 0; for (let j = -rad - 4; j <= rad + 4; j += 4) for (let i = -rad - 4; i <= rad + 4; i += 4) gmax = Math.max(gmax, this.rise(x + i, y + j, BIOMES.pasture));
+      this.places.push({ i: this.places.length, kind: 'isle', key, x, y, rad, h: Math.max(r.int(560, 760), gmax + r.int(360, 460)), seed: r.int(1, 1e9), lift: null, pad: null, lm: { x: x + r.int(-2, 2), y: y - Math.round(rad * 0.32) } });
     });
     // the giant trees in the forests, their canopies a world of their own up a basket lift
     for (let t = 0; t < 1500 && this.canopies.length < 4; t++) {
@@ -157,7 +160,7 @@ export class World {
       if (roofs.length >= 9) break; if (roofs.some((o) => Math.abs(o.li - L.li) + Math.abs(o.lj - L.lj) < 2)) continue;
       const inset = 1 + Math.floor(hash2(L.lot, 3, this.seed) * 2), lx0 = C2.x0 + L.li * C2.grid, ly0 = C2.y0 + L.lj * C2.grid, x0 = lx0 + 3 + inset, x1 = lx0 + C2.grid - 1 - (inset > 1 ? 1 : 0), y0 = ly0 + 3 + inset, y1 = ly0 + C2.grid - 1;
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, tall = 1 - Math.hypot((cx - (C2.x0 + C2.x1) / 2) / (C2.x1 - C2.x0), (cy - (C2.y0 + C2.y1) / 2) / (C2.y1 - C2.y0)) * 1.6, hb = Math.round(48 + clamp(tall, 0, 1) * 110 * (0.5 + hash2(L.lot, 11, this.seed) * 0.8));
-      const mx = Math.round(cx), Pr = { i: this.places.length, kind: 'roof', key: 'roof', group: 'roofs', x: mx, y: Math.round(cy), rad: Math.max(x1 - x0, y1 - y0) / 2, x0, y0, x1, y1, hb, h: hb + 1, seed: r.int(1, 1e9), li: L.li, lj: L.lj, lift: { x: mx, y: y1 + 1 }, pad: { x: mx, y: y1 } };
+      const mx = Math.round(cx), Pr = { i: this.places.length, kind: 'roof', key: 'roof', group: 'roofs', x: mx, y: Math.round(cy), rad: Math.max(x1 - x0, y1 - y0) / 2, x0, y0, x1, y1, hb, h: hb + 1 + this.cityE, seed: r.int(1, 1e9), li: L.li, lj: L.lj, lift: { x: mx, y: y1 + 1 }, pad: { x: mx, y: y1 } };
       Pr.lm = { x: mx, y: Math.round(cy) }; this.places.push(Pr); roofs.push(Pr); this.roofLots.set(L.lot, Pr);
     }
     for (const A of roofs) { const B = roofs.filter((o) => o !== A && !(o.links || []).some((w) => w.a === A || w.b === A)).sort((a, b) => Math.hypot(a.x - A.x, a.y - A.y) - Math.hypot(b.x - A.x, b.y - A.y))[0]; if (B && Math.hypot(B.x - A.x, B.y - A.y) < 34) this.makeWalk(A, B, r, { w: 1.1, sag: 6, ea: A.rad * 0.6, eb: B.rad * 0.6, group: 'roofs', roof: true, straight: true }); }
@@ -197,8 +200,12 @@ export class World {
     return lerp(lerp(a(i, j), a(i + 1, j), fx), lerp(a(i, j + 1), a(i + 1, j + 1), fx), fy);
   }
   // the ground's rise and fall before the canyons cut it: hills, ridges, mountains; flat by rivers, villages, the city
+  // the country's lie: high in the north, falling away to the lowlands and the water in the south
+  baseAt(y) { const t = clamp(y / WT, 0, 1); return 168 * Math.pow(1 - t, 1.6); }
   rise(x, y, B) {
-    const s = this.seed; let e = Math.max(0, fbm(x / 26, y / 26, s + 700, 4) - 0.4) * 2.6 * this.amp(x, y), big = false;
+    const s = this.seed, north = 1 - clamp(y / WT, 0, 1); let base = this.baseAt(y);
+    if (this.inCity(x, y, 14)) { const C = this.city, d = Math.max(C.x0 - x, x - C.x1, C.y0 - y, y - C.y1, 0); base = lerp(this.cityE, base, sstep(0, 14, d)); }
+    let e = Math.max(0, fbm(x / 26, y / 26, s + 700, 4) - 0.4) * 2.6 * this.amp(x, y) * (0.5 + north * 1.0), big = false;
     if (B.struct === 'ridges') e += Math.max(0, fbm(x / 10, y / 10, s + 81, 4) - 0.5) * 230;
     for (const M of this.mountains) {
       if (Math.abs(x - M.x) > M.rad * 1.4 || Math.abs(y - M.y) > M.rad * 1.4) continue;
@@ -210,7 +217,7 @@ export class World {
     if (this.inCity(x, y, 10)) { const C = this.city, d = Math.max(C.x0 - x, x - C.x1, C.y0 - y, y - C.y1); mask = Math.min(mask, sstep(0, 10, d)); }
     for (const v of this.villages) { const d = Math.hypot(v.x - x, v.y - y); if (d < v.rad + 9) mask = Math.min(mask, sstep(v.rad + 1, v.rad + 9, d)); }
     e *= mask; const q = big && e > 64 ? 16 : 8;
-    return Math.round(e / q) * q;
+    return Math.round((base + e) / q) * q;
   }
   canyonAt(x, y) { const [d, s, t] = this.canyonIx.near(x, y); if (!s) return { d: 1e9 }; return { d: d + (fbm(x / 4, y / 4, this.seed + 404, 2) - 0.5) * 1.6, s: s.s0 + (s.s1 - s.s0) * t, C: s.tag }; }
   canyonPoint(Cn, s) { const P = Cn.pts; let acc = 0; for (let k = 1; k < P.length; k++) { const l = Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]); if (acc + l >= s || k === P.length - 1) { const t = clamp((s - acc) / (l || 1), 0, 1), dx = (P[k][0] - P[k - 1][0]) / (l || 1), dy = (P[k][1] - P[k - 1][1]) / (l || 1); return [P[k - 1][0] + (P[k][0] - P[k - 1][0]) * t, P[k - 1][1] + (P[k][1] - P[k - 1][1]) * t, -dy, dx]; } acc += l; } return [P[0][0], P[0][1], 0, 1]; }
@@ -239,12 +246,13 @@ export class World {
   // everything about one tile: biome, kind, ground elevation, block height above it, block texture, the floor under a bridge
   tileInfo(x, y) {
     const out = { b: 0, k: K_GROUND, e: 0, h: 0, f: 0, lo: NOLO };
-    if (x < 0 || y < 0 || x >= WT || y >= WT) { out.k = K_CLIFF; out.h = 80; out.b = this.biomeAt(x, y); return out; }
+    if (x < 0 || y < 0 || x >= WT || y >= WT) { out.k = K_CLIFF; out.h = 80; out.e = Math.round(this.baseAt(y) / 8) * 8; out.b = this.biomeAt(x, y); return out; }
     const s = this.seed, b = (out.b = this.biomeAt(x, y)), B = BIOMES[BIOME_KEYS[b]];
     // border: a wall of cliffs round the world's edge
-    const ed = Math.min(x, y, WT - 1 - x, WT - 1 - y); if (ed < 2 + fbm(x / 5, y / 5, s + 5, 2) * 3) { out.k = K_CLIFF; out.h = 60 + hash2(x, y, 9) * 30; out.e = 0; return out; }
+    const ed = Math.min(x, y, WT - 1 - x, WT - 1 - y); if (ed < 2 + fbm(x / 5, y / 5, s + 5, 2) * 3) { out.k = K_CLIFF; out.h = 60 + hash2(x, y, 9) * 30; out.e = Math.round(this.baseAt(y) / 8) * 8; return out; }
     // the city: streets every `grid` tiles, buildings between (some fallen, some gone to green)
     if (this.inCity(x, y)) {
+      out.e = this.cityE;
       const C = this.city, gx = (x - C.x0) % C.grid, gy = (y - C.y0) % C.grid, lot = Math.floor((x - C.x0) / C.grid) * 97 + Math.floor((y - C.y0) / C.grid);
       if (gx < 3 || gy < 3) { out.k = K_STREET; return out; }
       const lr = hash2(lot, 7, s), park = lr < 0.12, ruin = lr > 0.82;
@@ -262,11 +270,11 @@ export class World {
     let e = this.rise(x, y, B);
     // water: the rivers, and lakes in the wet biomes
     let wet = river <= 0, lakeK = K_WATER;
-    if (!wet && B.water && !vil) { const n = fbm(x / 9, y / 9, s + 33, 4), thr = 1 - B.waterAmt * 0.9; if (n > thr) { wet = true; lakeK = B.water === 'toxic' ? K_TOXIC : K_WATER; e = 0; } else if (n > thr - 0.14) e = Math.round((e * clamp((thr - n) / 0.14, 0, 1)) / 8) * 8; }
+    if (!wet && B.water && !vil) { const n = fbm(x / 9, y / 9, s + 33, 4), thr = 1 - B.waterAmt * 0.9; if (n > thr) { wet = true; lakeK = B.water === 'toxic' ? K_TOXIC : K_WATER; e = Math.round(this.baseAt(y) / 8) * 8; } else if (n > thr - 0.14) { const bl = this.baseAt(y); e = Math.round((bl + (e - bl) * clamp((thr - n) / 0.14, 0, 1)) / 8) * 8; } }
     // the canyons cut through all of it, ramped at their ends; the rivers fall in, the roads bridge them
     const cn = this.canyonAt(x, y);
     if (cn.d < 0) {
-      const f = clamp(Math.min(cn.s, cn.C.L - cn.s) / 18, 0, 1), floor = Math.round(lerp(e, -cn.C.depth, f) / 16) * 16;
+      const f = clamp(Math.min(cn.s, cn.C.L - cn.s) / 18, 0, 1), floor = Math.round(lerp(e, this.baseAt(y) - cn.C.depth, f) / 16) * 16;
       if (road <= 0 && f > 0.3) { out.k = K_BRIDGE; out.e = e; out.lo = floor; return out; }
       out.e = floor; out.k = wet && river <= 0 ? K_WATER : K_GROUND; out.cn = 1; return out;
     }
@@ -339,7 +347,7 @@ export class World {
       if (inChunk(L.top.x, L.top.y)) { place('headframe', L.top.x * TS + 8, L.top.y * TS + 12, Cn.fam, 0, { clift: L }); C.lights.push({ x: L.top.x * TS + 8, y: L.top.y * TS + 12, h: eAt(L.top.x, L.top.y) + 40, r: 26, c: [255, 190, 110], beacon: 1 }); }
       if (inChunk(L.bot.x, L.bot.y)) { const be = eAt(L.bot.x, L.bot.y); place('basket', L.bot.x * TS + 8, L.bot.y * TS + 12, Cn.fam, 1, { clift: L }); C.shafts.push({ x: L.bot.x * TS + 8, y: L.bot.y * TS + 10, y0: be + 28, y1: be + Cn.depth + 30, rope: 1 }); C.lights.push({ x: L.bot.x * TS + 8, y: L.bot.y * TS + 12, h: be + 18, r: 22, c: [255, 200, 120] }); }
     }
-    for (const g of this.under?.gates || []) if (inChunk(g.x, g.y)) { place('stairs', g.x * TS + 8, g.y * TS + 12, 'rust', 0, { gate: g }); C.lights.push({ x: g.x * TS + 8, y: g.y * TS + 12, h: 20, r: 30, c: [255, 220, 160] }); }
+    for (const g of this.under?.gates || []) if (inChunk(g.x, g.y)) { place('stairs', g.x * TS + 8, g.y * TS + 12, 'rust', 0, { gate: g }); C.lights.push({ x: g.x * TS + 8, y: g.y * TS + 12, h: this.cityE + 20, r: 30, c: [255, 220, 160] }); }
     for (const P of this.places) if (P.kind === 'cave' && P.mouth && inChunk(P.mouth.x, P.mouth.y)) { const m = P.mouth; place('cavemouth', m.x * TS + 8, m.y * TS + 6, 'cave', 0, { mouth: P }); C.lights.push({ x: m.x * TS + 8, y: m.y * TS + 6, h: eAt(m.x, m.y) + 14, r: 30, c: [140, 230, 210] }); }
     // the treasures on the ground: a landmark, and a chest beside it
     for (const T of this.treasures) if (!T.place) {
@@ -351,11 +359,11 @@ export class World {
     for (let j = 0; j < CS; j++) for (let i = 0; i < CS; i++) {
       const x = X0 + i, y = Y0 + j, kk = k[at(i, j)], B = BIOMES[BIOME_KEYS[C.b[at(i, j)]]], fam = B.fam, rr = (q) => hash2(x * 7 + q, y * 13 + q * 3, s + 101);
       if (keep.has(j * CS + i) && (kk === K_STREET || kk === K_FLOOR)) continue;
-      if (kk === K_STREET) { if (rr(1) < 0.012) place(B.props.find((p) => p[0] === 'wreck') ? 'wreck' : 'scrap', x * TS + 8, y * TS + 12, fam); else if (rr(2) < 0.006) place('bus', x * TS + 8, y * TS + 12, fam); if (rr(3) < 0.05) C.decals.push({ type: rr(4) < 0.5 ? 'crack' : 'rubble', x, y, fam }); const C2 = this.city; if (((x - C2.x0) % C2.grid === 1) && (y % 6 === 0)) { place('lamp', x * TS + 4, y * TS + 8, fam); if (rr(5) < 0.25) C.lights.push({ x: x * TS + 6, y: y * TS + 8, h: 30, r: 20, c: [255, 200, 130] }); } continue; }
+      if (kk === K_STREET) { if (rr(1) < 0.012) place(B.props.find((p) => p[0] === 'wreck') ? 'wreck' : 'scrap', x * TS + 8, y * TS + 12, fam); else if (rr(2) < 0.006) place('bus', x * TS + 8, y * TS + 12, fam); if (rr(3) < 0.05) C.decals.push({ type: rr(4) < 0.5 ? 'crack' : 'rubble', x, y, fam }); const C2 = this.city; if (((x - C2.x0) % C2.grid === 1) && (y % 6 === 0)) { place('lamp', x * TS + 4, y * TS + 8, fam); if (rr(5) < 0.25) C.lights.push({ x: x * TS + 6, y: y * TS + 8, h: this.cityE + 30, r: 20, c: [255, 200, 130] }); } continue; }
       if (kk === K_FLOOR && inCity) { if (rr(6) < 0.04) place(rr(7) < 0.5 ? 'scrap' : 'burnt', x * TS + 8, y * TS + 12, fam); if (rr(8) < 0.12) C.decals.push({ type: 'rubble', x, y, fam }); continue; }
       if (kk === K_GROUND && inCity && this.inCity(x, y)) { if (rr(9) < 0.08 && free(i, j)) place(rr(10) < 0.6 ? 'tree' : 'burnt', x * TS + 8, y * TS + 14, 'green'); if (rr(11) < 0.15) C.decals.push({ type: 'tuft', x, y, fam: 'green' }); continue; }
       if (kk === K_GROUND) {
-        const e0 = C.e[at(i, j)];
+        const e0 = C.e[at(i, j)] - this.baseAt(y);   // how high above (or below) the country round about
         if (this.roads.near(x, y)[0] < 1.5 || this.villageAt(x, y, 2)) { if (rr(12) < 0.1) C.decals.push({ type: B.decals[0]?.[0] || 'tuft', x, y, fam }); continue; }
         // high on a mountain: rocks and snowpines only
         if (e0 >= 150) { if (rr(15) < (e0 >= 220 ? 0.02 : 0.05) && free(i, j)) place(rr(16) < 0.5 || e0 >= 220 ? 'rock' : 'snowpine', x * TS + 8, y * TS + 14, e0 >= 200 ? 'frost' : fam); if (rr(17) < 0.08) C.decals.push({ type: 'stones', x, y, fam }); continue; }

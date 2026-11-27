@@ -18,16 +18,18 @@ export function renderer() {
   try {
     R.P = prog(`attribute vec3 aPos;attribute vec2 aUV;attribute vec4 aRect;attribute vec2 aSA;uniform mat4 uMVP;varying vec2 vUV;varying vec4 vRect;varying vec2 vSA;varying float vD;varying float vY;
       void main(){vec4 p=uMVP*vec4(aPos,1.);gl_Position=p;vUV=aUV;vRect=aRect;vSA=aSA;vD=p.w;vY=aPos.y;}`,
-    `precision mediump float;uniform sampler2D uTex;uniform vec3 uFog;uniform vec2 uFogR;uniform float uFogA;uniform float uShadow;uniform float uPix;uniform float uDith;uniform vec2 uDR;uniform vec3 uTint;uniform vec4 uCut;uniform vec3 uCutP;uniform float uAdd;varying vec2 vUV;varying vec4 vRect;varying vec2 vSA;varying float vD;varying float vY;
+    `precision mediump float;uniform sampler2D uTex;uniform vec3 uFog;uniform vec2 uFogR;uniform float uFogA;uniform float uShadow;uniform float uPix;uniform float uDith;uniform vec2 uDR;uniform vec3 uTint;uniform vec4 uCut;uniform vec3 uCutP;uniform float uAdd;uniform float uBlend;varying vec2 vUV;varying vec4 vRect;varying vec2 vSA;varying float vD;varying float vY;
       float b2(vec2 a){a=floor(a);return fract(dot(a,vec2(.5,a.y*.75)));}
       float b4(vec2 a){return b2(.5*a)*.25+b2(a);}
       void main(){vec2 uv=vRect.z<0.?vRect.xy+vUV*abs(vRect.zw):vRect.xy+fract(vUV)*vRect.zw;vec4 c=texture2D(uTex,uv);
         if(uShadow>.5){if(c.a<.05)discard;gl_FragColor=vec4(0.,0.,0.,c.a*.75*vSA.y);return;}
         if(uAdd>.5){if(c.a<.5)discard;float fa=smoothstep(uFogR.x,uFogR.y,vD)*uFogA;gl_FragColor=vec4(c.rgb*vSA.x*vSA.y*(1.-fa*.55),0.);return;}
+        if(uBlend>.5){if(c.a<.02)discard;float fb=smoothstep(uFogR.x,uFogR.y,vD)*uFogA;gl_FragColor=vec4(mix(c.rgb*vSA.x*uTint,uFog,fb),c.a*vSA.y);return;}
         if(c.a<.5)discard;
-        if(uCut.w>.5&&vY>uCutP.y&&vD<uCutP.x){float k=max(1.-smoothstep(uCut.z*.55,uCut.z,distance(gl_FragCoord.xy,uCut.xy)),1.-smoothstep(uCutP.z*.6,uCutP.z,vD));if(k>.02&&k*.9>b4(floor(gl_FragCoord.xy/uPix)))discard;}
+        float ck=0.;if(uCut.w>.5&&vY>uCutP.y&&vD<uCutP.x)ck=max(1.-smoothstep(uCut.z*.4,uCut.z,distance(gl_FragCoord.xy,uCut.xy)),1.-smoothstep(uCutP.z*.55,uCutP.z,vD));
+        if(uCut.w>1.5){if(ck<.02)discard;}else if(uCut.w>.5&&ck>=.02)discard;
         if(vSA.y<.999){if(uDith>.5){if(vSA.y<b4(floor(gl_FragCoord.xy/uPix))+.03)discard;}else if(vSA.y<.5)discard;}
-        vec3 col=c.rgb*vSA.x*uTint;float f=smoothstep(uFogR.x,uFogR.y,vD)*uFogA;gl_FragColor=vec4(mix(col,uFog,f),clamp((vD-uDR.x)/uDR.y,0.,1.));}`);
+        vec3 col=c.rgb*vSA.x*uTint;float f=smoothstep(uFogR.x,uFogR.y,vD)*uFogA;gl_FragColor=vec4(mix(col,uFog,f),uCut.w>1.5?1.-ck*.85:clamp((vD-uDR.x)/uDR.y,0.,1.));}`);
     R.Q = prog(`attribute vec2 aP;void main(){gl_Position=vec4(aP,0.,1.);}`,
     `precision mediump float;uniform sampler2D uS;uniform vec2 uRes;uniform float uFocus,uBand,uMax,uSat,uBri,uCon,uMode,uFocal,uRange,uSoft,uDream,uPixB;uniform vec2 uDR;
       float coc(float a){return uMax*smoothstep(uRange,uRange+uSoft,abs(uDR.x+a*uDR.y-uFocal));}
@@ -42,7 +44,7 @@ export function renderer() {
   } catch (err) { console.warn('garden 3D disabled:', err); return null; }
   const P = R.P, Q = R.Q, u = (p, n) => gl.getUniformLocation(p, n);
   R.loc = { aPos: gl.getAttribLocation(P, 'aPos'), aUV: gl.getAttribLocation(P, 'aUV'), aRect: gl.getAttribLocation(P, 'aRect'), aSA: gl.getAttribLocation(P, 'aSA') };
-  for (const n of ['uMVP', 'uTex', 'uFog', 'uFogR', 'uFogA', 'uShadow', 'uDR', 'uPix', 'uDith', 'uTint', 'uCut', 'uCutP', 'uAdd']) R.loc[n] = u(P, n);
+  for (const n of ['uMVP', 'uTex', 'uFog', 'uFogR', 'uFogA', 'uShadow', 'uDR', 'uPix', 'uDith', 'uTint', 'uCut', 'uCutP', 'uAdd', 'uBlend']) R.loc[n] = u(P, n);
   R.qloc = { aP: gl.getAttribLocation(Q, 'aP') };
   for (const n of ['uS', 'uRes', 'uFocus', 'uBand', 'uMax', 'uSat', 'uBri', 'uCon', 'uMode', 'uFocal', 'uRange', 'uSoft', 'uDR', 'uDream', 'uPixB']) R.qloc[n] = u(Q, n);
   R.quad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, R.quad); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
@@ -183,11 +185,15 @@ export function glMain(fog, fogA, G, fogR = [0.95, 1.9], tint = [1, 1, 1], depth
   const gl = R.gl, L = R.loc; gl.useProgram(R.P); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.uniformMatrix4fv(L.uMVP, false, R.mvp); gl.uniform1i(L.uTex, 0);
   gl.uniform3f(L.uFog, fog[0] / 255, fog[1] / 255, fog[2] / 255); const fk = Math.max(0, G.fog - 1);
   gl.uniform2f(L.uFogR, R.D * Math.max(fogR[0] * 0.47, fogR[0] - fk * 0.13), R.D * Math.max(fogR[1] * 0.58, fogR[1] - fk * 0.2)); gl.uniform1f(L.uFogA, clamp(fogA * G.fog, 0, 0.97));
-  gl.uniform1f(L.uShadow, 0); gl.uniform1f(L.uAdd, 0); gl.uniform4f(L.uCut, 0, 0, 0, 0); gl.uniform3f(L.uCutP, 0, 0, 0); gl.uniform1f(L.uPix, R.scale); gl.uniform2f(L.uDR, R.D * 0.3, R.D * depthSpan); gl.uniform1f(L.uDith, G.dither ? 1 : 0); gl.uniform3f(L.uTint, tint[0], tint[1], tint[2]); gl.activeTexture(gl.TEXTURE0);
+  gl.uniform1f(L.uShadow, 0); gl.uniform1f(L.uAdd, 0); gl.uniform1f(L.uBlend, 0); gl.uniform4f(L.uCut, 0, 0, 0, 0); gl.uniform3f(L.uCutP, 0, 0, 0); gl.uniform1f(L.uPix, R.scale); gl.uniform2f(L.uDR, R.D * 0.3, R.D * depthSpan); gl.uniform1f(L.uDith, G.dither ? 1 : 0); gl.uniform3f(L.uTint, tint[0], tint[1], tint[2]); gl.activeTexture(gl.TEXTURE0);
 }
-// the cut-away: anything nearer the camera than the walker and higher than their feet, inside a circle
-// round them on screen (or very near the camera), dithers away so they are never lost behind it
-export function glCut(on, sx, sy, r, depth, h, near) { const gl = R.gl, L = R.loc; gl.uniform4f(L.uCut, sx * R.scale, (R.VH - sy) * R.scale, r * R.scale, on ? 1 : 0); gl.uniform3f(L.uCutP, depth, h, near); }
+// the cut-away: anything nearer the camera than the walker and higher than their feet, inside a circle round
+// them on screen (or very near the camera). Mode 1 (the opaque pass) leaves it out; mode 2 (drawn again after
+// everything behind it) draws only it, fading the nearer it is to the middle of the circle, blended over the scene
+export function glCut(mode, sx, sy, r, depth, h, near) { const gl = R.gl, L = R.loc; gl.uniform4f(L.uCut, sx * R.scale, (R.VH - sy) * R.scale, r * R.scale, +mode || 0); gl.uniform3f(L.uCutP, depth, h, near); }
+// alpha blending (keeping the depth the post pass reads in the alpha channel); flag also switches the shader to
+// draw a texture's own alpha (the water's ripples)
+export function glBlend(on, flag) { const gl = R.gl, L = R.loc; if (flag !== undefined) gl.uniform1f(L.uBlend, flag ? 1 : 0); if (on) { gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE); gl.depthMask(false); } else { gl.disable(gl.BLEND); gl.depthMask(true); } }
 // additive glows (lamps, fires, wisps): depth-tested against the scene, never writing depth, fading in the fog
 export function glAdd(on) { const gl = R.gl, L = R.loc; gl.uniform1f(L.uAdd, on ? 1 : 0); if (on) { gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ZERO, gl.ONE); gl.depthMask(false); } else { gl.disable(gl.BLEND); gl.depthMask(true); } }
 export function glTint(t) { R.gl.uniform3f(R.loc.uTint, t[0], t[1], t[2]); }

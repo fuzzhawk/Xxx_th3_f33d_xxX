@@ -107,7 +107,9 @@ export class ChunkVis {
     for (const b of bios) { const g = biomeTex(b, 'g'), g2 = biomeTex(b, 'g2'), p = biomeTex(b, 'path'); if (!g || !g2 || !p) ok = false; tex[b] = { g, g2, p }; }
     for (const f of fams) { ftex[f] = {}; for (const k of ['water', 'toxic', 'bridge', 'floor']) { const t = famTex(f, k); if (!t) ok = false; ftex[f][k] = t; } }
     const street = biomeTex(BIOMES.crown.i, 'path'); if (!street) ok = false;
-    let high = false; for (let q = 0; q < C.e.length; q++) if (C.e[q] >= 130) { high = true; break; }
+    // heights reckoned against the country's own lie (the north stands high), so rock and snow are where the ground rises above it
+    const rowBase = Array.from({ length: n }, (_, j) => W.baseAt(this.cy * CS - 1 + j));
+    let high = false; for (let q = 0; q < C.e.length; q++) if (C.e[q] - rowBase[Math.floor(q / n)] >= 130) { high = true; break; }
     const rock = high ? rockTex() : null, snow = high ? snowTex() : null; if (high && (!rock || !snow)) ok = false;
     if (!ok) return false;
     const cv = mk(S, S), x = cv.getContext('2d'), img = x.createImageData(S, S), d = img.data, seed = W.seed, X0 = this.cx * CS * TS, Y0 = this.cy * CS * TS, step = TS / ppt;
@@ -139,7 +141,7 @@ export class ChunkVis {
           if (pk === K_PATH || (k === K_PATH && pk !== K_GROUND)) c = samp(T2.p, wx, wy);
           else { const B = BIOMES[BIOME_KEYS[bb]]; c = samp(mixF[ci] + t * 0.18 > B.mix ? T2.g2 : T2.g, wx, wy); }
           // a mountain's shoulders go to bare rock, its head to snow
-          const e0 = C.e[q]; if (high && e0 >= 130 && k === K_GROUND) { const ee = e0 + (mixF[ci] - 0.5) * 60 + t * 14; if (ee >= 205) c = samp(snow, wx, wy); else if (ee >= 150) c = samp(rock, wx, wy); }
+          const e0 = C.e[q] - rowBase[ty + 1]; if (high && e0 >= 130 && k === K_GROUND) { const ee = e0 + (mixF[ci] - 0.5) * 60 + t * 14; if (ee >= 205) c = samp(snow, wx, wy); else if (ee >= 150) c = samp(rock, wx, wy); }
           if (e0 < -60) m = 0.84;   // the canyon floors, out of the sun
         }
         // the foot of a rise to the north sits in its shadow
@@ -171,7 +173,7 @@ export class ChunkVis {
     for (let j = 0; j < CS; j++) for (let i = 0; i < CS; i++) {
       const q = at(i, j), k = C.k[q], e = C.e[q], fam = BIOMES[BIOME_KEYS[C.b[q]]].fam, X0 = (this.cx * CS + i) * TS, X1 = X0 + TS, Z0 = (this.cy * CS + j) * TS, Z1 = Z0 + TS;
       // terrain faces: from this tile's ground down to the neighbour's (a bridge deck is only a plank thick)
-      const deck = C.lo[q] !== NOLO, wf = k === K_WATER, face = wf ? fc(fam, 'water') : deck ? fc(fam, 'bark') : e >= 180 ? fc('frost', 'cliffFace') : e >= 130 ? rockCell() : fc(fam, 'cliffFace');
+      const er = e - W.baseAt(this.cy * CS + j), deck = C.lo[q] !== NOLO, wf = k === K_WATER, face = wf ? fc(fam, 'water') : deck ? fc(fam, 'bark') : er >= 180 ? fc('frost', 'cliffFace') : er >= 130 ? rockCell() : fc(fam, 'cliffFace');
       const lowS = fl(q + n), lowE = fl(q + 1), lowW = fl(q - 1), dk = (b) => (deck ? Math.max(b, e - 6) : b);
       if (lowS < e) faceS(B, X0, X1, Z1, e, dk(lowS), face, wf ? 0.9 : 0.76);
       if (lowE < e) faceE(B, X1, Z0, Z1, e, dk(lowE), face, wf ? 0.8 : 0.62);
