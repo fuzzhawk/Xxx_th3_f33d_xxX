@@ -834,4 +834,7 @@ The Makhana garden grew, got its old dream back, and gained heights and depths. 
   - The fade in the city and among the mesas, the fog in Lantern Fungi, and swimming with the waves spreading (222 cells moving).
   - All seven summits and the canyon floors reachable on foot.
   - Error soaks from a village, an island and the undercity.
+- **Follow-up:**
+  - **Props fade whole:** a tree, a pillar or a house standing between the camera and the walker now fades as a whole sprite, easing down to 30% and back up as you pass. Before, the per-pixel cut left a tree's trunk solid and its crown faded, so it looked cut in half. The judgement is per prop, in screen space: it is nearer than the walker and its sprite covers them. Terrain and buildings keep the per-pixel fade.
+  - **The giant gardeners blur:** they are drawn with their true depth now. Their thinner fog stays so they still loom out of the haze, but the focus pass blurs them like everything else at their distance. Before, their depth was squeezed toward the focal plane, which kept them sharp.
 

@@ -636,13 +636,22 @@ export class Garden extends Game {
     for (const v of need) if (v.pN && !nearV.includes(v)) GL.glDraw(v.pBuf, v.pN, atlas);
     const nearP = here && this.pvis.get(here.i);
     for (const Q of places) { const pv = this.pvis.get(Q.i); if (!pv?.ok) continue; if (pv.gN) GL.glDraw(pv.gBuf, pv.gN, pv.tex); GL.glDraw(pv.bBuf, pv.bN, bt); if (pv.pN && pv !== nearP) GL.glDraw(pv.pBuf, pv.pN, atlas); }
-    this.bat ||= { m: new GL.Batch(2048), s: new GL.Batch(512), a: new GL.Batch(512), g: new GL.Batch(64), l: new GL.Batch(512), p: new GL.Batch(1024), r: new GL.Batch(6), bm: GL.newBuffer(), bs: GL.newBuffer(), ba: GL.newBuffer(), bg: GL.newBuffer(), bl: GL.newBuffer(), bp: GL.newBuffer(), br: GL.newBuffer() };
-    const BM = this.bat.m, BS = this.bat.s, BA = this.bat.a, BG = this.bat.g, BL = this.bat.l, BP = this.bat.p; BM.reset(); BS.reset(); BA.reset(); BG.reset(); BL.reset(); BP.reset(); this.BG = BG;
-    const nearProps = (list) => { for (const p of list) { if (p.chest && p.chest.found) continue; const sp = propSprite(p.type, p.fam, p.v); if (!sp) continue; BP.bb(sp, 0, 0, sp.width, sp.height, p.x, p.y, p.e - 1.5, K, 1, 1, undefined, 0, 1, this.sway.skew(p, sp.height)); } };
+    this.bat ||= { m: new GL.Batch(2048), s: new GL.Batch(512), a: new GL.Batch(512), g: new GL.Batch(64), l: new GL.Batch(512), p: new GL.Batch(1024), q: new GL.Batch(256), r: new GL.Batch(6), bq: GL.newBuffer(), bm: GL.newBuffer(), bs: GL.newBuffer(), ba: GL.newBuffer(), bg: GL.newBuffer(), bl: GL.newBuffer(), bp: GL.newBuffer(), br: GL.newBuffer() };
+    const BM = this.bat.m, BS = this.bat.s, BA = this.bat.a, BG = this.bat.g, BL = this.bat.l, BP = this.bat.p, BQ = this.bat.q; BM.reset(); BS.reset(); BA.reset(); BG.reset(); BL.reset(); BP.reset(); BQ.reset(); this.BG = BG;
+    // props near the walker: a tree, a pillar, a house standing between the camera and the walker fades as a whole
+    // (never cut through at some height), easing down and back up again as you pass behind it
+    const [, hyF, hwF] = PJ(P.x, P.y, 0, P.hv), pf = (this.pfade ||= new Map());
+    const nearProps = (list) => { for (const p of list) {
+      if (p.chest && p.chest.found) continue; const sp = propSprite(p.type, p.fam, p.v); if (!sp) continue;
+      const [fx, fy, fw] = PJ(p.x, p.y, 0, p.e), sc = D / Math.max(1, fw), top = fy - sp.height * K * sc, half = sp.width * 0.5 * sc;
+      const covers = fw < hwF - 4 && Math.abs(fx - hx) < half + 4 && top < hyF - 6 && fy > hyF - 30;
+      let a = pf.get(p)?.a ?? 1; a += ((covers ? 0.3 : 1) - a) * 0.16; if (a > 0.995) { pf.delete(p); a = 1; } else pf.set(p, { a, f: this.frameN });
+      (a < 1 ? BQ : BP).bb(sp, 0, 0, sp.width, sp.height, p.x, p.y, p.e - 1.5, K, 1, a, undefined, 0, 1, this.sway.skew(p, sp.height));
+    } };
     for (const v of nearV) nearProps(v.props);
     if (nearP?.props) { nearProps(nearP.props); for (const f of Wd.place(here).floaters) { const s2 = propSprite('floatrock', placeDef(here).fam, f.v); if (s2) BP.bb(s2, 0, 0, s2.width, s2.height, f.x, f.y, f.h + Math.sin(this.t0 * 0.6 + f.ph) * 3, K, 0.92, 1); } }
-    const nP = BP.upload(this.bat.bp); GL.glDraw(this.bat.bp, nP, atlas);
-    GL.glCut(0, ...cut);
+    for (const [p, v] of pf) if (v.f !== this.frameN) pf.delete(p);
+    GL.glCut(0, ...cut); const nP = BP.upload(this.bat.bp); GL.glDraw(this.bat.bp, nP, atlas);
     pt('static');
     // the living, as billboards (people from their own frame texture)
     let lights = []; this.safe('entities', () => { lights = this.entities(BM, BS, BA, K, PJ, cam); });
@@ -661,10 +670,10 @@ export class Garden extends Game {
     GL.glCut(2, ...cut); GL.glBlend(true);
     for (const v of nearV) { if (v.lod >= 0) GL.glDraw(v.gBuf, v.gN, v.tex); if (v.bN) GL.glDraw(v.bBuf, v.bN, bt); }
     for (const Q of places) { const pv = this.pvis.get(Q.i); if (!pv?.ok || Math.hypot(Q.x * TS - P.x, Q.y * TS - P.y) > 900 && Q !== here) continue; if (pv.gN) GL.glDraw(pv.gBuf, pv.gN, pv.tex); GL.glDraw(pv.bBuf, pv.bN, bt); }
-    GL.glDraw(this.bat.bp, nP, atlas);
     GL.glBlend(false); GL.glCut(0, ...cut);
+    const nQ = BQ.upload(this.bat.bq); if (nQ) { GL.glBlend(true, true); GL.glDraw(this.bat.bq, nQ, atlas); GL.glBlend(false, false); }
     // the giants loom out of the haze: drawn with a thinner fog, so they are seen from far off
-    const nG = BG.upload(this.bat.bg); if (nG) { GL.glMain(this.fogC, this.fogA * 0.8, GFX, [fogR[0] * 1.8, fogR[1] * 2.6], tint, lerp(3, 7, hi) * 2.4); GL.glDraw(this.bat.bg, nG, GL.atlasTex()); }
+    const nG = BG.upload(this.bat.bg); if (nG) { GL.glMain(this.fogC, this.fogA * 0.8, GFX, [fogR[0] * 1.8, fogR[1] * 2.6], tint, lerp(3, 7, hi)); GL.glDraw(this.bat.bg, nG, GL.atlasTex()); }
     // the glows: lamps, fires, windows, beacons, glowing creatures, your wisps, all hidden behind whatever stands in front
     this.wisps.lights(lights);
     const darkK = cave ? 1 : hour.dark;
