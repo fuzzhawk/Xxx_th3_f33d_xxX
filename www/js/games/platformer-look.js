@@ -23,14 +23,14 @@ export function phase(T) {
   const wA = 1 - sstep(0.12, 0.4, T), wC = sstep(0.5, 0.82, T), wB = Math.max(0, 1 - wA - wC);
   return { T, wA, wB, wC, burn: sstep(0.05, 0.2, T) * (1 - 0.65 * sstep(0.62, 0.92, T)), bio: sstep(0.3, 0.9, T) };
 }
-const HAZE = [[58, 66, 72], [108, 54, 28], [76, 34, 104]];
-const GRADE = [[110, 150, 190, 0.06], [255, 90, 30, 0.08], [190, 60, 255, 0.06]];
+const HAZE = [[58, 66, 72], [108, 54, 28], [46, 74, 50]];
+const GRADE = [[110, 150, 190, 0.06], [255, 90, 30, 0.08], [90, 210, 110, 0.06]];
 export const hazeAt = (T) => { const p = phase(T); return [0, 1, 2].map((k) => HAZE[0][k] * p.wA + HAZE[1][k] * p.wB + HAZE[2][k] * p.wC); };
 const h1 = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
 const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 const rgba = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 const pk = (r, g, b) => ((255 << 24) | ((b & 255) << 16) | ((g & 255) << 8) | (r & 255)) >>> 0;
-const CORES = [[170, 255, 90], [255, 80, 220], [90, 255, 240], [255, 220, 90]];
+const CORES = [[170, 255, 90], [120, 255, 150], [220, 255, 120], [90, 240, 190]];
 
 // ---------------------------------------------------------------- the bakes, shared by every platformer card
 const BASE = { mode: 'level', palette: 'sodium', dither: 0.45, greeble: 0.8, pipes: 0.75, windows: 0.6, neon: 0.3, grime: 0.9, wear: 0.75, relief: 1, lightdir: 315, platKind: 'auto',
@@ -41,13 +41,13 @@ const FACES = { street: ['slum', 'sodium', 'concrete'], under: ['undercity', 'ru
   tower: ['hab', 'sodium', 'concrete'], one: ['industrial', 'rust', 'catwalk'], move: ['spaceport', 'chrome', 'deck'], crum: ['brutalist', 'sodium', 'concrete'] };
 const SANDFAC = [['megacorp', 'chrome'], ['kowloon', 'sodium'], ['hab', 'sodium'], ['industrial', 'rust'], ['brutalist', 'sodium'], ['arcology', 'chrome'], ['slum', 'rust'], ['server', 'chrome']];
 const DECALS = [['vent', 'industrial'], ['junction', 'industrial'], ['escape', 'slum'], ['graffiti', 'slum'], ['shrine', 'kowloon'], ['tunnel', 'undercity'], ['collapse', 'ruin']];
-// the moods: cold rain over the living city; an ember storm over its ruin; a magnetar's sky over fungus,
-// and (the far layers taking turns with it) a jungle canopy under a toxic dusk
+// the moods: cold rain over the living city; an ember storm over its ruin; a toxic dusk over a forest of
+// fungus spires and (the far layers taking turns with it) a jungle canopy in an acid mist: greens
 const SKIES = [
   { style: 'megacorp', skyMood: 'coldrain', palette: 'sodium', cityRuin: 0.08, cityLights: 0.7, citySkyway: 1.3, cityBlimps: 0.6 },
   { style: 'ruin', skyMood: 'emberstorm', palette: 'rust', cityRuin: 1.8, cityLights: 0.12, citySkyway: 0.3, cityBlimps: 0, cloudTurb: 1.1 },
-  { style: 'ruin', skyMood: 'magnetar', palette: 'none', cityRuin: 1, cityWidth: 1.9, cityMass: 1.35, flora: { form: 'cap', veg: ['#10342e', '#18402a', '#1c2a46'], lit: '#5affc8', dens: 0.75 } },
-  { style: 'ruin', skyMood: 'toxicdusk', palette: 'none', cityRuin: 1, cityWidth: 1.6, cityMass: 1.5, flora: { form: 'canopy', veg: ['#3a1238', '#12302c', '#40183a'], lit: '#ff5ad0', dens: 0.9 } }
+  { style: 'ruin', skyMood: 'toxicdusk', palette: 'none', cityRuin: 1, cityWidth: 1.4, cityMass: 1.5, flora: { form: 'spine', veg: ['#16301c', '#1d3a22', '#122a20'], lit: '#b0ff60', dens: 0.9 } },
+  { style: 'ruin', skyMood: 'acidmist', palette: 'none', cityRuin: 1, cityWidth: 1.6, cityMass: 1.5, flora: { form: 'canopy', veg: ['#14321a', '#1e4024', '#0e2a1e'], lit: '#7dff9a', dens: 0.9 } }
 ];
 let ART = null;
 export const art = () => (ART ||= new Art());
@@ -84,13 +84,18 @@ class Art {
       for (let i = 0; i < fw * fh; i++) u[i] = ((Math.min(255, field[i] * 255) << 24) | ((col[2] | 0) << 16) | ((col[1] | 0) << 8) | (col[0] | 0)) >>> 0;
       cx.putImageData(im, 0, 0); return c;
     });
-    // grain and the vignette
-    const gn = (this.grain = mk(128, 128)).getContext('2d'), gi = gn.createImageData(128, 128), gu = new Uint32Array(gi.data.buffer);
+    // grain, and the vignette with the grain baked into it: three frames to cycle, one full-screen draw a frame
+    const gn = mk(128, 128).getContext('2d'), gi = gn.createImageData(128, 128), gu = new Uint32Array(gi.data.buffer);
     for (let i = 0; i < gu.length; i++) { const r = R(); gu[i] = r < 0.5 ? ((((r * 90) | 0) << 24) >>> 0) : ((((r - 0.5) * 70) | 0) << 24 | 0xd8e0e8) >>> 0; }
     gn.putImageData(gi, 0, 0);
-    const vg = (this.vig = mk(W, H)).getContext('2d'), vr = vg.createRadialGradient(W / 2, H * 0.46, H * 0.25, W / 2, H * 0.5, H * 0.78);
-    vr.addColorStop(0, 'rgba(0,0,0,0)'); vr.addColorStop(0.7, 'rgba(4,2,6,0.35)'); vr.addColorStop(1, 'rgba(2,0,4,0.82)');
-    vg.fillStyle = vr; vg.fillRect(0, 0, W, H);
+    this.vigs = [0, 1, 2].map(() => {
+      const cv = mk(W, H), vg = cv.getContext('2d'), vr = vg.createRadialGradient(W / 2, H * 0.46, H * 0.25, W / 2, H * 0.5, H * 0.78);
+      vr.addColorStop(0, 'rgba(0,0,0,0)'); vr.addColorStop(0.7, 'rgba(4,2,6,0.35)'); vr.addColorStop(1, 'rgba(2,0,4,0.82)');
+      vg.fillStyle = vr; vg.fillRect(0, 0, W, H);
+      vg.globalAlpha = 0.5; const ox = -Math.floor(R() * 128), oy = -Math.floor(R() * 128);
+      for (let y = oy; y < H; y += 128) for (let x = ox; x < W; x += 128) vg.drawImage(gn.canvas, x, y);
+      return cv;
+    });
   }
   start(GW) {
     if (!GW) return;
@@ -121,6 +126,8 @@ class Art {
   // a sky: the gritted sky, its far layers, each layer's skyline (where an asteroid can land) and its low colour
   skyDone(k, v) {
     const sky = grit(v.sky, 31 + k, { streak: 0.02, sat: 0.9, levels: 10 }), tops = [], layers = [], oys = [];
+    // the green skies are bright at the horizon: take them down toward a deep green dusk
+    if (k >= 2) { const x = sky.getContext('2d'), g = x.createLinearGradient(0, 0, 0, sky.height); g.addColorStop(0, 'rgb(90,112,92)'); g.addColorStop(1, 'rgb(128,150,118)'); x.globalCompositeOperation = 'multiply'; x.fillStyle = g; x.fillRect(0, 0, sky.width, sky.height); }
     for (const L of v.layers) {
       const w = L.width, h = L.height, d = L.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data, top = new Int16Array(w).fill(h);
       let y0 = h;
@@ -193,13 +200,13 @@ export class Backdrop {
     S.view(ax0, ax1);
     const lo = ax0 - S.c0, hi = ax1 - S.c0;
     this.acc += dt; let n = 0;
-    while (this.acc >= 1 / 60 && n < 2) { S.step(lo - 24, hi + 24, P.bio); this.acc -= 1 / 60; n++; }
+    while (this.acc >= 1 / 60 && n < 2) { S.step(lo - 16, hi + 16, P.bio); this.acc -= 1 / 60; n++; }
     if (this.acc > 0.05) this.acc = 0;
     // haunted: now and then the lights stutter and the dark comes in
     this.flk -= dt;
     if (this.flk <= 0) { this.flkN = 1 + Math.floor(this.R(0, 3)); this.flk = this.R(7, 16); this.flkT = 0; }
     if (this.flkN > 0) { this.flkT += dt; const on = Math.floor(this.flkT / 0.07) % 2 === 0; this.lightK = on ? 0.12 : 1; this.dark = on ? 0.22 : 0; if (this.flkT > this.flkN * 0.14) { this.flkN = 0; this.lightK = 1; this.dark = 0; } }
-    S.render(lo - 1, hi + 1, now, this.lightK);
+    S.render(lo - 1, hi + 1, now, this.lightK, Math.floor(-this.sandY() / CS));
     this.flash = Math.max(0, this.flash - dt * 2.5);
     if (dt > 0) { this.stepAst(dt, P); this.stepFx(dt, P); }
     this.stepWeather(dt, cx);
@@ -218,7 +225,7 @@ export class Backdrop {
       const px = a.x, py = a.y;
       a.x += a.vx * dt; a.y += a.vy * dt; a.age += dt;
       if (a.L === 'sand') { const h = this.trace(px, py, a.x, a.y); if (h) { a.x = h.x; a.y = h.y; a.ax = h.ax; a.row = h.row; this.hit(a, P); a.dead = true; continue; } }
-      for (let k = 0, n = typeof a.L === 'number' ? 1 : 2; k < n; k++) a.tr.push({ x: a.x + this.R(-1, 1) * a.s * 0.4, y: a.y + this.R(-1, 1) * a.s * 0.4, l: 0, m: this.R(0.35, 0.8) * (a.L === 'near' ? 1.3 : 1), s: a.s * this.R(0.8, 1.5), vx: -a.vx * 0.06 + this.R(-6, 6), vy: -a.vy * 0.06 - this.R(4, 14) });
+      a.tr.push({ x: a.x + this.R(-1, 1) * a.s * 0.4, y: a.y + this.R(-1, 1) * a.s * 0.4, l: 0, m: this.R(0.3, 0.6) * (a.L === 'near' ? 1.3 : 1), s: a.s * this.R(1, 1.8), vx: -a.vx * 0.06 + this.R(-6, 6), vy: -a.vy * 0.06 - this.R(4, 14) });
       if (a.y >= a.ty) { this.hit(a, P); a.dead = true; }
     }
     // trails fade; a struck asteroid's trail lingers a moment after it
@@ -228,7 +235,7 @@ export class Backdrop {
   launchSand(P) {
     const g = this.g, Lx = g.camX * PF, sy = this.sandY(), tx = Lx + this.R(W * 0.45, W * 1.25), ty = this.R(60, 250) - sy;
     const dir = this.rng() < 0.7 ? -1 : 1, dx = dir * this.R(0.3, 0.7), l = Math.hypot(dx, 1), ux = dx / l, uy = 1 / l, D = (ty - (-40 - sy)) / uy, sp = this.R(300, 390);
-    this.ast.push({ L: 'sand', x: tx - ux * D, y: ty - uy * D, vx: ux * sp, vy: uy * sp, ty: 1e9, r: Math.round(this.R(5, 8 + P.burn * 5)), s: this.R(4, 6.5), core: CORES[Math.floor(this.R(0, 4))], tr: [], age: 0 });
+    this.ast.push({ L: 'sand', x: tx - ux * D, y: ty - uy * D, vx: ux * sp, vy: uy * sp, ty: 1e9, r: Math.round(this.R(3, 6 + P.burn * 3)), s: this.R(4, 6.5), core: CORES[Math.floor(this.R(0, 4))], tr: [], age: 0 });
   }
   // a sand asteroid's path from (x0, y0) to (x1, y1), traced cell by cell: the first solid cell, or null
   trace(x0, y0, x1, y1) {
@@ -293,7 +300,7 @@ export class Backdrop {
     if (this.nextGhost <= 0 && this.ghosts.length < 2) {
       this.nextGhost = this.R(5, 12);
       const S = this.sand, Lx = this.g.camX * PF, ax = Math.floor((Lx + this.R(W * 0.55, W * 1.1)) / CS), y = S.surface(ax);
-      if (y > 12 && y < SGH - ROCKH - 2) this.ghosts.push({ x: ax * CS + 1, y: y * CS, t: 0, life: this.R(4, 8), k: P.bio > 0.4 ? 1 : 0, ph: this.R(0, TAU), h: this.R(13, 19) });
+      if (y > 8 && y < SGH - ROCKH - 2) this.ghosts.push({ x: ax * CS + 1, y: y * CS, t: 0, life: this.R(4, 8), k: P.bio > 0.4 ? 1 : 0, ph: this.R(0, TAU), h: this.R(13, 19) });
     }
     for (const q of this.ghosts) q.t += dt;
     this.ghosts = this.ghosts.filter((q) => q.t < q.life);
@@ -323,8 +330,9 @@ export class Backdrop {
     const low = [0, 1, 2].map((k) => { let s = 0, n = 0; for (let j = 0; j < 3; j++) if (A.skies[j]) { s += A.skies[j].low[k] * ws[j]; n += ws[j]; } return n ? s / n : HAZE[0][k] * 0.6; });
     // the trails mutator: the sky and the far city only partly cover the last frame, so what moves smears
     const ta = g.mods.trails && g.t > 0.5 ? 0.25 : 1;
-    c.globalAlpha = ta; c.fillStyle = rgba(low); c.fillRect(0, 0, W, H);
-    const sy = this.skyY();
+    const sy = this.skyY(), sky = A.skies.some((k, j) => k && j < 3 && ws[j] > 0.01);
+    c.globalAlpha = ta; c.fillStyle = rgba(low);
+    if (sky && ta === 1) c.fillRect(0, sy + 298, W, H - sy - 298); else c.fillRect(0, 0, W, H); // the sky is opaque: fill only below it
     // the sky: the three moods crossfaded, tiled slowly
     let acc = 0;
     for (let k = 0; k < 3; k++) {
@@ -440,7 +448,7 @@ export class Backdrop {
       c.fillStyle = 'rgba(8,4,4,0.75)'; c.beginPath(); c.ellipse(s.x, s.y + 1, 26 * s.s, 3, 0, 0, TAU); c.fill();
       for (let i = 0; i < 9; i++) {
         const dx = (R() - 0.5) * 46 * s.s, hh = (4 + R() * 12) * k * s.s, col = CORES[Math.floor(R() * 3)], fl = 0.7 + 0.3 * Math.sin(t * 3 + i);
-        if (R() < 0.5) { c.fillStyle = '#d8cfc0'; c.fillRect(s.x + dx - 0.8, s.y - hh, 1.6, hh); c.fillStyle = rgba(col); c.beginPath(); c.ellipse(s.x + dx, s.y - hh, 3.5 * k * s.s, 2 * k * s.s, 0, Math.PI, 0); c.fill(); }
+        if (R() < 0.5) { const ln = (R() - 0.5) * 3; c.fillStyle = '#7a9a64'; c.beginPath(); c.moveTo(s.x + dx - 2, s.y); c.lineTo(s.x + dx + ln, s.y - hh * 1.4); c.lineTo(s.x + dx + 2, s.y); c.fill(); c.fillStyle = rgba(col); c.fillRect(s.x + dx + ln - 1, s.y - hh * 1.4 - 1, 2, 2); }
         else { c.strokeStyle = '#2f8a50'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(s.x + dx, s.y); c.quadraticCurveTo(s.x + dx + 4, s.y - hh * 0.6, s.x + dx + (R() - 0.5) * 6, s.y - hh); c.stroke(); c.fillStyle = rgba(col); c.fillRect(s.x + dx - 1.5, s.y - hh - 1.5, 3, 3); }
         c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.5 * fl * k; this.tintGlow(c, col, s.x + dx, s.y - hh, 7); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
       }
@@ -463,13 +471,13 @@ export class Backdrop {
     c.restore();
     // the grade: a wash of the mood's colour, the stutter's dark, a strike's flash, the vignette, the grain
     const ws = [P.wA, P.wB, P.wC];
-    for (let k = 0; k < 3; k++) if (ws[k] > 0.01) { const q = GRADE[k]; c.fillStyle = `rgba(${q[0]},${q[1]},${q[2]},${q[3] * ws[k]})`; c.fillRect(0, 0, W, H); }
+    let ga = 0; const gc = [0, 0, 0];
+    for (let k = 0; k < 3; k++) { const q = GRADE[k], w = ws[k] * q[3]; ga += w; for (let j = 0; j < 3; j++) gc[j] += q[j] * w; }
+    if (ga > 0.005) { c.fillStyle = `rgba(${(gc[0] / ga) | 0},${(gc[1] / ga) | 0},${(gc[2] / ga) | 0},${ga})`; c.fillRect(0, 0, W, H); }
     if (this.dark > 0) { c.fillStyle = `rgba(0,0,0,${this.dark})`; c.fillRect(0, 0, W, H); }
     if (this.flash > 0) { c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(255,190,130,${Math.min(0.35, this.flash * 0.4)})`; c.fillRect(0, 0, W, H); c.restore(); }
-    c.drawImage(this.A.vig, 0, 0);
-    c.save(); c.globalAlpha = 0.5; c.fillStyle = this.pat(c, this.A.grain);
-    const gx = Math.floor(this.rng() * 128), gy = Math.floor(this.rng() * 128);
-    c.translate(-gx, -gy); c.fillRect(gx, gy, W, H); c.restore();
+    this.vf = ((this.vf || 0) + 1) % 9;
+    c.drawImage(this.A.vigs[(this.vf / 3) | 0], 0, 0);
   }
   // hanging cables, pipes and signs at the top, wreckage below; tendrils, bulbs and fronds once it turns
   foreground(c, cx, cy, t) {
@@ -499,8 +507,8 @@ export class Backdrop {
         if (bio > 0.5) {
           c.lineWidth = 3; c.beginPath(); c.moveTo(x, by); c.quadraticCurveTo(x + 10, by - hh, x + 34 + Math.sin(t + b) * 3, by - hh * 1.1); c.stroke();
           for (let q = 0; q < 6; q++) { const u = q / 6, px = x + 10 * u + 24 * u * u, py = by - hh * (u * 1.05); c.beginPath(); c.ellipse(px, py, 9, 2.5, -0.6 - u, 0, TAU); c.fill(); }
-          c.fillRect(x + 40, by - hh * 0.8, 4, hh * 0.8); c.beginPath(); c.ellipse(x + 42, by - hh * 0.8, 16, 7, 0, Math.PI, 0); c.fill();
-          c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.4; this.tintGlow(c, CORES[b & 1 ? 1 : 2], x + 42, by - hh * 0.8 - 2, 14); c.restore();
+          c.beginPath(); c.moveTo(x + 36, by); c.lineTo(x + 43, by - hh * 1.6); c.lineTo(x + 50, by); c.fill();
+          c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.45; this.tintGlow(c, CORES[b & 1 ? 1 : 2], x + 43, by - hh * 1.6, 10); c.restore();
         } else {
           c.beginPath(); c.moveTo(x - 10, by); for (let q = 0; q <= 8; q++) c.lineTo(x + q * 10, by - hh * (0.4 + 0.6 * Math.sin((q / 8) * Math.PI)) * (0.7 + h1(b * 11 + q) * 0.4)); c.lineTo(x + 90, by); c.closePath();
           c.fillStyle = this.pat(c, face); c.fill(); c.fillStyle = 'rgba(6,5,4,0.8)'; c.fill();

@@ -941,3 +941,44 @@ The platformer keeps its play and gets a new look. The levels, the hero's physic
   - Bakes total about 0.7 s, sliced; a sky's largest slice is about 40 ms.
   - At 4× CPU throttle in the burning phase, a frame's JS is about 10 ms: sand step 1.7 ms (often two ticks), sand render 1.3 ms, the play layer about 4 ms.
   - Unthrottled it is about 2.5 ms.
+
+## The platformer, second round: faster, greener, shorter tunnels (2026-11-28)
+
+- **Evening's blue-light filter:**
+  - The filter is a page-wide layer (`#bluelight`) multiplied over everything. While something under it redraws every frame, the phone has to re-blend the whole screen each frame, which is costly.
+  - A heavy game now opts out (`static ownWarm = true`, set only on the platformer for now). While it runs, `modes.js` hides the layer and the game draws the same multiply on its own canvas in `engine.js`. The colour is worked out from the slider, so the look matches.
+  - The layer comes back when the game stops. A periodic prune also brings it back if a card vanishes without stopping its game.
+  - The trade-off: while the platformer plays, the rest of the screen (top bar, edges of other cards) is not warmed.
+- **Resolution and pacing:**
+  - The platformer's canvas is drawn at 1.5× at most (`dprCap`; other games keep 2×).
+  - If the median frame time over 90 frames is over 24 ms, it steps down to 1.25× and then 1×, for that game instance (`pace()`).
+- **The sand city is coarser:** 300 × 114 cells of 3 px (was 448 × 170 of 2 px), so the simulation and the picture have under half the cells.
+  - All of the plan's sizes were scaled to match: towers, gaps, rubble, mounds, craters and the grains' speeds.
+  - Only the rows on screen are written and uploaded.
+  - The glow is a single half-size pass (the quarter-size one is gone).
+  - The spore rain is lighter, so fewer chunks stay awake.
+- **Less overdraw:**
+  - The base colour fills only below the sky, which is opaque.
+  - The mood wash is one fill instead of up to three.
+  - The grain is baked into three vignette frames that cycle, one full-screen draw instead of two.
+  - Building faces are textured only in their top 220 px, with a plain fill below.
+  - Asteroid trails emit one puff a frame.
+- **Measured** (headless, CPU throttled 4×): a frame's JS went from about 6 to 3.3 ms in the city and from about 10–12.7 to 6.7 ms in the burning phase. The headless frame rate about doubled.
+- **The alien forest is green** and grows vines and fungus spires instead of mushroom caps:
+  - **The sand city:**
+    - Tapering, ridged, pale-green spires with glowing pores and a lit tip, in clusters, grow from the plan and live from spores.
+    - Vines climb the towers and now also hang from their roofs, with small glowing buds.
+    - The creeping crust is moss, lichen and olive instead of flesh, and the mounds at the far end are moss.
+    - Glow, spores and ooze are green.
+  - **The far layers:** a toxic dusk over a forest of spires (greebleworks' `spine` flora), taking turns with a jungle canopy in an acid mist. Both skies are darkened toward a deep green dusk.
+  - **The play layer:**
+    - Small spires and green buds stand on the tops, and green tendrils hang down the faces.
+    - The lamps become spire clusters and the signs become coiled fern fronds.
+    - Bounce pads become green pods and spikes become dark thorns.
+    - The eyes stay.
+  - **The rest:** asteroid cores, weather spores, scars and the foreground's late shapes are green too.
+- **Tunnels are shorter:** an underpass is now one or two segments of 240–380 px, against two to five segments of 460–640 px before. Over a generated level the tunnels ran 260–840 px (mean 560), a few seconds of running each.
+- **Tested** headless with no errors:
+  - Seeds 1, 2, 3, 4, 5, 7 and 9, with their mutators.
+  - A death and restart, and a tower cut and collapse on the new grid.
+  - The evening handoff: the veil hides while the game runs and returns when it stops, and the canvas shows the tint (blue fell from 56 to 38 on average).

@@ -91,7 +91,7 @@ export class Game {
 
   resize() {
     const cw = this.canvas.clientWidth || 360;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = Math.min(this.dprCap || 2, window.devicePixelRatio || 1); // a heavy game may draw at a lower resolution
     this.canvas.style.filter = this.mods.hue ? `hue-rotate(${(this.post.seed % 300) + 30}deg) saturate(1.6)` : this.mods.invert ? 'invert(1) hue-rotate(180deg)' : '';
     this.canvas.width = Math.round(cw * dpr);
     this.canvas.height = Math.round(cw * (H / W) * dpr);
@@ -108,8 +108,9 @@ export class Game {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
+    if (this.constructor.ownWarm) window.feedWarm?.add(this);
   }
-  stop() { this.running = false; cancelAnimationFrame(this.raf); }
+  stop() { this.running = false; cancelAnimationFrame(this.raf); window.feedWarm?.remove(this); }
   frame(now) {
     const dt = Math.min(1 / 20, (now - this.last) / 1000) * this.T;
     this.last = now;
@@ -130,6 +131,10 @@ export class Game {
     this.drawParticles(c);
     c.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     if (this.mods.mono) { c.globalCompositeOperation = 'color'; c.fillStyle = `hsl(${this.monoHue},45%,50%)`; c.fillRect(0, 0, W, H); c.globalCompositeOperation = 'source-over'; }
+    // evening's blue-light filter, drawn here instead of by the page while a heavy game runs (modes.js):
+    // the same warm multiply, on the canvas alone, which costs far less than blending the whole screen
+    const wm = window.feedWarm;
+    if (wm?.on && wm.games.has(this)) { c.globalCompositeOperation = 'multiply'; c.fillStyle = wm.css; c.fillRect(0, 0, W, H); c.globalCompositeOperation = 'source-over'; }
     if (this.score > this.best) this.best = this.score;
     this.onHud?.(this.hud());
   }

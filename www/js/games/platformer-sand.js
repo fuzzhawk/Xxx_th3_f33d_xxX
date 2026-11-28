@@ -1,16 +1,16 @@
-// The platformer's middle distance: a city of falling sand. Every cell is a grain with a type and a colour,
-// on a grid that scrolls with the parallax (half the hero's speed) and is painted ahead from a plan of
-// towers (greebleworks facades, a texel to a cell), rubble, giant fungus, vines, flowers and flesh. The
+// The platformer's middle distance: a city of falling sand. Every cell (3 px) is a grain with a type and a
+// colour, on a grid that scrolls with the parallax (half the hero's speed) and is painted ahead from a plan
+// of towers (greebleworks facades, a texel to a cell), rubble, fungus spires, vines, buds and moss. The
 // flaming spore asteroids blow craters in it: the blast throws grains, leaves embers and fire, and any
 // part of a tower no longer joined to the ground falls whole and shatters into sand where it lands.
-// Spores seed growth that climbs the wreck, and flesh creeps over what still stands. The further the hero
-// gets, the more ruined and overgrown the plan is to begin with.
+// Spores seed vines and spires that climb the wreck, and a green crust creeps over what still stands. The
+// further the hero gets, the more ruined and overgrown the plan is to begin with.
 import { mulberry32 } from '../util.js';
 
-export const CS = 2, GW = 448, GH = 170, ROCKH = 4;
-const N = GW * GH, GW2 = GW >> 1, GH2 = GH >> 1, GW4 = GW2 >> 1, GH4 = GH2 >> 1;
+export const CS = 3, GW = 300, GH = 114, ROCKH = 3;
+const N = GW * GH, GW2 = GW >> 1, GH2 = GH >> 1;
 // the grid in 16×16 chunks: a chunk where nothing moves sleeps until something moves, lands or burns near it
-const CW = GW >> 4, CH = (GH + 15) >> 4;
+const CW = (GW + 15) >> 4, CH = (GH + 15) >> 4;
 // cell types: static first (structures), then loose grains, then the light things that rise or drift
 const E = 0, ROCK = 1, SOLID = 2, FLESH = 3, VINE = 4, STALK = 5, CAP = 6, BLOOM = 7, TIP = 8,
   RUBBLE = 9, SAND = 10, EMBER = 11, OOZE = 12, FALL = 13, FIRE = 14, SMOKE = 15, SPORE = 16;
@@ -30,11 +30,13 @@ const vn2 = (x, y, s, k) => {
 };
 const mkc = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 
-// the growth's colours: vivid, the opposite of the city's sodium murk
-const VINES = [[34, 140, 84], [20, 170, 140], [96, 196, 54], [60, 120, 40], [24, 110, 120]];
-const CAPS = [[236, 60, 170], [40, 220, 226], [255, 136, 40], [150, 84, 255], [190, 255, 70], [255, 70, 90]];
-const PETALS = [[255, 70, 180], [70, 140, 255], [255, 200, 40], [170, 255, 60], [255, 110, 60], [200, 90, 255]];
-const FLESHP = [[[38, 6, 20], [150, 32, 70], [236, 128, 150]], [[28, 8, 40], [120, 40, 150], [226, 150, 255]], [[8, 30, 28], [30, 130, 110], [150, 255, 200]]];
+// the growth's colours: greens, against the city's sodium murk, lit by a pale green-gold glow
+const VINES = [[34, 140, 64], [56, 170, 60], [96, 196, 54], [40, 120, 48], [70, 150, 40], [24, 110, 70]];
+const SPIRES = [[120, 160, 96], [96, 150, 90], [140, 170, 104], [86, 130, 74], [110, 150, 120]];
+const PETALS = [[200, 255, 140], [150, 230, 90], [230, 255, 190], [120, 255, 170], [210, 240, 110]];
+// the crust that creeps over the towers: dark moss, lichen, and a wet olive
+const FLESHP = [[[18, 26, 12], [70, 100, 40], [170, 210, 110]], [[10, 28, 22], [36, 104, 76], [130, 220, 160]], [[26, 24, 10], [92, 92, 34], [196, 206, 104]]];
+const SPORES = [pk(200, 255, 120), pk(150, 255, 170), pk(230, 255, 150), pk(120, 230, 110)];
 const FIRE_LUT = new Uint32Array(256), FIRE_GLOW = new Uint32Array(256);
 for (let l = 0; l < 256; l++) {
   const k = l / 255, r = k > 0.25 ? 255 : 120 + k * 540, g = k < 0.2 ? 20 + k * 100 : k < 0.7 ? 40 + (k - 0.2) * 300 : 190 + (k - 0.7) * 200, b = k > 0.75 ? (k - 0.75) * 600 : 10;
@@ -66,7 +68,6 @@ export class Sand {
     this.vis = new Uint16Array(N); this.gen = 0; this.queue = new Int32Array(N); this.act = new Uint8Array(CW * CH);
     this.cv = mkc(GW, GH); this.cx = this.cv.getContext('2d'); this.img = this.cx.createImageData(GW, GH); this.px = new Uint32Array(this.img.data.buffer);
     this.gv = mkc(GW2, GH2); this.gx = this.gv.getContext('2d'); this.gimg = this.gx.createImageData(GW2, GH2); this.gpx = new Uint32Array(this.gimg.data.buffer);
-    this.gq = mkc(GW4, GH4); this.gqx = this.gq.getContext('2d'); this.gqx.imageSmoothingEnabled = true;
     this.ar = new Uint16Array(GW2 * GH2); this.ag = new Uint16Array(GW2 * GH2); this.ab = new Uint16Array(GW2 * GH2);
     this.tex = [0, 1, 2, 3].map((k) => fallbackTex(k + 1)); this.real = false;
     this.pulse = new Float32Array(64);
@@ -81,9 +82,9 @@ export class Sand {
   reset(ax0) {
     this.t.fill(0); this.col.fill(0); this.life.fill(0); this.glow.fill(0);
     this.rng = mulberry32(((this.host.seed || 1) ^ 0x5a17d) >>> 0);
-    this.c0 = Math.floor(ax0) - 120; this.genAx = this.c0 - 40; this.blds = []; this.ops = new Map();
+    this.c0 = Math.floor(ax0) - 80; this.genAx = this.c0 - 30; this.blds = []; this.ops = new Map();
     this.tips = []; this.front = []; this.parts = []; this.rechecks = []; this.tick = 0; this.hits = 0;
-    this.plan(this.c0 + GW + 60);
+    this.plan(this.c0 + GW + 40);
     for (let gx = 0; gx < GW; gx++) this.paint(gx);
     this.act.fill(2);
   }
@@ -98,69 +99,77 @@ export class Sand {
     const R = () => this.rng(), G = GH - ROCKH;
     while (this.genAx < until) {
       const ax = this.genAx, T = this.host.tAt(ax + 16), ruin = sstep(0.1, 0.62, T), bio = sstep(0.3, 0.9, T), tn = this.tone(T);
-      let gap = 1 + Math.floor(R() * (3 + ruin * 5)) + (R() < 0.35 + ruin * 0.3 ? 4 + Math.floor(R() * 12) : 0);
-      // between towers: heaps of rubble, then flowers, fungus and ooze as the place turns
+      let gap = 1 + Math.floor(R() * (2 + ruin * 3)) + (R() < 0.35 + ruin * 0.3 ? 3 + Math.floor(R() * 8) : 0);
+      // between towers: heaps of rubble, then buds, fungus spires and ooze as the place turns
       if (gap > 0) {
-        if (ruin > 0.1) for (let x = 0; x < gap + 4; x++) { const hh = Math.floor(ruin * (3 + 9 * Math.sin(((x + 0.5) / (gap + 4)) * Math.PI)) * (0.6 + R() * 0.5)); for (let y = 0; y < hh; y++) { const v = 34 + R() * 30; this.op(ax - 2 + x, G - 1 - y, RUBBLE, tn(v * 1.1, v, v * 0.85)); } }
-        if (bio > 0.12 && gap > 3 && R() < bio) this.fungus(ax + Math.floor(gap / 2) - 1, G - 1 - Math.floor(ruin * 6), bio, T);
-        if (bio > 0.4 && R() < bio * 0.6) for (let x = 0; x < gap; x++) for (let y = 0; y < 2; y++) this.op(ax + x, G - 1 - Math.floor(ruin * 5) - y, OOZE, pk(120, 255, 90), 160);
+        if (ruin > 0.1) for (let x = 0; x < gap + 3; x++) { const hh = Math.floor(ruin * (2 + 6 * Math.sin(((x + 0.5) / (gap + 3)) * Math.PI)) * (0.6 + R() * 0.5)); for (let y = 0; y < hh; y++) { const v = 34 + R() * 30; this.op(ax - 1 + x, G - 1 - y, RUBBLE, tn(v * 1.1, v, v * 0.85)); } }
+        if (bio > 0.12 && gap > 2 && R() < bio) this.spires(ax + Math.floor(gap / 2), G - 1 - Math.floor(ruin * 4), bio);
+        if (bio > 0.4 && R() < bio * 0.5) for (let x = 0; x < gap; x++) this.op(ax + x, G - 1 - Math.floor(ruin * 4), OOZE, pk(120, 230, 80), 140);
       }
       const x0 = ax + gap;
       if (T > 0.82 && R() < (T - 0.82) * 3) { this.genAx = this.mound(x0, bio, T) + 1; continue; }
-      const w = 12 + Math.floor(R() * 30), tall = 34 + Math.pow(R(), 1.1) * (G - 40), hgt = Math.max(14, Math.floor(tall * (1 - ruin * R() * 0.5)));
+      const w = 8 + Math.floor(R() * 20), tall = 22 + Math.pow(R(), 1.1) * (G - 27), hgt = Math.max(9, Math.floor(tall * (1 - ruin * R() * 0.5)));
       const b = { x0, w, top: G - hgt, hgt, steps: [], ant: -1, antH: 0, tex: Math.floor(R() * 64), ox: Math.floor(R() * 64), oy: Math.floor(R() * 64), ruin: ruin * (0.6 + R() * 0.6), jagA: hgt * 0.4,
         bio: bio * (0.5 + R() * 0.7), fp: Math.floor(R() * 3), seed: Math.floor(R() * 1e6), dark: 0.8 + R() * 0.35, T };
-      for (let s = 0, n = R() < 0.6 ? 1 + Math.floor(R() * 2) : 0, y = b.top; s < n; s++) { y += Math.floor(hgt * (0.12 + R() * 0.2)); const ins = 2 + Math.floor(R() * (w / 5)); if (w - ins * 2 > 6) b.steps.push([y, ins * (s + 1)]); }
-      if (b.ruin < 0.35 && R() < 0.5) { b.ant = 3 + Math.floor(R() * (w - 6)); b.antH = 5 + Math.floor(R() * 16); }
+      for (let s = 0, n = R() < 0.6 ? 1 + Math.floor(R() * 2) : 0, y = b.top; s < n; s++) { y += Math.floor(hgt * (0.12 + R() * 0.2)); const ins = 1 + Math.floor(R() * (w / 5)); if (w - ins * 2 > 4) b.steps.push([y, ins * (s + 1)]); }
+      if (b.ruin < 0.35 && R() < 0.5) { b.ant = 2 + Math.floor(R() * (w - 4)); b.antH = 3 + Math.floor(R() * 11); }
       this.blds.push(b);
-      // vines up its face
-      if (b.bio > 0.1) for (let v = 0, nv = Math.floor(b.bio * 4 * R()) + (R() < b.bio ? 1 : 0); v < nv; v++) this.vine(x0 - 1 + Math.floor(R() * (w + 2)), G - 1, Math.floor(hgt * (0.3 + R() * 0.8) * b.bio), T);
+      // vines up its face and hanging down from its roof
+      if (b.bio > 0.1) for (let v = 0, nv = Math.floor(b.bio * 4 * R()) + (R() < b.bio ? 1 : 0); v < nv; v++) this.vine(x0 - 1 + Math.floor(R() * (w + 2)), G - 1, Math.floor(hgt * (0.3 + R() * 0.8) * b.bio), T, -1);
+      if (b.bio > 0.25) for (let v = 0, nv = Math.floor(b.bio * 3 * R()); v < nv; v++) this.vine(x0 + Math.floor(R() * w), b.top + 1, Math.floor(hgt * (0.15 + R() * 0.45) * b.bio), T, 1);
       if (b.bio > 0.3 && R() < b.bio * 0.5) this.flowers(x0 + Math.floor(R() * w), G - 1, T);
       this.genAx = x0 + w;
     }
   }
-  vine(ax, y, len, T) {
+  // a vine climbing (dir -1) or hanging (dir 1): leaves now and then, a bud at the end
+  vine(ax, y, len, T, dir = -1) {
     const R = () => this.rng(), vc = VINES[Math.floor(R() * VINES.length)], k = 0.7 + T * 0.4;
     let x = ax, lean = R() < 0.5 ? -1 : 1;
     for (let s = 0; s < len; s++) {
       this.op(x, y, VINE, pk(vc[0] * k * (0.8 + R() * 0.4), vc[1] * k * (0.8 + R() * 0.4), vc[2] * k), 0);
-      if (R() < 0.12) this.op(x + lean, y, VINE, pk(vc[0] * 1.2, vc[1] * 1.25, vc[2] * 1.1), 30);
-      if (R() < 0.035) this.bloom(x + (R() < 0.5 ? -1 : 1), y, 1);
-      y--; if (R() < 0.22) x += lean; if (R() < 0.08) lean = -lean;
+      if (R() < 0.14) this.op(x + lean, y, VINE, pk(vc[0] * 1.2, vc[1] * 1.25, vc[2] * 1.1), 30);
+      if (R() < 0.025) this.bloom(x + (R() < 0.5 ? -1 : 1), y, 0);
+      y += dir; if (R() < (dir < 0 ? 0.22 : 0.1)) x += lean; if (R() < 0.08) lean = -lean;
     }
-    this.bloom(x, y, R() < 0.5 ? 2 : 1);
+    this.bloom(x, y, R() < 0.3 ? 1 : 0);
   }
+  // a bud (r 0: one glowing cell) or a small cluster round it
   bloom(ax, y, r) {
     const R = () => this.rng(), pc = PETALS[Math.floor(R() * PETALS.length)];
-    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (dx * dx + dy * dy > r * r + 1) continue; const core = !dx && !dy; this.op(ax + dx, y + dy, BLOOM, core ? pk(255, 250, 200) : pk(pc[0], pc[1], pc[2]), core ? 255 : 170); }
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (dx * dx + dy * dy > r * r + 1) continue; const core = !dx && !dy; this.op(ax + dx, y + dy, BLOOM, core ? pk(230, 255, 170) : pk(pc[0], pc[1], pc[2]), core ? 230 : 120); }
   }
-  flowers(ax, y, T) { const R = () => this.rng(); for (let i = 0, n = 2 + Math.floor(R() * 4); i < n; i++) { const x = ax + Math.floor((R() - 0.5) * 10), h = 2 + Math.floor(R() * 8); for (let s = 0; s < h; s++) this.op(x, y - s, VINE, pk(40, 150 + R() * 40, 70)); this.bloom(x, y - h, R() < 0.3 ? 2 : 1); } }
-  fungus(ax, base, bio, T) {
-    const R = () => this.rng(), sw = 2 + Math.floor(R() * 3), sh = Math.floor((18 + R() * 100) * bio), cc = CAPS[Math.floor(R() * CAPS.length)];
-    let x = ax;
-    for (let s = 0; s < sh; s++) { for (let k = 0; k < sw; k++) { const v = 150 + R() * 40; this.op(x + k, base - s, STALK, pk(v, v * 0.92, v * 0.86), k === 1 && s % 6 < 2 ? 60 : 0); } if (R() < 0.05) x += R() < 0.5 ? -1 : 1; }
-    this.cap(x + (sw >> 1), base - sh, 5 + sw + Math.floor(R() * 15 * bio), cc, (ax2, y, ty, c, g) => this.op(ax2, y, ty, c, g));
+  flowers(ax, y, T) { const R = () => this.rng(); for (let i = 0, n = 2 + Math.floor(R() * 3); i < n; i++) { const x = ax + Math.floor((R() - 0.5) * 7), h = 2 + Math.floor(R() * 5); for (let s = 0; s < h; s++) this.op(x, y - s, VINE, pk(40, 150 + R() * 40, 60)); this.bloom(x, y - h, 0); } }
+  // a cluster of fungus spires: one tall, a smaller one or two beside it
+  spires(ax, base, bio) {
+    const R = () => this.rng(), put = (x, y, ty, c, g) => this.op(x, y, ty, c, g);
+    this.spire(ax, base, (14 + R() * 64) * bio, 2 + Math.floor(R() * 4), (R() - 0.5) * 0.5, SPIRES[Math.floor(R() * SPIRES.length)], put);
+    for (let k = 0, n = Math.floor(R() * 3); k < n; k++) this.spire(ax + (R() < 0.5 ? -1 : 1) * (2 + Math.floor(R() * 4)), base, (8 + R() * 30) * bio, 1 + Math.floor(R() * 3), (R() - 0.5) * 0.7, SPIRES[Math.floor(R() * SPIRES.length)], put);
   }
-  cap(cx, cy, rx, cc, put) {
-    const R = () => this.rng(), ry = Math.max(3, Math.floor(rx * (0.35 + R() * 0.2))), sp = CAPS[Math.floor(R() * CAPS.length)];
-    for (let dx = -rx; dx <= rx; dx++) {
-      const hh = Math.floor(ry * Math.sqrt(Math.max(0, 1 - (dx * dx) / (rx * rx))));
-      for (let dy = -hh; dy <= 1; dy++) {
-        const rim = dy >= 0, spot = !rim && h2(cx + dx, cy + dy, 91) < 0.1, sh = 0.7 + 0.3 * (1 + dy / (hh + 1));
-        put(cx + dx, cy + dy, CAP, rim ? pk(cc[0] * 0.5, cc[1] * 0.5, cc[2] * 0.5) : spot ? pk(sp[0], sp[1], sp[2]) : pk(cc[0] * sh, cc[1] * sh, cc[2] * sh), rim ? 140 : spot ? 230 : 40);
-      }
+  // one spire, h cells tall from (ax, base): a tapering ridged column, a little lean, glowing pores, a lit tip
+  spire(ax, base, h, w0, lean, sc, put) {
+    h = Math.max(5, Math.floor(h));
+    for (let s = 0; s < h; s++) this.spireRow(ax, base, h, w0, lean, sc, s, put);
+    const tx = ax + Math.round(lean * h);
+    put(tx, base - h, BLOOM, pk(220, 255, 150), 255);
+  }
+  spireRow(ax, base, h, w0, lean, sc, s, put) {
+    const u = s / h, w = Math.max(1, Math.round(w0 * Math.pow(1 - u, 0.7))), x0 = ax + Math.round(lean * s * u) - (w >> 1), ridge = s % 4 === 0 ? 0.76 : 1, y = base - s;
+    for (let k = 0; k < w; k++) {
+      const sh = (0.66 + (w > 1 ? k / (w - 1) : 0.5) * 0.5) * ridge, pore = w > 1 && h2(x0 + k, y, 77) < 0.05;
+      put(x0 + k, y, STALK, pore ? pk(200, 255, 120) : pk(sc[0] * sh, sc[1] * sh, sc[2] * sh), pore ? 200 : 0);
     }
+    if (w > 1 && h2(ax, y, 78) < 0.06) put(h2(ax, y, 79) < 0.5 ? x0 - 1 : x0 + w, y, STALK, pk(sc[0] * 0.7, sc[1] * 0.7, sc[2] * 0.7), 0); // a spur
   }
-  // the far end: no towers left, a hill of flesh with the jungle on it
+  // the far end: no towers left, a hill of moss with the jungle on it
   mound(x0, bio, T) {
-    const R = () => this.rng(), w = 30 + Math.floor(R() * 50), A = 10 + R() * 40, G = GH - ROCKH, fp = FLESHP[Math.floor(R() * 3)], sd = Math.floor(R() * 1e5);
+    const R = () => this.rng(), w = 20 + Math.floor(R() * 34), A = 7 + R() * 27, G = GH - ROCKH, fp = FLESHP[Math.floor(R() * 3)], sd = Math.floor(R() * 1e5);
     for (let x = 0; x < w; x++) {
-      const hh = Math.floor(A * Math.pow(Math.sin(((x + 0.5) / w) * Math.PI), 0.7) * (0.85 + vn1(x0 + x, 5, sd) * 0.3));
-      for (let y = 0; y < hh; y++) { const n = vn2(x0 + x, y, 4, sd), vein = Math.abs(vn2(x0 + x, y, 7, sd + 1) - 0.5) < 0.03; const c = vein ? fp[2] : n < 0.5 ? fp[0] : fp[1], k = 0.75 + n * 0.4; this.op(x0 + x, G - 1 - y, FLESH, pk(c[0] * k, c[1] * k, c[2] * k), vein ? 120 : 0); }
-      if (R() < 0.25) for (let s = 0, gh = 1 + Math.floor(R() * 3); s < gh; s++) this.op(x0 + x, G - 1 - hh - s, VINE, pk(60, 200, 90));
-      if (R() < 0.05) this.flowers(x0 + x, G - 1 - hh, T);
-      if (R() < 0.03 && x > 6 && x < w - 6) this.fungus(x0 + x, G - 1 - hh, bio, T);
-      if (R() < 0.04) this.vine(x0 + x, G - 1 - hh, 6 + Math.floor(R() * 30), T);
+      const hh = Math.floor(A * Math.pow(Math.sin(((x + 0.5) / w) * Math.PI), 0.7) * (0.85 + vn1(x0 + x, 4, sd) * 0.3));
+      for (let y = 0; y < hh; y++) { const n = vn2(x0 + x, y, 3, sd), vein = Math.abs(vn2(x0 + x, y, 5, sd + 1) - 0.5) < 0.03; const c = vein ? fp[2] : n < 0.5 ? fp[0] : fp[1], k = 0.75 + n * 0.4; this.op(x0 + x, G - 1 - y, FLESH, pk(c[0] * k, c[1] * k, c[2] * k), vein ? 90 : 0); }
+      if (R() < 0.3) for (let s = 0, gh = 1 + Math.floor(R() * 3); s < gh; s++) this.op(x0 + x, G - 1 - hh - s, VINE, pk(60, 180 + R() * 40, 70));
+      if (R() < 0.04) this.flowers(x0 + x, G - 1 - hh, T);
+      if (R() < 0.04 && x > 4 && x < w - 4) this.spires(x0 + x, G - 1 - hh, bio);
+      if (R() < 0.05) this.vine(x0 + x, G - 1 - hh, 4 + Math.floor(R() * 22), T);
     }
     return x0 + w;
   }
@@ -181,15 +190,15 @@ export class Sand {
       const top = this.topAt(b, lx), T = this.tex[b.tex % this.tex.length], tn = this.tone(b.T), fp = FLESHP[b.fp], edge = lx === 0 || lx === b.w - 1;
       for (let y = Math.max(0, top); y < G; y++) {
         const i = y * GW + gx;
-        if (b.ruin > 0.15 && y > top + 2 && vn2(ax, y, 6, b.seed + 11) > 1.02 - b.ruin * 0.35) continue; // blown out
+        if (b.ruin > 0.15 && y > top + 2 && vn2(ax, y, 4, b.seed + 11) > 1.02 - b.ruin * 0.35) continue; // blown out
         const ti = (((G - 1 - y + b.oy) % T.h) * T.w + ((lx + b.ox) % T.w)), c = T.data[ti], g = T.glow[ti];
         let k = b.dark * (edge ? 0.55 : y === top ? 1.25 : 1);
-        if (b.ruin > 0.15 && vn2(ax, y, 6, b.seed + 11) > 0.94 - b.ruin * 0.35) k *= 0.45; // scorched round the holes
+        if (b.ruin > 0.15 && vn2(ax, y, 4, b.seed + 11) > 0.94 - b.ruin * 0.35) k *= 0.45; // scorched round the holes
         t[i] = SOLID;
-        if (b.bio > 0.05 && vn2(ax, y, 9, b.seed + 23) < b.bio * 0.5) {
+        if (b.bio > 0.05 && vn2(ax, y, 6, b.seed + 23) < b.bio * 0.5) {
           const L = (cR(c) * 0.3 + cG(c) * 0.59 + cB(c) * 0.11) / 255, a = L < 0.35 ? fp[0] : fp[1], z = L < 0.35 ? fp[1] : fp[2], q = Math.min(1, (L < 0.35 ? L / 0.35 : (L - 0.35) / 0.65));
           t[i] = FLESH; col[i] = pk(a[0] + (z[0] - a[0]) * q, a[1] + (z[1] - a[1]) * q, a[2] + (z[2] - a[2]) * q);
-          if (g > 40) { glow[i] = 220; col[i] = b.fp === 2 ? pk(220, 255, 120) : pk(255, 210, 90); }
+          if (g > 40) { glow[i] = 200; col[i] = b.fp === 1 ? pk(150, 255, 170) : pk(210, 255, 120); }
           continue;
         }
         col[i] = tn(cR(c), cG(c), cB(c), k);
@@ -202,17 +211,17 @@ export class Sand {
   }
   // keep the grid under the view: shift it left and paint what comes in
   view(ax0, ax1) {
-    if (ax0 < this.c0 - 60 || ax1 > this.c0 + GW + 200) return this.reset(ax0);
-    if (this.c0 + GW >= ax1 + 24) return;
-    const S = Math.min(GW, ax1 + 72 - (this.c0 + GW));
+    if (ax0 < this.c0 - 40 || ax1 > this.c0 + GW + 140) return this.reset(ax0);
+    if (this.c0 + GW >= ax1 + 16) return;
+    const S = Math.min(GW, ax1 + 48 - (this.c0 + GW));
     for (let y = 0; y < GH; y++) {
       const r = y * GW;
       for (const a of [this.t, this.col, this.life, this.glow]) a.copyWithin(r, r + S, r + GW);
     }
     this.c0 += S;
-    this.plan(this.c0 + GW + 60);
+    this.plan(this.c0 + GW + 40);
     for (let gx = GW - S; gx < GW; gx++) this.paint(gx);
-    this.collapse(GW - S - 60, GW - 1); // a ruin painted with nothing left holding it up comes down
+    this.collapse(GW - S - 40, GW - 1); // a ruin painted with nothing left holding it up comes down
     this.act.fill(2);
     for (const k of this.ops.keys()) if (k < this.c0) this.ops.delete(k);
     this.blds = this.blds.filter((b) => b.x0 + b.w >= this.c0);
@@ -240,7 +249,7 @@ export class Sand {
       if (d > 1) continue;
       const i = y * GW + x, ty = t[i];
       if (ty === ROCK || PASS[ty]) continue;
-      const c = scl(col[i], 0.55), ang = Math.atan2(dy - r * 0.6, dx), sp = 0.6 + R() * 1.6;
+      const c = scl(col[i], 0.55), ang = Math.atan2(dy - r * 0.6, dx), sp = 0.4 + R() * 1.1;
       if (d < 0.6) {
         const q = R();
         if (q < 0.4) this.part(this.c0 + x + 0.5, y + 0.5, Math.cos(ang) * sp, Math.sin(ang) * sp - 0.6, R() < 0.7 ? SAND : RUBBLE, c);
@@ -255,9 +264,9 @@ export class Sand {
     }
     // smoke over the crater and spores everywhere, most of them glowing
     for (let k = 0; k < r * 5; k++) { const x = gx + Math.floor((R() - 0.5) * r * 2), y = cy - r - Math.floor(R() * r); if (y > 0 && t[y * GW + x] === E) { const i = y * GW + x, v = 30 + R() * 25; t[i] = SMOKE; life[i] = 100 + R() * 120; col[i] = pk(v, v * 0.9, v * 0.85); } }
-    for (let k = 0; k < r * (3 + bio * 6); k++) { const a = -Math.PI * (0.1 + R() * 0.8), sp = 0.5 + R() * 2.2; this.part(ax + 0.5, cy - r * 0.5, Math.cos(a) * sp, Math.sin(a) * sp, SPORE, 0); }
+    for (let k = 0; k < r * (3 + bio * 6); k++) { const a = -Math.PI * (0.1 + R() * 0.8), sp = 0.35 + R() * 1.5; this.part(ax + 0.5, cy - r * 0.5, Math.cos(a) * sp, Math.sin(a) * sp, SPORE, 0); }
     this.wakeRect(gx - r * 2, cy - r * 3, gx + r * 2, cy + r + 2);
-    this.collapse(gx - 90, gx + 90);
+    this.collapse(gx - 60, gx + 60);
     this.rechecks.push([gx, this.tick + 40], [gx, this.tick + 110]);
     // what the spores bring: growth at the rim, flesh creeping from it
     if (bio > 0.2) for (let k = 0, n = 1 + Math.floor(bio * 3 * R()); k < n; k++) this.sprout(gx + Math.floor((R() - 0.5) * r * 2.4), cy - r, bio);
@@ -266,14 +275,15 @@ export class Sand {
   }
   clear(i) { this.t[i] = E; this.col[i] = 0; this.life[i] = 0; this.glow[i] = 0; }
   part(x, y, vx, vy, k, c) { if (this.parts.length < 900) this.parts.push({ x, y, vx, vy, k, c }); }
-  // a growing tip on whatever surface is under (gx, y0): a vine, or (later on) a giant fungus stalk
+  // a growing tip on whatever surface is under (gx, y0): a vine, or (later on) a fungus spire
   sprout(gx, y0, bio) {
-    if (gx < 2 || gx >= GW - 4 || this.tips.length > 150) return;
+    if (gx < 2 || gx >= GW - 4 || this.tips.length > 110) return;
     let y = Math.max(1, y0); while (y < GH - 1 && PASS[this.t[(y + 1) * GW + gx]]) y++;
     if (y >= GH - ROCKH || this.t[y * GW + gx] !== E) return;
-    const R = () => this.rng(), stalk = bio > 0.45 && R() < 0.3, i = y * GW + gx, vc = VINES[Math.floor(R() * VINES.length)];
+    const R = () => this.rng(), spire = bio > 0.35 && R() < 0.4, i = y * GW + gx, vc = VINES[Math.floor(R() * VINES.length)];
     this.t[i] = TIP; this.col[i] = pk(200, 255, 150); this.glow[i] = 200;
-    this.tips.push({ x: this.c0 + gx, y, k: stalk ? 1 : 0, e: stalk ? 20 + R() * 70 * bio : 12 + R() * 50 * bio, lean: R() < 0.5 ? -1 : 1, rate: stalk ? 0.35 : 0.25 + R() * 0.25, vc, w: 2 + Math.floor(R() * 2), cc: CAPS[Math.floor(R() * CAPS.length)] });
+    this.tips.push({ x: this.c0 + gx, y, k: spire ? 1 : 0, e: 8 + R() * 36 * bio, lean: R() < 0.5 ? -1 : 1, rate: spire ? 0.3 : 0.25 + R() * 0.25, vc,
+      bx: this.c0 + gx, by: y, s: 0, h: Math.floor(10 + R() * 50 * bio), w0: 2 + Math.floor(R() * 3), sl: (R() - 0.5) * 0.5, sc: SPIRES[Math.floor(R() * SPIRES.length)] });
   }
   // everything structural that is no longer joined to the ground (or the window's edge) falls
   collapse(lo, hi) {
@@ -384,9 +394,9 @@ export class Sand {
     }
     for (let cy = 0; cy < CH; cy++) for (let cx = lo >> 4, c = cy * CW + cx; cx <= hi >> 4; cx++, c++) if (act[c]) act[c]--;
     this.particles(); this.grow(bio); this.infect(bio);
-    for (let k = this.rechecks.length - 1; k >= 0; k--) { const r = this.rechecks[k]; if (this.tick >= r[1]) { this.collapse(r[0] - 90, r[0] + 90); this.rechecks.splice(k, 1); } }
+    for (let k = this.rechecks.length - 1; k >= 0; k--) { const r = this.rechecks[k]; if (this.tick >= r[1]) { this.collapse(r[0] - 60, r[0] + 60); this.rechecks.splice(k, 1); } }
     // the spore rain, once the change is under way: drifting down out of the sky, seeding what it lands on
-    if (bio > 0.15 && R() < bio * 0.35) { const x = lo + Math.floor(R() * (hi - lo)); if (t[x] === E) { t[x] = SPORE; life[x] = 200 + R() * 55; act[x >> 4] = 2; } }
+    if (bio > 0.15 && R() < bio * 0.2) { const x = lo + Math.floor(R() * (hi - lo)); if (t[x] === E) { t[x] = SPORE; life[x] = 120 + R() * 60; act[x >> 4] = 2; } }
   }
   particles() {
     const t = this.t, ps = this.parts, c0 = this.c0;
@@ -395,7 +405,7 @@ export class Sand {
       let dead = false;
       for (let s = 0; s < n && !dead; s++) {
         const px = p.x, py = p.y;
-        p.vy += 0.09 / n; p.x += p.vx / n; p.y += p.vy / n;
+        p.vy += 0.06 / n; p.x += p.vx / n; p.y += p.vy / n;
         const gx = Math.floor(p.x) - c0, gy = Math.floor(p.y);
         if (gx < 0 || gx >= GW || gy >= GH) { dead = true; break; }
         if (gy < 0) continue;
@@ -430,11 +440,14 @@ export class Sand {
         if (R() < 0.03) this.liveBloom(gx + p.lean, p.y, 1);
         if (R() < 0.08) p.lean = -p.lean;
       } else {
-        let free = p.y > 2;
-        for (let w = 0; w < p.w && free; w++) if (t[(p.y - 1) * GW + gx + w] !== E) free = false;
-        for (let w = 0; w < p.w; w++) { const j = p.y * GW + gx + w; if (t[j] === E || t[j] === TIP) { const v = 150 + R() * 40; t[j] = STALK; col[j] = pk(v, v * 0.92, v * 0.86); glow[j] = 0; } }
-        if (!free || --p.e <= 0) { this.cap(gx + (p.w >> 1), p.y - 1, 4 + p.w + Math.floor(R() * 12 * bio), p.cc, (x, y, ty, c, g) => { if (x < 1 || x >= GW - 1 || y < 0 || y >= GH) return; const j = y * GW + x; if (PASS[t[j]]) { t[j] = ty; col[j] = c; glow[j] = g; this.life[j] = 0; } }); drop(); continue; }
-        p.y--; const j = p.y * GW + gx; t[j] = TIP; col[j] = pk(240, 230, 210); glow[j] = 120;
+        // a spire: a row a growth, narrowing as it rises; it ends in a lit tip
+        let laid = 0;
+        const put = (x, y, ty, c, g) => { x -= this.c0; if (x < 1 || x >= GW - 1 || y < 0 || y >= GH) return; const j = y * GW + x; if (PASS[t[j]] || t[j] === TIP) { t[j] = ty; col[j] = c; glow[j] = g; this.life[j] = 0; laid++; } };
+        t[i] = STALK; col[i] = pk(p.sc[0], p.sc[1], p.sc[2]); glow[i] = 0;
+        this.spireRow(p.bx, p.by, p.h, p.w0, p.sl, p.sc, p.s, put);
+        const s = ++p.s, tx = p.bx + Math.round(p.sl * s * (s / p.h)) - this.c0, ty = p.by - s;
+        if (!laid || s >= p.h || ty < 1 || tx < 1 || tx >= GW - 1 || !PASS[t[ty * GW + tx]]) { put(this.c0 + Math.min(GW - 2, Math.max(1, tx)), Math.max(0, ty), BLOOM, pk(220, 255, 150), 255); drop(); continue; }
+        const j = ty * GW + tx; t[j] = TIP; col[j] = pk(220, 255, 160); glow[j] = 160; p.x = this.c0 + tx; p.y = ty;
       }
     }
   }
@@ -459,7 +472,7 @@ export class Sand {
         if (t[j] === SOLID && R() < 0.2 + bio * 0.6) {
           const c = col[j], L = (cR(c) * 0.3 + cG(c) * 0.59 + cB(c) * 0.11) / 255, fp = FLESHP[(((f[0] >> 6) % 3) + 3) % 3], a = L < 0.3 ? fp[0] : fp[1], z = L < 0.3 ? fp[1] : fp[2], u = Math.min(1, L < 0.3 ? L / 0.3 : (L - 0.3) / 0.7);
           t[j] = FLESH; col[j] = pk(a[0] + (z[0] - a[0]) * u, a[1] + (z[1] - a[1]) * u, a[2] + (z[2] - a[2]) * u);
-          if (this.glow[j]) { this.glow[j] = 230; col[j] = pk(255, 210, 90); }
+          if (this.glow[j]) { this.glow[j] = 200; col[j] = pk(210, 255, 120); }
           if (F.length < 600) F.push([this.c0 + x, y]);
         }
       }
@@ -468,14 +481,15 @@ export class Sand {
   }
 
   // ---------------------------------------------------------------- the picture: the grains, and their glow at half size
-  render(lo, hi, time, lightK) {
-    lo = Math.max(0, lo & ~3); hi = Math.min(GW - 1, hi | 3);
+  // y0: the first row on screen (the ones above it are neither drawn nor written)
+  render(lo, hi, time, lightK, y0 = 0) {
+    lo = Math.max(0, lo & ~1); hi = Math.min(GW - 1, hi | 1); y0 = Math.max(0, Math.min(GH - 2, y0 & ~1));
     const t = this.t, col = this.col, life = this.life, glow = this.glow, px = this.px, ar = this.ar, ag = this.ag, ab = this.ab, pu = this.pulse;
     for (let k = 0; k < 64; k++) pu[k] = 0.82 + 0.18 * Math.sin(time * 2.4 + k * 0.196);
     const g0 = lo >> 1, g1 = hi >> 1;
-    for (let y = 0; y < GH2; y++) { const r = y * GW2; ar.fill(0, r + g0, r + g1 + 1); ag.fill(0, r + g0, r + g1 + 1); ab.fill(0, r + g0, r + g1 + 1); }
+    for (let y = y0 >> 1; y < GH2; y++) { const r = y * GW2; ar.fill(0, r + g0, r + g1 + 1); ag.fill(0, r + g0, r + g1 + 1); ab.fill(0, r + g0, r + g1 + 1); }
     const blink = Math.sin(time * 3) > 0.6 ? 1 : 0.15, sp = 0.6 + 0.4 * Math.sin(time * 5);
-    for (let y = 0; y < GH; y++) {
+    for (let y = y0; y < GH; y++) {
       const row = y * GW, grow = (y >> 1) * GW2;
       for (let x = lo; x <= hi; x++) {
         const i = row + x, ty = t[i];
@@ -483,7 +497,7 @@ export class Sand {
         let c, gc = 0, gk = 0;
         if (ty === FIRE) { const l = life[i]; c = FIRE_LUT[l]; gc = FIRE_GLOW[l]; gk = 1; }
         else if (ty === SMOKE) { const a = life[i] * 1.3; c = (col[i] & 0xffffff) | ((a > 150 ? 150 : a | 0) << 24); c >>>= 0; }
-        else if (ty === SPORE) { const v = ((x * 7 + y * 3) & 3); c = v === 0 ? pk(200, 255, 120) : v === 1 ? pk(255, 120, 230) : v === 2 ? pk(120, 255, 240) : pk(255, 230, 120); gc = c; gk = sp; }
+        else if (ty === SPORE) { const v = ((x * 7 + y * 3) & 3); c = SPORES[v]; gc = c; gk = sp; }
         else if (ty === FLESH) { const k = pu[(x + y * 2) & 63]; c = scl(col[i], k); if (glow[i]) { gc = col[i]; gk = (glow[i] / 255) * k * k; } }
         else { c = col[i]; const g = glow[i]; if (g) { gc = c; const l = life[i]; gk = (g / 255) * (l === 1 ? blink : l === 2 ? (h2(x, (time * 9) | 0, y) < 0.4 ? 0.1 : 1) : lightK); } }
         px[i] = c;
@@ -492,29 +506,27 @@ export class Sand {
     }
     for (const p of this.parts) {
       const gx = Math.floor(p.x) - this.c0, gy = Math.floor(p.y);
-      if (gx < lo || gx > hi || gy < 0 || gy >= GH) continue;
+      if (gx < lo || gx > hi || gy < y0 || gy >= GH) continue;
       const i = gy * GW + gx;
       if (p.k === SPORE) { px[i] = pk(220, 255, 150); const gi = (gy >> 1) * GW2 + (gx >> 1); ar[gi] += 120; ag[gi] += 200; ab[gi] += 120; } else px[i] = p.c;
     }
     const gpx = this.gpx;
-    for (let y = 0; y < GH2; y++) for (let x = g0; x <= g1; x++) { const i = y * GW2 + x, r = ar[i] >> 1, g = ag[i] >> 1, b = ab[i] >> 1; gpx[i] = r | g | b ? pk(r, g, b) : 0; }
-    this.cx.putImageData(this.img, 0, 0, lo, 0, hi - lo + 1, GH);
-    this.gx.putImageData(this.gimg, 0, 0, g0, 0, g1 - g0 + 1, GH2);
-    this.gqx.clearRect(g0 >> 1, 0, ((g1 - g0) >> 1) + 2, GH4);
-    this.gqx.drawImage(this.gv, g0, 0, g1 - g0 + 1, GH2, g0 >> 1, 0, (g1 - g0 + 1) >> 1, GH4);
-    this.lo = lo; this.hi = hi;
+    for (let y = y0 >> 1; y < GH2; y++) for (let x = g0; x <= g1; x++) { const i = y * GW2 + x, r = ar[i] >> 1, g = ag[i] >> 1, b = ab[i] >> 1; gpx[i] = r | g | b ? pk(r, g, b) : 0; }
+    this.cx.putImageData(this.img, 0, 0, lo, y0, hi - lo + 1, GH - y0);
+    this.gx.putImageData(this.gimg, 0, 0, g0, y0 >> 1, g1 - g0 + 1, GH2 - (y0 >> 1));
+    this.lo = lo; this.hi = hi; this.y0 = y0;
   }
   // the grains at (sx, sy) = the screen position of grid cell (0, 0)
   draw(c, sx, sy) {
-    const lo = this.lo, w = this.hi - lo + 1;
+    const lo = this.lo, w = this.hi - lo + 1, y0 = this.y0;
     c.imageSmoothingEnabled = false;
-    c.drawImage(this.cv, lo, 0, w, GH, sx + lo * CS, sy, w * CS, GH * CS);
+    c.drawImage(this.cv, lo, y0, w, GH - y0, sx + lo * CS, sy + y0 * CS, w * CS, (GH - y0) * CS);
   }
+  // the glow: the half-size buffer, smoothed up, added once
   drawGlow(c, sx, sy, a = 1) {
-    const g0 = this.lo >> 1, gw = (this.hi - this.lo + 1) >> 1;
-    c.save(); c.globalCompositeOperation = 'lighter'; c.imageSmoothingEnabled = true;
-    c.globalAlpha = 0.4 * a; c.drawImage(this.gv, g0, 0, gw, GH2, sx + g0 * 2 * CS, sy, gw * 2 * CS, GH2 * 2 * CS);
-    c.globalAlpha = 0.65 * a; c.drawImage(this.gq, g0 >> 1, 0, gw >> 1, GH4, sx + g0 * 2 * CS, sy, gw * 2 * CS, GH4 * 4 * CS);
+    const g0 = this.lo >> 1, gw = (this.hi - this.lo + 1) >> 1, gy = this.y0 >> 1;
+    c.save(); c.globalCompositeOperation = 'lighter'; c.imageSmoothingEnabled = true; c.globalAlpha = 0.85 * a;
+    c.drawImage(this.gv, g0, gy, gw, GH2 - gy, sx + g0 * 2 * CS, sy + gy * 2 * CS, gw * 2 * CS, (GH2 - gy) * 2 * CS);
     c.restore();
   }
 }

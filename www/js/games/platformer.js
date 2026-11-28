@@ -36,11 +36,12 @@ const SURF = { g: 1, o: 1, l: 1, p: 1, c: 1, m: 1 }, NONE = [];
 const hash = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
 // the faces and decks each area is built from (keys into platformer-look.js's bakes), and the growth's colours
 const LOOK = { meadow: { face: 'street', deck: 'street' }, cave: { face: 'under', deck: 'under' }, ruins: { face: 'ruin', deck: 'ruin' }, works: { face: 'works', deck: 'works' }, sky: { face: 'sky', deck: 'sky' } };
-const CORE = [[170, 255, 90], [255, 80, 220], [90, 255, 240]], PET = [[255, 70, 180], [70, 140, 255], [255, 200, 40], [170, 255, 60], [255, 110, 60], [200, 90, 255]];
+const CORE = [[170, 255, 90], [120, 255, 150], [210, 255, 120]], PET = [[200, 255, 140], [150, 230, 90], [230, 255, 190], [120, 255, 170], [210, 240, 110]];
 const rgbS = (c) => `rgb(${c[0]},${c[1]},${c[2]})`, h1s = (x) => { const v = Math.sin(x * 78.233) * 43758.5453; return v - Math.floor(v); };
 const mixc = (a, b, t) => { const p = rgbOf(a), q = rgbOf(b); return `rgb(${p.map((v, i) => Math.round(v + (q[i] - v) * t)).join(',')})`; };
 
 export class Platformer extends Game {
+  static ownWarm = true; // draws evening's warm filter itself (engine.js, modes.js)
   setup() {
     const G = this.G, S = this.S, sg = Math.sqrt(G);
     this.ph = { g: 1500 * G, jv: 560 * sg, av: 480 * sg, run: 150 * S ** 0.3, acc: 560, w: Math.round(16 * S), h: Math.round(28 * S), climb: 125,
@@ -53,6 +54,7 @@ export class Platformer extends Game {
     this.hero = new Actor(this.skin.crystal(0, ERAS[(this.skin.cseed >>> 0) % 3], ['W', 'E', 'N']), { mode: 'side', dir: 'E', walkSpeed: 4, runSpeed: 95, walkStride: 6, runStride: 11 });
     this.qa = []; this.qb = []; this.qn = 0; this.oid = 1;
     this.lr = mulberry32(((this.post.seed || 1) ^ 0x2c1b3c6d) >>> 0);
+    this.dprCap = 1.5; this.fq = []; // the canvas resolution: 1.5× at most, lower if the frames are slow (pace())
     this.looks();
     this.reset(true);
   }
@@ -401,7 +403,7 @@ export class Platformer extends Game {
     const P = this.ph; let x = B.x0, y = B.y0, len = this.R(90, 140);
     B.clr = P.h + this.R(62, 96);
     this.gnd(B, x, len, y); this.ceil(B, x, len, y); x += len;
-    const end = B.x0 + this.R(460, 640);
+    const end = B.x0 + this.R(240, 380);
     while (x < end - 60) {
       const r = this.lr();
       if (r < 0.3) { const ny = this.clampY(y + this.R(-20, 30)), g = this.R(30, 0.5 * this.cap.D1(ny - y)); this.ceil(B, x, g, Math.min(y, ny)); this.row(B, x + g / 2 - 12, Math.min(y, ny) - 30, 2); x += g; y = ny; }
@@ -493,7 +495,7 @@ export class Platformer extends Game {
   *makeSeg() {
     const i = ++this.segN, d = Math.min(1, Math.max(0, (i - 2) / 22));
     let flag = false;
-    if (--this.areaLeft < 0) { let a; do a = this.Ri(0, AREAS.length - 1); while (a === this.areaI); this.areaI = a; this.areaLeft = this.Ri(2, 4); flag = true; }
+    if (--this.areaLeft < 0) { let a; do a = this.Ri(0, AREAS.length - 1); while (a === this.areaI); this.areaI = a; this.areaLeft = AREAS[a].ceil ? this.Ri(0, 1) : this.Ri(2, 4); flag = true; }
     const area = AREAS[this.areaI], pw = --this.pwIn <= 0 ? this.pickPw() : null, heart = --this.heartIn <= 0;
     if (pw) this.pwIn = this.Ri(3, 4); if (heart) this.heartIn = this.Ri(6, 9);
     for (let tries = 0; ; tries++) {
@@ -665,7 +667,18 @@ export class Platformer extends Game {
     return best;
   }
   lamp(c, col, x, y, r, a) { c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = Math.max(0, Math.min(1, a)); this.bd.tintGlow(c, col, x, y, r); c.restore(); }
+  // if frames come slowly (a phone, a warm filter), draw at a lower resolution: 1.5× → 1.25× → 1×
+  pace() {
+    const now = performance.now(), q = this.fq;
+    if (this.lastDraw) q.push(now - this.lastDraw);
+    this.lastDraw = now;
+    if (q.length < 90) return;
+    q.sort((a, b) => a - b);
+    const med = q[q.length >> 1]; q.length = 0;
+    if (med > 24 && med < 200 && this.dprCap > 1) { this.dprCap = this.dprCap > 1.3 ? 1.25 : 1; this.resize(); }
+  }
   draw(c) {
+    if (this.running && !document.hidden) this.pace(); else this.lastDraw = 0;
     this.pump(3);
     const p = this.p, P = this.ph, cx = this.camX, cy = this.camY, t = this.t, A = this.A;
     c.imageSmoothingEnabled = false;
@@ -709,7 +722,7 @@ export class Platformer extends Game {
     c.fillStyle = this.lipCol(x); c.fillRect(a, y - 2, b - a, 1.5);
   }
   // the lip's light: the mood's colour where the deck is
-  lipCol(x) { const T = tAt(x); return T < 0.25 ? 'rgba(200,225,240,0.55)' : T < 0.6 ? 'rgba(255,190,120,0.55)' : 'rgba(255,170,240,0.55)'; }
+  lipCol(x) { const T = tAt(x); return T < 0.25 ? 'rgba(200,225,240,0.55)' : T < 0.6 ? 'rgba(255,190,120,0.55)' : 'rgba(170,255,150,0.5)'; }
   drawBlock(c, o, bot, x0, x1) {
     const A = this.A, bd = this.bd, id = AREAS[o.a || 0].id, L = LOOK[id], st = o.st, y = o.y, deep = o.h === DEEP;
     let hh = Math.min(o.h, bot - y);
@@ -736,18 +749,18 @@ export class Platformer extends Game {
       // drips; tendrils with lit bulbs once the change has come
       for (let x = Math.floor(vx0 / 16) * 16 + 6; x < vx1; x += 16) {
         const k = hash(x), bio = sstep(0.3, 0.85, tAt(x));
-        if (k < bio * 0.5) { const len = 6 + k * 40, sw = Math.sin(this.t * 1.4 + x) * 2; c.strokeStyle = '#2a0e22'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x, yb); c.quadraticCurveTo(x + sw, yb + len * 0.6, x + sw * 1.5, yb + len); c.stroke(); this.lamp(c, CORE[(x >> 4) % 3], x + sw * 1.5, yb + len, 6, 0.6); }
+        if (k < bio * 0.5) { const len = 6 + k * 40, sw = Math.sin(this.t * 1.4 + x) * 2; c.strokeStyle = '#1c3418'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x, yb); c.quadraticCurveTo(x + sw, yb + len * 0.6, x + sw * 1.5, yb + len); c.stroke(); this.lamp(c, CORE[(x >> 4) % 3], x + sw * 1.5, yb + len, 6, 0.6); }
         else if (k > 0.6) { c.fillStyle = '#0b0807'; c.beginPath(); c.moveTo(x - 4, yb); c.lineTo(x, yb + 5 + (k - 0.6) * 25); c.lineTo(x + 4, yb); c.fill(); }
       }
       return;
     }
     const sky = id === 'sky' && deep;
     if (sky) hh = Math.min(hh, 48);
-    c.fillStyle = bd.pat(c, A.faceOf(st === 'tower' ? 'tower' : L.face)); c.fillRect(vx0, y, vx1 - vx0, hh);
+    c.fillStyle = bd.pat(c, A.faceOf(st === 'tower' ? 'tower' : L.face)); c.fillRect(vx0, y, vx1 - vx0, Math.min(hh, 220));
     if (hh > 70) this.decals(c, o, y, vx0, vx1);
     this.eyes(c, o, y, hh, vx0, vx1);
     c.save(); c.translate(0, y); c.fillStyle = this.shadeG; c.fillRect(vx0, 0, vx1 - vx0, Math.min(hh, 220)); c.restore();
-    if (hh > 220) { c.fillStyle = 'rgba(3,2,3,0.94)'; c.fillRect(vx0, y + 220, vx1 - vx0, hh - 220); }
+    if (hh > 220) { c.fillStyle = '#060506'; c.fillRect(vx0, y + 220, vx1 - vx0, hh - 220); }
     if (sky) { c.fillStyle = '#0c0d10'; c.beginPath(); c.moveTo(o.x, y + hh); for (let x = o.x; x <= o.x + o.w; x += 14) c.lineTo(x + 7, y + hh + 8 + hash(x) * 22), c.lineTo(Math.min(o.x + o.w, x + 14), y + hh); c.fill(); }
     c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(o.x, y, 2, hh); c.fillRect(o.x + o.w - 2, y, 2, hh);
     this.deckStrip(c, o.belt ? 'works' : st === 'tower' ? 'tower' : L.deck, o.x, y, o.w, vx0, vx1);
@@ -777,7 +790,7 @@ export class Platformer extends Game {
       if (bio <= 0 || hash(k * 5.7 + 0.2) > bio * 0.7 || ex < o.x + 14 || ex > o.x + o.w - 14 || ex < vx0 - 20 || ex > vx1 + 20) continue;
       const ey = y + 44 + hash(k * 4.1) * 40, s = 4 + hash(k * 6.6) * 4, p = this.p, hx = p.x + this.ph.w / 2, hy = p.y + this.ph.h / 2;
       const bl = Math.sin(this.t * 0.9 + k * 3.3) > 0.97 ? 0.15 : 1, ang = Math.atan2(hy - ey, hx - ex);
-      c.fillStyle = '#1a0610'; c.beginPath(); c.ellipse(ex, ey, s * 1.6, s * 1.05, 0, 0, TAU); c.fill();
+      c.fillStyle = '#0c1609'; c.beginPath(); c.ellipse(ex, ey, s * 1.6, s * 1.05, 0, 0, TAU); c.fill();
       c.fillStyle = '#e8dcc0'; c.beginPath(); c.ellipse(ex, ey, s * 1.25, s * 0.8 * bl, 0, 0, TAU); c.fill();
       if (bl > 0.5) { const ix = ex + Math.cos(ang) * s * 0.45, iy = ey + Math.sin(ang) * s * 0.25; c.fillStyle = rgbS(CORE[k % 3]); c.beginPath(); c.arc(ix, iy, s * 0.5, 0, TAU); c.fill(); c.fillStyle = '#050204'; c.fillRect(ix - 0.6, iy - s * 0.4, 1.2, s * 0.8); }
       this.lamp(c, [255, 60, 90], ex, ey, s * 3, 0.22);
@@ -791,20 +804,20 @@ export class Platformer extends Game {
       if (x < o.x || x > o.x + o.w - 3) continue;
       const bio = sstep(0.28, 0.85, tAt(x)); if (bio < 0.02) continue;
       const h = hash(x * 0.731 + 0.3), w = Math.min(5, o.x + o.w - x);
-      if (h < bio * 1.05) { const fl = h < bio * 0.45; c.fillStyle = fl ? (h < bio * 0.2 ? '#5a1438' : '#7a2048') : (h > 0.5 ? '#2f7a3a' : '#1f5a40'); c.fillRect(x, y - 1 - Math.floor(hash(x * 2.1) * 2), w, 3 + Math.floor(h * 3)); }
+      if (h < bio * 1.05) { const fl = h < bio * 0.45; c.fillStyle = fl ? (h < bio * 0.2 ? '#1d3a1a' : '#36502a') : (h > 0.5 ? '#2f7a3a' : '#1f5a40'); c.fillRect(x, y - 1 - Math.floor(hash(x * 2.1) * 2), w, 3 + Math.floor(h * 3)); }
       if (!face) continue;
       const h2 = hash(x * 1.913 + 0.7);
       if (h2 < bio * 0.1) {
         const len = 8 + hash(x * 3.1) * 28, sw = Math.sin(t * 1.2 + x * 0.1) * 2;
-        c.strokeStyle = '#3a1030'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x + 2, y + 2); c.quadraticCurveTo(x + 2 + sw, y + len * 0.6, x + 2 + sw * 1.6, y + len); c.stroke();
+        c.strokeStyle = '#1f3a1a'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x + 2, y + 2); c.quadraticCurveTo(x + 2 + sw, y + len * 0.6, x + 2 + sw * 1.6, y + len); c.stroke();
         this.lamp(c, CORE[Math.floor(h2 * 300) % 3], x + 2 + sw * 1.6, y + len, 6, 0.55 + 0.3 * Math.sin(t * 2.5 + x));
       }
       const h3 = hash(x * 2.377 + 1.1);
       if (h3 < bio * 0.05) {
-        const sh = 3 + hash(x * 4.4) * 6, col = CORE[Math.floor(h3 * 997) % 3];
-        c.fillStyle = '#d6cbb8'; c.fillRect(x + 1.5, y - sh, 1.5, sh);
-        c.fillStyle = rgbS(col); c.beginPath(); c.ellipse(x + 2.2, y - sh, 3.4, 2.2, 0, Math.PI, 0); c.fill();
-        this.lamp(c, col, x + 2.2, y - sh - 1, 7, 0.45);
+        const sh = 5 + hash(x * 4.4) * 9, col = CORE[Math.floor(h3 * 997) % 3];
+        c.fillStyle = '#6e8c5a'; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 2.2, y - sh); c.lineTo(x + 4.4, y); c.fill();
+        c.fillStyle = rgbS(col); c.fillRect(x + 1.6, y - sh - 0.5, 1.4, 1.4);
+        this.lamp(c, col, x + 2.2, y - sh, 6, 0.45);
       } else if (h3 < bio * 0.1) {
         const sh = 4 + hash(x * 5.9) * 7, col = PET[Math.floor(h3 * 1301) % PET.length], sw = Math.sin(t + x) * 1.5;
         c.strokeStyle = '#2f8a4a'; c.lineWidth = 1; c.beginPath(); c.moveTo(x + 2, y); c.quadraticCurveTo(x + 4, y - sh * 0.5, x + 2 + sw, y - sh); c.stroke();
@@ -857,16 +870,16 @@ export class Platformer extends Game {
       } else {
         const sq = 1 - s * 0.45;
         c.fillStyle = '#d8cfbe'; c.fillRect(cxp - 4, base - 7, 8, 7);
-        c.fillStyle = '#c0307a'; c.beginPath(); c.ellipse(cxp, base - 7, o.w / 2 + s * 3, 9 * sq, 0, Math.PI, 0); c.fill();
-        c.fillStyle = '#ffd0f0'; for (const k of [-8, 0, 7]) { c.beginPath(); c.arc(cxp + k, base - 10 * sq - (k ? 0 : 3 * sq), 1.8, 0, TAU); c.fill(); }
-        this.lamp(c, [255, 80, 200], cxp, base - 10, 14 + s * 10, 0.4 + s * 0.4);
+        c.fillStyle = '#2e6a30'; c.beginPath(); c.ellipse(cxp, base - 7, o.w / 2 + s * 3, 9 * sq, 0, Math.PI, 0); c.fill();
+        c.fillStyle = '#c8ff80'; for (const k of [-8, 0, 7]) { c.beginPath(); c.arc(cxp + k, base - 10 * sq - (k ? 0 : 3 * sq), 1.8, 0, TAU); c.fill(); }
+        this.lamp(c, [150, 255, 110], cxp, base - 10, 14 + s * 10, 0.4 + s * 0.4);
       }
     } else if (o.k === 's') {
       const bone = bio > 0.5;
-      c.fillStyle = bone ? '#d8ccb4' : '#6e5c4c'; c.strokeStyle = bone ? '#4a0c18' : '#241c16'; c.lineWidth = 1; c.beginPath();
+      c.fillStyle = bone ? '#3a5a2a' : '#6e5c4c'; c.strokeStyle = bone ? '#0e1a0a' : '#241c16'; c.lineWidth = 1; c.beginPath();
       for (let x = o.x; x < o.x + o.w - 1; x += 8) { c.moveTo(x, o.y + o.h); c.lineTo(x + 4 + (bone ? Math.sin(x) * 1.5 : 0), o.y); c.lineTo(x + 8, o.y + o.h); }
       c.fill(); c.stroke();
-      c.fillStyle = bone ? '#a01428' : '#a8a098'; for (let x = o.x; x < o.x + o.w - 1; x += 8) c.fillRect(x + 3 + (bone ? Math.sin(x) * 1.5 : 0), o.y, 2, 2);
+      c.fillStyle = bone ? '#d8f0b0' : '#a8a098'; for (let x = o.x; x < o.x + o.w - 1; x += 8) c.fillRect(x + 3 + (bone ? Math.sin(x) * 1.5 : 0), o.y, 2, 2);
     }
   }
   coin(c, x, y, t, s = 1) {
@@ -964,7 +977,7 @@ export class Platformer extends Game {
       }
     } else if (d.k === 'torch') {
       if (late) {
-        for (let i = 0; i < 3; i++) { const sh = 6 + i * 4 + d.r * 4, x = d.x - 6 + i * 6, col = CORE[(i + Math.floor(d.r * 5)) % 3]; c.fillStyle = '#d8cfbe'; c.fillRect(x - 0.8, d.y - sh, 1.6, sh); c.fillStyle = rgbS(col); c.beginPath(); c.ellipse(x, d.y - sh, 4, 2.6, 0, Math.PI, 0); c.fill(); this.lamp(c, col, x, d.y - sh, 16, 0.5); }
+        for (let i = 0; i < 3; i++) { const sh = 10 + (i === 1 ? 12 : 0) + d.r * 8, x = d.x - 7 + i * 7, col = CORE[(i + Math.floor(d.r * 5)) % 3]; c.fillStyle = '#6e8c5a'; c.beginPath(); c.moveTo(x - 3, d.y); c.lineTo(x, d.y - sh); c.lineTo(x + 3, d.y); c.fill(); c.fillStyle = '#4a6640'; c.fillRect(x - 1, d.y - sh * 0.6, 2, 1); c.fillRect(x - 2, d.y - sh * 0.3, 4, 1); this.lamp(c, col, x, d.y - sh, 14, 0.5); }
       } else {
         c.fillStyle = '#2a2420'; c.fillRect(d.x - 1.5, d.y - 54, 3, 54); c.fillRect(d.x - 1.5, d.y - 54, 10, 2.5); c.fillStyle = '#4a4036'; c.fillRect(d.x + 4, d.y - 52, 8, 3);
         const on = Math.sin(t * 5 + d.r * 30) > -0.85 ? fl : 0.15;
@@ -988,10 +1001,12 @@ export class Platformer extends Game {
       if (on) this.lamp(c, col, d.x + 14, d.y - 61, 22 + up * 14, 0.5 + up * 0.3);
     } else if (d.k === 'banner') {
       if (late) {
-        c.strokeStyle = '#2f8a4a'; c.lineWidth = 2; c.beginPath(); c.moveTo(d.x, d.y); c.quadraticCurveTo(d.x - 4, d.y - 24, d.x + 2, d.y - 40); c.stroke();
-        const col = PET[Math.floor(d.r * PET.length)], sp = t * 0.5;
-        c.fillStyle = rgbS(col); for (let i = 0; i < 6; i++) { const a = sp + (i * TAU) / 6; c.beginPath(); c.ellipse(d.x + 2 + Math.cos(a) * 6, d.y - 40 + Math.sin(a) * 6, 5, 2.5, a, 0, TAU); c.fill(); }
-        c.fillStyle = '#fff4c0'; c.beginPath(); c.arc(d.x + 2, d.y - 40, 2.5, 0, TAU); c.fill(); this.lamp(c, col, d.x + 2, d.y - 40, 24, 0.55);
+        // a fern frond, its head still coiled and lit
+        const sw = Math.sin(t * 1.1 + d.r * 9) * 2, hx = d.x + 4 + sw, hy = d.y - 38;
+        c.strokeStyle = '#2f7a3a'; c.lineWidth = 2; c.beginPath(); c.moveTo(d.x, d.y); c.quadraticCurveTo(d.x - 5, d.y - 22, hx, hy + 6); c.stroke();
+        c.fillStyle = '#3f8a3a'; for (let i = 1; i < 6; i++) { const u = i / 6, px = d.x - 4 * u * (1 - u) * 5 + (hx - d.x) * u * u, py = d.y - 38 * u; c.beginPath(); c.ellipse(px - 4, py, 4, 1.4, 0.5, 0, TAU); c.ellipse(px + 4, py, 4, 1.4, -0.5, 0, TAU); c.fill(); }
+        c.lineWidth = 2; c.beginPath(); c.arc(hx, hy, 4, 0.5, TAU * 0.85); c.stroke(); c.beginPath(); c.arc(hx + 1, hy, 1.8, 0, TAU * 0.8); c.stroke();
+        this.lamp(c, [170, 255, 90], hx, hy, 18, 0.5);
       } else {
         c.fillStyle = '#2a2826'; c.fillRect(d.x - 1, d.y - 44, 2, 44);
         const on = h1s(Math.floor(t * 8) + d.r * 99) > 0.12, col = d.r > 0.5 ? [255, 60, 140] : [80, 220, 255];
@@ -1000,10 +1015,10 @@ export class Platformer extends Game {
         if (on) this.lamp(c, col, d.x + 12, d.y - 42, 22, 0.55);
       }
     } else if (d.k === 'gear' || d.k === 'pipe') {
-      c.save(); c.translate(d.x, d.y - 26); c.rotate(t * (d.r > 0.5 ? 1 : -1)); c.fillStyle = late ? '#3a2234' : '#4e4034';
+      c.save(); c.translate(d.x, d.y - 26); c.rotate(t * (d.r > 0.5 ? 1 : -1)); c.fillStyle = late ? '#22301a' : '#4e4034';
       for (let i = 0; i < 8; i++) { c.rotate(TAU / 8); c.fillRect(-3, -16, 6, 6); }
       c.beginPath(); c.arc(0, 0, 12, 0, TAU); c.fill(); c.fillStyle = '#1c1610'; c.beginPath(); c.arc(0, 0, 4, 0, TAU); c.fill(); c.restore();
-      if (late) this.lamp(c, [255, 80, 200], d.x, d.y - 26, 12, 0.35);
+      if (late) this.lamp(c, [150, 255, 110], d.x, d.y - 26, 12, 0.35);
     }
   }
   overlay(c) {

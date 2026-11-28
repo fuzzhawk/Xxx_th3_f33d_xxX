@@ -36,11 +36,25 @@ export function setMode(m, { manual = false } = {}) {
 }
 
 // ------------------------------------------------ blue-light filter (multiplies the screen by a warm amber)
+// Blending a layer over the whole screen is costly while something under it redraws every frame, so a
+// heavy game (one whose class sets ownWarm) draws the same multiply on its own canvas while it runs and
+// the page's layer steps aside until it stops (games/engine.js).
 let veil = null;
+const warm = (window.feedWarm = {
+  on: false, css: '#ffffff', games: new Set(), timer: 0,
+  add(g) { if (!this.games.has(g)) { this.games.add(g); applyFilter(); } this.timer ||= setInterval(() => this.prune(), 3000); },
+  remove(g) { if (this.games.delete(g)) applyFilter(); },
+  // a card thrown away while its game ran never says it stopped: let the veil come back anyway
+  prune() { for (const g of this.games) if (!g.running || !g.canvas?.isConnected) this.remove(g); if (!this.games.size) { clearInterval(this.timer); this.timer = 0; } }
+});
 export function applyFilter() {
   veil ||= document.body.appendChild(el('div', { id: 'bluelight', 'aria-hidden': 'true' }));
-  const on = mode === 'evening' && settings.blueLightOn !== false;
-  veil.style.opacity = on ? String(Math.max(0, Math.min(0.75, settings.blueLight ?? 0.35))) : '0';
+  const on = mode === 'evening' && settings.blueLightOn !== false, op = Math.max(0, Math.min(0.75, settings.blueLight ?? 0.35));
+  // the veil's amber (#ff9a3c) at opacity op, multiplied: each channel scaled toward the amber by op
+  warm.on = on; warm.css = `rgb(255,${Math.round(255 - 101 * op)},${Math.round(255 - 195 * op)})`;
+  if (on && warm.games.size) { veil.style.display = 'none'; return; }
+  veil.style.display = '';
+  veil.style.opacity = on ? String(op) : '0';
 }
 
 // ------------------------------------------------ top-bar switch (+ the filter slider in evening mode)
