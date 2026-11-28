@@ -880,3 +880,64 @@ The small floating islands and their bridges, the roof gardens and the old under
   - Error soaks with the autopilot (which takes the lifts by itself) from the city, an island, the Machine Deep, a canyon and a village.
 - **Cost:** JS is about 4–5 ms a frame. In software GL, streaming the sky and the ground far below peaks at about 18 ms, and the GPU part is about 140 ms there; that is a few milliseconds on a phone.
 
+
+## The platformer: a city ending (2026-11-28)
+
+The platformer keeps its play and gets a new look. The levels, the hero's physics, the beatability checks and the autopilot are unchanged; everything drawn around them is new.
+
+- **The idea:** the run is a city ending.
+  - At the start it is a murky, living city in cold rain, lit by sodium windows.
+  - Flaming spore asteroids begin to fall and the city burns under an ember storm.
+  - Further on, fungus, alien flowers, jungle and flesh take it over until it is a vibrant biological nightmare.
+  - Progress follows the hero's distance (`tAt(x)`: full change at about 15,500 px, roughly 100 s of running). A death starts the city over.
+- **Greebleworks (Vitriol's procedural facades) everywhere** (`platformer-look.js`): the bakes run in small slices and are shared by every platformer card.
+  - **Building faces** for the ground the hero runs on, one style per area: slum, undercity, ruin, industrial, megacorp, plus hab for towers.
+  - **Deck strips** along every top: concrete, pipes, grating, catwalk, deck. A thin lit lip on each top keeps it readable against the dark.
+  - **Also baked:** a ceiling for the tunnels, and decals on the faces (vents, junction boxes, fire escapes, graffiti, shrines, tunnel mouths, breaches; growth later).
+  - **Four skies, each with four far-city layers:** cold rain over the city; an ember storm over a ruined skyline; a magnetar sky over a fungal forest; and a jungle canopy under a toxic dusk, which takes turns with the fungus layers.
+- **The parallax, back to front:**
+  - The sky, crossfaded by mood.
+  - Four far layers, each with its own asteroids, burning fires and smoke.
+  - A band of haze, then the sand city, its glow, the ghosts on its rooftops and its asteroids.
+  - Street fog, then the play layer.
+  - In front: hanging cables, pipes and signs (tendrils with lit bulbs, and fronds, later), wreckage below, and weather: drizzle, then ash and embers, then rising spores.
+  - Last, the grade: a mood wash, a vignette and film grain.
+- **The sand city** (`platformer-sand.js`): a falling-sand grid, 448 × 170 cells of 2 px, scrolling at half the hero's speed and painted ahead from a plan.
+  - **Towers** are painted a greebleworks texel to a cell, with setbacks, antennas with blinking lights, and lit windows, a few of which flicker.
+  - **What gets painted changes along the run:**
+    - Towers come ruined (jagged tops, blown-out holes, scorching), with rubble heaps between them.
+    - Then giant glowing fungus, vines with blooms, flower clusters, pools of ooze, and flesh spreading over facades (lit windows become glowing pustules).
+    - At the far end, flesh mounds overgrown with jungle.
+  - **The asteroids** are traced cell by cell along their paths and strike whatever they meet first, often a tower's side:
+    - A crater: grains thrown out as particles, embers and fire left behind, smoke above, glowing spores everywhere.
+    - Any part of a structure no longer joined to the ground (a flood fill) falls whole, crushes into the debris below and shatters into coloured sand.
+    - The spores seed vines and fungus stalks that grow live, and flesh creeps outward from the craters.
+    - Later on, a spore rain falls from the sky and seeds whatever it lands on.
+  - **Cell types:** solid, flesh, vine, stalk, cap, bloom, growing tip, rubble, sand, ember, ooze, falling, fire, smoke and spore.
+  - **Simulation:** 60 ticks a second over the view plus a margin, in 16 × 16 chunks; chunks where nothing moves sleep.
+  - **Drawing:** one `putImageData` for the visible window and a half-size glow buffer drawn twice, soft and wide, with `lighter`.
+- **The play layer:**
+  - **Hazards and moving parts:**
+    - Jump pads are lit plates in the city and bounce shrooms later on.
+    - Springs are rusted and spikes are rusted shards; the spikes turn to bone thorns later.
+    - Movers have thrusters, and crumbling slabs glow as they go.
+  - **Props:** barrels (some burning), vents with warning lights, sodium lamps, broken neon, holo pylons that light up as you pass, and neon signs. Each turns, at its own moment, into alien flowers, glowing fungus, spore pods or a bloom.
+  - **Growth on the tops:** moss and flesh crust over the lips, with tendrils, mushrooms and flowers.
+  - **Late on:** the walls grow eyes that follow the hero.
+  - **Areas** have new names, which change late in the run: Sprawl/Bloom, Underpass/Root Tunnels, Ruins/Overgrowth, Foundry/Hive Works, Skyway/Spore Canopy.
+- **Haunted:**
+  - Every 7–16 s the lights stutter and the dark comes in for a moment.
+  - Pale figures stand on the rooftops and fade as you near; later they are dark watchers with red eyes.
+  - Now and then an asteroid lands right in the play layer: a flash, a shake, sparks, and a patch of glowing growth left where it struck. It is only for show and never changes the level.
+- **Mutators:**
+  - `trails` still smears: the sky and the far city only partly cover the last frame.
+  - `hue`, `mono`, `mirror`, `chaos` and the rest work as before.
+- **Feed cards:** the bakes also pump on a timer, so a card showing a still (autopilot off) is redrawn once its pictures are ready.
+- **Tested** headless with no errors:
+  - Runs through the whole change on several seeds and mutators (mirror, chaos, trails, mono, tiny, slow, glass).
+  - A death and restart.
+  - A tower cut through by a row of strikes, whose top fell and slumped into a heap of sand.
+- **Cost:**
+  - Bakes total about 0.7 s, sliced; a sky's largest slice is about 40 ms.
+  - At 4× CPU throttle in the burning phase, a frame's JS is about 10 ms: sand step 1.7 ms (often two ticks), sand render 1.3 ms, the play layer about 4 ms.
+  - Unthrottled it is about 2.5 ms.
